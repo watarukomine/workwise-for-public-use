@@ -144,7 +144,15 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
                     lng: typeof c.経度 === 'string' ? parseFloat(c.経度) : c.経度
                   }}
                 >
-                    <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-bold">{c.店舗}</p>
+                      <p>{c.住所}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </AdvancedMarker>
               ) : null
             )}
