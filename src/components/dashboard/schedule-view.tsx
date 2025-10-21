@@ -606,7 +606,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     const hslMatch = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
     if (hslMatch) {
       const [_, h] = hslMatch;
-      backgroundColor = `hsl(${h}, 50%, 50%)`;
+      backgroundColor = `hsl(${h}, 20%, 50%)`;
       color = 'white';
     } else {
       backgroundColor = 'hsl(210, 14%, 88%)'; // Muted color fallback
@@ -645,4 +645,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   );
 };
 
+    
     
