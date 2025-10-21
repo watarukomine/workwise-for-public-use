@@ -29,6 +29,7 @@ const OptimizeRouteInputSchema = z.object({
     z.enum(['time', 'distance'])
       .default('time')
       .describe('Whether to optimize for time or distance.'),
+  avoidHighways: z.boolean().optional().describe('Whether to avoid highways in the route calculation.'),
 });
 export type OptimizeRouteInput = z.infer<typeof OptimizeRouteInputSchema>;
 
@@ -41,6 +42,7 @@ const OptimizeRouteOutputSchema = z.object({
         address: z.string().describe('The street address of the location.'),
         latitude: z.number().describe('The latitude of the location.'),
         longitude: z.number().describe('The longitude of the location.'),
+        type: z.enum(['customer', 'staff']).optional().describe('The type of location.'),
       })
     )
     .describe('An array of work locations in the optimized order, starting with the start location and ending with the end location.'),
@@ -67,6 +69,9 @@ const prompt = ai.definePrompt({
 
   Given a starting location, an ending location, and a list of intermediate waypoints, your task is to determine the optimal route that starts at the start location, visits all waypoints, and ends at the end location. The goal is to minimize travel time and fuel costs.
   The optimization is based on {{{optimizeFor}}}.
+  {{#if avoidHighways}}
+  The route should avoid highways.
+  {{/if}}
 
   Start Location:
   - ID: {{startLocation.id}}, Name: {{startLocation.name}}, Address: {{startLocation.address}}, Latitude: {{startLocation.latitude}}, Longitude: {{startLocation.longitude}}
@@ -97,4 +102,3 @@ const optimizeRouteFlow = ai.defineFlow(
     return output!;
   }
 );
-

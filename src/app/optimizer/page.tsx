@@ -13,6 +13,7 @@ import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficien
 export default function OptimizerPage() {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
+  const [avoidHighways, setAvoidHighways] = React.useState(false);
 
   const customers: Customer[] = customerData;
 
@@ -20,6 +21,11 @@ export default function OptimizerPage() {
     const staffDetails = staffData.find(staff => staff.id === status.staffId);
     return { ...staffDetails, ...status } as (Staff & StaffStatus);
   });
+
+  const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
+    setOptimizedRoute(data);
+    setAvoidHighways(options.avoidHighways);
+  }
 
   return (
     <div className="space-y-8">
@@ -34,7 +40,7 @@ export default function OptimizerPage() {
           <RouteOptimizer 
             customers={customers} 
             staff={staffWithStatus}
-            onRouteOptimized={setOptimizedRoute}
+            onRouteOptimized={handleRouteOptimized}
           />
         </div>
         <div className="lg:col-span-2">
@@ -44,6 +50,7 @@ export default function OptimizerPage() {
                 staff={staffWithStatus} 
                 customers={customers} 
                 optimizedRoute={optimizedRoute?.optimizedRoute}
+                avoidHighways={avoidHighways}
               />
             </APIProvider>
           ) : (

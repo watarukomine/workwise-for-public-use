@@ -14,10 +14,14 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type State = {
   data: OptimizeRouteOutput | null;
   error: string | null;
+  options: {
+    avoidHighways: boolean;
+  };
 };
 
 type Location = {
@@ -32,7 +36,7 @@ type Location = {
 interface RouteOptimizerProps {
   customers: Customer[];
   staff: StaffWithStatus[];
-  onRouteOptimized: (data: OptimizeRouteOutput | null) => void;
+  onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
 }
 
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
@@ -40,10 +44,11 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
   const endLocationId = formData.get('endLocation') as string;
   const waypointIds = formData.getAll('waypoints') as string[];
   const optimizeFor = formData.get('optimizeFor') as OptimizeRouteInput['optimizeFor'];
+  const avoidHighways = formData.get('avoidHighways') === 'on';
   const allLocations = JSON.parse(formData.get('allLocations') as string) as Location[];
 
   if (!startLocationId || !endLocationId) {
-    return { data: null, error: '出発地と目的地を選択してください。' };
+    return { data: null, error: '出発地と目的地を選択してください。', options: { avoidHighways } };
   }
 
   const findLocation = (id: string) => allLocations.find(loc => loc.id === id);
@@ -53,7 +58,7 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
   const waypoints = waypointIds.map(findLocation).filter((loc): loc is Location => !!loc);
 
   if (!startLocation || !endLocation) {
-    return { data: null, error: '有効な出発地と目的地が見つかりません。' };
+    return { data: null, error: '有効な出発地と目的地が見つかりません。', options: { avoidHighways } };
   }
 
   try {
@@ -62,11 +67,12 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
       endLocation,
       waypoints,
       optimizeFor: optimizeFor,
+      avoidHighways: avoidHighways,
     });
-    return { data: result, error: null };
+    return { data: result, error: null, options: { avoidHighways } };
   } catch (e) {
     console.error(e);
-    return { data: null, error: 'ルートの最適化に失敗しました。もう一度お試しください。' };
+    return { data: null, error: 'ルートの最適化に失敗しました。もう一度お試しください。', options: { avoidHighways } };
   }
 }
 
@@ -167,11 +173,11 @@ export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOpti
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
   const [waypoints, setWaypoints] = React.useState<string[]>([]);
-  const [state, formActionWithState] = useActionState(formAction, { data: null, error: null });
+  const [state, formActionWithState] = useActionState(formAction, { data: null, error: null, options: { avoidHighways: false } });
 
   React.useEffect(() => {
-    onRouteOptimized(state.data);
-  }, [state.data, onRouteOptimized]);
+    onRouteOptimized(state.data, state.options);
+  }, [state.data, state.options, onRouteOptimized]);
 
   const allLocations = React.useMemo(() => {
     const customerLocations: Location[] = customers
@@ -281,6 +287,13 @@ export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOpti
                   <Label htmlFor="distance">距離</Label>
                 </div>
               </RadioGroup>
+            </div>
+
+             <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox id="avoid-highways" name="avoidHighways" />
+                <Label htmlFor="avoid-highways" className="font-normal">高速道路を使用しない</Label>
+              </div>
             </div>
           </CardContent>
           <CardFooter>

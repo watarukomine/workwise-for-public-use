@@ -22,9 +22,10 @@ interface RouteMapProps {
   staff: StaffWithStatus[];
   customers: Customer[];
   optimizedRoute?: OptimizedRouteLocation[];
+  avoidHighways?: boolean;
 }
 
-function Directions({ route }: { route: OptimizedRouteLocation[] }) {
+function Directions({ route, avoidHighways }: { route: OptimizedRouteLocation[], avoidHighways?: boolean }) {
   const map = useMap();
   const routesLibrary = useMapsLibrary('routes');
   const [directionsService, setDirectionsService] = React.useState<google.maps.DirectionsService>();
@@ -66,6 +67,7 @@ function Directions({ route }: { route: OptimizedRouteLocation[] }) {
       destination: destination,
       waypoints: waypoints,
       travelMode: google.maps.TravelMode.DRIVING,
+      avoidHighways: avoidHighways,
     }).then(response => {
       directionsRenderer.setDirections(response);
       setRoutes(response.routes);
@@ -79,13 +81,13 @@ function Directions({ route }: { route: OptimizedRouteLocation[] }) {
           directionsRenderer.set('directions', null);
        }
     }
-  }, [directionsService, directionsRenderer, route]);
+  }, [directionsService, directionsRenderer, route, avoidHighways]);
 
   return null;
 }
 
 
-export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
+export function RouteMap({ staff, customers, optimizedRoute, avoidHighways }: RouteMapProps) {
   const allCoordinates = [
     ...staff.filter(s => s.latitude && s.longitude).map(s => ({ lat: s.latitude!, lng: s.longitude! })),
     ...customers.filter(c => c.latitude && c.longitude).map(c => ({ lat: c.latitude!, lng: c.longitude! }))
@@ -160,7 +162,7 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
               ) : null
             )}
             {showRoute && (
-                <Directions route={optimizedRoute} />
+                <Directions route={optimizedRoute} avoidHighways={avoidHighways} />
             )}
           </Map>
         </TooltipProvider>
