@@ -28,20 +28,14 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO } from 'date-fns';
-import { staffData, customerData as staticCustomerData, scheduleData as staticScheduleData, orderData } from '@/lib/data';
+import { staffData, customerData as staticCustomerData, scheduleData as staticScheduleData, orderData as staticOrderData } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
-import { Separator } from '../ui/separator';
-
-const hours = Array.from({ length: 11 }, (_, i) => 8 + i); // 8:00 to 18:00
-const timeSlots = Array.from({ length: 21 }, (_, i) => 8 + i * 0.5); // 8:00 to 18:00, 30min increments
 
 const PIXELS_PER_MINUTE = 2;
 const timelineStartHour = 8;
-const timelineStartOffsetPixels = 8 * 16; // 8rem for staff column
 
 // --- Helper Functions ---
-
 const formatTime = (date: Date | string) => {
   const d = typeof date === 'string' ? parseISO(date) : date;
   return format(d, 'HH:mm');
@@ -52,8 +46,8 @@ const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
 const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
 
 const getEventDimensions = (event: ScheduleEvent) => {
-  const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-  const end = typeof event.end === 'string' ? parseISO(event.end) : event.end;
+  const start = event.start instanceof Date ? event.start : parseISO(event.start);
+  const end = event.end instanceof Date ? event.end : parseISO(event.end);
   const startOfDay = new Date(start);
   startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
@@ -66,7 +60,8 @@ const getEventDimensions = (event: ScheduleEvent) => {
   };
 };
 
-// --- Draggable Task Components (integrated from unassigned-orders) ---
+
+// --- Draggable Task Components ---
 
 interface DraggableOrderProps {
   order: Order;
@@ -85,7 +80,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
     opacity: isDragging ? 0.8 : 1,
-    width: `${order.estimatedDuration * PIXELS_PER_MINUTE}px`,
+    width: `${(order.estimatedDuration || 60) * PIXELS_PER_MINUTE}px`,
   };
 
   return (
@@ -110,18 +105,19 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
 };
 
 
-const genericTasks: Order[] = [
-    { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 60 },
-    { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60 },
-];
-
 // --- Main Component ---
 
 export function ScheduleView() {
   const [isClient, setIsClient] = React.useState(false);
-  const [customerData, setCustomerData] = React.useState<Customer[]>(staticCustomerData);
+  const [customerData] = React.useState<Customer[]>(staticCustomerData);
   const [scheduleData, setScheduleData] = React.useState<ScheduleEvent[]>(staticScheduleData);
-  
+  const [unassignedOrders, setUnassignedOrders] = React.useState<Order[]>(staticOrderData);
+
+  const genericTasks: Order[] = [
+      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30 },
+      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60 },
+  ];
+
   React.useEffect(() => {
     setIsClient(true);
   }, []);
@@ -131,7 +127,6 @@ export function ScheduleView() {
 
   const [activeItem, setActiveItem] = React.useState<ScheduleEvent | Order | null>(null);
   const [currentOverStaffId, setCurrentOverStaffId] = React.useState<UniqueIdentifier | null>(null);
-  const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 });
 
   const handleDragStart = (event: DragStartEvent) => {
     const item = event.active.data.current as ScheduleEvent | Order;
@@ -199,6 +194,11 @@ export function ScheduleView() {
         };
 
         setScheduleData(prev => [...prev, newEvent]);
+
+        // If the dragged item was not a generic task, remove it from unassigned list
+        if (!order.id.startsWith('generic-')) {
+          setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
+        }
     }
 
     setActiveItem(null);
@@ -222,14 +222,14 @@ export function ScheduleView() {
                         className={task.id === 'generic-travel' ? 'bg-yellow-500 text-black' : 'bg-gray-400 text-white'}
                       />
                   ))}
-                  {orderData.map((order) => (
+                  {unassignedOrders.map((order) => (
                     <DraggableOrder
                       key={order.id}
                       order={order}
                       customer={getCustomerByCode(order.customerCode)}
                     />
                   ))}
-                  {orderData.length === 0 && genericTasks.length === 0 && (
+                  {unassignedOrders.length === 0 && genericTasks.length === 0 && (
                     <div className="flex items-center justify-center h-24 text-center text-muted-foreground">
                         <p>利用可能なタスクはありません。</p>
                     </div>
@@ -243,7 +243,7 @@ export function ScheduleView() {
         <div className="grid sticky top-0 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
           <div />
           <div className="relative grid grid-cols-11 border-l border-border text-xs text-muted-foreground">
-            {hours.map((hour) => (
+            {Array.from({ length: 11 }, (_, i) => 8 + i).map((hour) => (
               <div key={hour} className="text-center border-r border-border py-1">
                 {hour}:00
               </div>
@@ -312,8 +312,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver 
         <span className="text-sm font-medium truncate">{staff.name}</span>
       </div>
       <div className="relative h-14 bg-muted/50 rounded-md border-l border-border">
-        <div className="absolute inset-0 grid grid-cols-22">
-          {timeSlots.slice(0, -1).map((_, i) => (
+        <div className="absolute inset-0 grid" style={{gridTemplateColumns: `repeat(${11 * 2}, 1fr)`}}>
+          {Array.from({ length: 11 * 2 }).map((_, i) => (
             <div key={i} className={`h-full ${i % 2 === 0 ? 'border-r border-border/80' : 'border-r border-dashed border-border/40'}`}></div>
           ))}
         </div>
@@ -378,3 +378,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
