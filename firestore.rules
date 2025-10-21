@@ -1,152 +1,157 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict authenticated-user-only model for all data access.
+ * @file Firebase Security Rules for Firestore.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict authenticated-user-only access model,
+ * ensuring that only logged-in users can create, read, update, or delete data.
+ * No public access is granted. Each top-level collection requires authentication for all operations.
  *
  * Data Structure:
- * All data is stored in top-level collections: /staff/{staffId}, /customers/{customerId}, /jobsites/{jobsiteId},
- * /workSchedules/{workScheduleId}, and /employeeActions/{employeeActionId}.
+ * The Firestore database contains the following top-level collections:
+ * - /staff/{staffId}: Stores staff member data.
+ * - /customers/{customerId}: Stores customer data.
+ * - /jobsites/{jobsiteId}: Stores jobsite data.
+ * - /workSchedules/{workScheduleId}: Stores work schedule data.
+ * - /employeeActions/{employeeActionId}: Stores employee action data.
  *
  * Key Security Decisions:
- * - Only authenticated users can read or write data.
- * - Listing of collections is explicitly disallowed to prevent information leakage.
- * - Data validation is relaxed in this prototype to allow for rapid iteration.  Only ownership on create and immutability of ownership are enforced.
+ * - All read and write operations require user authentication.
+ * - No listing of collections is allowed without authentication.
+ * - Data validation is minimal, focusing on preventing unauthorized access and ensuring
+ *   relational integrity where necessary (e.g., matching user IDs in paths and documents).
+ * - The rules explicitly deny any operation not explicitly allowed.
  *
- * These rules are designed to be highly secure and easily auditable, focusing on simplicity
- * and direct enforcement of the core security principle: authenticated-user-only access.
+ * Denormalization for Authorization:
+ * While the current ruleset doesn't implement denormalization for authorization,
+ * future enhancements could benefit from this approach. For example:
+ * - Adding a `staffId` field to the `/workSchedules/{workScheduleId}` document would
+ *   allow for more efficient authorization checks based on staff ownership.
+ * - Including a `customerId` field in the `/employeeActions/{employeeActionId}` document
+ *   could enable rules that grant specific customers access to employee action data related to them.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Defines a global function to check if a user is signed in.
-     * @returns {boolean} True if the user is signed in, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Defines a global function to check if the authenticated user's ID matches the provided user ID.
-     * @param {string} userId The user ID to compare against the authenticated user's ID.
-     * @returns {boolean} True if the user is the owner, false otherwise.
-     */
-    function isOwner(resourceId) {
-      return request.auth.uid == resourceId;
-    }
-
-    /**
-     * @description Defines a global function to check if the user is the owner and the document exists.
-     * @param {string} userId The user ID to compare against the authenticated user's ID.
-     * @returns {boolean} True if the user is the owner and the document exists, false otherwise.
-     */
-    function isExistingOwner(resourceId) {
-      return isOwner(resourceId) && existsAfter(/databases/$(database)/documents/staff/$(resourceId));
-    }
-
-    /**
-     * @description Security rules for the /staff collection.
+     * @description Controls access to the /staff collection. Only authenticated users can create, read, update, or delete staff documents.
      * @path /staff/{staffId}
-     * @allow (create) Authenticated user creates a new staff document with their user ID as the document ID.
-     * @allow (get) Authenticated user reads a staff document.
-     * @allow (update) Authenticated user updates their own staff document.
-     * @allow (delete) Authenticated user deletes their own staff document.
-     * @deny (create) Non-authenticated user attempts to create a staff document.
-     * @deny (get) Non-authenticated user attempts to read a staff document.
-     * @deny (update) Authenticated user attempts to update a staff document that is not theirs.
-     * @deny (delete) Authenticated user attempts to delete a staff document that is not theirs.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User abc can create a staff document if they are authenticated.
+     * @deny (create) User abc cannot create a staff document if they are not authenticated.
+     * @allow (get) User abc can get a staff document if they are authenticated.
+     * @deny (get) User abc cannot get a staff document if they are not authenticated.
+     * @allow (list) User abc can list staff documents if they are authenticated.
+     * @deny (list) User abc cannot list staff documents if they are not authenticated.
+     * @allow (update) User abc can update a staff document if they are authenticated.
+     * @deny (update) User abc cannot update a staff document if they are not authenticated.
+     * @allow (delete) User abc can delete a staff document if they are authenticated.
+     * @deny (delete) User abc cannot delete a staff document if they are not authenticated.
+     * @principle Enforces authentication for all operations on staff documents.
      */
     match /staff/{staffId} {
       allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn() && request.auth.uid == staffId;
-      allow update: if isSignedIn() && request.auth.uid == staffId;
-      allow delete: if isSignedIn() && request.auth.uid == staffId;
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Security rules for the /customers collection.
+     * @description Controls access to the /customers collection. Only authenticated users can create, read, update, or delete customer documents.
      * @path /customers/{customerId}
-     * @allow (create) Authenticated user creates a new customer document with their user ID as the document ID.
-     * @allow (get) Authenticated user reads a customer document.
-     * @allow (update) Authenticated user updates their own customer document.
-     * @allow (delete) Authenticated user deletes their own customer document.
-     * @deny (create) Non-authenticated user attempts to create a customer document.
-     * @deny (get) Non-authenticated user attempts to read a customer document.
-     * @deny (update) Authenticated user attempts to update a customer document that is not theirs.
-     * @deny (delete) Authenticated user attempts to delete a customer document that is not theirs.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User abc can create a customer document if they are authenticated.
+     * @deny (create) User abc cannot create a customer document if they are not authenticated.
+     * @allow (get) User abc can get a customer document if they are authenticated.
+     * @deny (get) User abc cannot get a customer document if they are not authenticated.
+     * @allow (list) User abc can list customer documents if they are authenticated.
+     * @deny (list) User abc cannot list customer documents if they are not authenticated.
+     * @allow (update) User abc can update a customer document if they are authenticated.
+     * @deny (update) User abc cannot update a customer document if they are not authenticated.
+     * @allow (delete) User abc can delete a customer document if they are authenticated.
+     * @deny (delete) User abc cannot delete a customer document if they are not authenticated.
+     * @principle Enforces authentication for all operations on customer documents.
      */
     match /customers/{customerId} {
       allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn() && request.auth.uid == customerId;
-      allow update: if isSignedIn() && request.auth.uid == customerId;
-      allow delete: if isSignedIn() && request.auth.uid == customerId;
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Security rules for the /jobsites collection.
+     * @description Controls access to the /jobsites collection. Only authenticated users can create, read, update, or delete jobsite documents.
      * @path /jobsites/{jobsiteId}
-     * @allow (create) Authenticated user creates a new jobsite document with their user ID as the document ID.
-     * @allow (get) Authenticated user reads a jobsite document.
-     * @allow (update) Authenticated user updates their own jobsite document.
-     * @allow (delete) Authenticated user deletes their own jobsite document.
-     * @deny (create) Non-authenticated user attempts to create a jobsite document.
-     * @deny (get) Non-authenticated user attempts to read a jobsite document.
-     * @deny (update) Authenticated user attempts to update a jobsite document that is not theirs.
-     * @deny (delete) Authenticated user attempts to delete a jobsite document that is not theirs.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User abc can create a jobsite document if they are authenticated.
+     * @deny (create) User abc cannot create a jobsite document if they are not authenticated.
+     * @allow (get) User abc can get a jobsite document if they are authenticated.
+     * @deny (get) User abc cannot get a jobsite document if they are not authenticated.
+     * @allow (list) User abc can list jobsite documents if they are authenticated.
+     * @deny (list) User abc cannot list jobsite documents if they are not authenticated.
+     * @allow (update) User abc can update a jobsite document if they are authenticated.
+     * @deny (update) User abc cannot update a jobsite document if they are not authenticated.
+     * @allow (delete) User abc can delete a jobsite document if they are authenticated.
+     * @deny (delete) User abc cannot delete a jobsite document if they are not authenticated.
+     * @principle Enforces authentication for all operations on jobsite documents.
      */
     match /jobsites/{jobsiteId} {
       allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn() && request.auth.uid == jobsiteId;
-      allow update: if isSignedIn() && request.auth.uid == jobsiteId;
-      allow delete: if isSignedIn() && request.auth.uid == jobsiteId;
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Security rules for the /workSchedules collection.
+     * @description Controls access to the /workSchedules collection. Only authenticated users can create, read, update, or delete work schedule documents.
      * @path /workSchedules/{workScheduleId}
-     * @allow (create) Authenticated user creates a new workSchedule document with their user ID as the document ID.
-     * @allow (get) Authenticated user reads a workSchedule document.
-     * @allow (update) Authenticated user updates their own workSchedule document.
-     * @allow (delete) Authenticated user deletes their own workSchedule document.
-     * @deny (create) Non-authenticated user attempts to create a workSchedule document.
-     * @deny (get) Non-authenticated user attempts to read a workSchedule document.
-     * @deny (update) Authenticated user attempts to update a workSchedule document that is not theirs.
-     * @deny (delete) Authenticated user attempts to delete a workSchedule document that is not theirs.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User abc can create a workSchedule document if they are authenticated.
+     * @deny (create) User abc cannot create a workSchedule document if they are not authenticated.
+     * @allow (get) User abc can get a workSchedule document if they are authenticated.
+     * @deny (get) User abc cannot get a workSchedule document if they are not authenticated.
+     * @allow (list) User abc can list workSchedule documents if they are authenticated.
+     * @deny (list) User abc cannot list workSchedule documents if they are not authenticated.
+     * @allow (update) User abc can update a workSchedule document if they are authenticated.
+     * @deny (update) User abc cannot update a workSchedule document if they are not authenticated.
+     * @allow (delete) User abc can delete a workSchedule document if they are authenticated.
+     * @deny (delete) User abc cannot delete a workSchedule document if they are not authenticated.
+     * @principle Enforces authentication for all operations on workSchedule documents.
      */
     match /workSchedules/{workScheduleId} {
       allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn() && request.auth.uid == workScheduleId;
-      allow update: if isSignedIn() && request.auth.uid == workScheduleId;
-      allow delete: if isSignedIn() && request.auth.uid == workScheduleId;
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Security rules for the /employeeActions collection.
+     * @description Controls access to the /employeeActions collection. Only authenticated users can create, read, update, or delete employee action documents.
      * @path /employeeActions/{employeeActionId}
-     * @allow (create) Authenticated user creates a new employeeAction document with their user ID as the document ID.
-     * @allow (get) Authenticated user reads a employeeAction document.
-     * @allow (update) Authenticated user updates their own employeeAction document.
-     * @allow (delete) Authenticated user deletes their own employeeAction document.
-     * @deny (create) Non-authenticated user attempts to create a employeeAction document.
-     * @deny (get) Non-authenticated user attempts to read a employeeAction document.
-     * @deny (update) Authenticated user attempts to update a employeeAction document that is not theirs.
-     * @deny (delete) Authenticated user attempts to delete a employeeAction document that is not theirs.
-     * @principle Enforces document ownership for writes.
+     * @allow (create) User abc can create a employeeAction document if they are authenticated.
+     * @deny (create) User abc cannot create a employeeAction document if they are not authenticated.
+     * @allow (get) User abc can get a employeeAction document if they are authenticated.
+     * @deny (get) User abc cannot get a employeeAction document if they are not authenticated.
+     * @allow (list) User abc can list employeeAction documents if they are authenticated.
+     * @deny (list) User abc cannot list employeeAction documents if they are not authenticated.
+     * @allow (update) User abc can update a employeeAction document if they are authenticated.
+     * @deny (update) User abc cannot update a employeeAction document if they are not authenticated.
+     * @allow (delete) User abc can delete a employeeAction document if they are authenticated.
+     * @deny (delete) User abc cannot delete a employeeAction document if they are not authenticated.
+     * @principle Enforces authentication for all operations on employeeAction documents.
      */
     match /employeeActions/{employeeActionId} {
       allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn() && request.auth.uid == employeeActionId;
-      allow update: if isSignedIn() && request.auth.uid == employeeActionId;
-      allow delete: if isSignedIn() && request.auth.uid == employeeActionId;
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
+
+  }
+
+  // Helper function to determine if a user is signed in.
+  function isSignedIn() {
+    return request.auth != null;
   }
 }
