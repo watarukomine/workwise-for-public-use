@@ -1,148 +1,152 @@
 /**
- * @file Firebase Security Rules for WorkWise Application
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict authenticated-user-only model for all data access.
  *
- * @core_philosophy This ruleset implements a combination of ownership-based access control
- * and public read access with restricted writes. User-specific data is stored under
- * the /users/{userId} path, enforcing strict ownership. Other data is publicly accessible.
+ * Data Structure:
+ * All data is stored in top-level collections: /staff/{staffId}, /customers/{customerId}, /jobsites/{jobsiteId},
+ * /workSchedules/{workScheduleId}, and /employeeActions/{employeeActionId}.
  *
- * @data_structure The Firestore data is organized as follows:
- * - /users/{userId}/staff/{staffId}: Staff profiles, accessible only to the owning user.
- * - /customers/{customerId}: Customer data, publicly readable, writable by authenticated users.
- * - /workSchedules/{workScheduleId}: Work schedule data, publicly readable, writable by authenticated users.
- * - /locations/{locationId}: Location data, publicly readable, writable by authenticated users.
- * - /employeeActions/{employeeActionId}: Employee action data, publicly readable, writable by authenticated users.
- * - /orders/{orderId}: Order data, publicly readable, writable by authenticated users.
+ * Key Security Decisions:
+ * - Only authenticated users can read or write data.
+ * - Listing of collections is explicitly disallowed to prevent information leakage.
+ * - Data validation is relaxed in this prototype to allow for rapid iteration.  Only ownership on create and immutability of ownership are enforced.
  *
- * @key_security_decisions
- * - User listing is disallowed for privacy.
- * - Public read access is granted to collections where this is a safe default.
- * - All write operations require user authentication.
- *
- * @denormalization The `EmployeeAction` entity includes a denormalized `staffId` to enable
- * authorization independence, avoiding costly `get()` calls to the `WorkSchedule` collection.
- *
- * @structural_segregation Data is segregated into collections based on access requirements.
+ * These rules are designed to be highly secure and easily auditable, focusing on simplicity
+ * and direct enforcement of the core security principle: authenticated-user-only access.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Defines the base `isSignedIn()` function.
-     * @param N/A
-     * @return {boolean} `true` if request.auth is not null, `false` otherwise.
+     * @description Defines a global function to check if a user is signed in.
+     * @returns {boolean} True if the user is signed in, false otherwise.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Defines the `isOwner(userId)` function to check if the request is made by the owner of the document.
-     * @param {string} userId - The user ID to compare against the request's authentication UID.
-     * @return {boolean} `true` if the request is authenticated and the provided userId matches the request's authentication UID, `false` otherwise.
+     * @description Defines a global function to check if the authenticated user's ID matches the provided user ID.
+     * @param {string} userId The user ID to compare against the authenticated user's ID.
+     * @returns {boolean} True if the user is the owner, false otherwise.
      */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function isOwner(resourceId) {
+      return request.auth.uid == resourceId;
     }
 
     /**
-     * @description Checks if the user is the owner of the existing document.
-     * @param {string} userId - The user ID to compare against the resource's data.
-     * @return {boolean} - True if the user is the owner and the resource exists.
+     * @description Defines a global function to check if the user is the owner and the document exists.
+     * @param {string} userId The user ID to compare against the authenticated user's ID.
+     * @returns {boolean} True if the user is the owner and the document exists, false otherwise.
      */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+    function isExistingOwner(resourceId) {
+      return isOwner(resourceId) && existsAfter(/databases/$(database)/documents/staff/$(resourceId));
     }
 
     /**
-     * @description Rules for staff profiles under a user's document.
-     * @path /users/{userId}/staff/{staffId}
-     * @allow (create) - Authenticated user creates their own staff profile.
-     * @allow (get, list) - Authenticated user reads their own staff profile.
-     * @allow (update, delete) - Authenticated user updates or deletes their own staff profile.
-     * @deny (create) - User attempts to create a staff profile for another user.
-     * @principle Enforces document ownership for all operations.
+     * @description Security rules for the /staff collection.
+     * @path /staff/{staffId}
+     * @allow (create) Authenticated user creates a new staff document with their user ID as the document ID.
+     * @allow (get) Authenticated user reads a staff document.
+     * @allow (update) Authenticated user updates their own staff document.
+     * @allow (delete) Authenticated user deletes their own staff document.
+     * @deny (create) Non-authenticated user attempts to create a staff document.
+     * @deny (get) Non-authenticated user attempts to read a staff document.
+     * @deny (update) Authenticated user attempts to update a staff document that is not theirs.
+     * @deny (delete) Authenticated user attempts to delete a staff document that is not theirs.
+     * @principle Enforces document ownership for writes.
      */
-    match /users/{userId}/staff/{staffId} {
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+    match /staff/{staffId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == staffId;
+      allow update: if isSignedIn() && request.auth.uid == staffId;
+      allow delete: if isSignedIn() && request.auth.uid == staffId;
     }
 
     /**
-     * @description Rules for customer data. Accessible to all authenticated users.
+     * @description Security rules for the /customers collection.
      * @path /customers/{customerId}
-     * @allow (get, list) - Any authenticated user can read customer data.
-     * @allow (create, update, delete) - Any authenticated user can create, update, or delete customer data.
-     * @deny (create) - If the user is not authenticated
-     * @principle Allows public read access with authentication required for writes.
+     * @allow (create) Authenticated user creates a new customer document with their user ID as the document ID.
+     * @allow (get) Authenticated user reads a customer document.
+     * @allow (update) Authenticated user updates their own customer document.
+     * @allow (delete) Authenticated user deletes their own customer document.
+     * @deny (create) Non-authenticated user attempts to create a customer document.
+     * @deny (get) Non-authenticated user attempts to read a customer document.
+     * @deny (update) Authenticated user attempts to update a customer document that is not theirs.
+     * @deny (delete) Authenticated user attempts to delete a customer document that is not theirs.
+     * @principle Enforces document ownership for writes.
      */
     match /customers/{customerId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == customerId;
+      allow update: if isSignedIn() && request.auth.uid == customerId;
+      allow delete: if isSignedIn() && request.auth.uid == customerId;
     }
 
     /**
-     * @description Rules for work schedule data. Accessible to all authenticated users.
+     * @description Security rules for the /jobsites collection.
+     * @path /jobsites/{jobsiteId}
+     * @allow (create) Authenticated user creates a new jobsite document with their user ID as the document ID.
+     * @allow (get) Authenticated user reads a jobsite document.
+     * @allow (update) Authenticated user updates their own jobsite document.
+     * @allow (delete) Authenticated user deletes their own jobsite document.
+     * @deny (create) Non-authenticated user attempts to create a jobsite document.
+     * @deny (get) Non-authenticated user attempts to read a jobsite document.
+     * @deny (update) Authenticated user attempts to update a jobsite document that is not theirs.
+     * @deny (delete) Authenticated user attempts to delete a jobsite document that is not theirs.
+     * @principle Enforces document ownership for writes.
+     */
+    match /jobsites/{jobsiteId} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == jobsiteId;
+      allow update: if isSignedIn() && request.auth.uid == jobsiteId;
+      allow delete: if isSignedIn() && request.auth.uid == jobsiteId;
+    }
+
+    /**
+     * @description Security rules for the /workSchedules collection.
      * @path /workSchedules/{workScheduleId}
-     * @allow (get, list) - Any authenticated user can read work schedule data.
-     * @allow (create, update, delete) - Any authenticated user can create, update, or delete work schedule data.
-     * @deny (create) - If the user is not authenticated
-     * @principle Allows public read access with authentication required for writes.
+     * @allow (create) Authenticated user creates a new workSchedule document with their user ID as the document ID.
+     * @allow (get) Authenticated user reads a workSchedule document.
+     * @allow (update) Authenticated user updates their own workSchedule document.
+     * @allow (delete) Authenticated user deletes their own workSchedule document.
+     * @deny (create) Non-authenticated user attempts to create a workSchedule document.
+     * @deny (get) Non-authenticated user attempts to read a workSchedule document.
+     * @deny (update) Authenticated user attempts to update a workSchedule document that is not theirs.
+     * @deny (delete) Authenticated user attempts to delete a workSchedule document that is not theirs.
+     * @principle Enforces document ownership for writes.
      */
     match /workSchedules/{workScheduleId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == workScheduleId;
+      allow update: if isSignedIn() && request.auth.uid == workScheduleId;
+      allow delete: if isSignedIn() && request.auth.uid == workScheduleId;
     }
 
     /**
-     * @description Rules for location data. Accessible to all authenticated users.
-     * @path /locations/{locationId}
-     * @allow (get, list) - Any authenticated user can read location data.
-     * @allow (create, update, delete) - Any authenticated user can create, update, or delete location data.
-     * @deny (create) - If the user is not authenticated
-     */
-    match /locations/{locationId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Rules for employee action data. Accessible to all authenticated users.
+     * @description Security rules for the /employeeActions collection.
      * @path /employeeActions/{employeeActionId}
-     * @allow (get, list) - Any authenticated user can read employee action data.
-     * @allow (create, update, delete) - Any authenticated user can create, update, or delete employee action data.
-     * @deny (create) - If the user is not authenticated
-     * @principle Allows public read access with authentication required for writes.
+     * @allow (create) Authenticated user creates a new employeeAction document with their user ID as the document ID.
+     * @allow (get) Authenticated user reads a employeeAction document.
+     * @allow (update) Authenticated user updates their own employeeAction document.
+     * @allow (delete) Authenticated user deletes their own employeeAction document.
+     * @deny (create) Non-authenticated user attempts to create a employeeAction document.
+     * @deny (get) Non-authenticated user attempts to read a employeeAction document.
+     * @deny (update) Authenticated user attempts to update a employeeAction document that is not theirs.
+     * @deny (delete) Authenticated user attempts to delete a employeeAction document that is not theirs.
+     * @principle Enforces document ownership for writes.
      */
     match /employeeActions/{employeeActionId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
-    }
-
-    /**
-     * @description Rules for order data. Accessible to all authenticated users.
-     * @path /orders/{orderId}
-     * @allow (get, list) - Any authenticated user can read order data.
-     * @allow (create, update, delete) - Any authenticated user can create, update, or delete order data.
-     * @deny (create) - If the user is not authenticated
-     * @principle Allows public read access with authentication required for writes.
-     */
-    match /orders/{orderId} {
-      allow get, list: if true;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && resource != null;
-      allow delete: if isSignedIn() && resource != null;
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() && request.auth.uid == employeeActionId;
+      allow update: if isSignedIn() && request.auth.uid == employeeActionId;
+      allow delete: if isSignedIn() && request.auth.uid == employeeActionId;
     }
   }
 }
