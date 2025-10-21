@@ -45,9 +45,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 
-const PIXELS_PER_MINUTE = 2;
+const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 8;
-const timelineEndHour = 19;
+const timelineEndHour = 18;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 
@@ -614,7 +614,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   if (isTravelEvent) {
     const hslMatch = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
     if (hslMatch) {
-      const [_, h] = hslMatch;
+      const [_, h, s, l] = hslMatch;
       backgroundColor = `hsl(${h}, 20%, 50%)`;
       color = 'white';
     } else {
@@ -656,5 +656,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-    
