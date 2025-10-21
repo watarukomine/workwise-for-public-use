@@ -35,6 +35,7 @@ const timeSlots = Array.from({ length: 21 }, (_, i) => 8 + i * 0.5); // 8:00 to 
 
 const PIXELS_PER_MINUTE = 2;
 const timelineStartHour = 8;
+const timelineStartOffsetPixels = 8 * 16; // 8rem for staff column
 
 // --- Helper Functions ---
 
@@ -130,8 +131,10 @@ export function ScheduleView() {
     else if ('estimatedDuration' in item && newStaffId && over?.rect) {
         const order = item;
         const timelineRect = over.rect;
-        const dropX = event.activatorEvent.clientX - timelineRect.left - dragOffset.x;
         
+        // Use delta.x to determine drop position relative to the start of the timeline
+        const dropX = active.rect.current.initial!.left - timelineRect.left + delta.x;
+
         const dropMinutes = pixelsToMinutes(dropX);
 
         const today = new Date();
@@ -292,3 +295,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
