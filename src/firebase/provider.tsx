@@ -1,16 +1,17 @@
 'use client';
 
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, DependencyList } from 'react';
-import { Auth, User, onAuthStateChanged } from 'firebase/auth';
+import { Auth, User } from 'firebase/auth';
 import { getFirebase } from '@/firebase'; // Import the new centralized getter
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { useUser as useAuthUser } from './auth/use-user';
 
 // Extract the instances from the central getter.
 const { auth: authInstance } = getFirebase();
 
 // Combined state for the Firebase context
 export interface FirebaseContextState {
-  auth: Auth | null;
+  auth: Auth;
   user: User | null;
   isLoading: boolean;
   error: Error | null;
@@ -24,26 +25,7 @@ export const FirebaseContext = createContext<FirebaseContextState | undefined>(u
  * Firebase services (app, auth, firestore) are now managed by getFirebase().
  */
 export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  useEffect(() => {
-    // Use the singleton auth instance for the auth state listener.
-    const unsubscribe = onAuthStateChanged(
-      authInstance,
-      (firebaseUser) => {
-        setUser(firebaseUser);
-        setIsLoading(false);
-      },
-      (authError) => {
-        console.error("FirebaseProvider: onAuthStateChanged error:", authError);
-        setError(authError);
-        setIsLoading(false);
-      }
-    );
-    return () => unsubscribe();
-  }, []);
+  const { user, isLoading, error } = useAuthUser(authInstance);
 
   const contextValue = useMemo(() => ({
     auth: authInstance, // Provide the singleton auth instance
@@ -69,7 +51,7 @@ const useFirebaseContext = () => {
 };
 
 // Hooks to access context values
-export const useAuth = (): Auth | null => useFirebaseContext().auth;
+export const useAuth = (): Auth => useFirebaseContext().auth;
 export const useUser = () => {
     const { user, isLoading, error } = useFirebaseContext();
     return { user, isLoading, error };

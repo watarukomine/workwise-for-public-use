@@ -1,7 +1,6 @@
 'use client';
 
 import { 
-  Auth,
   GoogleAuthProvider, 
   signInWithPopup,
   signOut as firebaseSignOut
