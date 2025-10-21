@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Papa from 'papaparse';
-import { useFirestore, useUser, useAuth } from '@/firebase';
+import { getFirebase, useUser } from '@/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,10 +19,10 @@ import { signInWithGoogle } from '@/lib/auth';
 type DataType = 'customers' | 'staff' | 'schedules';
 type Status = 'idle' | 'parsing' | 'importing' | 'success' | 'error';
 
+const { firestore } = getFirebase(); // Get the singleton firestore instance
+
 export function DataImporter() {
-  const firestore = useFirestore();
   const { user, isLoading: isUserLoading } = useUser();
-  const auth = useAuth();
   const { toast } = useToast();
   const [file, setFile] = React.useState<File | null>(null);
   const [dataType, setDataType] = React.useState<DataType>('customers');
@@ -31,9 +31,7 @@ export function DataImporter() {
   const [results, setResults] = React.useState({ success: 0, failed: 0 });
 
   const handleSignIn = async () => {
-    if (auth) {
-      await signInWithGoogle(auth);
-    }
+    await signInWithGoogle();
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {

@@ -36,7 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useUser, useAuth } from '@/firebase';
+import { useUser } from '@/firebase';
 import { signInWithGoogle, signOut } from '@/lib/auth';
 
 const navItems = [
@@ -50,18 +50,13 @@ const navItems = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, isLoading } = useUser();
-  const auth = useAuth();
 
   const handleSignIn = async () => {
-    if (auth) {
-      await signInWithGoogle(auth);
-    }
+    await signInWithGoogle();
   };
 
   const handleSignOut = async () => {
-    if (auth) {
-      await signOut(auth);
-    }
+    await signOut();
   };
 
   return (

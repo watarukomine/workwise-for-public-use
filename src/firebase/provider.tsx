@@ -1,16 +1,15 @@
 'use client';
 
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, DependencyList } from 'react';
-import { FirebaseApp, getApps, initializeApp, getApp } from 'firebase/app';
-import { Firestore, getFirestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged, getAuth } from 'firebase/auth';
-import { firebaseConfig } from '@/firebase/config';
+import { Auth, User, onAuthStateChanged } from 'firebase/auth';
+import { getFirebase } from '@/firebase'; // Import the new centralized getter
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+
+// Extract the instances from the central getter.
+const { auth: authInstance } = getFirebase();
 
 // Combined state for the Firebase context
 export interface FirebaseContextState {
-  firebaseApp: FirebaseApp | null;
-  firestore: Firestore | null;
   auth: Auth | null;
   user: User | null;
   isLoading: boolean;
@@ -21,54 +20,37 @@ export interface FirebaseContextState {
 export const FirebaseContext = createContext<FirebaseContextState | undefined>(undefined);
 
 /**
- * FirebaseProvider manages and provides Firebase services and user authentication state.
+ * FirebaseProvider manages and provides user authentication state.
+ * Firebase services (app, auth, firestore) are now managed by getFirebase().
  */
 export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [firebaseApp, setFirebaseApp] = useState<FirebaseApp | null>(null);
-  const [firestore, setFirestore] = useState<Firestore | null>(null);
-  const [auth, setAuth] = useState<Auth | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    try {
-      const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-      const authInstance = getAuth(app);
-      const firestoreInstance = getFirestore(app);
-
-      setFirebaseApp(app);
-      setAuth(authInstance);
-      setFirestore(firestoreInstance);
-
-      const unsubscribe = onAuthStateChanged(
-        authInstance,
-        (firebaseUser) => {
-          setUser(firebaseUser);
-          setIsLoading(false);
-        },
-        (authError) => {
-          console.error("FirebaseProvider: onAuthStateChanged error:", authError);
-          setError(authError);
-          setIsLoading(false);
-        }
-      );
-      return () => unsubscribe();
-    } catch (e) {
-      console.error("Failed to initialize Firebase", e);
-      setError(e as Error);
-      setIsLoading(false);
-    }
+    // Use the singleton auth instance for the auth state listener.
+    const unsubscribe = onAuthStateChanged(
+      authInstance,
+      (firebaseUser) => {
+        setUser(firebaseUser);
+        setIsLoading(false);
+      },
+      (authError) => {
+        console.error("FirebaseProvider: onAuthStateChanged error:", authError);
+        setError(authError);
+        setIsLoading(false);
+      }
+    );
+    return () => unsubscribe();
   }, []);
 
   const contextValue = useMemo(() => ({
-    firebaseApp,
-    firestore,
-    auth,
+    auth: authInstance, // Provide the singleton auth instance
     user,
     isLoading,
     error,
-  }), [firebaseApp, firestore, auth, user, isLoading, error]);
+  }), [user, isLoading, error]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>
@@ -86,14 +68,14 @@ const useFirebaseContext = () => {
   return context;
 };
 
-export const useFirebaseApp = (): FirebaseApp | null => useFirebaseContext().firebaseApp;
-export const useFirestore = (): Firestore | null => useFirebaseContext().firestore;
+// Hooks to access context values
 export const useAuth = (): Auth | null => useFirebaseContext().auth;
 export const useUser = () => {
     const { user, isLoading, error } = useFirebaseContext();
     return { user, isLoading, error };
 };
 
+// Memoization hook remains the same, but App and Firestore hooks are removed as they are no longer part of this provider
 type MemoFirebase <T> = T & {__memo?: boolean};
 
 export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {
