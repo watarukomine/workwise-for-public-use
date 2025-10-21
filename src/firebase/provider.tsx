@@ -6,8 +6,6 @@ import { getFirebase } from '@/firebase'; // Import the new centralized getter
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { useUser as useAuthUserHook } from './auth/use-user';
 
-// Extract the instances from the central getter.
-const { auth: authInstance } = getFirebase();
 
 // Combined state for the Firebase context
 export interface FirebaseContextState {
@@ -25,6 +23,8 @@ export const FirebaseContext = createContext<FirebaseContextState | undefined>(u
  * Firebase services (app, auth, firestore) are now managed by getFirebase().
  */
 export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  // Extract the instances from the central getter inside the component.
+  const { auth: authInstance } = getFirebase();
   const { user, isLoading, error } = useAuthUserHook(authInstance);
 
   const contextValue = useMemo(() => ({
@@ -32,7 +32,7 @@ export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }
     user,
     isLoading,
     error,
-  }), [user, isLoading, error]);
+  }), [authInstance, user, isLoading, error]);
 
   return (
     <FirebaseContext.Provider value={contextValue}>

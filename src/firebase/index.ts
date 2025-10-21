@@ -11,6 +11,8 @@ export * from './firestore/use-collection';
 export * from './firestore/use-doc';
 export * from './errors';
 export * from './error-emitter';
+export { useUser } from './auth/use-user';
+
 
 // --- Centralized Firebase Initialization ---
 
@@ -34,6 +36,3 @@ export const getFirebase = () => {
   }
   return { firebaseApp, auth, firestore };
 };
-
-// Re-export useUser after getFirebase is defined
-export { useUser } from './auth/use-user';
