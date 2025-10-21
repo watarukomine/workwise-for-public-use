@@ -4,7 +4,6 @@ import * as React from 'react';
 import Papa from 'papaparse';
 import { getFirebase } from '@/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
-import { signInAnonymously } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +18,7 @@ import { errorEmitter, FirestorePermissionError } from '@/firebase';
 type DataType = 'customers' | 'staff' | 'schedules';
 type Status = 'idle' | 'parsing' | 'importing' | 'success' | 'error';
 
-const { firestore, auth } = getFirebase(); // Get the singleton instances
+const { firestore } = getFirebase(); // Get the singleton instances
 
 export function DataImporter() {
   const { toast } = useToast();
@@ -52,21 +51,6 @@ export function DataImporter() {
     setProgress(0);
     setResults({ success: 0, failed: 0 });
     
-    // Ensure user is signed in anonymously if not already logged in
-    if (!auth.currentUser) {
-      try {
-        await signInAnonymously(auth);
-      } catch (error) {
-        setStatus('error');
-        toast({
-          variant: 'destructive',
-          title: 'Authentication Error',
-          description: 'Could not sign in anonymously to import data.',
-        });
-        return;
-      }
-    }
-
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
@@ -85,7 +69,7 @@ export function DataImporter() {
 
         for (const record of data) {
            try {
-            const collectionName = dataType === 'schedules' ? `staff/${record.staffId}/workSchedules` : dataType;
+            const collectionName = dataType === 'schedules' ? `workSchedules` : dataType;
             const collectionRef = collection(firestore, collectionName);
             const recordId = record.id || record['ユーザーコード'] || doc(collectionRef).id;
             const docRef = doc(collectionRef, recordId);
@@ -102,19 +86,25 @@ export function DataImporter() {
             delete dataToImport.id; 
             
             await setDoc(docRef, dataToImport, { merge: true })
+              .catch((serverError) => {
+                failedCount++;
+                const permissionError = new FirestorePermissionError({
+                  path: docRef.path,
+                  operation: 'write',
+                  requestResourceData: record,
+                });
+                errorEmitter.emit('permission-error', permissionError);
+                // We re-throw the error to be caught by the outer try-catch block
+                throw permissionError;
+              });
+
             successCount++;
-          } catch (serverError) {
-            failedCount++;
-            const collectionName = dataType === 'schedules' ? `staff/${record.staffId}/workSchedules` : dataType;
-            const collectionRef = collection(firestore, collectionName);
-            const recordId = record.id || 'unknown-id';
-            const docRef = doc(collectionRef, recordId);
-            const permissionError = new FirestorePermissionError({
-              path: docRef.path,
-              operation: 'write',
-              requestResourceData: record,
-            });
-            errorEmitter.emit('permission-error', permissionError);
+          } catch (error) {
+            // This will catch the re-thrown permission error
+            if (!(error instanceof FirestorePermissionError)) {
+               failedCount++;
+               console.error("An unexpected error occurred during import:", error);
+            }
           } finally {
             const processedCount = successCount + failedCount;
             setProgress((processedCount / totalRecords) * 100);
@@ -196,7 +186,7 @@ export function DataImporter() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Import Finished with Errors</AlertTitle>
             <AlertDescription>
-              {results.success} records imported, {results.failed} failed. Check the developer console for details.
+              {results.success} records imported, {results.failed} failed. Check the developer console for details on permission errors.
             </AlertDescription>
           </Alert>
         )}
