@@ -9,10 +9,20 @@ export type Staff = {
 
 export type Customer = {
   id: string;
-  name: string;
-  address: string;
-  latitude?: number;
-  longitude?: number;
+  "No": string;
+  "ユーザーコード": string;
+  "旧チャネルSEQ"?: string;
+  "店舗"?: string;
+  "管理C"?: string;
+  "機材 有無"?: string;
+  "住所": string;
+  "緯度"?: number;
+  "経度"?: number;
+  "電話番号"?: string;
+  "営業時間"?: string;
+  // The name property is added for search functionality.
+  // It will be mapped from one of the Japanese fields.
+  name?: string;
 };
 
 export type ScheduleEvent = {

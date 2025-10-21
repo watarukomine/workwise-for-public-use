@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import type { Customer } from '@/lib/types';
@@ -15,7 +16,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { MapPin, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 export function CustomerTable({ customers }: { customers: Customer[] }) {
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -23,7 +24,7 @@ export function CustomerTable({ customers }: { customers: Customer[] }) {
   const rowsPerPage = 10;
 
   const filteredCustomers = customers.filter(customer =>
-    customer && customer.name && customer.name.toLowerCase().includes(searchTerm.toLowerCase())
+    customer && customer['ユーザーコード'] && customer['ユーザーコード'].toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const paginatedCustomers = filteredCustomers.slice(
@@ -40,7 +41,7 @@ export function CustomerTable({ customers }: { customers: Customer[] }) {
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name..."
+              placeholder="Search by user code..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -51,33 +52,30 @@ export function CustomerTable({ customers }: { customers: Customer[] }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>Coordinates</TableHead>
+                <TableHead>No</TableHead>
+                <TableHead>ユーザーコード</TableHead>
+                <TableHead>店舗</TableHead>
+                <TableHead>住所</TableHead>
+                <TableHead>電話番号</TableHead>
+                <TableHead>営業時間</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedCustomers.length > 0 ? (
                 paginatedCustomers.map((customer) => (
                   <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell>{customer.address}</TableCell>
-                    <TableCell>
-                      {customer.latitude && customer.longitude ? (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <MapPin className="h-4 w-4" />
-                          <span>{customer.latitude.toFixed(4)}, {customer.longitude.toFixed(4)}</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground/70 italic">Not geocoded</span>
-                      )}
-                    </TableCell>
+                    <TableCell className="font-medium">{customer.No}</TableCell>
+                    <TableCell>{customer['ユーザーコード']}</TableCell>
+                    <TableCell>{customer['店舗']}</TableCell>
+                    <TableCell>{customer['住所']}</TableCell>
+                    <TableCell>{customer['電話番号']}</TableCell>
+                    <TableCell>{customer['営業時間']}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={3} className="h-24 text-center">
-                    No customers found.
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    {customers.length === 0 ? "No customers found." : "No matching customers found for your search."}
                   </TableCell>
                 </TableRow>
               )}
