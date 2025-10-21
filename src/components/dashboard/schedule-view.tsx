@@ -123,7 +123,7 @@ export function ScheduleView() {
     const newStaffId = over?.id as string | undefined;
 
     // --- Logic for moving existing events ---
-    if ('staffId' in item) {
+    if ('staffId' in item && 'start' in item) {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
       
@@ -157,7 +157,7 @@ export function ScheduleView() {
       }
     }
     // --- Logic for adding new orders as events ---
-    else if (newStaffId && over?.rect) {
+    else if ('estimatedDuration' in item && newStaffId && over?.rect) {
         const order = item;
         const timelineRect = over.rect;
         // Adjust drop position by the initial cursor offset within the dragged item
