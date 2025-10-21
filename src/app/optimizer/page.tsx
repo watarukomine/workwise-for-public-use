@@ -7,39 +7,30 @@ import { APIProvider } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import type { Customer, Staff, StaffStatus } from '@/lib/types';
-import { collection } from 'firebase/firestore';
+import { customerData, staffData, staffStatusData } from '@/lib/data';
 
 export default function OptimizerPage() {
-  const firestore = useFirestore();
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
   const [avoidHighways, setAvoidHighways] = React.useState(false);
 
-  const customersRef = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
-  const staffRef = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
-  const staffStatusRef = useMemoFirebase(() => firestore ? collection(firestore, 'staffStatus') : null, [firestore]);
-
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersRef);
-  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffRef);
-  const { data: staffStatusData, isLoading: isLoadingStaffStatus } = useCollection<StaffStatus>(staffStatusRef);
-
+  const [customers] = React.useState<Customer[]>(customerData);
+  const [staff] = React.useState<Staff[]>(staffData);
 
   const staffWithStatus = React.useMemo(() => {
-    if (!staff || !staffStatusData) return [];
     return staffStatusData.map(status => {
       const staffDetails = staff.find(s => s.id === status.staffId);
       return { ...staffDetails, ...status } as (Staff & StaffStatus);
     }).filter(s => s.id); // filter out cases where staffDetails was not found
-  }, [staff, staffStatusData]);
+  }, [staff]);
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
     setOptimizedRoute(data);
     setAvoidHighways(options.avoidHighways);
   }
   
-  const isLoading = isLoadingCustomers || isLoadingStaff || isLoadingStaffStatus;
+  const isLoading = !customers || !staff;
 
   return (
     <div className="space-y-8">

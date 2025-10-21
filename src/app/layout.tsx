@@ -5,23 +5,11 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
-import { FirebaseClientProvider, useFirebase } from '@/firebase';
-import { seedData } from '@/firebase/seed';
 import React from 'react';
 
 // This can't be in the same file as the metadata export if it's a client component.
 // But for now, we will add 'use client' to the whole file to fix the immediate error.
 // A better solution would be to move DataSeeder to its own file.
-
-function DataSeeder() {
-  const { firestore } = useFirebase();
-  React.useEffect(() => {
-    if (firestore) {
-      seedData(firestore);
-    }
-  }, [firestore]);
-  return null;
-}
 
 
 export default function RootLayout({
@@ -39,11 +27,8 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
-          <DataSeeder />
           <AppShell>{children}</AppShell>
           <Toaster />
-        </FirebaseClientProvider>
       </body>
     </html>
   );

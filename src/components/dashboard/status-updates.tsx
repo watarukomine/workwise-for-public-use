@@ -13,8 +13,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Separator } from '../ui/separator';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
 import React from 'react';
 
 const statusColors: Record<StaffStatus['status'], string> = {
@@ -34,16 +32,13 @@ const statusJapanese: Record<StaffStatus['status'], string> = {
 }
 
 export function StatusUpdates() {
-  const firestore = useFirestore();
-  const statusesRef = useMemoFirebase(() => firestore ? collection(firestore, 'staffStatus') : null, [firestore]);
-  const staffRef = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
-  const { data: statuses, isLoading: isLoadingStatuses } = useCollection<StaffStatus>(statusesRef);
-  const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffRef);
-
-  const getStaff = React.useCallback((id: string): Staff | undefined => {
-    return staffData?.find(s => s.id === id);
-  }, [staffData]);
-
+  const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
+  
+  const getStaff = (id: string): Staff | undefined => {
+    return staffData.find(s => s.id === id);
+  };
+  
+  const isLoading = !statuses;
 
   return (
     <Card>
@@ -53,7 +48,7 @@ export function StatusUpdates() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {isLoadingStatuses || isLoadingStaff ? (
+          {isLoading ? (
             <p>Loading statuses...</p>
           ) : statuses && statuses.length > 0 ? (
             statuses.map((status, index) => {

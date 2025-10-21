@@ -12,6 +12,7 @@ import {
   type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { staffData, customerData, scheduleData, unassignedOrdersData } from '@/lib/data';
 import type { ScheduleEvent, Staff, Customer, Order } from '@/lib/types';
 import {
   Card,
@@ -42,9 +43,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
-
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 8;
@@ -135,20 +133,9 @@ type EditedEventDetails = {
 // --- Main Component ---
 
 export function ScheduleView() {
-  const firestore = useFirestore();
-  const staffRef = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
-  const customersRef = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
-  const eventsRef = useMemoFirebase(() => firestore ? collection(firestore, 'events') : null, [firestore]);
-  const ordersRef = useMemoFirebase(() => firestore ? collection(firestore, 'orders') : null, [firestore]);
-
-  const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffRef);
-  const { data: customerData, isLoading: isLoadingCustomers } = useCollection<Customer>(customersRef);
-  const { data: scheduleData, isLoading: isLoadingSchedule } = useCollection<ScheduleEvent>(eventsRef);
-  const { data: unassignedOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersRef);
-
   const [isClient, setIsClient] = React.useState(false);
-  const [internalScheduleData, setInternalScheduleData] = React.useState<ScheduleEvent[]>([]);
-  const [internalUnassignedOrders, setInternalUnassignedOrders] = React.useState<Order[]>([]);
+  const [internalScheduleData, setInternalScheduleData] = React.useState<ScheduleEvent[]>(scheduleData);
+  const [internalUnassignedOrders, setInternalUnassignedOrders] = React.useState<Order[]>(unassignedOrdersData);
   
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   
@@ -157,15 +144,6 @@ export function ScheduleView() {
     startTime: '',
     endTime: '',
   });
-
-  React.useEffect(() => {
-    if (scheduleData) setInternalScheduleData(scheduleData);
-  }, [scheduleData]);
-
-  React.useEffect(() => {
-    if (unassignedOrders) setInternalUnassignedOrders(unassignedOrders);
-  }, [unassignedOrders]);
-
 
   const genericTasks: Order[] = [
       { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30 },
@@ -177,8 +155,8 @@ export function ScheduleView() {
     setIsClient(true);
   }, []);
   
-  const getCustomerByCode = (code: string | undefined): Customer | undefined => customerData?.find(c => c.userCode === code);
-  const getCustomerById = (id: string | undefined): Customer | undefined => customerData?.find(c => c.id === id);
+  const getCustomerByCode = (code: string | undefined): Customer | undefined => customerData.find(c => c.userCode === code);
+  const getCustomerById = (id: string | undefined): Customer | undefined => customerData.find(c => c.id === id);
 
   const [activeItem, setActiveItem] = React.useState<ScheduleEvent | Order | null>(null);
   const [currentOverStaffId, setCurrentOverStaffId] = React.useState<UniqueIdentifier | null>(null);
@@ -353,9 +331,8 @@ export function ScheduleView() {
     }
 
     // If the deleted event was from an order, add it back to unassigned orders
-    const orderId = eventToDelete.orderId || (scheduleData?.find(e => e.tripId === eventToDelete.tripId && e.orderId))?.orderId;
-    if (orderId) {
-        const originalOrder = unassignedOrders?.find(o => o.id === orderId);
+    if (eventToDelete.orderId) {
+        const originalOrder = unassignedOrdersData.find(o => o.id === eventToDelete.orderId);
         if (originalOrder && !internalUnassignedOrders.find(o => o.id === originalOrder.id)) {
             setInternalUnassignedOrders(prev => [...prev, originalOrder]);
         }
@@ -366,12 +343,12 @@ export function ScheduleView() {
   const getDialogDetails = () => {
     if (dialogState.mode === 'edit') {
       const { event } = dialogState;
-      const staff = staffData?.find(s => s.id === event.staffId);
+      const staff = staffData.find(s => s.id === event.staffId);
       const customer = getCustomerById(event.locationId);
       return { event, staff, customer, title: '予定の編集' };
     }
     if (dialogState.mode === 'new') {
-      const staff = staffData?.find(s => s.id === dialogState.staffId);
+      const staff = staffData.find(s => s.id === dialogState.staffId);
       return { staff, start: dialogState.start, title: '新規予定の作成' };
     }
     return { title: '' };
@@ -412,9 +389,9 @@ export function ScheduleView() {
                         customer={getCustomerByCode(order.customerCode)}
                       />
                     ))}
-                    {(isLoadingOrders || (internalUnassignedOrders.length === 0 && genericTasks.length === 0)) && (
+                    {internalUnassignedOrders.length === 0 && genericTasks.length === 0 && (
                       <div className="flex items-center justify-center h-24 text-center text-muted-foreground">
-                          <p>{isLoadingOrders ? "Loading..." : "利用可能なタスクはありません。"}</p>
+                          <p>利用可能なタスクはありません。</p>
                       </div>
                     )}
                   </div>
@@ -436,11 +413,11 @@ export function ScheduleView() {
 
           <div className="space-y-2">
             <TooltipProvider>
-              {(staffData || []).map((staff) => (
+              {staffData.map((staff) => (
                 <StaffRow
                   key={staff.id}
                   staff={staff}
-                  events={(internalScheduleData || []).filter(e => e.staffId === staff.id)}
+                  events={internalScheduleData.filter(e => e.staffId === staff.id)}
                   getCustomer={getCustomerById}
                   isOver={currentOverStaffId === staff.id}
                   onDoubleClickEvent={handleDoubleClickEvent}
@@ -523,7 +500,7 @@ export function ScheduleView() {
     </>
   );
 
-  if (!isClient || isLoadingStaff || isLoadingCustomers || isLoadingSchedule) {
+  if (!isClient) {
     return (
       <Card className="h-full">
         <CardHeader>

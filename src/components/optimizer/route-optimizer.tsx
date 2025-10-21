@@ -3,7 +3,8 @@
 import * as React from 'react';
 import { useActionState } from 'react';
 
-import type { Customer, Staff } from '@/lib/types';
+import type { Customer, Staff, StaffStatus } from '@/lib/types';
+import { customerData, staffData, staffStatusData } from '@/lib/data';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,8 +16,6 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -168,12 +167,8 @@ const LocationSelector: React.FC<{
 
 
 export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
-  const firestore = useFirestore();
-  const customersRef = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
-  const staffRef = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
-
-  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersRef);
-  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffRef);
+  const [customers] = React.useState<Customer[]>(customerData);
+  const [staff] = React.useState<Staff[]>(staffData);
   
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
@@ -185,7 +180,11 @@ export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
   }, [state.data, state.options, onRouteOptimized]);
 
   const allLocations = React.useMemo(() => {
-    if (!customers || !staff) return [];
+    const staffWithStatus = staffStatusData.map(status => {
+        const staffDetails = staff.find(s => s.id === status.staffId);
+        return { ...staffDetails, ...status } as (Staff & StaffStatus);
+    }).filter(s => s.id);
+
     const customerLocations: Location[] = customers
       .filter(c => c.latitude && c.longitude && c.storeName)
       .map(c => ({
@@ -197,14 +196,14 @@ export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
         type: 'customer'
       }));
 
-    const staffLocations: Location[] = staff
-      .filter(s => 'latitude' in s && 'longitude' in s) // This is a temp check for staff status
+    const staffLocations: Location[] = staffWithStatus
+      .filter(s => s.latitude && s.longitude)
       .map(s => ({
-        id: s.id,
+        id: s.id!,
         name: `${s.name} (現在地)`,
         address: 'Current Location',
-        latitude: (s as any).latitude!,
-        longitude: (s as any).longitude!,
+        latitude: s.latitude!,
+        longitude: s.longitude!,
         type: 'staff'
       }));
 
@@ -230,8 +229,10 @@ export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
   const removeWaypoint = (index: number) => {
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
+  
+  const isLoading = !customers || !staff;
 
-  if (isLoadingCustomers || isLoadingStaff) {
+  if (isLoading) {
     return (
         <Card>
             <CardHeader>

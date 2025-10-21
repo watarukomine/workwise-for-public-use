@@ -2,6 +2,7 @@
 'use client';
 import * as React from 'react';
 import type { Customer } from '@/lib/types';
+import { customerData } from '@/lib/data';
 import {
   Table,
   TableBody,
@@ -17,20 +18,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
 
 export function CustomerTable() {
-  const firestore = useFirestore();
-  const customersRef = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
-  const { data: customers, isLoading } = useCollection<Customer>(customersRef);
-  
+  const [customers] = React.useState<Customer[]>(customerData);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
 
   const filteredCustomers = React.useMemo(() => {
-    if (!customers) return [];
     return customers.filter(customer =>
       customer && customer.userCode && customer.userCode.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -44,6 +39,7 @@ export function CustomerTable() {
   }, [filteredCustomers, page, rowsPerPage]);
 
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
+  const isLoading = !customers;
 
   return (
     <Card>
