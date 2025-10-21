@@ -4,6 +4,7 @@ import * as React from 'react';
 import Papa from 'papaparse';
 import { getFirebase } from '@/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,14 +15,16 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useUser } from '@/firebase';
 
 type DataType = 'customers' | 'staff' | 'schedules';
 type Status = 'idle' | 'parsing' | 'importing' | 'success' | 'error';
 
-const { firestore } = getFirebase(); // Get the singleton firestore instance
+const { firestore, auth } = getFirebase(); // Get the singleton instances
 
 export function DataImporter() {
   const { toast } = useToast();
+  const { user, isLoading: isUserLoading } = useUser();
   const [file, setFile] = React.useState<File | null>(null);
   const [dataType, setDataType] = React.useState<DataType>('customers');
   const [status, setStatus] = React.useState<Status>('idle');
@@ -50,6 +53,21 @@ export function DataImporter() {
     setStatus('parsing');
     setProgress(0);
     setResults({ success: 0, failed: 0 });
+    
+    // Ensure user is signed in anonymously if not already logged in
+    if (!auth.currentUser) {
+      try {
+        await signInAnonymously(auth);
+      } catch (error) {
+        setStatus('error');
+        toast({
+          variant: 'destructive',
+          title: 'Authentication Error',
+          description: 'Could not sign in anonymously to import data.',
+        });
+        return;
+      }
+    }
 
     Papa.parse(file, {
       header: true,
