@@ -115,8 +115,8 @@ export function ScheduleView() {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
       
-      const originalStart = typeof eventToUpdate.start === 'string' ? parseISO(eventToUpdate.start) : eventToUpdate.start;
-      const originalEnd = typeof eventToUpdate.end === 'string' ? parseISO(eventToUpdate.end) : eventToUpdate.end;
+      const originalStart = eventToUpdate.start instanceof Date ? eventToUpdate.start : parseISO(eventToUpdate.start);
+      const originalEnd = eventToUpdate.end instanceof Date ? eventToUpdate.end : parseISO(eventToUpdate.end);
 
       const newStart = addMinutes(originalStart, dragMinutes);
       const newEnd = addMinutes(originalEnd, dragMinutes);
@@ -137,8 +137,9 @@ export function ScheduleView() {
         const order = item;
         const timelineRect = over.rect;
         
-        const dropX = active.rect.current.initial!.left - timelineRect.left + delta.x;
-        
+        // Calculate the drop position relative to the timeline
+        const dropX = (active.rect.current.initial?.left ?? 0) - timelineRect.left + delta.x;
+
         const dropMinutes = pixelsToMinutes(dropX);
 
         const today = new Date();
