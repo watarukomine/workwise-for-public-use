@@ -52,9 +52,6 @@ const OptimizeRouteOutputSchema = z.object({
     .string()
     .optional()
     .describe('The estimated travel distance for the optimized route.'),
-  summary: z
-    .string()
-    .describe('A summary of the route optimization, including key waypoints.'),
 });
 export type OptimizeRouteOutput = z.infer<typeof OptimizeRouteOutputSchema>;
 
@@ -84,7 +81,7 @@ const prompt = ai.definePrompt({
   End Location:
   - ID: {{endLocation.id}}, Name: {{endLocation.name}}, Address: {{endLocation.address}}, Latitude: {{endLocation.latitude}}, Longitude: {{endLocation.longitude}}
 
-  Please provide the optimized route as an ordered list of all locations (start, waypoints, and end). Also include the estimated travel time, estimated travel distance, and a summary of the route optimization.
+  Please provide the optimized route as an ordered list of all locations (start, waypoints, and end). Also include the estimated travel time and estimated travel distance.
   Ensure that the locations in the optimizedRoute array contain all the original fields (id, name, address, latitude, longitude) from the input. The final optimizedRoute array must include the start location, all waypoints, and the end location in the calculated optimal order.
   `,
 });
@@ -100,3 +97,4 @@ const optimizeRouteFlow = ai.defineFlow(
     return output!;
   }
 );
+

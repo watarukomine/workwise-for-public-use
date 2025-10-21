@@ -314,8 +314,6 @@ export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOpti
             </CardHeader>
             <CardContent className="space-y-6">
                 <div>
-                    <h3 className="font-semibold mb-2">概要</h3>
-                    <p className="text-sm text-muted-foreground">{state.data.summary}</p>
                     <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
                     {state.data.estimatedTravelTime && (
                         <div className="flex flex-col p-3 bg-muted rounded-md">
@@ -355,3 +353,4 @@ export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOpti
     </div>
   );
 }
+
