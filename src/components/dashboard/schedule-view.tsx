@@ -27,7 +27,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { addMinutes, differenceInMinutes, format, parse, parseISO } from 'date-fns';
+import { addMinutes, differenceInMinutes, format, parse, parseISO, subMinutes } from 'date-fns';
 import { staffData, customerData as staticCustomerData, scheduleData as staticScheduleData, orderData as staticOrderData } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
@@ -49,6 +49,7 @@ const PIXELS_PER_MINUTE = 2;
 const timelineStartHour = 8;
 const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
+const TRAVEL_TIME_MINUTES = 30;
 
 // --- Helper Functions ---
 const formatTime = (date: Date | string) => {
@@ -213,26 +214,52 @@ export function ScheduleView() {
         const today = new Date();
         const startOfDay = new Date(today);
         startOfDay.setHours(timelineStartHour, 0, 0, 0);
-
-        const newStart = addMinutes(startOfDay, dropMinutes);
-        const newEnd = addMinutes(newStart, order.estimatedDuration);
-        const customer = getCustomerByCode(order.customerCode);
+        
         const isGeneric = order.id.startsWith('generic-');
 
-        const newEvent: ScheduleEvent = {
-            id: `event-${Date.now()}`,
-            orderId: isGeneric ? undefined : order.id,
-            title: order.taskDetails,
-            staffId: newStaffId,
-            locationId: customer?.id || '',
-            start: newStart,
-            end: newEnd,
-        };
+        if (isGeneric) {
+             const newStart = addMinutes(startOfDay, dropMinutes);
+             const newEnd = addMinutes(newStart, order.estimatedDuration);
+             const newEvent: ScheduleEvent = {
+                id: `event-${Date.now()}`,
+                title: order.taskDetails,
+                staffId: newStaffId,
+                locationId: '',
+                start: newStart,
+                end: newEnd,
+             };
+             setScheduleData(prev => [...prev, newEvent]);
+        } else {
+            // This is a customer order, so add travel time
+            const taskStart = addMinutes(startOfDay, dropMinutes);
+            const taskEnd = addMinutes(taskStart, order.estimatedDuration);
+            const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+            const customer = getCustomerByCode(order.customerCode);
+            const tripId = `trip-${Date.now()}`;
 
-        setScheduleData(prev => [...prev, newEvent]);
+            const travelEvent: ScheduleEvent = {
+                id: `event-${Date.now()}-travel`,
+                tripId: tripId,
+                title: `移動: ${customer?.storeName || order.customerCode}`,
+                staffId: newStaffId,
+                locationId: customer?.id || '',
+                start: travelStart,
+                end: taskStart,
+            };
 
-        if (!isGeneric) {
-          setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
+            const taskEvent: ScheduleEvent = {
+                id: `event-${Date.now()}-task`,
+                tripId: tripId,
+                orderId: order.id,
+                title: order.taskDetails,
+                staffId: newStaffId,
+                locationId: customer?.id || '',
+                start: taskStart,
+                end: taskEnd,
+            };
+
+            setScheduleData(prev => [...prev, travelEvent, taskEvent]);
+            setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
         }
     }
 
@@ -563,6 +590,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     onDoubleClick();
   };
 
+  const isTravelEvent = event.title?.startsWith('移動:');
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -574,8 +603,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           className="absolute h-12 rounded-md px-2 flex items-center cursor-move"
           style={{
             ...style,
-            backgroundColor: staff.color,
-            color: 'white',
+            backgroundColor: isTravelEvent ? 'hsl(48, 96%, 86%)' : staff.color,
+            color: isTravelEvent ? 'hsl(var(--foreground))' : 'white',
           }}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">

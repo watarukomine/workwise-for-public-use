@@ -31,6 +31,7 @@ export type Customer = {
 
 export type ScheduleEvent = {
   id: string;
+  tripId?: string; // To group travel and task events
   orderId?: string; // To link back to the original order
   title?: string;
   locationId: string;
