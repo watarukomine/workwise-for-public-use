@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Papa from 'papaparse';
-import { initializeFirebase } from '@/firebase';
+import { useUser, initializeFirebase } from '@/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import type { Customer } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,16 +12,18 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, Loader2, CheckCircle, AlertCircle, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter, FirestorePermissionError } from '@/firebase';
+import { getAuthInstance, signInWithGoogle } from '@/lib/auth';
+import { Skeleton } from '../ui/skeleton';
 
 type DataType = 'customers' | 'staff' | 'schedules' | 'orders';
 type Status = 'idle' | 'parsing' | 'importing' | 'success' | 'error';
 
-const { firestore } = initializeFirebase(); 
+const { firestore } = initializeFirebase();
 
-export function DataImporter() {
+function ImporterCore() {
   const { toast } = useToast();
   const [file, setFile] = React.useState<File | null>(null);
   const [dataType, setDataType] = React.useState<DataType>('customers');
@@ -153,7 +155,7 @@ export function DataImporter() {
   const isProcessing = status === 'parsing' || status === 'importing';
 
   return (
-    <Card>
+      <Card>
       <CardHeader>
         <CardTitle>Import Data</CardTitle>
         <CardDescription>Upload a CSV file to import data into your Firestore collections.</CardDescription>
@@ -174,7 +176,7 @@ export function DataImporter() {
               <RadioGroupItem value="schedules" id="schedules" />
               <Label htmlFor="schedules">Schedules</Label>
             </div>
-            <div className="flex items-center space-x-2">
+             <div className="flex items-center space-x-2">
               <RadioGroupItem value="orders" id="orders" />
               <Label htmlFor="orders">Orders</Label>
             </div>
@@ -220,5 +222,53 @@ export function DataImporter() {
         )}
       </CardContent>
     </Card>
-  );
+  )
 }
+
+
+export function DataImporter() {
+  const { user, isUserLoading } = useUser();
+  const auth = getAuthInstance();
+
+  const handleSignIn = async () => {
+    if (!auth) return;
+    await signInWithGoogle(auth);
+  };
+
+  if (isUserLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-7 w-1/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-32" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Authentication Required</CardTitle>
+          <CardDescription>Please sign in to import data.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={handleSignIn}>
+            <LogIn className="mr-2 h-4 w-4" />
+            Sign In with Google
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return <ImporterCore />;
+}
+
+    
