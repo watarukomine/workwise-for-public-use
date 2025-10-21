@@ -10,7 +10,8 @@ import {
   LogIn,
   Home,
   Map,
-  ClipboardList
+  ClipboardList,
+  Upload,
 } from 'lucide-react';
 
 import {
@@ -43,6 +44,7 @@ const navItems = [
   { href: '/customers', label: '顧客一覧', icon: Building2 },
   { href: '/staff', label: 'スタッフ一覧', icon: Users },
   { href: '/optimizer', label: 'ルート最適化', icon: Map },
+  { href: '/import', label: 'データ取込', icon: Upload },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
