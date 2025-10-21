@@ -83,11 +83,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </SidebarContent>
         <SidebarFooter className="p-2">
           {isUserLoading ? (
-             <div className="flex items-center gap-3 p-2">
-                <Avatar className="h-9 w-9 shimmer" />
+             <div className="flex items-center gap-3 p-2 animate-pulse">
+                <div className="h-9 w-9 rounded-full bg-muted" />
                 <div className="flex-1 space-y-2">
-                    <div className="h-3 w-3/4 rounded bg-gray-200 shimmer" />
-                    <div className="h-2 w-1/2 rounded bg-gray-200 shimmer" />
+                    <div className="h-3 w-3/4 rounded bg-muted" />
+                    <div className="h-2 w-1/2 rounded bg-muted" />
                 </div>
             </div>
           ) : user ? (

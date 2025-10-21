@@ -49,12 +49,13 @@ export function DataImporter() {
 
     setStatus('parsing');
     setProgress(0);
+    setResults({ success: 0, failed: 0 });
 
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: async (results) => {
-        const data = results.data as any[];
+      complete: async (parseResults) => {
+        const data = parseResults.data as any[];
         if (data.length === 0) {
           setStatus('error');
           toast({ variant: 'destructive', title: 'Empty File', description: 'The selected CSV file is empty or invalid.' });
@@ -64,53 +65,52 @@ export function DataImporter() {
         setStatus('importing');
         let successCount = 0;
         let failedCount = 0;
+        const totalRecords = data.length;
 
-        for (let i = 0; i < data.length; i++) {
-          const record = data[i];
-          const collectionRef = collection(firestore, dataType);
-          // Use a specific ID from the CSV or generate a new one
-          const recordId = record.id || doc(collectionRef).id;
-          const docRef = doc(collectionRef, recordId);
-          
-          // Simple data cleaning/transformation
-          let dataToImport: any = { ...record };
-          if (dataType === 'customers') {
-              dataToImport.latitude = parseFloat(record.latitude) || null;
-              dataToImport.longitude = parseFloat(record.longitude) || null;
-          } else if (dataType === 'schedules') {
-              dataToImport.startTime = new Date(record.startTime);
-              dataToImport.endTime = new Date(record.endTime);
-          }
-          
-          setDoc(docRef, dataToImport, { merge: true })
-            .then(() => {
-              successCount++;
-            })
-            .catch(async (serverError) => {
-              failedCount++;
-              const permissionError = new FirestorePermissionError({
-                path: docRef.path,
-                operation: 'write',
-                requestResourceData: dataToImport,
-              });
-              errorEmitter.emit('permission-error', permissionError);
-            })
-            .finally(() => {
-                const processedCount = successCount + failedCount;
-                setProgress((processedCount / data.length) * 100);
-
-                if (processedCount === data.length) {
-                    setResults({ success: successCount, failed: failedCount });
-                    setStatus(failedCount > 0 ? 'error' : 'success');
-
-                    toast({
-                        title: 'Import Complete',
-                        description: `${successCount} records imported successfully. ${failedCount} failed.`,
-                        variant: failedCount > 0 ? 'destructive' : 'default',
-                    });
-                }
+        const promises = data.map(async (record) => {
+          try {
+            const collectionRef = collection(firestore, dataType);
+            const recordId = record.id || doc(collectionRef).id;
+            const docRef = doc(collectionRef, recordId);
+            
+            let dataToImport: any = { ...record };
+            if (dataType === 'customers') {
+                dataToImport.latitude = parseFloat(record.latitude) || null;
+                dataToImport.longitude = parseFloat(record.longitude) || null;
+            } else if (dataType === 'schedules') {
+                dataToImport.startTime = new Date(record.startTime);
+                dataToImport.endTime = new Date(record.endTime);
+            }
+            
+            await setDoc(docRef, dataToImport, { merge: true });
+            successCount++;
+          } catch (serverError) {
+            failedCount++;
+            // Assuming docRef is available or can be constructed
+            const collectionRef = collection(firestore, dataType);
+            const recordId = record.id || 'unknown-id';
+            const docRef = doc(collectionRef, recordId);
+            const permissionError = new FirestorePermissionError({
+              path: docRef.path,
+              operation: 'write',
+              requestResourceData: record,
             });
-        }
+            errorEmitter.emit('permission-error', permissionError);
+          } finally {
+            const processedCount = successCount + failedCount;
+            setProgress((processedCount / totalRecords) * 100);
+          }
+        });
+
+        await Promise.all(promises);
+
+        setResults({ success: successCount, failed: failedCount });
+        setStatus(failedCount > 0 ? 'error' : 'success');
+        toast({
+            title: 'Import Complete',
+            description: `${successCount} records imported successfully. ${failedCount} failed.`,
+            variant: failedCount > 0 ? 'destructive' : 'default',
+        });
       },
       error: (error: any) => {
         setStatus('error');
@@ -168,7 +168,7 @@ export function DataImporter() {
       <CardContent className="space-y-6">
         <div className="space-y-2">
           <Label>Data Type</Label>
-          <RadioGroup value={dataType} onValueChange={(value: DataType) => setDataType(value)} className="flex gap-4">
+          <RadioGroup value={dataType} onValueChange={(value: any) => setDataType(value)} className="flex gap-4">
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="customers" id="customers" />
               <Label htmlFor="customers">Customers</Label>
@@ -191,7 +191,7 @@ export function DataImporter() {
 
         <Button onClick={handleImport} disabled={!file || isProcessing || !user} className="w-full sm:w-auto">
           {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-          {status === 'importing' ? `Importing...` : 'Import Data'}
+          {status === 'importing' ? `Importing... (${Math.round(progress)}%)` : 'Import Data'}
         </Button>
 
         {(status === 'importing' || status === 'success' || status === 'error') && (
