@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import type { Order, Customer } from '@/lib/types';
@@ -41,7 +40,6 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
       style={style}
       {...listeners}
       {...attributes}
-      className="touch-none"
     >
       <div
         className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
