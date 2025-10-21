@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Staff": {
@@ -46,6 +47,26 @@
         "address": {
           "type": "string",
           "description": "The address of the customer."
+        },
+        "no": {
+          "type": "string",
+          "description": "The customer number."
+        },
+        "userCode": {
+          "type": "string",
+          "description": "The user code for the customer."
+        },
+        "storeName": {
+          "type": "string",
+          "description": "The name of the customer's store."
+        },
+        "phoneNumber": {
+          "type": "string",
+          "description": "The phone number of the customer."
+        },
+        "businessHours": {
+          "type": "string",
+          "description": "The business hours of the customer's store."
         }
       },
       "required": [

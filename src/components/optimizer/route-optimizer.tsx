@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useActionState } from 'react';
 
-import type { Customer, Staff, StaffStatus } from '@/lib/types';
+import type { Customer, Staff } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,8 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -34,8 +36,6 @@ type Location = {
 };
 
 interface RouteOptimizerProps {
-  customers: Customer[];
-  staff: StaffWithStatus[];
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
 }
 
@@ -119,8 +119,6 @@ function SubmitButton() {
   );
 }
 
-type StaffWithStatus = Staff & StaffStatus;
-
 const LocationSelector: React.FC<{
   locations: Location[];
   selectedValue: string | undefined;
@@ -169,7 +167,14 @@ const LocationSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
+  const firestore = useFirestore();
+  const customersRef = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
+  const staffRef = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
+
+  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersRef);
+  const { data: staff, isLoading: isLoadingStaff } = useCollection<Staff>(staffRef);
+  
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
   const [waypoints, setWaypoints] = React.useState<string[]>([]);
@@ -180,6 +185,7 @@ export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOpti
   }, [state.data, state.options, onRouteOptimized]);
 
   const allLocations = React.useMemo(() => {
+    if (!customers || !staff) return [];
     const customerLocations: Location[] = customers
       .filter(c => c.latitude && c.longitude && c.storeName)
       .map(c => ({
@@ -192,13 +198,13 @@ export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOpti
       }));
 
     const staffLocations: Location[] = staff
-      .filter(s => s.latitude && s.longitude)
+      .filter(s => 'latitude' in s && 'longitude' in s) // This is a temp check for staff status
       .map(s => ({
         id: s.id,
         name: `${s.name} (現在地)`,
-        address: s.lastAction,
-        latitude: s.latitude!,
-        longitude: s.longitude!,
+        address: 'Current Location',
+        latitude: (s as any).latitude!,
+        longitude: (s as any).longitude!,
         type: 'staff'
       }));
 
@@ -225,6 +231,19 @@ export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOpti
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
 
+  if (isLoadingCustomers || isLoadingStaff) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>ルート詳細</CardTitle>
+                <CardDescription>出発地、目的地、経由地、最適化の基準を選択してください。</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <p>Loading locations...</p>
+            </CardContent>
+        </Card>
+    )
+  }
 
   return (
     <div className="space-y-4">

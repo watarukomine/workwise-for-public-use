@@ -17,20 +17,31 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
-export function CustomerTable({ customers }: { customers: Customer[] }) {
+export function CustomerTable() {
+  const firestore = useFirestore();
+  const customersRef = useMemoFirebase(() => firestore ? collection(firestore, 'customers') : null, [firestore]);
+  const { data: customers, isLoading } = useCollection<Customer>(customersRef);
+  
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
 
-  const filteredCustomers = customers.filter(customer =>
-    customer && customer.userCode && customer.userCode.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCustomers = React.useMemo(() => {
+    if (!customers) return [];
+    return customers.filter(customer =>
+      customer && customer.userCode && customer.userCode.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [customers, searchTerm]);
 
-  const paginatedCustomers = filteredCustomers.slice(
-    (page - 1) * rowsPerPage,
-    page * rowsPerPage
-  );
+  const paginatedCustomers = React.useMemo(() => {
+    return filteredCustomers.slice(
+      (page - 1) * rowsPerPage,
+      page * rowsPerPage
+    );
+  }, [filteredCustomers, page, rowsPerPage]);
 
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
 
@@ -61,7 +72,13 @@ export function CustomerTable({ customers }: { customers: Customer[] }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedCustomers.length > 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    Loading customers...
+                  </TableCell>
+                </TableRow>
+              ) : paginatedCustomers.length > 0 ? (
                 paginatedCustomers.map((customer) => (
                   <TableRow key={customer.id}>
                     <TableCell className="font-medium">{customer.no}</TableCell>
@@ -75,7 +92,7 @@ export function CustomerTable({ customers }: { customers: Customer[] }) {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    {customers.length === 0 ? "No customers found." : "No matching customers found for your search."}
+                    {customers && customers.length === 0 ? "No customers found." : "No matching customers found for your search."}
                   </TableCell>
                 </TableRow>
               )}

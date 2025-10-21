@@ -1,4 +1,5 @@
-import { staffData } from '@/lib/data';
+
+'use client';
 import type { Staff } from '@/lib/types';
 import {
   Table,
@@ -13,9 +14,14 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import React from 'react';
 
 export function StaffTable() {
-  const staff: Staff[] = staffData;
+  const firestore = useFirestore();
+  const staffRef = useMemoFirebase(() => firestore ? collection(firestore, 'staff') : null, [firestore]);
+  const { data: staff, isLoading } = useCollection<Staff>(staffRef);
 
   return (
     <Card>
@@ -30,26 +36,40 @@ export function StaffTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {staff.map((member) => (
-                <TableRow key={member.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarImage src={member.avatarUrl} alt={member.name} data-ai-hint="person" />
-                        <AvatarFallback>{member.name.slice(0, 2)}</AvatarFallback>
-                      </Avatar>
-                      <span className="font-medium">{member.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{member.calendarId}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                       <div className="h-4 w-4 rounded-full border" style={{ backgroundColor: member.color }} />
-                       <span className="text-muted-foreground font-mono text-sm">{member.color}</span>
-                    </div>
-                  </TableCell>
+              {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center">
+                      Loading staff...
+                    </TableCell>
+                  </TableRow>
+              ) : staff && staff.length > 0 ? (
+                staff.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={member.avatarUrl} alt={member.name} data-ai-hint="person" />
+                          <AvatarFallback>{member.name.slice(0, 2)}</AvatarFallback>
+                        </Avatar>
+                        <span className="font-medium">{member.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{member.calendarId}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                         <div className="h-4 w-4 rounded-full border" style={{ backgroundColor: member.color }} />
+                         <span className="text-muted-foreground font-mono text-sm">{member.color}</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center">
+                      No staff members found.
+                    </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>

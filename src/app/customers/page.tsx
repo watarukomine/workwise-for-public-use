@@ -2,12 +2,8 @@
 'use client';
 
 import { CustomerTable } from '@/components/customers/customer-table';
-import { customerData } from '@/lib/data';
-import type { Customer } from '@/lib/types';
 
 export default function CustomersPage() {
-  const customers: Customer[] = customerData;
-
   return (
     <div className="space-y-8">
       <div>
@@ -16,7 +12,7 @@ export default function CustomersPage() {
           Manage and search your list of customers.
         </p>
       </div>
-      <CustomerTable customers={customers} />
+      <CustomerTable />
     </div>
   );
 }

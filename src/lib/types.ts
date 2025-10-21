@@ -1,4 +1,5 @@
 
+
 export type Staff = {
   id: string;
   name: string;
@@ -17,15 +18,6 @@ export type Customer = {
   longitude?: number;
   phoneNumber?: string;
   businessHours?: string;
-  // Legacy fields from import
-  "No"?: string;
-  "ユーザーコード"?: string;
-  "店舗"?: string;
-  "住所"?: string;
-  "緯度"?: number | string;
-  "経度"?: number | string;
-  "電話番号"?: string;
-  "営業時間"?: string;
   name?: string; // for search
 };
 
