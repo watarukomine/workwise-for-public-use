@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { useActionState } from 'react';
@@ -30,26 +31,27 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
   
   const selectedCustomers = allCustomers.filter(c => selectedLocationIds.includes(c.id));
 
-  // Simulate automatic geocoding
   const locationsWithCoords = selectedCustomers.map(loc => {
     if (loc.latitude && loc.longitude) {
-      return loc;
+      return loc as Required<Customer>;
     }
-    // Simulate finding coordinates for an address
+    // This is a fallback and shouldn't happen if data is clean
+    // In a real app, you would geocode the address here.
     return {
       ...loc,
-      latitude: 33.5 + Math.random(), // Random latitude in a plausible range
-      longitude: -117.5 - Math.random(), // Random longitude in a plausible range
+      latitude: 35.45, // Defaulting to Yokohama's general area
+      longitude: 139.63,
     };
   })
 
   try {
     const result = await optimizeRoute({
-      locations: locationsWithCoords,
+      locations: locationsWithCoords.map(c => ({...c, name: c.name})),
       optimizeFor: optimizeFor,
     });
     return { data: result, error: null };
   } catch (e) {
+    console.error(e);
     return { data: null, error: 'Failed to optimize route. Please try again.' };
   }
 }
@@ -95,8 +97,11 @@ export function RouteOptimizer({ customers }: { customers: Customer[] }) {
   const [selected, setSelected] = React.useState<string[]>([]);
   const [state, formActionWithState] = useActionState(formAction, { data: null, error: null });
 
+  const customersWithCoords = React.useMemo(() => customers.filter(c => c.latitude && c.longitude), [customers]);
+
+
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle>Route Details</CardTitle>
@@ -106,7 +111,7 @@ export function RouteOptimizer({ customers }: { customers: Customer[] }) {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label>Locations</Label>
-              <input type="hidden" name="allCustomers" value={JSON.stringify(customers)} />
+              <input type="hidden" name="allCustomers" value={JSON.stringify(customersWithCoords)} />
               {selected.map(id => <input key={id} type="hidden" name="locations" value={id} />)}
               
               <Popover open={open} onOpenChange={setOpen}>
@@ -125,9 +130,9 @@ export function RouteOptimizer({ customers }: { customers: Customer[] }) {
                   <Command>
                     <CommandInput placeholder="Search location..." />
                     <CommandList>
-                      <CommandEmpty>No location found.</CommandEmpty>
+                      <CommandEmpty>No geocoded locations found.</CommandEmpty>
                       <CommandGroup>
-                        {customers.map((customer) => (
+                        {customersWithCoords.map((customer) => (
                           <CommandItem
                             key={customer.id}
                             value={customer.name}
@@ -176,28 +181,29 @@ export function RouteOptimizer({ customers }: { customers: Customer[] }) {
         </form>
       </Card>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Optimized Route</CardTitle>
-          <CardDescription>The most efficient path based on your selection.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {state.error && (
-            <Alert variant="destructive">
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{state.error}</AlertDescription>
-            </Alert>
-          )}
+      {state.error && (
+        <Alert variant="destructive">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{state.error}</AlertDescription>
+        </Alert>
+      )}
 
-          {!state.data && !state.error && (
-            <div className="flex flex-col items-center justify-center text-center text-muted-foreground h-48">
-              <MapPinned className="h-12 w-12 mb-4" />
-              <p>Your optimized route will appear here.</p>
-            </div>
-          )}
+      {!state.data && !state.error && (
+        <Card className="h-full">
+            <CardContent className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 pt-6">
+                <MapPinned className="h-12 w-12 mb-4" />
+                <p>Your optimized route will appear here.</p>
+            </CardContent>
+        </Card>
+      )}
 
-          {state.data && (
-            <div className="space-y-6">
+      {state.data && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Optimized Route</CardTitle>
+            <CardDescription>The most efficient path based on your selection.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
               <div>
                 <h3 className="font-semibold mb-2">Summary</h3>
                 <p className="text-sm text-muted-foreground">{state.data.summary}</p>
@@ -233,10 +239,9 @@ export function RouteOptimizer({ customers }: { customers: Customer[] }) {
                   ))}
                 </ol>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

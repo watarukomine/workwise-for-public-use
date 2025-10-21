@@ -1,3 +1,4 @@
+
 import type { Staff, Customer, ScheduleEvent, StaffStatus } from './types';
 
 export const staffData: Staff[] = [
@@ -11,9 +12,9 @@ export const customerData: Customer[] = [
   { id: 'cust-1', name: '桜ヶ丘中央病院', address: '神奈川県横浜市中区桜木町1-1-1', latitude: 35.4513, longitude: 139.6322 },
   { id: 'cust-2', name: 'みなとみらい高校', address: '神奈川県横浜市西区みなとみらい3-5-1', latitude: 35.4658, longitude: 139.6353 },
   { id: 'cust-3', name: 'ベイサイドモール', address: '神奈川県横浜市金沢区白帆5-2', latitude: 35.3813, longitude: 139.6455 },
-  { id: 'cust-4', name: 'レイクサイド・アパートメンツ', address: '神奈川県横浜市旭区上白根町123' },
+  { id: 'cust-4', name: 'レイクサイド・アパートメンツ', address: '神奈川県横浜市旭区上白根町123', latitude: 35.5011, longitude: 139.5241 },
   { id: 'cust-5', name: '横浜ビジネスパーク', address: '神奈川県横浜市保土ケ谷区神戸町134', latitude: 35.4593, longitude: 139.5962 },
-  { id: 'cust-6', name: '京浜工業地帯 倉庫', address: '神奈川県横浜市鶴見区大黒ふ頭15' },
+  { id: 'cust-6', name: '京浜工業地帯 倉庫', address: '神奈川県横浜市鶴見区大黒ふ頭15', latitude: 35.4782, longitude: 139.6781 },
 ];
 
 const today = new Date();
@@ -32,8 +33,8 @@ export const scheduleData: ScheduleEvent[] = [
 ];
 
 export const staffStatusData: StaffStatus[] = [
-  { staffId: 'staff-1', status: 'Working', lastAction: '作業開始: 定期メンテナンス', distanceFromSite: '0 km' },
-  { staffId: 'staff-2', status: 'On Site', lastAction: 'ベイサイドモールに到着', distanceFromSite: '0 km' },
-  { staffId: 'staff-3', status: 'En Route', lastAction: 'みなとみらい高校へ向けて出発', distanceFromSite: '3.2 km' },
-  { staffId: 'staff-4', status: 'Idle', lastAction: '次の指示を待っています', distanceFromSite: undefined },
+  { staffId: 'staff-1', status: 'Working', lastAction: '作業開始: 定期メンテナンス', distanceFromSite: '0 km', latitude: 35.4513, longitude: 139.6322 },
+  { staffId: 'staff-2', status: 'On Site', lastAction: 'ベイサイドモールに到着', distanceFromSite: '0 km', latitude: 35.3813, longitude: 139.6455 },
+  { staffId: 'staff-3', status: 'En Route', lastAction: 'みなとみらい高校へ向けて出発', distanceFromSite: '3.2 km', latitude: 35.4600, longitude: 139.6300 },
+  { staffId: 'staff-4', status: 'Idle', lastAction: '次の指示を待っています', distanceFromSite: undefined, latitude: 35.48, longitude: 139.58 },
 ];

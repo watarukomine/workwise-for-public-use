@@ -1,3 +1,4 @@
+
 export type Staff = {
   id: string;
   name: string;
@@ -28,4 +29,6 @@ export type StaffStatus = {
   status: 'Idle' | 'En Route' | 'On Site' | 'Working' | 'Departing';
   lastAction: string;
   distanceFromSite?: string;
+  latitude?: number;
+  longitude?: number;
 };

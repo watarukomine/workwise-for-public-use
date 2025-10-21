@@ -1,7 +1,20 @@
+
+"use client";
+
 import { RouteOptimizer } from "@/components/optimizer/route-optimizer";
-import { customerData } from "@/lib/data";
+import { customerData, staffData, staffStatusData } from "@/lib/data";
+import { RouteMap } from "@/components/optimizer/route-map";
+import { APIProvider } from "@vis.gl/react-google-maps";
+import { staffData as allStaff } from "@/lib/data";
+import type { Staff, StaffStatus } from "@/lib/types";
 
 export default function OptimizerPage() {
+
+  const staffWithStatus = staffStatusData.map(status => {
+    const staffDetails = allStaff.find(staff => staff.id === status.staffId);
+    return { ...staffDetails, ...status } as (Staff & StaffStatus);
+  });
+
   return (
     <div className="space-y-8">
       <div>
@@ -10,7 +23,16 @@ export default function OptimizerPage() {
           Generate the most efficient route between multiple work locations.
         </p>
       </div>
-      <RouteOptimizer customers={customerData} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-1">
+          <RouteOptimizer customers={customerData} />
+        </div>
+        <div className="lg:col-span-2">
+            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
+              <RouteMap staff={staffWithStatus} customers={customerData} />
+            </APIProvider>
+        </div>
+      </div>
     </div>
   );
 }
