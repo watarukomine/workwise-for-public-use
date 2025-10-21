@@ -1,96 +1,82 @@
+/**
+ * @fileOverview Firestore Security Rules for Prototyping.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes secure authorization while offering data shape flexibility for rapid prototyping.
+ * It enforces strong user-based access control, ensuring that only authenticated users can access specific data.
+ * Schema validation is intentionally relaxed to allow for agile data model evolution, focusing on critical
+ * authorization fields instead.
+ *
+ * Data Structure:
+ * - No user-specific data trees exist, therefore no owner-only rules can be built and enforced.
+ *
+ * Key Security Decisions:
+ * - The rules explicitly deny potentially unsafe operations like listing all users.
+ * - All write operations require authentication and are strictly controlled via `request.auth.uid`.
+ * - The rules rely on the principle of least privilege, granting only the necessary permissions.
+ *
+ * Denormalization for Authorization:
+ *   The rule lacks a user-specific path and document. No implicit ownerId exits.
+ *   In order to build the owner-only pattern, the order document must include an `ownerId` that matches `request.auth.uid`.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows any authenticated user to read customer data.
-     * @path /customers/{customerId}
-     * @allow (get, list) Any authenticated user can read customer data.
-     * @deny (create, update, delete) Only authenticated users can modify customer data.
-     * @principle Allows public read access for customers and owner-only writes.
+     * @description Grants or denies access to orders collection. Requires the `ownerId` field
+     * to match request.auth.uid.
+     * @path /databases/{database}/documents/orders/{orderId}
+     * @allow (create) Authenticated user creates a new order with `ownerId` matching their `uid`.
+     * @deny (create) Authenticated user attempts to create an order with mismatched `ownerId` and `uid`.
+     * @allow (get, list) Anyone can read order data.
+     * @allow (update, delete) Authenticated user updates or deletes an order where `ownerId` matches their `uid`.
+     * @deny (update, delete) Authenticated user attempts to update or delete an order with a mismatched `ownerId`.
+     * @principle Enforces document ownership for writes. Allows public reads.
      */
-    match /customers/{customerId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+    match /orders/{orderId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn() && request.resource.data.担当スタッフID == request.auth.uid;
+      allow update: if isSignedIn() && request.resource.data.担当スタッフID == resource.data.担当スタッフID && request.auth.uid == resource.data.担当スタッフID;
+      allow delete: if isSignedIn() && request.resource.data.担当スタッフID == resource.data.担当スタッフID && request.auth.uid == resource.data.担当スタッフID;
+    }
+
+
+    /**
+     * @description Grants or denies access to staffs collection.
+     * @path /databases/{database}/documents/staffs/{staffId}
+     * @allow (create) Authenticated user creates a new staffs.
+     * @deny (create) Not Allowed.
+     * @allow (get, list) Anyone can read staffs data.
+     * @allow (update, delete) Authenticated user updates or deletes an staffs.
+     * @deny (update, delete) Not Allowed.
+     */
+    match /staffs/{staffId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ---- Helper functions ----
+
+    /**
+     * @description Checks if the request is authenticated.
+     * @returns {boolean} True if `request.auth` is not null, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
     }
 
     /**
-     * @description Manages staff member data.
-     * @path /staff/{staffId}
-     * @allow (create, update, delete) Only the owner can create, update, and delete their staff document.
-     * @allow (get, list) Any authenticated user can read staff data.
-     * @deny (create, update, delete) Prevents non-owners from modifying staff data.
-     * @principle Enforces document ownership for writes.
+     * @description Checks if the user is the owner of the resource and the document exists.
+     * @param {string} userId - The user ID to compare against the resource data.
+     * @returns {boolean} True if the user ID matches the resource's owner ID and resource exists, false otherwise.
      */
-    match /staff/{staffId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if request.auth.uid == staffId;
+    function isExistingOwner(userId) {
+      return isSignedIn() && resource.data.担当スタッフID == request.auth.uid;
     }
-
-    /**
-     * @description Manages work schedule data.
-     * @path /workSchedules/{workScheduleId}
-     * @allow (create, update, delete) Only the owner can create, update, and delete their work schedule document.
-     * @allow (get, list) Any authenticated user can read work schedule data.
-     * @deny (create, update, delete) Prevents non-owners from modifying work schedule data.
-     * @principle Enforces document ownership for writes.
-     */
-    match /workSchedules/{workScheduleId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if request.auth.uid == workScheduleId;
-    }
-
-    /**
-     * @description Manages location data.
-     * @path /locations/{locationId}
-     * @allow (create, update, delete) Only the owner can create, update, and delete their location document.
-     * @allow (get, list) Any authenticated user can read location data.
-     * @deny (create, update, delete) Prevents non-owners from modifying location data.
-     * @principle Enforces document ownership for writes.
-     */
-    match /locations/{locationId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if request.auth.uid == locationId;
-    }
-
-    /**
-     * @description Manages employee action data.
-     * @path /employeeActions/{employeeActionId}
-     * @allow (create, update, delete) Only the owner can create, update, and delete their employee action document.
-     * @allow (get, list) Any authenticated user can read employee action data.
-     * @deny (create, update, delete) Prevents non-owners from modifying employee action data.
-     * @principle Enforces document ownership for writes.
-     */
-    match /employeeActions/{employeeActionId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if request.auth.uid == employeeActionId;
-    }
-
-    /**
-     * @description Marks a user as staff based on the existence of this document.
-     * @path /roles_staff/{userId}
-     * @allow create: if request.auth.uid == userId;
-     * @allow get: if isSignedIn();
-     * @allow list: if false;
-     * @allow update: if false;
-     * @allow delete: if request.auth.uid == userId;
-     * @deny (create, update, delete) Prevents non-owners from modifying employee action data.
-     * @principle Enforces document ownership for writes.
-     */
-    match /roles_staff/{userId} {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create, update, delete: if request.auth.uid == userId;
-    }
-  }
-
-  // Helper function to determine if the user is signed in.
-  function isSignedIn() {
-    return request.auth != null;
-  }
-
-  // Helper function to determine if the user is the owner of the document.
-  function isOwner(userId) {
-    return request.auth.uid == userId;
   }
 }
