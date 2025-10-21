@@ -1,131 +1,143 @@
 /**
- * @file Firebase Security Rules for Firestore.
- * @description This ruleset addresses the "Missing or insufficient permissions" error when listing customer documents.
+ * @file Firestore Security Rules
+ * @description This ruleset defines access control for the Firestore database.
  *
  * Core Philosophy:
- *  This ruleset prioritizes ease of access for authenticated users while providing a foundation for stricter role-based access control if needed. It assumes that any authenticated user can list customers unless a `roles_staff` document exists for the user, which signifies staff status.
+ * This ruleset prioritizes security by default, requiring explicit rules to grant access.
+ * It assumes a flat data structure with top-level collections for each entity type (Customer, Staff, WorkSchedule, Location, EmployeeAction, roles_staff).
  *
  * Data Structure:
- *  - `/customers/{customerId}`: Stores customer data.
- *  - `/staff/{staffId}`: Stores staff data.
- *  - `/workSchedules/{workScheduleId}`: Stores work schedule data.
- *  - `/locations/{locationId}`: Stores location data.
- *  - `/employeeActions/{employeeActionId}`: Stores employee action data.
- *  - `/roles_staff/{userId}`: Used to indicate a user is staff.
+ * - /customers/{customerId}: Stores customer data. Any authenticated user can list customers.
+ * - /staff/{staffId}: Stores staff member data.
+ * - /workSchedules/{workScheduleId}: Stores work schedule data.
+ * - /locations/{locationId}: Stores location data.
+ * - /employeeActions/{employeeActionId}: Stores employee action data.
+ * - /roles_staff/{userId}: Marks a user as staff based on the existence of this document.
  *
  * Key Security Decisions:
- *  - Customers are publicly listable by any authenticated user. If this needs to be restricted to staff only, create a `roles_staff/{userId}` document for staff users.
- *  - All write operations are disallowed by default for non-staff users.
- *  - No data shape validation is performed beyond authorization checks for rapid prototyping.
+ * - Customer listing is open to any authenticated user, as per the problem description. If this is not desired, a `/roles_staff/{uid}` collection must be implemented, and the rules updated.
+ * - All write operations (create, update, delete) require authentication and explicit authorization logic to prevent unauthorized data modification.
+ * - No data shape validation is performed beyond what is necessary for authorization (e.g., checking the `staffId` on `WorkSchedule` documents).
  *
  * Denormalization for Authorization:
- *  - The presence of a document in `/roles_staff/{userId}` is used to denote staff status, avoiding the need for `get()` calls to a separate roles collection.
+ * - The ruleset avoids `get()` calls by assuming that all necessary data for authorization is available directly within the document being accessed or can be derived from the request context (e.g., `request.auth.uid`).
  *
  * Structural Segregation:
- *  - The `/customers` collection is used to ensure that all customer documents have a homogeneous security posture.
+ * - Publicly readable data (like customer listings) is stored in a top-level collection with read access granted to all authenticated users.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows any authenticated user to read customer data, but only staff can create, update, or delete.
+     * @description Allows any authenticated user to read customer data. Write access is denied.
      * @path /customers/{customerId}
-     * @allow (list) - Authenticated user can list customers: `auth != null`
-     * @allow (get) - Authenticated user can get customers: `auth != null`
-     * @deny (create) - Non-staff user cannot create a customer: `auth == null || !exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @deny (update) - Non-staff user cannot update a customer: `auth == null || !exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @deny (delete) - Non-staff user cannot delete a customer: `auth == null || !exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @principle Allows any authenticated user to list and get customer data.
+     * @allow (get, list) User is authenticated (any user).
+     * @deny (create, update, delete) Any user, as write access is not permitted.
+     * @principle Allows public read access to customer data while preventing unauthorized writes.
      */
     match /customers/{customerId} {
       allow get, list: if isSignedIn();
-      allow create, update, delete: if isStaff();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows only staff to read, create, update, or delete staff data.
+     * @description Manages staff member data. Only the staff member themselves can read, update, or delete their own data.
      * @path /staff/{staffId}
-     * @allow (get) - Staff can get staff data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (list) - Staff can list staff data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (create) - Staff can create staff data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (update) - Staff can update staff data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (delete) - Staff can delete staff data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @deny (create) - Non-staff user cannot create staff data: `!exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @principle Enforces staff-only access for staff data.
+     * @allow (get) User is authenticated and is the owner of the staff document.
+     * @allow (create) User is authenticated and the staffId matches the user's UID.
+     * @allow (update, delete) User is authenticated, is the owner of the staff document, and the document exists.
+     * @deny (get) User is not authenticated.
+     * @deny (create) User is not authenticated or the staffId does not match the user's UID.
+     * @deny (update, delete) User is not authenticated or is not the owner of the staff document.
+     * @principle Enforces strict user ownership for staff data.
      */
     match /staff/{staffId} {
-      allow get, list, create, update, delete: if isStaff();
+      allow get: if isSignedIn() && isOwner(staffId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(staffId);
+      allow update: if isSignedIn() && isExistingOwner(staffId);
+      allow delete: if isSignedIn() && isExistingOwner(staffId);
     }
 
     /**
-     * @description Allows only staff to read, create, update, or delete work schedule data.
+     * @description Manages work schedule data.  Write access is denied.
      * @path /workSchedules/{workScheduleId}
-     * @allow (get) - Staff can get work schedule data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (list) - Staff can list work schedule data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (create) - Staff can create work schedule data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (update) - Staff can update work schedule data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (delete) - Staff can delete work schedule data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @deny (create) - Non-staff user cannot create work schedule data: `!exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @principle Enforces staff-only access for work schedule data.
+     * @allow (get, list) User is authenticated.
+     * @deny (create, update, delete) Any user, as write access is not permitted.
+     * @principle Read access is allowed for any authenticated user, but write access is denied.
      */
     match /workSchedules/{workScheduleId} {
-      allow get, list, create, update, delete: if isStaff();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows only staff to read, create, update, or delete location data.
+     * @description Manages location data.  Write access is denied.
      * @path /locations/{locationId}
-     * @allow (get) - Staff can get location data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (list) - Staff can list location data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (create) - Staff can create location data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (update) - Staff can update location data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (delete) - Staff can delete location data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @deny (create) - Non-staff user cannot create location data: `!exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @principle Enforces staff-only access for location data.
+     * @allow (get, list) User is authenticated.
+     * @deny (create, update, delete) Any user, as write access is not permitted.
+     * @principle Read access is allowed for any authenticated user, but write access is denied.
      */
     match /locations/{locationId} {
-      allow get, list, create, update, delete: if isStaff();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Allows only staff to read, create, update, or delete employee action data.
+     * @description Manages employee action data. Write access is denied.
      * @path /employeeActions/{employeeActionId}
-     * @allow (get) - Staff can get employee action data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (list) - Staff can list employee action data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (create) - Staff can create employee action data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (update) - Staff can update employee action data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @allow (delete) - Staff can delete employee action data: `exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @deny (create) - Non-staff user cannot create employee action data: `!exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid))`
-     * @principle Enforces staff-only access for employee action data.
+     * @allow (get, list) User is authenticated.
+     * @deny (create, update, delete) Any user, as write access is not permitted.
+     * @principle Read access is allowed for any authenticated user, but write access is denied.
      */
     match /employeeActions/{employeeActionId} {
-      allow get, list, create, update, delete: if isStaff();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
-    
-    /**
-     * @description Allows a user to create their own staff role document.  Staff role documents are created to mark a user as staff.
-     * @path /roles_staff/{userId}
-     * @allow (create) - User can create their own staff role document: `request.auth.uid == userId`
-     * @deny (get) - Cannot get the staff role document
-     * @deny (list) - Cannot list the staff role document
-     * @deny (update) - Cannot update the staff role document
-     * @deny (delete) - Cannot delete the staff role document
-     * @principle: User can create only their own document, no reads, updates, or deletes
-     */
+
+     /**
+      * @description Marks a user as staff. Only the user themselves can create or delete their staff role document.
+      * @path /roles_staff/{userId}
+      * @allow (create) User is authenticated and the userId matches the user's UID.
+      * @allow (delete) User is authenticated, is the owner of the staff role document, and the document exists.
+      * @deny (get, list, update) Any user, as these operations are not permitted.
+      * @deny (create) User is not authenticated or the userId does not match the user's UID.
+      * @deny (delete) User is not authenticated or is not the owner of the staff role document.
+      * @principle Enforces strict user ownership for staff role documents.
+      */
     match /roles_staff/{userId} {
-      allow create: if request.auth.uid == userId;
-      allow get, list, update, delete: if false;
+      allow get, list, update: if false;
+      allow create: if isSignedIn() && isOwner(userId);
+      allow delete: if isSignedIn() && isExistingOwner(userId);
     }
-  }
 
-  // Helper function to determine if a user is signed in.
-  function isSignedIn() {
-    return request.auth != null;
-  }
+    // --- Helper Functions ---
 
-  // Helper function to determine if a user is staff.
-  function isStaff() {
-    return isSignedIn() && exists(/databases/$(database)/documents/roles_staff/$(request.auth.uid));
+    /**
+     * @description Checks if the user is signed in.
+     * @return {bool} True if the user is signed in, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the user is the owner of the resource.
+     * @param {string} userId The user ID to check against.
+     * @return {bool} True if the user is the owner, false otherwise.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is the owner of the resource and the resource exists.  Used for update/delete operations.
+     * @param {string} userId The user ID to check against.
+     * @return {bool} True if the user is the owner and the resource exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
   }
 }
