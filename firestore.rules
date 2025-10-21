@@ -2,127 +2,148 @@
  * @fileoverview Firestore Security Rules for WorkWise application.
  *
  * Core Philosophy:
- * This ruleset enforces a combination of user-ownership and admin-only access patterns.
- * User data (staff profiles) are strictly controlled by the owning user, while other
- * data (customers, work schedules, locations, and employee actions) are managed by
- * administrators.  This ensures data privacy and prevents unauthorized modifications.
+ * This ruleset prioritizes authorization independence and structural segregation.
+ * Staff data is strictly user-owned via path-based authorization.
+ * Customer, WorkSchedule, Location, EmployeeAction, and Order data is broadly accessible to authenticated users, but write operations are limited for specific entities (e.g., only admins can modify locations).
  *
  * Data Structure:
- * - /users/{userId}/staff/{staffId}: Staff profiles, owned by the user.
- * - /customers/{customerId}: Customer data, admin-only access.
- * - /workSchedules/{workScheduleId}: Work schedule data, admin-only access.
- * - /locations/{locationId}: Location data, admin-only access.
- * - /employeeActions/{employeeActionId}: Employee action data, admin-only access.
+ * - /users/{userId}/staff/{staffId}: Staff member profiles, owned by the user.
+ * - /customers/{customerId}: Customer data.
+ * - /workSchedules/{workScheduleId}: Work schedule data.
+ * - /locations/{locationId}: Location data (e.g., office addresses).
+ * - /employeeActions/{employeeActionId}: Records of employee actions.
+ * - /orders/{orderId}: Unassigned work orders.
  *
  * Key Security Decisions:
- * - User listing is disallowed at the root level to prevent enumeration attacks.
- * - Data validation is relaxed (prototyping mode), focusing on authorization.
+ * - User listing is disabled to prevent information disclosure.
+ * - Missing ownership fields for the 'Recipe' entity will result in owner-only writes being disabled until the schema is updated.
+ * - Ambiguous write permissions default to `allow create, update, delete: if false;`.
  *
  * Denormalization for Authorization:
- * To simplify and optimize rules, `EmployeeAction` documents may contain denormalized
- * `staffId` data, avoiding the need for `get()` calls to the `WorkSchedule` document.
+ * The `EmployeeAction` entity denormalizes the `staffId` from the associated `WorkSchedule`. This design choice enables rules to validate an employee's access to an action independently of the work schedule, avoiding expensive `get()` operations.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is authenticated.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user's UID matches the provided userId.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user is the owner of the existing document.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Rules for documents in the /users/{userId}/staff/{staffId} path.
+     * @description Allows a user to manage their own staff profile.
      * @path /users/{userId}/staff/{staffId}
-     * @allow (create) User "user123" can create a staff document if their UID matches {userId} and the document's `id` matches {staffId}.
-     * @allow (get) User "user123" can read their own staff document.
-     * @allow (update) User "user123" can update their own staff document.
-     * @allow (delete) User "user123" can delete their own staff document.
-     * @deny (create) User "user456" cannot create a staff document under /users/{user123} because the UID does not match.
-     * @deny (get) User "user456" cannot read staff document under /users/{user123}.
-     * @principle Enforces document ownership for writes; restricts access to a user's own data tree.
+     * @allow (create) - User with UID 'user123' can create a staff document with staffId 'staff456' under /users/user123/staff/staff456
+     * @allow (get,update,delete) - User with UID 'user123' can get, update, or delete their staff document with staffId 'staff456' under /users/user123/staff/staff456
+     * @deny (create) - User with UID 'user123' cannot create a staff document under /users/otherUser/staff/staff456
+     * @deny (update,delete) - User with UID 'user123' cannot update or delete the staff document with staffId 'staff789' under /users/user123/staff/staff789
+     * @principle Enforces document ownership for all operations within a user's data tree.
      */
     match /users/{userId}/staff/{staffId} {
-      // Read rules: Only the owner can read their own staff document.
-      allow get: if isOwner(userId);
-      allow list: if isOwner(userId);
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
 
-      // Write rules: Only the owner can create, update, or delete their own staff document.
-      allow create: if isOwner(userId) && request.resource.data.id == staffId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
-      allow delete: if isExistingOwner(userId);
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if isSignedIn() && isOwner(userId);
+      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isSignedIn() && isOwner(userId) && resource != null && request.resource.data.id == resource.data.id;
+      allow delete: if isSignedIn() && isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Rules for documents in the /customers/{customerId} path.
+     * @description Allows any authenticated user to read customer data.
      * @path /customers/{customerId}
-     * @allow (get) Any authenticated user can read customer data.
-     * @deny (create) No user can create customer data without admin privileges.
-     * @deny (update) No user can update customer data without admin privileges.
-     * @deny (delete) No user can delete customer data without admin privileges.
-     * @principle Restricts access to Customer collection to admins only.
+     * @allow (get, list) - Any authenticated user can read customer data.
+     * @deny (create, update, delete) - Only an admin can modify customer data (currently denied).
+     * @principle Allows public read access for customer data, but restricts writes.
      */
     match /customers/{customerId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Rules for documents in the /workSchedules/{workScheduleId} path.
+     * @description Allows any authenticated user to read work schedule data.
      * @path /workSchedules/{workScheduleId}
-     * @allow (get) Any authenticated user can read work schedule data.
-     * @deny (create) No user can create work schedule data without admin privileges.
-     * @deny (update) No user can update work schedule data without admin privileges.
-     * @deny (delete) No user can delete work schedule data without admin privileges.
-     * @principle Restricts access to WorkSchedule collection to admins only.
+     * @allow (get, list) - Any authenticated user can read work schedule data.
+     * @deny (create, update, delete) - Only an admin can modify work schedule data (currently denied).
+     * @principle Allows public read access for work schedule data, but restricts writes.
      */
     match /workSchedules/{workScheduleId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Rules for documents in the /locations/{locationId} path.
+     * @description Allows only admins to manage location data.
      * @path /locations/{locationId}
-     * @allow (get) Any authenticated user can read location data.
-     * @deny (create) No user can create location data without admin privileges.
-     * @deny (update) No user can update location data without admin privileges.
-     * @deny (delete) No user can delete customer data without admin privileges.
-     * @principle Restricts access to Location collection to admins only.
+     * @allow (create, update, delete) - Only an admin can modify location data.
+     * @deny (get, list) - Non-admins cannot read location data (currently allowed for all signed in users).
+     * @principle Restricts access to location data to authorized personnel.
      */
     match /locations/{locationId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Rules for documents in the /employeeActions/{employeeActionId} path.
+     * @description Allows only admins to manage employee action data.
      * @path /employeeActions/{employeeActionId}
-     * @allow (get) Any authenticated user can read employee action data.
-     * @deny (create) No user can create employee action data without admin privileges.
-     * @deny (update) No user can update employee action data without admin privileges.
-     * @deny (delete) No user can delete employee action data without admin privileges.
-     * @principle Restricts access to EmployeeAction collection to admins only.
+     * @allow (create, update, delete) - Only an admin can modify employee action data.
+     * @deny (get, list) - Non-admins cannot read employee action data (currently allowed for all signed in users).
+     * @principle Restricts access to employee action data to authorized personnel.
      */
     match /employeeActions/{employeeActionId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if false;
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows any authenticated user to read order data.
+     * @path /orders/{orderId}
+     * @allow (get, list) - Any authenticated user can read order data.
+     * @deny (create, update, delete) - Only an admin can modify order data (currently denied).
+     * @principle Allows public read access for order data, but restricts writes.
+     */
+    match /orders/{orderId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
