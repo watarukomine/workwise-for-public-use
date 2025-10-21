@@ -28,7 +28,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO } from 'date-fns';
-import { staffData, customerData as staticCustomerData, scheduleData as staticScheduleData } from '@/lib/data';
+import { staffData, customerData as staticCustomerData, scheduleData as staticScheduleData, orderData } from '@/lib/data';
+import { cn } from '@/lib/utils';
+import { ScrollArea } from '../ui/scroll-area';
+import { Separator } from '../ui/separator';
 
 const hours = Array.from({ length: 11 }, (_, i) => 8 + i); // 8:00 to 18:00
 const timeSlots = Array.from({ length: 21 }, (_, i) => 8 + i * 0.5); // 8:00 to 18:00, 30min increments
@@ -63,6 +66,55 @@ const getEventDimensions = (event: ScheduleEvent) => {
   };
 };
 
+// --- Draggable Task Components (integrated from unassigned-orders) ---
+
+interface DraggableOrderProps {
+  order: Order;
+  customer?: Customer;
+  className?: string;
+}
+
+const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className }) => {
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: order.id,
+      data: order,
+    });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    zIndex: isDragging ? 100 : 1,
+    opacity: isDragging ? 0.8 : 1,
+    width: `${order.estimatedDuration * PIXELS_PER_MINUTE}px`,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+    >
+      <div
+        className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
+      >
+        <p className="text-xs font-semibold truncate pointer-events-none">
+          {order.taskDetails}
+        </p>
+        <p className="text-xs opacity-80 truncate pointer-events-none">
+          @{customer?.storeName || order.customerCode}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+
+const genericTasks: Order[] = [
+    { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 60 },
+    { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60 },
+];
+
 // --- Main Component ---
 
 export function ScheduleView() {
@@ -84,17 +136,6 @@ export function ScheduleView() {
   const handleDragStart = (event: DragStartEvent) => {
     const item = event.active.data.current as ScheduleEvent | Order;
     setActiveItem(item);
-    
-    if (item && 'estimatedDuration' in item) {
-       const node = event.active.node.parent?.children[0]?.node.current;
-      if (node) {
-        const rect = node.getBoundingClientRect();
-        const offsetX = event.activatorEvent.clientX - rect.left;
-        setDragOffset({ x: offsetX, y: 0 });
-      }
-    } else {
-      setDragOffset({ x: 0, y: 0 });
-    }
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -137,9 +178,7 @@ export function ScheduleView() {
         const order = item;
         const timelineRect = over.rect;
         
-        // Calculate the drop position relative to the timeline
         const dropX = (active.rect.current.initial?.left ?? 0) - timelineRect.left + delta.x;
-
         const dropMinutes = pixelsToMinutes(dropX);
 
         const today = new Date();
@@ -170,9 +209,37 @@ export function ScheduleView() {
     <Card className="h-full">
       <CardHeader>
         <CardTitle>本日のスケジュール</CardTitle>
-        <CardDescription>各スタッフのタイムライン形式のスケジュールです。ドラッグ＆ドロップで予定を編集できます。</CardDescription>
+        <CardDescription>タスクを下のタイムラインにドラッグして割り当てます。既存の予定もドラッグで変更できます。</CardDescription>
+        <div className="pt-4">
+             <CardTitle className="text-lg mb-2">ドラッグ可能なタスク</CardTitle>
+            <ScrollArea className="w-full whitespace-nowrap">
+              <div className="pr-4">
+                <div className="flex flex-wrap gap-2">
+                  {genericTasks.map((task) => (
+                     <DraggableOrder
+                        key={task.id}
+                        order={task}
+                        className={task.id === 'generic-travel' ? 'bg-yellow-500 text-black' : 'bg-gray-400 text-white'}
+                      />
+                  ))}
+                  {orderData.map((order) => (
+                    <DraggableOrder
+                      key={order.id}
+                      order={order}
+                      customer={getCustomerByCode(order.customerCode)}
+                    />
+                  ))}
+                  {orderData.length === 0 && genericTasks.length === 0 && (
+                    <div className="flex items-center justify-center h-24 text-center text-muted-foreground">
+                        <p>利用可能なタスクはありません。</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4 select-none h-[calc(100%-4rem)] overflow-y-auto pr-6">
+      <CardContent className="space-y-4 select-none h-[calc(100%-14rem)] overflow-y-auto pr-6">
         <div className="grid sticky top-0 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
           <div />
           <div className="relative grid grid-cols-11 border-l border-border text-xs text-muted-foreground">
@@ -208,7 +275,7 @@ export function ScheduleView() {
           <CardTitle>本日のスケジュール</CardTitle>
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。ドラッグ＆ドロップで予定を編集できます。</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 select-none h-[calc(100%-4rem)] overflow-y-auto pr-6">
+        <CardContent>
            {/* Skeleton loader can be placed here */}
         </CardContent>
       </Card>

@@ -1,6 +1,5 @@
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
-import { UnassignedOrders } from '@/components/dashboard/unassigned-orders';
 
 export default function DashboardPage() {
   return (
@@ -12,7 +11,6 @@ export default function DashboardPage() {
         </p>
       </div>
       <div className="flex flex-col gap-8">
-        <UnassignedOrders />
         <ScheduleView />
         <StatusUpdates />
       </div>
