@@ -37,7 +37,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useUser } from '@/firebase';
-import { signInWithGoogle, signOut } from '@/lib/auth';
+import { signIn, signOut } from '@/lib/auth';
 
 const navItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList },
@@ -52,7 +52,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useUser();
 
   const handleSignIn = async () => {
-    await signInWithGoogle();
+    await signIn();
   };
 
   const handleSignOut = async () => {
@@ -107,8 +107,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <AvatarFallback>{user.displayName?.charAt(0) ?? 'A'}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 -space-y-1">
-                    <p className="text-sm font-semibold">{user.displayName}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                    <p className="text-sm font-semibold">{user.displayName || 'Anonymous User'}</p>
+                    <p className="text-xs text-muted-foreground">{user.email || `UID: ${user.uid.slice(0,6)}...`}</p>
                   </div>
                 </Button>
               </DropdownMenuTrigger>
@@ -124,7 +124,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ) : (
             <Button onClick={handleSignIn} variant="outline" className="w-full">
               <LogIn className="mr-2 h-4 w-4" />
-              Sign In with Google
+              Sign In
             </Button>
           )}
         </SidebarFooter>

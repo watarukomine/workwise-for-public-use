@@ -15,7 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, Loader2, CheckCircle, AlertCircle, LogIn } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter, FirestorePermissionError } from '@/firebase';
-import { getAuthInstance, signInWithGoogle } from '@/lib/auth';
+import { getAuthInstance, signIn } from '@/lib/auth';
 import { Skeleton } from '../ui/skeleton';
 
 type DataType = 'customers' | 'staff' | 'schedules' | 'orders';
@@ -232,7 +232,7 @@ export function DataImporter() {
 
   const handleSignIn = async () => {
     if (!auth) return;
-    await signInWithGoogle(auth);
+    await signIn(auth);
   };
 
   if (isUserLoading) {
@@ -261,7 +261,7 @@ export function DataImporter() {
         <CardContent>
           <Button onClick={handleSignIn}>
             <LogIn className="mr-2 h-4 w-4" />
-            Sign In with Google
+            Sign In
           </Button>
         </CardContent>
       </Card>
@@ -270,5 +270,3 @@ export function DataImporter() {
 
   return <ImporterCore />;
 }
-
-    
