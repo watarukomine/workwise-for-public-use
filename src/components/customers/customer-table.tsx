@@ -1,0 +1,103 @@
+'use client';
+import * as React from 'react';
+import type { Customer } from '@/lib/types';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Card,
+  CardContent,
+} from "@/components/ui/card";
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { MapPin, Search } from 'lucide-react';
+
+export function CustomerTable({ customers }: { customers: Customer[] }) {
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [page, setPage] = React.useState(1);
+  const rowsPerPage = 10;
+
+  const filteredCustomers = customers.filter(customer =>
+    customer.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const paginatedCustomers = filteredCustomers.slice(
+    (page - 1) * rowsPerPage,
+    page * rowsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
+
+  return (
+    <Card>
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Address</TableHead>
+                <TableHead>Coordinates</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginatedCustomers.map((customer) => (
+                <TableRow key={customer.id}>
+                  <TableCell className="font-medium">{customer.name}</TableCell>
+                  <TableCell>{customer.address}</TableCell>
+                  <TableCell>
+                    {customer.latitude && customer.longitude ? (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <MapPin className="h-4 w-4" />
+                        <span>{customer.latitude.toFixed(4)}, {customer.longitude.toFixed(4)}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground/70 italic">Not geocoded</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <span className="text-sm text-muted-foreground">
+            Page {page} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            Next
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
