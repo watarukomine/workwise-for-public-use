@@ -57,28 +57,36 @@ export function CustomerTable({ customers }: { customers: Customer[] }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedCustomers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell className="font-medium">{customer.name}</TableCell>
-                  <TableCell>{customer.address}</TableCell>
-                  <TableCell>
-                    {customer.latitude && customer.longitude ? (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <MapPin className="h-4 w-4" />
-                        <span>{customer.latitude.toFixed(4)}, {customer.longitude.toFixed(4)}</span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground/70 italic">Not geocoded</span>
-                    )}
+              {paginatedCustomers.length > 0 ? (
+                paginatedCustomers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell>{customer.address}</TableCell>
+                    <TableCell>
+                      {customer.latitude && customer.longitude ? (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <MapPin className="h-4 w-4" />
+                          <span>{customer.latitude.toFixed(4)}, {customer.longitude.toFixed(4)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground/70 italic">Not geocoded</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={3} className="h-24 text-center">
+                    No customers found.
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>
         <div className="flex items-center justify-end space-x-2 py-4">
           <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages}
+            Page {page} of {totalPages > 0 ? totalPages : 1}
           </span>
           <Button
             variant="outline"
@@ -92,7 +100,7 @@ export function CustomerTable({ customers }: { customers: Customer[] }) {
             variant="outline"
             size="sm"
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
+            disabled={page === totalPages || totalPages === 0}
           >
             Next
           </Button>

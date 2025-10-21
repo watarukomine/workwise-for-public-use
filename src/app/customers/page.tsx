@@ -1,7 +1,20 @@
-import { customerData } from "@/lib/data";
-import { CustomerTable } from "@/components/customers/customer-table";
+'use client';
+
+import { useCollection, useMemoFirebase } from '@/firebase';
+import { CustomerTable } from '@/components/customers/customer-table';
+import type { Customer } from '@/lib/types';
+import { collection, getFirestore } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 export default function CustomersPage() {
+  const firestore = getFirestore();
+  const customersCollection = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'customers') : null),
+    [firestore]
+  );
+  const { data: customers, isLoading } = useCollection<Customer>(customersCollection);
+
   return (
     <div className="space-y-8">
       <div>
@@ -10,7 +23,20 @@ export default function CustomersPage() {
           Manage and search your list of customers.
         </p>
       </div>
-      <CustomerTable customers={customerData} />
+      {isLoading ? (
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-1/4" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </CardContent>
+        </Card>
+      ) : (
+        <CustomerTable customers={customers || []} />
+      )}
     </div>
   );
 }
