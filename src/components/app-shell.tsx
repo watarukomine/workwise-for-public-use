@@ -32,7 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useAuth } from './auth-provider';
+import { useUser } from '@/firebase';
 import { signInWithGoogle, signOut } from '@/lib/auth';
 
 const navItems = [
@@ -44,7 +44,7 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user } = useUser();
 
   return (
     <SidebarProvider>

@@ -5,7 +5,9 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut
 } from 'firebase/auth';
-import { auth } from './firebase';
+import { initializeFirebase } from '@/firebase';
+
+const { auth } = initializeFirebase();
 
 const provider = new GoogleAuthProvider();
 provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
