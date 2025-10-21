@@ -15,7 +15,7 @@ import { Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter, FirestorePermissionError } from '@/firebase';
 
-type DataType = 'customers' | 'staff' | 'schedules';
+type DataType = 'customers' | 'staff' | 'schedules' | 'orders';
 type Status = 'idle' | 'parsing' | 'importing' | 'success' | 'error';
 
 const { firestore } = getFirebase(); // Get the singleton instances
@@ -82,6 +82,8 @@ export function DataImporter() {
             } else if (dataType === 'schedules') {
               dataToImport.startTime = new Date(record.startTime);
               dataToImport.endTime = new Date(record.endTime);
+            } else if (dataType === 'orders' && record.estimatedDuration) {
+              dataToImport.estimatedDuration = parseInt(record.estimatedDuration, 10) || 60;
             }
             delete dataToImport.id; 
             
@@ -137,7 +139,7 @@ export function DataImporter() {
       <CardContent className="space-y-6">
         <div className="space-y-2">
           <Label>Data Type</Label>
-          <RadioGroup value={dataType} onValueChange={(value: any) => setDataType(value)} className="flex gap-4">
+          <RadioGroup value={dataType} onValueChange={(value: any) => setDataType(value)} className="flex gap-4 flex-wrap">
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="customers" id="customers" />
               <Label htmlFor="customers">Customers</Label>
@@ -149,6 +151,10 @@ export function DataImporter() {
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="schedules" id="schedules" />
               <Label htmlFor="schedules">Schedules</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="orders" id="orders" />
+              <Label htmlFor="orders">Orders</Label>
             </div>
           </RadioGroup>
         </div>

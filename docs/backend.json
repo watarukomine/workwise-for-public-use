@@ -76,6 +76,10 @@
           "type": "string",
           "description": "The end time of the work schedule.",
           "format": "date-time"
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the schedule event."
         }
       },
       "required": [
@@ -148,12 +152,43 @@
         "actionType",
         "timestamp"
       ]
+    },
+    "Order": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Order",
+      "type": "object",
+      "description": "Represents a work order, such as a tire change.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Order."
+        },
+        "customerCode": {
+          "type": "string",
+          "description": "The customer code associated with the order."
+        },
+        "taskDetails": {
+          "type": "string",
+          "description": "Details of the task to be performed."
+        },
+        "estimatedDuration": {
+          "type": "number",
+          "description": "Estimated duration of the task in minutes."
+        }
+      },
+      "required": [
+        "id",
+        "customerCode",
+        "taskDetails",
+        "estimatedDuration"
+      ]
     }
   },
   "auth": {
     "providers": [
       "password",
-      "anonymous"
+      "anonymous",
+      "google.com"
     ]
   },
   "firestore": {
@@ -185,7 +220,7 @@
           "schema": {
             "$ref": "#/backend/entities/Customer"
           },
-          "description": "Stores customer data. Only accessible to admins.",
+          "description": "Stores customer data. Accessible to all authenticated users.",
           "params": [
             {
               "name": "customerId",
@@ -201,7 +236,7 @@
           "schema": {
             "$ref": "#/backend/entities/WorkSchedule"
           },
-          "description": "Stores work schedule data. Accessible to admins.",
+          "description": "Stores work schedule data. Accessible to all authenticated users.",
           "params": [
             {
               "name": "workScheduleId",
@@ -238,6 +273,22 @@
             {
               "name": "employeeActionId",
               "description": "The unique ID of the employee action."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/orders/{orderId}",
+        "definition": {
+          "entityName": "Order",
+          "schema": {
+            "$ref": "#/backend/entities/Order"
+          },
+          "description": "Stores unassigned work orders. Accessible to all authenticated users.",
+          "params": [
+            {
+              "name": "orderId",
+              "description": "The unique ID of the order."
             }
           ]
         }

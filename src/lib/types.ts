@@ -42,3 +42,10 @@ export type StaffStatus = {
   latitude?: number;
   longitude?: number;
 };
+
+export type Order = {
+  id: string;
+  customerCode: string;
+  taskDetails: string;
+  estimatedDuration: number; // in minutes
+};
