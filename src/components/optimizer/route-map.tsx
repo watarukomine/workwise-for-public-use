@@ -88,7 +88,7 @@ function Directions({ route }: { route: OptimizedRouteLocation[] }) {
 export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
   const allCoordinates = [
     ...staff.filter(s => s.latitude && s.longitude).map(s => ({ lat: s.latitude!, lng: s.longitude! })),
-    ...customers.filter(c => c.緯度 && c.経度).map(c => ({ lat: typeof c.緯度! === 'string' ? parseFloat(c.緯度!) : c.緯度!, lng: typeof c.経度! === 'string' ? parseFloat(c.経度!) : c.経度! }))
+    ...customers.filter(c => c.latitude && c.longitude).map(c => ({ lat: c.latitude!, lng: c.longitude! }))
   ];
 
   const center = React.useMemo(() => {
@@ -139,12 +139,12 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
               ) : null
             )}
             {customers.map((c) => 
-               c.緯度 && c.経度 ? (
+               c.latitude && c.longitude ? (
                 <AdvancedMarker
                   key={`customer-${c.id}`}
                   position={{ 
-                    lat: typeof c.緯度 === 'string' ? parseFloat(c.緯度) : c.緯度, 
-                    lng: typeof c.経度 === 'string' ? parseFloat(c.経度) : c.経度
+                    lat: c.latitude, 
+                    lng: c.longitude
                   }}
                 >
                   <Tooltip>
@@ -152,8 +152,8 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
                       <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="font-bold">{c.店舗}</p>
-                      <p>{c.住所}</p>
+                      <p className="font-bold">{c.storeName}</p>
+                      <p>{c.address}</p>
                     </TooltipContent>
                   </Tooltip>
                 </AdvancedMarker>

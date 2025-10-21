@@ -27,9 +27,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { collection, doc, getFirestore, updateDoc, addDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
-import { addMinutes, differenceInMinutes, format, parseISO, startOfHour } from 'date-fns';
-import { ja } from 'date-fns/locale';
+import { collection, doc, getFirestore, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import { addMinutes, differenceInMinutes, format, parseISO } from 'date-fns';
 import { Skeleton } from '../ui/skeleton';
 import { errorEmitter, FirestorePermissionError } from '@/firebase';
 import { staffData } from '@/lib/data';
@@ -81,7 +80,7 @@ export function ScheduleView() {
   );
   const { data: scheduleData, isLoading: isLoadingSchedules } = useCollection<ScheduleEvent>(workSchedulesCollection);
   
-  const getCustomerByCode = (code: string | undefined): Customer | undefined => customerData?.find(c => c['ユーザーコード'] === code);
+  const getCustomerByCode = (code: string | undefined): Customer | undefined => customerData?.find(c => c.userCode === code);
   const getCustomerById = (id: string | undefined): Customer | undefined => customerData?.find(c => c.id === id);
 
   const [activeItem, setActiveItem] = React.useState<ScheduleEvent | Order | null>(null);
@@ -273,7 +272,7 @@ interface StaffRowProps {
 }
 
 const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver }) => {
-  const { setNodeRef, rect } = useDroppable({ id: staff.id });
+  const { setNodeRef } = useDroppable({ id: staff.id });
 
   return (
      <div ref={setNodeRef} className="grid items-center transition-colors duration-200 rounded-md" style={{ gridTemplateColumns: '8rem 1fr', backgroundColor: isOver ? 'hsl(var(--accent))' : 'transparent' }}>
@@ -338,13 +337,13 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           }}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
-            {event.title || '未定のタスク'} @ {customer?.店舗 || '未定'}
+            {event.title || '未定のタスク'} @ {customer?.storeName || '未定'}
           </p>
         </div>
       </TooltipTrigger>
       <TooltipContent>
         <p className="font-bold">{event.title || '未定のタスク'}</p>
-        <p>顧客: {customer?.店舗 || '未定'}</p>
+        <p>顧客: {customer?.storeName || '未定'}</p>
         <p>時間: {formatTime(parseISO(event.start))} - {formatTime(parseISO(event.end))}</p>
         <p>担当: {staff.name}</p>
       </TooltipContent>

@@ -24,7 +24,7 @@ export function CustomerTable({ customers }: { customers: Customer[] }) {
   const rowsPerPage = 10;
 
   const filteredCustomers = customers.filter(customer =>
-    customer && customer['ユーザーコード'] && customer['ユーザーコード'].toLowerCase().includes(searchTerm.toLowerCase())
+    customer && customer.userCode && customer.userCode.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const paginatedCustomers = filteredCustomers.slice(
@@ -64,12 +64,12 @@ export function CustomerTable({ customers }: { customers: Customer[] }) {
               {paginatedCustomers.length > 0 ? (
                 paginatedCustomers.map((customer) => (
                   <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.No}</TableCell>
-                    <TableCell>{customer['ユーザーコード']}</TableCell>
-                    <TableCell>{customer['店舗']}</TableCell>
-                    <TableCell>{customer['住所']}</TableCell>
-                    <TableCell>{customer['電話番号']}</TableCell>
-                    <TableCell>{customer['営業時間']}</TableCell>
+                    <TableCell className="font-medium">{customer.no}</TableCell>
+                    <TableCell>{customer.userCode}</TableCell>
+                    <TableCell>{customer.storeName}</TableCell>
+                    <TableCell>{customer.address}</TableCell>
+                    <TableCell>{customer.phoneNumber}</TableCell>
+                    <TableCell>{customer.businessHours}</TableCell>
                   </TableRow>
                 ))
               ) : (

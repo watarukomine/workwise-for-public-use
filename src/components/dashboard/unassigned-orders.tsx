@@ -45,7 +45,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer }) => {
                         <div className="flex-1">
                             <p className="font-semibold">{order.taskDetails}</p>
                             <p className="text-sm text-muted-foreground">
-                                {customer?.店舗 || order.customerCode}
+                                {customer?.storeName || order.customerCode}
                             </p>
                             <p className="text-xs text-muted-foreground">
                                 作業時間(目安): {order.estimatedDuration}分
@@ -75,7 +75,7 @@ export function UnassignedOrders() {
   const { data: customersData, isLoading: isLoadingCustomers } = useCollection<Customer>(customersCollection);
 
   const getCustomerByCode = (code: string) => {
-    return customersData?.find(c => c['ユーザーコード'] === code);
+    return customersData?.find(c => c.userCode === code);
   };
   
   const isLoading = isLoadingOrders || isLoadingCustomers;

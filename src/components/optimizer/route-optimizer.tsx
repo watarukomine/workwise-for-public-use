@@ -175,13 +175,13 @@ export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOpti
 
   const allLocations = React.useMemo(() => {
     const customerLocations: Location[] = customers
-      .filter(c => c.緯度 && c.経度 && c.店舗)
+      .filter(c => c.latitude && c.longitude && c.storeName)
       .map(c => ({
         id: c.id,
-        name: c.店舗!,
-        address: c.住所,
-        latitude: typeof c.緯度 === 'string' ? parseFloat(c.緯度) : c.緯度!,
-        longitude: typeof c.経度 === 'string' ? parseFloat(c.経度) : c.経度!,
+        name: c.storeName!,
+        address: c.address,
+        latitude: c.latitude!,
+        longitude: c.longitude!,
         type: 'customer'
       }));
 
@@ -353,4 +353,3 @@ export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOpti
     </div>
   );
 }
-

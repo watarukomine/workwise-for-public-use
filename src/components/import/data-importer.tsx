@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import Papa from 'papaparse';
-import { getFirebase } from '@/firebase';
+import { initializeFirebase } from '@/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
+import type { Customer } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,7 @@ import { errorEmitter, FirestorePermissionError } from '@/firebase';
 type DataType = 'customers' | 'staff' | 'schedules' | 'orders';
 type Status = 'idle' | 'parsing' | 'importing' | 'success' | 'error';
 
-const { firestore } = getFirebase(); // Get the singleton instances
+const { firestore } = initializeFirebase(); 
 
 export function DataImporter() {
   const { toast } = useToast();
@@ -71,21 +72,44 @@ export function DataImporter() {
            try {
             const collectionName = dataType === 'schedules' ? `workSchedules` : dataType;
             const collectionRef = collection(firestore, collectionName);
-            const recordId = record.id || record['ユーザーコード'] || doc(collectionRef).id;
-            const docRef = doc(collectionRef, recordId);
+            
+            let dataToImport: any = {};
+            let recordId: string;
 
-            let dataToImport: any = { ...record };
-
-            if (dataType === 'customers' && record.緯度 && record.経度) {
-              dataToImport['緯度'] = parseFloat(record.緯度) || null;
-              dataToImport['経度'] = parseFloat(record.経度) || null;
+            if (dataType === 'customers') {
+                const customerRecord = record as Customer;
+                recordId = customerRecord.id || customerRecord.userCode || customerRecord['ユーザーコード'] || doc(collectionRef).id;
+                dataToImport = {
+                    id: recordId,
+                    no: customerRecord.No,
+                    userCode: customerRecord.userCode || customerRecord['ユーザーコード'],
+                    storeName: customerRecord.storeName || customerRecord['店舗'],
+                    address: customerRecord.address || customerRecord['住所'],
+                    latitude: parseFloat(customerRecord.latitude as string) || null,
+                    longitude: parseFloat(customerRecord.longitude as string) || null,
+                    phoneNumber: customerRecord.phoneNumber || customerRecord['電話番号'],
+                    businessHours: customerRecord.businessHours || customerRecord['営業時間'],
+                };
             } else if (dataType === 'schedules') {
-              dataToImport.startTime = new Date(record.startTime);
-              dataToImport.endTime = new Date(record.endTime);
-            } else if (dataType === 'orders' && record.estimatedDuration) {
-              dataToImport.estimatedDuration = parseInt(record.estimatedDuration, 10) || 60;
+              recordId = record.id || doc(collectionRef).id;
+              dataToImport = {
+                ...record,
+                startTime: new Date(record.startTime),
+                endTime: new Date(record.endTime),
+              };
+            } else if (dataType === 'orders') {
+              recordId = record.id || doc(collectionRef).id;
+              dataToImport = {
+                ...record,
+                estimatedDuration: parseInt(record.estimatedDuration, 10) || 60,
+              };
+            } else {
+               recordId = record.id || doc(collectionRef).id;
+               dataToImport = { ...record };
             }
-            delete dataToImport.id; 
+            
+            const docRef = doc(collectionRef, recordId);
+            delete dataToImport.id; // Don't save the id field inside the document
             
             await setDoc(docRef, dataToImport, { merge: true })
               .catch((serverError) => {
@@ -93,16 +117,14 @@ export function DataImporter() {
                 const permissionError = new FirestorePermissionError({
                   path: docRef.path,
                   operation: 'write',
-                  requestResourceData: record,
+                  requestResourceData: dataToImport,
                 });
                 errorEmitter.emit('permission-error', permissionError);
-                // We re-throw the error to be caught by the outer try-catch block
                 throw permissionError;
               });
 
             successCount++;
           } catch (error) {
-            // This will catch the re-thrown permission error
             if (!(error instanceof FirestorePermissionError)) {
                failedCount++;
                console.error("An unexpected error occurred during import:", error);

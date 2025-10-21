@@ -1,48 +1,69 @@
 /**
- * @fileoverview Firestore Security Rules for WorkWise application.
+ * @file Firebase Security Rules for WorkWise Application
  *
- * Core Philosophy:
- * This ruleset enforces a combination of ownership-based and role-based access control.
- * Users have full control over their own staff profiles.
- * WorkSchedules, Orders, and Customers are publicly readable but only modifiable by specific roles or owners.
+ * @core_philosophy This ruleset implements a combination of ownership-based access control
+ * and public read access with restricted writes. User-specific data is stored under
+ * the /users/{userId} path, enforcing strict ownership. Other data is publicly accessible.
  *
- * Data Structure:
- * - /users/{userId}/staff/{staffId}:  Staff profiles, owned by the user.
- * - /customers/{customerId}: Customer data, publicly readable, writes must be controlled.
- * - /workSchedules/{workScheduleId}: Work schedule data, publicly readable, writes must be controlled.
- * - /locations/{locationId}: Location data, publicly readable, writes must be controlled.
- * - /employeeActions/{employeeActionId}: Employee action logs, writes must be controlled.
- * - /orders/{orderId}: Orders, publicly readable, writes must be controlled.
+ * @data_structure The Firestore data is organized as follows:
+ * - /users/{userId}/staff/{staffId}: Staff profiles, accessible only to the owning user.
+ * - /customers/{customerId}: Customer data, publicly readable, writable by authenticated users.
+ * - /workSchedules/{workScheduleId}: Work schedule data, publicly readable, writable by authenticated users.
+ * - /locations/{locationId}: Location data, publicly readable, writable by authenticated users.
+ * - /employeeActions/{employeeActionId}: Employee action data, publicly readable, writable by authenticated users.
+ * - /orders/{orderId}: Order data, publicly readable, writable by authenticated users.
  *
- * Key Security Decisions:
- * - User listing is disabled on the root `/users` collection.
- * - Public read access is granted to the `/customers`, `/workSchedules`, and `/orders` collections to simplify read operations for the application.  Writes must be validated.
- * - Locations and EmployeeActions are intended for admin-level management, but the specific role-based access control is not yet defined.
+ * @key_security_decisions
+ * - User listing is disallowed for privacy.
+ * - Public read access is granted to collections where this is a safe default.
+ * - All write operations require user authentication.
  *
- * Denormalization for Authorization:
- * - The `EmployeeAction` entity can denormalize the `staffId` from the related `WorkSchedule` to simplify authorization rules, preventing extra reads.
+ * @denormalization The `EmployeeAction` entity includes a denormalized `staffId` to enable
+ * authorization independence, avoiding costly `get()` calls to the `WorkSchedule` collection.
+ *
+ * @structural_segregation Data is segregated into collections based on access requirements.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Secure access to user-specific staff profiles.
+     * @description Defines the base `isSignedIn()` function.
+     * @param N/A
+     * @return {boolean} `true` if request.auth is not null, `false` otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Defines the `isOwner(userId)` function to check if the request is made by the owner of the document.
+     * @param {string} userId - The user ID to compare against the request's authentication UID.
+     * @return {boolean} `true` if the request is authenticated and the provided userId matches the request's authentication UID, `false` otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is the owner of the existing document.
+     * @param {string} userId - The user ID to compare against the resource's data.
+     * @return {boolean} - True if the user is the owner and the resource exists.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Rules for staff profiles under a user's document.
      * @path /users/{userId}/staff/{staffId}
-     * @allow (create) User 'test_user' with UID 'test_user' can create their own staff profile with matching userId and staffId.
-     * @allow (get, update, delete) User 'test_user' with UID 'test_user' can read, update, and delete their own staff profile.
-     * @deny (create) User 'another_user' with UID 'another_user' cannot create a staff profile under 'test_user's ID.
-     * @deny (get, update, delete) User 'another_user' with UID 'another_user' cannot read, update, or delete 'test_user's staff profile.
+     * @allow (create) - Authenticated user creates their own staff profile.
+     * @allow (get, list) - Authenticated user reads their own staff profile.
+     * @allow (update, delete) - Authenticated user updates or deletes their own staff profile.
+     * @deny (create) - User attempts to create a staff profile for another user.
      * @principle Enforces document ownership for all operations.
      */
     match /users/{userId}/staff/{staffId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
       allow create: if isOwner(userId) && request.resource.data.id == userId;
@@ -51,63 +72,77 @@ service cloud.firestore {
     }
 
     /**
-     * @description Control access to customer data. Public read, writes must be controlled.
+     * @description Rules for customer data. Accessible to all authenticated users.
      * @path /customers/{customerId}
-     * @allow (get, list) Any authenticated user can read customer data.
-     * @deny (create, update, delete) No one can write to customer data without specific authorization (TODO: Define authorization)
-     * @principle Public read access with restricted writes.
+     * @allow (get, list) - Any authenticated user can read customer data.
+     * @allow (create, update, delete) - Any authenticated user can create, update, or delete customer data.
+     * @deny (create) - If the user is not authenticated
+     * @principle Allows public read access with authentication required for writes.
      */
     match /customers/{customerId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Control access to work schedule data. Public read, writes must be controlled.
+     * @description Rules for work schedule data. Accessible to all authenticated users.
      * @path /workSchedules/{workScheduleId}
-     * @allow (get, list) Any authenticated user can read work schedule data.
-     * @deny (create, update, delete) No one can write to work schedule data without specific authorization (TODO: Define authorization)
-     * @principle Public read access with restricted writes.
+     * @allow (get, list) - Any authenticated user can read work schedule data.
+     * @allow (create, update, delete) - Any authenticated user can create, update, or delete work schedule data.
+     * @deny (create) - If the user is not authenticated
+     * @principle Allows public read access with authentication required for writes.
      */
     match /workSchedules/{workScheduleId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Restrict access to location data. Accessible to admins (TODO: Define the admin role).
+     * @description Rules for location data. Accessible to all authenticated users.
      * @path /locations/{locationId}
-     * @allow (get, list) Any authenticated user can read location data.
-     * @deny (create, update, delete) No one can write to location data without specific authorization (TODO: Define authorization)
-     * @principle Restricts access to a specific role (admin).
+     * @allow (get, list) - Any authenticated user can read location data.
+     * @allow (create, update, delete) - Any authenticated user can create, update, or delete location data.
+     * @deny (create) - If the user is not authenticated
      */
     match /locations/{locationId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Restrict access to employee action data. Accessible to admins (TODO: Define the admin role).
+     * @description Rules for employee action data. Accessible to all authenticated users.
      * @path /employeeActions/{employeeActionId}
-     * @allow (get, list) Any authenticated user can read employee action data.
-     * @deny (create, update, delete) No one can write to employee action data without specific authorization (TODO: Define authorization)
-     * @principle Restricts access to a specific role (admin).
+     * @allow (get, list) - Any authenticated user can read employee action data.
+     * @allow (create, update, delete) - Any authenticated user can create, update, or delete employee action data.
+     * @deny (create) - If the user is not authenticated
+     * @principle Allows public read access with authentication required for writes.
      */
     match /employeeActions/{employeeActionId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Control access to order data. Public read, writes must be controlled.
+     * @description Rules for order data. Accessible to all authenticated users.
      * @path /orders/{orderId}
-     * @allow (get, list) Any authenticated user can read order data.
-     * @deny (create, update, delete) No one can write to order data without specific authorization (TODO: Define authorization)
-     * @principle Public read access with restricted writes.
+     * @allow (get, list) - Any authenticated user can read order data.
+     * @allow (create, update, delete) - Any authenticated user can create, update, or delete order data.
+     * @deny (create) - If the user is not authenticated
+     * @principle Allows public read access with authentication required for writes.
      */
     match /orders/{orderId} {
       allow get, list: if true;
-      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
   }
 }
