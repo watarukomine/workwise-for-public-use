@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
 
 import type { Customer } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
@@ -91,7 +91,7 @@ function SubmitButton() {
 export function RouteOptimizer({ customers }: { customers: Customer[] }) {
   const [open, setOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<string[]>([]);
-  const [state, formActionWithState] = useFormState(formAction, { data: null, error: null });
+  const [state, formActionWithState] = useActionState(formAction, { data: null, error: null });
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
