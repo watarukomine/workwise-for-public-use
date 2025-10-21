@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { Map, Marker, Polyline } from '@vis.gl/react-google-maps';
+import { Map, Marker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Customer, Staff, StaffStatus } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -23,6 +23,32 @@ interface RouteMapProps {
   customers: Customer[];
   optimizedRoute?: OptimizedRouteLocation[];
 }
+
+function RoutePolyline({ path }: { path: google.maps.LatLngLiteral[] }) {
+  const map = useMap();
+  const maps = useMapsLibrary('maps');
+
+  React.useEffect(() => {
+    if (!map || !maps || path.length === 0) return;
+
+    const polyline = new maps.Polyline({
+      path: path,
+      geodesic: true,
+      strokeColor: '#0000FF',
+      strokeOpacity: 0.8,
+      strokeWeight: 5,
+    });
+
+    polyline.setMap(map);
+
+    return () => {
+      polyline.setMap(null);
+    };
+  }, [map, maps, path]);
+
+  return null;
+}
+
 
 export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
   // Calculate center of the map
@@ -82,13 +108,8 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
                 />
               ) : null
             )}
-             {routeCoordinates.length > 0 && (
-              <Polyline
-                path={routeCoordinates}
-                strokeColor="#0000FF"
-                strokeOpacity={0.8}
-                strokeWeight={5}
-              />
+            {routeCoordinates.length > 0 && (
+                <RoutePolyline path={routeCoordinates} />
             )}
           </Map>
         </TooltipProvider>
