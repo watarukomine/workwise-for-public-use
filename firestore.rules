@@ -2,147 +2,118 @@
  * @fileoverview Firestore Security Rules for WorkWise application.
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for staff profiles nested under `/users/{userId}/staff/{staffId}`.
- * All other collections (`customers`, `workSchedules`, `locations`, `employeeActions`) are intended for admin-only access.
- * The rules explicitly deny potentially dangerous operations like listing all documents in the root collections,
- * unless specifically designed for public access.
+ * This ruleset enforces a combination of user-ownership for staff profiles and admin-only access for customer, location, work schedule, and employee action data.
  *
  * Data Structure:
- * - /users/{userId}/staff/{staffId}: Staff profiles owned by individual users.
- * - /customers/{customerId}: Customer data (admin-only).
- * - /workSchedules/{workScheduleId}: Work schedule data (admin-only).
- * - /locations/{locationId}: Location data (admin-only).
- * - /employeeActions/{employeeActionId}: Employee action data (admin-only). Contains denormalized `staffId` for authorization.
+ * - Staff profiles are nested under `/users/{userId}/staff/{staffId}`, ensuring user-specific access.
+ * - Customer data resides in `/customers/{customerId}` and is intended for admin use.
+ * - Work schedules are stored in `/workSchedules/{workScheduleId}` and are intended for admin use.
+ * - Locations are stored in `/locations/{locationId}` and are intended for admin use.
+ * - Employee actions are stored in `/employeeActions/{employeeActionId}` and are intended for admin use.
  *
  * Key Security Decisions:
- * - No public access is granted to any collections.
- * - Listing of root collections (customers, workSchedules, locations, employeeActions) is denied to prevent unauthorized data discovery.
- * - User listing is explicitly disallowed.
- * - Access to 'EmployeeAction' documents, while admin-only, leverages the denormalized 'staffId' field to simplify potential future access control scenarios.
+ * - Users can only access their own staff profile data.
+ * - Listing of work schedules is restricted.
+ * - Customers, locations, and employee actions are only accessible to admins (not implemented in this version, defaults to deny all).
  *
  * Denormalization for Authorization:
- * - 'EmployeeAction' documents include a denormalized 'staffId' field from the associated 'WorkSchedule'. This allows for simpler, more performant rules if we need to restrict access to EmployeeActions based on the staff member involved.
+ * The `EmployeeAction` entity's schema includes `staffId`, denormalized from `WorkSchedule`. This enables authorization rules for `EmployeeAction` documents without needing to perform additional reads to fetch associated `WorkSchedule` data.
+ *
+ * Structural Segregation:
+ * The use of a user subcollection `/users/{userId}/staff/{staffId}` separates private staff data from public or shared data, allowing for more secure and performant list operations.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Secure staff profiles under a user's path. Enforces ownership.
+     * @description Enforces user-ownership for staff profiles. Only the authenticated user can access their own staff profile.
      * @path /users/{userId}/staff/{staffId}
-     * @allow (create) User 'test_user' can create a staff profile at /users/test_user/staff/staff_123 if request.auth.uid == 'test_user' and request.resource.data.id == 'test_user'.
-     * @allow (get) User 'test_user' can read their own staff profile at /users/test_user/staff/staff_123 if request.auth.uid == 'test_user'.
-     * @allow (update) User 'test_user' can update their own staff profile at /users/test_user/staff/staff_123 if request.auth.uid == 'test_user'.
-     * @allow (delete) User 'test_user' can delete their own staff profile at /users/test_user/staff/staff_123 if request.auth.uid == 'test_user'.
-     * @deny (create) User 'other_user' cannot create a staff profile under 'test_user's path.
-     * @deny (get) User 'other_user' cannot read 'test_user's staff profile.
-     * @deny (update) User 'other_user' cannot update 'test_user's staff profile.
-     * @deny (delete) User 'other_user' cannot delete 'test_user's staff profile.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create) - User '0hhwNJRPFMTfqXhnHKGfn2Dz9Oi1' creates their own staff profile with staffId matching userId.
+     * @allow (get, update, delete) - User '0hhwNJRPFMTfqXhnHKGfn2Dz9Oi1' reads, updates, or deletes their own staff profile.
+     * @deny (create) - User '0hhwNJRPFMTfqXhnHKGfn2Dz9Oi1' tries to create a staff profile under a different userId.
+     * @deny (get, update, delete) - User 'anotherUser' tries to read, update, or delete staff profile belonging to '0hhwNJRPFMTfqXhnHKGfn2Dz9Oi1'.
+     * @principle Enforces document ownership for writes, restricts access to a user's own data tree, validates relational integrity between documents.
      */
     match /users/{userId}/staff/{staffId} {
-      allow create: if isSignedIn() && isOwner(userId) && request.resource.data.id == userId;
-      allow get: if isSignedIn() && isOwner(userId);
-      allow list: if isSignedIn() && isOwner(userId);
-      allow update: if isSignedIn() && isOwner(userId) && resource.data.id == request.resource.data.id;
-      allow delete: if isSignedIn() && isExistingOwner(userId);
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Secure customer data. Accessible only to admins.
+     * @description Restricts access to customer data to admins only.
      * @path /customers/{customerId}
-     * @allow (create) Should be granted to an admin user. Example: allow create: if isAdmin();
-     * @allow (get) Should be granted to an admin user. Example: allow get: if isAdmin();
-     * @allow (update) Should be granted to an admin user. Example: allow update: if isAdmin();
-     * @allow (delete) Should be granted to an admin user. Example: allow delete: if isAdmin();
-     * @deny (create) Any non-admin user cannot create customer data.
-     * @deny (get) Any non-admin user cannot read customer data.
-     * @deny (update) Any non-admin user cannot update customer data.
-     * @deny (delete) Any non-admin user cannot delete customer data.
-     * @principle Restricts access to admin users only.
+     * @allow None - No access is granted in this prototype version.
+     * @deny All - All operations are denied to all users.
+     * @principle Restricts access to a collection.
      */
     match /customers/{customerId} {
-      allow create: if false; // TODO: Add admin validation once roles are defined.
-      allow get: if false; // TODO: Add admin validation once roles are defined.
+      allow get: if false;
       allow list: if false;
-      allow update: if false; // TODO: Add admin validation once roles are defined.
-      allow delete: if false; // TODO: Add admin validation once roles are defined.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Secure work schedule data. Accessible only to admins.
+     * @description Restricts access to work schedule data.
      * @path /workSchedules/{workScheduleId}
-     * @allow (create) Should be granted to an admin user. Example: allow create: if isAdmin();
-     * @allow (get) Should be granted to an admin user. Example: allow get: if isAdmin();
-     * @allow (update) Should be granted to an admin user. Example: allow update: if isAdmin();
-     * @allow (delete) Should be granted to an admin user. Example: allow delete: if isAdmin();
-     * @deny (create) Any non-admin user cannot create work schedule data.
-     * @deny (get) Any non-admin user cannot read work schedule data.
-     * @deny (update) Any non-admin user cannot update work schedule data.
-     * @deny (delete) Any non-admin user cannot delete work schedule data.
-     * @principle Restricts access to admin users only.
+     * @allow None - No access is granted in this prototype version.
+     * @deny All - All operations are denied to all users.
+     * @principle Restricts access to a collection.
      */
     match /workSchedules/{workScheduleId} {
-      allow create: if false; // TODO: Add admin validation once roles are defined.
-      allow get: if false; // TODO: Add admin validation once roles are defined.
+      allow get: if false;
       allow list: if false;
-      allow update: if false; // TODO: Add admin validation once roles are defined.
-      allow delete: if false; // TODO: Add admin validation once roles are defined.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Secure location data. Accessible only to admins.
+     * @description Restricts access to location data.
      * @path /locations/{locationId}
-     * @allow (create) Should be granted to an admin user. Example: allow create: if isAdmin();
-     * @allow (get) Should be granted to an admin user. Example: allow get: if isAdmin();
-     * @allow (update) Should be granted to an admin user. Example: allow update: if isAdmin();
-     * @allow (delete) Should be granted to an admin user. Example: allow delete: if isAdmin();
-     * @deny (create) Any non-admin user cannot create location data.
-     * @deny (get) Any non-admin user cannot read location data.
-     * @deny (update) Any non-admin user cannot update location data.
-     * @deny (delete) Any non-admin user cannot delete location data.
-     * @principle Restricts access to admin users only.
+     * @allow None - No access is granted in this prototype version.
+     * @deny All - All operations are denied to all users.
+     * @principle Restricts access to a collection.
      */
     match /locations/{locationId} {
-      allow create: if false; // TODO: Add admin validation once roles are defined.
-      allow get: if false; // TODO: Add admin validation once roles are defined.
+      allow get: if false;
       allow list: if false;
-      allow update: if false; // TODO: Add admin validation once roles are defined.
-      allow delete: if false; // TODO: Add admin validation once roles are defined.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Secure employee action data. Accessible only to admins.
+     * @description Restricts access to employee action data.
      * @path /employeeActions/{employeeActionId}
-     * @allow (create) Should be granted to an admin user. Example: allow create: if isAdmin();
-     * @allow (get) Should be granted to an admin user. Example: allow get: if isAdmin();
-     * @allow (update) Should be granted to an admin user. Example: allow update: if isAdmin();
-     * @allow (delete) Should be granted to an admin user. Example: allow delete: if isAdmin();
-     * @deny (create) Any non-admin user cannot create employee action data.
-     * @deny (get) Any non-admin user cannot read employee action data.
-     * @deny (update) Any non-admin user cannot update employee action data.
-     * @deny (delete) Any non-admin user cannot delete employee action data.
-     * @principle Restricts access to admin users only.
+     * @allow None - No access is granted in this prototype version.
+     * @deny All - All operations are denied to all users.
+     * @principle Restricts access to a collection.
      */
     match /employeeActions/{employeeActionId} {
-      allow create: if false; // TODO: Add admin validation once roles are defined.
-      allow get: if false; // TODO: Add admin validation once roles are defined.
+      allow get: if false;
       allow list: if false;
-      allow update: if false; // TODO: Add admin validation once roles are defined.
-      allow delete: if false; // TODO: Add admin validation once roles are defined.
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
-  }
 
-  // Helper functions
-  function isSignedIn() {
-    return request.auth != null;
-  }
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-  function isOwner(userId) {
-    return request.auth.uid == userId;
-  }
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
 
-  function isExistingOwner(userId) {
-    return isOwner(userId) && resource != null;
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
   }
 }
