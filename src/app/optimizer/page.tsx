@@ -7,8 +7,11 @@ import { RouteMap } from "@/components/optimizer/route-map";
 import { APIProvider } from "@vis.gl/react-google-maps";
 import { staffData as allStaff } from "@/lib/data";
 import type { Staff, StaffStatus } from "@/lib/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function OptimizerPage() {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   const staffWithStatus = staffStatusData.map(status => {
     const staffDetails = allStaff.find(staff => staff.id === status.staffId);
@@ -28,9 +31,21 @@ export default function OptimizerPage() {
           <RouteOptimizer customers={customerData} />
         </div>
         <div className="lg:col-span-2">
-            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
+          {apiKey ? (
+            <APIProvider apiKey={apiKey}>
               <RouteMap staff={staffWithStatus} customers={customerData} />
             </APIProvider>
+          ) : (
+            <div className="flex items-center justify-center h-full rounded-lg border border-dashed shadow-sm">
+                <Alert variant="destructive" className="max-w-md">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Google Maps API Key Missing</AlertTitle>
+                    <AlertDescription>
+                        The Google Maps API key is not configured. Please add it to your <code>.env</code> file as <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to display the map.
+                    </AlertDescription>
+                </Alert>
+            </div>
+          )}
         </div>
       </div>
     </div>
