@@ -11,7 +11,7 @@ import {
   type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase, useUser } from '@/firebase';
 import type { ScheduleEvent, Staff, Customer, Order } from '@/lib/types';
 import {
   Card,
@@ -69,17 +69,17 @@ const getEventDimensions = (event: ScheduleEvent) => {
 
 export function ScheduleView() {
   const firestore = getFirestore();
-  const isLoadingStaff = false;
+  const { user, isLoading: isUserLoading } = useUser();
 
   const customersCollection = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'customers') : null),
-    [firestore]
+    () => (firestore && user ? collection(firestore, 'customers') : null),
+    [firestore, user]
   );
   const { data: customerData, isLoading: isLoadingCustomers } = useCollection<Customer>(customersCollection);
 
   const workSchedulesCollection = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'workSchedules') : null),
-    [firestore]
+    () => (firestore && user ? collection(firestore, 'workSchedules') : null),
+    [firestore, user]
   );
   const { data: scheduleData, isLoading: isLoadingSchedules } = useCollection<ScheduleEvent>(workSchedulesCollection);
   
@@ -214,7 +214,7 @@ export function ScheduleView() {
     setCurrentOverStaffId(null);
   };
 
-  const isLoading = isLoadingStaff || isLoadingCustomers || isLoadingSchedules;
+  const isLoading = isUserLoading || isLoadingCustomers || isLoadingSchedules;
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>

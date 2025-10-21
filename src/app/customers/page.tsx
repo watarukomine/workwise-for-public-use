@@ -1,6 +1,6 @@
 'use client';
 
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { CustomerTable } from '@/components/customers/customer-table';
 import type { Customer } from '@/lib/types';
 import { collection, getFirestore } from 'firebase/firestore';
@@ -9,11 +9,15 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 export default function CustomersPage() {
   const firestore = getFirestore();
+  const { user, isLoading: isUserLoading } = useUser();
+
   const customersCollection = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'customers') : null),
-    [firestore]
+    () => (firestore && user ? collection(firestore, 'customers') : null),
+    [firestore, user]
   );
-  const { data: customers, isLoading } = useCollection<Customer>(customersCollection);
+  const { data: customers, isLoading: isLoadingCustomers } = useCollection<Customer>(customersCollection);
+
+  const isLoading = isUserLoading || isLoadingCustomers;
 
   return (
     <div className="space-y-8">

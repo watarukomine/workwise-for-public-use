@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase, useUser } from '@/firebase';
 import type { Order, Customer } from '@/lib/types';
 import { collection, getFirestore } from 'firebase/firestore';
 import {
@@ -58,17 +58,18 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer }) => {
 
 export function UnassignedOrders() {
   const firestore = getFirestore();
+  const { user, isLoading: isUserLoading } = useUser();
 
   const ordersCollection = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'orders') : null),
-    [firestore]
+    () => (firestore && user ? collection(firestore, 'orders') : null),
+    [firestore, user]
   );
   const { data: ordersData, isLoading: isLoadingOrders } =
     useCollection<Order>(ordersCollection);
 
   const customersCollection = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'customers') : null),
-    [firestore]
+    () => (firestore && user ? collection(firestore, 'customers') : null),
+    [firestore, user]
   );
   const { data: customersData, isLoading: isLoadingCustomers } =
     useCollection<Customer>(customersCollection);
@@ -77,7 +78,7 @@ export function UnassignedOrders() {
     return customersData?.find((c) => c.userCode === code);
   };
 
-  const isLoading = isLoadingOrders || isLoadingCustomers;
+  const isLoading = isUserLoading || isLoadingOrders || isLoadingCustomers;
 
   return (
     <Card>
