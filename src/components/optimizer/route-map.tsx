@@ -2,10 +2,9 @@
 'use client';
 
 import * as React from 'react';
-import { Map, Marker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
+import { Map, AdvancedMarker, useMap, useMapsLibrary } from '@vis.gl/react-google-maps';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Customer, Staff, StaffStatus } from '@/lib/types';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import {
   Tooltip,
   TooltipContent,
@@ -13,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
+import { User } from 'lucide-react';
 
 type StaffWithStatus = Staff & StaffStatus;
 type OptimizedRouteLocation = OptimizeRouteOutput['optimizedRoute'][0];
@@ -48,7 +48,9 @@ function Directions({ route }: { route: OptimizedRouteLocation[] }) {
   React.useEffect(() => {
     if (!directionsService || !directionsRenderer || !route || route.length < 2) {
         // Clear previous route if any
-        directionsRenderer?.set('directions', null);
+        if (directionsRenderer) {
+            directionsRenderer.set('directions', null);
+        }
         return;
     };
 
@@ -73,7 +75,9 @@ function Directions({ route }: { route: OptimizedRouteLocation[] }) {
 
     return () => {
         // Clean up directions
-       // directionsRenderer.set('directions', null);
+       if (directionsRenderer) {
+          directionsRenderer.set('directions', null);
+       }
     }
   }, [directionsService, directionsRenderer, route]);
 
@@ -116,31 +120,32 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
           >
             {!showRoute && staff.map((s) =>
               s.latitude && s.longitude ? (
-                <Marker key={`staff-${s.id}`} position={{ lat: s.latitude, lng: s.longitude }}>
+                <AdvancedMarker key={`staff-${s.id}`} position={{ lat: s.latitude, lng: s.longitude }}>
                    <Tooltip>
                       <TooltipTrigger asChild>
-                        <Avatar className="h-10 w-10 border-2" style={{borderColor: s.color}}>
-                          <AvatarImage src={s.avatarUrl} alt={s.name} />
-                          <AvatarFallback>{s.name.charAt(0)}</AvatarFallback>
-                        </Avatar>
+                        <div className="w-8 h-8 rounded-full bg-white border-2 border-primary flex items-center justify-center">
+                            <User className="w-5 h-5 text-primary" />
+                        </div>
                       </TooltipTrigger>
                       <TooltipContent>
                         <p className="font-bold">{s.name}</p>
                         <p>{s.lastAction}</p>
                       </TooltipContent>
                     </Tooltip>
-                </Marker>
+                </AdvancedMarker>
               ) : null
             )}
             {!showRoute && customers.map((c) => 
                c.緯度 && c.経度 ? (
-                <Marker
+                <AdvancedMarker
                   key={`customer-${c.id}`}
                   position={{ 
                     lat: typeof c.緯度 === 'string' ? parseFloat(c.緯度) : c.緯度, 
                     lng: typeof c.経度 === 'string' ? parseFloat(c.経度) : c.経度
                   }}
-                />
+                >
+                    <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
+                </AdvancedMarker>
               ) : null
             )}
             {showRoute && (
