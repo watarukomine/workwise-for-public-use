@@ -64,12 +64,14 @@ function SubmitButton() {
         if (el.tagName === 'FORM') return el as HTMLFormElement;
         return findForm(el.parentElement);
     }
+    
+    const handleFormSubmit = () => setPending(true);
+
     // A bit of a hack to get form pending state without experimental useFormStatus
     const button = document.getElementById('optimizer-submit-button');
     if (button) {
       form = findForm(button);
       if (form) {
-        const handleFormSubmit = () => setPending(true);
         form.addEventListener('submit', handleFormSubmit);
       }
     }
