@@ -1,194 +1,180 @@
 /**
- * @file Firebase Security Rules for WorkWise Application
+ * @fileoverview Firestore Security Rules for WorkWise application.
  *
- * @core_philosophy This ruleset enforces a combination of user-based ownership and administrative control.
- *   Staff members have full access to their own data (profile and actions), while administrative roles
- *   are required to manage customer, schedule, and location data. Admin privileges are granted based on
- *   the existence of a document in the `/roles_admin/{uid}` collection, where {uid} matches the Firebase auth UID.
- *   All write operations are secured with authorization checks.
+ * Core Philosophy:
+ * This ruleset enforces a hybrid security model. Staff members have ownership-based access to their own profiles and actions.
+ * Administrative access is granted via a database-based access control (DBAC) mechanism using the `/roles_admin/{uid}` collection.
+ * Other top-level collections (`customers`, `workSchedules`, `locations`) are implicitly restricted to admin-only access.
  *
- * @data_structure
- *   - `/staff/{staffId}`: Stores profile information for each staff member. Only the staff member themselves can modify this data.
- *   - `/customers/{customerId}`: Stores customer information. Only admins can manage customer data.
- *   - `/workSchedules/{workScheduleId}`: Stores work schedule data. Only admins can manage work schedules.
- *   - `/locations/{locationId}`: Stores location data. Only admins can manage location data.
- *   - `/staff/{staffId}/employeeActions/{employeeActionId}`: Stores employee action logs. Only the staff member themselves can access these logs.
- *   - `/roles_admin/{uid}`: Indicates admin privileges for a user. The existence of a document at this path grants admin rights.
+ * Data Structure:
+ * - /staff/{staffId}: Staff member profiles, accessible only by the staff member themselves or an admin.
+ * - /customers/{customerId}: Customer information, accessible only by admins.
+ * - /workSchedules/{workScheduleId}: Work schedules, accessible only by admins.
+ * - /locations/{locationId}: Location information, accessible only by admins.
+ * - /staff/{staffId}/employeeActions/{employeeActionId}: Employee action logs, accessible only by the staff member themselves or an admin.
+ * - /roles_admin/{uid}: Documents indicating admin role. The existence of a document grants admin privileges to the corresponding user.
  *
- * @key_security_decisions
- *   - User listing is disallowed across the board for privacy.
- *   - Admin privileges are determined by the existence of a document in `/roles_admin/{uid}`.
- *   - All data is private by default, and explicit rules are required to grant access.
+ * Key Security Decisions:
+ * - Customers, WorkSchedules, and Locations are only accessible by admins.
+ * - Staff members can only access their own profile and employee actions.
+ * - Admin status is determined by the presence of a document in the `/roles_admin/{uid}` collection.
+ * - List operations on the `/customers` collection are explicitly denied to non-admins to avoid accidental exposure of customer data.
  *
- * @denormalization_for_authorization
- *   - N/A: Current data model does not require denormalization for authorization. The admin role
- *     is checked via the existence of a document in the `/roles_admin/{uid}` collection.
+ * Denormalization for Authorization:
+ *  - Admin status is checked via `exists(/databases/(default)/documents/roles_admin/$(request.auth.uid))`, avoiding the need to store admin status within the user document itself.
  *
- * @structural_segregation
- *   - N/A: There are no public vs. private versions of the same data.
+ * Structural Segregation:
+ *  - Employee actions are stored in a subcollection under the staff member's profile, ensuring clear ownership and preventing accidental public exposure.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Secure read and write access to Staff documents. Only the staff member themselves can read or write their own profile.
+     * @description Checks if the request is made by a signed-in user.
+     * @return {bool} True if the user is signed in, false otherwise.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the request is made by the owner of the document.
+     * @param {string} userId - The user ID to compare against the request's auth UID.
+     * @return {bool} True if the user ID matches the request's auth UID, false otherwise.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+     /**
+     * @description Checks if the request is made by an existing owner of the document.
+     * @param {string} userId - The user ID to compare against the request's auth UID.
+     * @return {bool} True if the user ID matches the request's auth UID and the document exists, false otherwise.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Checks if the requesting user has admin privileges by verifying the existence of a document in the `/roles_admin/{uid}` collection.
+     * @return {bool} True if the user is an admin, false otherwise.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/(default)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /**
+     * @description Rules for staff documents.
      * @path /staff/{staffId}
-     * @allow (get, update, delete) if the user is signed in and their UID matches the staffId.
-     * @allow (create) if the user is signed in and their UID matches the staffId.
-     * @deny (get, update, delete) if the user is not signed in or their UID does not match the staffId.
-     * @deny (create) if the user is not signed in or their UID does not match the staffId.
-     * @principle Enforces document ownership for writes.
+     * @allow (get) Authenticated staff member can read their own document: request.auth.uid == staffId
+     * @allow (create) Authenticated staff member can create their own document: request.auth.uid == staffId
+     * @allow (update) Authenticated staff member can update their own document: request.auth.uid == staffId
+     * @allow (delete) Authenticated staff member can delete their own document: request.auth.uid == staffId
+     * @deny (get) Authenticated staff member cannot read another staff member's document: request.auth.uid != staffId
+     * @deny (create) Unauthenticated user cannot create a staff document: request.auth == null
+     * @principle Enforces document ownership for staff profiles.
      */
     match /staff/{staffId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+      allow get: if isSignedIn() && (isOwner(staffId) || isAdmin());
+      allow list: if false; // Prevent listing of all staff documents
 
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow get: if isOwner(staffId);
-      allow list: if false;
-
-      allow create: if isOwner(staffId) && request.resource.data.id == staffId;
+      allow create: if isSignedIn() && isOwner(staffId) && request.resource.data.id == staffId;
       allow update: if isExistingOwner(staffId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(staffId);
     }
 
     /**
-     * @description Secure read and write access to Customer documents. Only admins can manage customer data.
+     * @description Rules for customer documents.
      * @path /customers/{customerId}
-     * @allow (get, list, create, update, delete) if the user is an admin.
-     * @deny (get, list, create, update, delete) if the user is not an admin.
-     * @principle Restricts access to admins.
+     * @allow (get) Admin user can read customer documents.
+     * @allow (create) Admin user can create customer documents.
+     * @allow (update) Admin user can update customer documents.
+     * @allow (delete) Admin user can delete customer documents.
+     * @deny (get) Non-admin user cannot read customer documents.
+     * @deny (create) Non-admin user cannot create customer documents.
+     * @principle Restricts customer data access to admins only.
      */
     match /customers/{customerId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isAdmin() {
-        return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      }
-
       allow get: if isAdmin();
-      allow list: if isAdmin();
-
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin() && resource != null;
       allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Secure read and write access to WorkSchedule documents. Only admins can manage work schedule data.
+     * @description Rules for work schedule documents.
      * @path /workSchedules/{workScheduleId}
-     * @allow (get, list, create, update, delete) if the user is an admin.
-     * @deny (get, list, create, update, delete) if the user is not an admin.
-     * @principle Restricts access to admins.
+     * @allow (get) Admin user can read work schedule documents.
+     * @allow (create) Admin user can create work schedule documents.
+     * @allow (update) Admin user can update work schedule documents.
+     * @allow (delete) Admin user can delete work schedule documents.
+     * @deny (get) Non-admin user cannot read work schedule documents.
+     * @deny (create) Non-admin user cannot create work schedule documents.
+     * @principle Restricts work schedule data access to admins only.
      */
     match /workSchedules/{workScheduleId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isAdmin() {
-        return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      }
-
       allow get: if isAdmin();
       allow list: if isAdmin();
-
       allow create: if isAdmin();
       allow update: if isAdmin() && resource != null;
       allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Secure read and write access to Location documents. Only admins can manage location data.
+     * @description Rules for location documents.
      * @path /locations/{locationId}
-     * @allow (get, list, create, update, delete) if the user is an admin.
-     * @deny (get, list, create, update, delete) if the user is not an admin.
-     * @principle Restricts access to admins.
+     * @allow (get) Admin user can read location documents.
+     * @allow (create) Admin user can create location documents.
+     * @allow (update) Admin user can update location documents.
+     * @allow (delete) Admin user can delete location documents.
+     * @deny (get) Non-admin user cannot read location documents.
+     * @deny (create) Non-admin user cannot create location documents.
+     * @principle Restricts location data access to admins only.
      */
     match /locations/{locationId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isAdmin() {
-        return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
-      }
-
       allow get: if isAdmin();
       allow list: if isAdmin();
-
       allow create: if isAdmin();
       allow update: if isAdmin() && resource != null;
       allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Secure read and write access to EmployeeAction documents. Only the staff member themselves can read or write their own action history.
+     * @description Rules for employee action documents within a staff member's subcollection.
      * @path /staff/{staffId}/employeeActions/{employeeActionId}
-     * @allow (get, update, delete) if the user is signed in and their UID matches the staffId.
-     * @allow (create) if the user is signed in and their UID matches the staffId.
-     * @deny (get, update, delete) if the user is not signed in or their UID does not match the staffId.
-     * @deny (create) if the user is not signed in or their UID does not match the staffId.
-     * @principle Enforces document ownership for writes.
+     * @allow (get) Authenticated staff member can read their own employee actions: request.auth.uid == staffId
+     * @allow (create) Authenticated staff member can create employee actions under their own profile: request.auth.uid == staffId
+     * @allow (update) Authenticated staff member can update their own employee actions: request.auth.uid == staffId
+     * @allow (delete) Authenticated staff member can delete their own employee actions: request.auth.uid == staffId
+     * @deny (get) Authenticated staff member cannot read another staff member's employee actions: request.auth.uid != staffId
+     * @deny (create) Unauthenticated user cannot create employee actions: request.auth == null
+     * @principle Enforces ownership for employee actions within a staff member's profile.
      */
     match /staff/{staffId}/employeeActions/{employeeActionId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-       function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow get: if isOwner(staffId);
-      allow list: if isOwner(staffId);
-
-      allow create: if isOwner(staffId);
-      allow update: if isExistingOwner(staffId);
+      allow get: if isSignedIn() && (isOwner(staffId) || isAdmin());
+      allow list: if isSignedIn() && (isOwner(staffId) || isAdmin());
+      allow create: if isSignedIn() && isOwner(staffId) && request.resource.data.staffId == staffId;
+      allow update: if isExistingOwner(staffId) && request.resource.data.staffId == resource.data.staffId;
       allow delete: if isExistingOwner(staffId);
     }
 
     /**
-     * @description Secure the admin role document.  Only a user whose auth ID matches the document ID can create this document, effectively granting themselves admin rights.
+     * @description Rules for admin role documents.
      * @path /roles_admin/{uid}
-     * @allow (create) if the user is signed in and their UID matches the uid parameter.
-     * @deny (get, list, update, delete) to prevent unauthorized access or modification.
-     * @principle Restricts admin role creation to the user themselves.
+     * @allow (get) Anyone can get a role.
+     * @allow (create) Only a service account can create roles. // TODO
+     * @allow (update) No one can update roles.
+     * @allow (delete) Only a service account can delete roles. // TODO
+     * @principle DBAC: Existence of document grants admin role.
      */
     match /roles_admin/{uid} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow get: if false;
-      allow list: if false;
-
-      allow create: if isOwner(uid);
-      allow update: if false;
-      allow delete: if isExistingOwner(uid);
+        allow get: if isAdmin();
+        allow list: if false;
+        allow create: if false; // TODO: Only allow create from a trusted server environment or service account
+        allow update: if false;
+        allow delete: if false; // TODO: Only allow delete from a trusted server environment or service account
     }
   }
 }
