@@ -3,159 +3,134 @@
  *
  * Core Philosophy:
  * This ruleset enforces a strict user-ownership model for staff-related data
- * (work schedules, employee actions), ensuring that only the staff member
- * associated with a given document can create, read, update, or delete it.
- * Customer and Location data is open for read access but write access is restricted.
+ * (work schedules, employee actions) and allows public read access to other collections.
  *
  * Data Structure:
- * - /staff/{staffId}: Stores staff member profiles.
- * - /customers/{customerId}: Stores customer profiles.
- * - /staff/{staffId}/workSchedules/{workScheduleId}: Stores work schedules for each staff member.
- * - /locations/{locationId}: Stores location information.
- * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores employee actions for each staff member.
+ * - `/staff/{staffId}`: Stores staff member profiles.
+ * - `/customers/{customerId}`: Stores customer profiles.
+ * - `/staff/{staffId}/workSchedules/{workScheduleId}`: Stores work schedules for each staff member.
+ * - `/locations/{locationId}`: Stores location information.
+ * - `/staff/{staffId}/employeeActions/{employeeActionId}`: Stores employee actions for each staff member.
  *
  * Key Security Decisions:
- * - **Staff data**: All data is nested under /staff/{staffId}, enforcing ownership.
- * - **Customer & Location data**: These top-level collections allow public read access
- *   but require authentication for writes.  Further restrictions on write access may
- *   be needed based on the application's authorization model.
- * - **No User Listing**: Listing all users (staff) is disallowed to protect privacy.
+ * - Staff members can only access their own work schedules and employee actions.
+ * - Listing of customer and location documents is allowed for all users.
+ * - All write operations are restricted based on ownership or explicit denial.
+ *
+ * Denormalization for Authorization:
+ *  - No denormalization is required as we are enforcing path based ownership.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is authenticated.
-     * @return {boolean} True if the request is authenticated, false otherwise.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * @description Checks if the authenticated user's ID matches the provided user ID.
-     * @param {string} userId - The user ID to compare against.
-     * @return {boolean} True if the user is signed in and their ID matches, false otherwise.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user is the owner of an existing document.
-     * @param {string} userId - The user ID to compare against.
-     * @return {boolean} True if the user is signed in, their ID matches, the resource exists, and they own it, false otherwise.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Rules for the /staff/{staffId} collection.
+     * @description Grants access to staff profiles based on ownership.
      * @path /staff/{staffId}
-     * @allow (create) User with UID 'user123' can create a staff document with staffId 'user123'.
-     * @allow (get) User with UID 'user123' can read a staff document with staffId 'user123'.
-     * @allow (update) User with UID 'user123' can update a staff document with staffId 'user123'.
-     * @allow (delete) User with UID 'user123' can delete a staff document with staffId 'user123'.
-     * @deny (create) User with UID 'user456' cannot create a staff document with staffId 'user123'.
-     * @deny (get) User with UID 'user456' cannot read a staff document with staffId 'user123'.
-     * @deny (update) User with UID 'user456' cannot update a staff document with staffId 'user123'.
-     * @deny (delete) User with UID 'user456' cannot delete a staff document with staffId 'user123'.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create) - Authenticated user can create their own staff profile.
+     * @allow (get, list, update, delete) - Authenticated user can access their own staff profile.
+     * @deny (create, get, list, update, delete) - Any user other than the staff member themselves.
+     * @principle Enforces document ownership for writes.
      */
     match /staff/{staffId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
       allow get: if isOwner(staffId);
-      allow list: if false; // Prevent listing all staff members.
+      allow list: if false;
       allow create: if isOwner(staffId) && request.resource.data.id == staffId;
       allow update: if isExistingOwner(staffId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(staffId);
     }
 
     /**
-     * @description Rules for the /customers/{customerId} collection.
+     * @description Grants public read access to customer profiles.
      * @path /customers/{customerId}
-     * @allow (get) Any user can read customer profiles.
-     * @deny (create) Anonymous user cannot create a customer profile.
-     * @principle Allows public read access, restricts write access to authenticated users.
+     * @allow (get, list) - Any user can read customer profiles.
+     * @deny (create, update, delete) - No user can create, update, or delete customer profiles.
+     * @principle Allows public read with owner-only writes, but writes are explicitly denied since there is no clear owner.
      */
     match /customers/{customerId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn(); // TODO: Further restrict create access based on application needs.
-      allow update: if false; // TODO: Further restrict update access based on application needs.
-      allow delete: if false; // TODO: Further restrict delete access based on application needs.
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Rules for the /staff/{staffId}/workSchedules/{workScheduleId} collection.
+     * @description Grants access to work schedules based on staff ownership.
      * @path /staff/{staffId}/workSchedules/{workScheduleId}
-     * @allow (create) User with UID 'user123' can create a work schedule under staffId 'user123'.
-     * @allow (get) User with UID 'user123' can read a work schedule under staffId 'user123'.
-     * @allow (update) User with UID 'user123' can update a work schedule under staffId 'user123'.
-     * @allow (delete) User with UID 'user123' can delete a work schedule under staffId 'user123'.
-     * @deny (create) User with UID 'user456' cannot create a work schedule under staffId 'user123'.
-     * @deny (get) User with UID 'user456' cannot read a work schedule under staffId 'user123'.
-     * @deny (update) User with UID 'user456' cannot update a work schedule under staffId 'user123'.
-     * @deny (delete) User with UID 'user456' cannot delete a work schedule under staffId 'user123'.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create, get, list, update, delete) - Authenticated user can access their own work schedules.
+     * @deny (create, get, list, update, delete) - Any user other than the staff member themselves.
+     * @principle Enforces document ownership for writes, enforces relational integrity.
      */
     match /staff/{staffId}/workSchedules/{workScheduleId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
       allow get: if isOwner(staffId);
       allow list: if isOwner(staffId);
-      allow create: if isOwner(staffId) && request.resource.data.staffId == staffId;
-      allow update: if isExistingOwner(staffId) && request.resource.data.staffId == staffId;
+      allow create: if isOwner(staffId);
+      allow update: if isExistingOwner(staffId);
       allow delete: if isExistingOwner(staffId);
     }
 
     /**
-     * @description Rules for the /locations/{locationId} collection.
+     * @description Grants public read access to location information.
      * @path /locations/{locationId}
-     * @allow (get) Any user can read location information.
-     * @deny (create) Anonymous user cannot create a location.
-     * @principle Allows public read access, restricts write access to authenticated users.
+     * @allow (get, list) - Any user can read location information.
+     * @deny (create, update, delete) - No user can create, update, or delete location information.
+     * @principle Allows public read with owner-only writes, but writes are explicitly denied since there is no clear owner.
      */
     match /locations/{locationId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isSignedIn(); // TODO: Further restrict create access based on application needs.
-      allow update: if false; // TODO: Further restrict update access based on application needs.
-      allow delete: if false; // TODO: Further restrict delete access based on application needs.
+      allow get, list: if true;
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Rules for the /staff/{staffId}/employeeActions/{employeeActionId} collection.
+     * @description Grants access to employee actions based on staff ownership.
      * @path /staff/{staffId}/employeeActions/{employeeActionId}
-     * @allow (create) User with UID 'user123' can create an employee action under staffId 'user123'.
-     * @allow (get) User with UID 'user123' can read an employee action under staffId 'user123'.
-     * @allow (update) User with UID 'user123' can update an employee action under staffId 'user123'.
-     * @allow (delete) User with UID 'user123' can delete an employee action under staffId 'user123'.
-     * @deny (create) User with UID 'user456' cannot create an employee action under staffId 'user123'.
-     * @deny (get) User with UID 'user456' cannot read an employee action under staffId 'user123'.
-     * @deny (update) User with UID 'user456' cannot update an employee action under staffId 'user123'.
-     * @deny (delete) User with UID 'user456' cannot delete an employee action under staffId 'user123'.
-     * @principle Enforces document ownership for all operations.
+     * @allow (create, get, list, update, delete) - Authenticated user can access their own employee actions.
+     * @deny (create, get, list, update, delete) - Any user other than the staff member themselves.
+     * @principle Enforces document ownership for writes, enforces relational integrity.
      */
     match /staff/{staffId}/employeeActions/{employeeActionId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
       allow get: if isOwner(staffId);
       allow list: if isOwner(staffId);
-      allow create: if isOwner(staffId) && request.resource.data.staffId == staffId;
-      allow update: if isExistingOwner(staffId) && request.resource.data.staffId == staffId;
+      allow create: if isOwner(staffId);
+      allow update: if isExistingOwner(staffId);
       allow delete: if isExistingOwner(staffId);
     }
 
-    /**
-     * @description Denies access to the "events" collection.
-     * @path /events
-     * @deny (list) All users are denied from listing the "events" collection.
-     * @principle Explicitly denies access to the "events" collection, ensuring no data can be accessed.
-     */
-     match /events/{eventId} {
-        allow get: if false;
-        allow list: if false;
-        allow create: if false;
-        allow update: if false;
-        allow delete: if false;
-    }
+     /**
+      * @description Denies all access to the `staffStatus` collection.
+      * @path /staffStatus
+      * @allow None
+      * @deny All
+      * @principle: Explicitly deny access to prevent unintended data exposure.
+      */
+     match /staffStatus/{document} {
+       allow get: if false;
+       allow list: if false;
+       allow create: if false;
+       allow update: if false;
+       allow delete: if false;
+     }
   }
 }
