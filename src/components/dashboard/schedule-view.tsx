@@ -173,7 +173,7 @@ export function ScheduleView() {
         <CardDescription>各スタッフのタイムライン形式のスケジュールです。ドラッグ＆ドロップで予定を編集できます。</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 select-none h-[calc(100%-4rem)] overflow-y-auto pr-6">
-        <div className="grid sticky top-0 bg-card z-10 py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
+        <div className="grid sticky top-0 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
           <div />
           <div className="relative grid grid-cols-11 border-l border-border text-xs text-muted-foreground">
             {hours.map((hour) => (
