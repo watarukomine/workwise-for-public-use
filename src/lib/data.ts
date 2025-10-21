@@ -1,5 +1,5 @@
 
-import type { Staff, Customer, ScheduleEvent, StaffStatus } from './types';
+import type { Staff, Customer, ScheduleEvent, StaffStatus, Order } from './types';
 
 export const staffData: Staff[] = [
   { id: 'staff-1', name: '佐藤 花子', calendarId: 'hanako.sato@example.com', avatarUrl: 'https://picsum.photos/seed/hanako/100/100', color: 'hsl(217, 91%, 60%)' },
@@ -9,12 +9,13 @@ export const staffData: Staff[] = [
 ];
 
 export const customerData: Customer[] = [
-  { id: 'cust-1', name: '桜ヶ丘中央病院', address: '神奈川県横浜市中区桜木町1-1-1', latitude: 35.4513, longitude: 139.6322 },
-  { id: 'cust-2', name: 'みなとみらい高校', address: '神奈川県横浜市西区みなとみらい3-5-1', latitude: 35.4658, longitude: 139.6353 },
-  { id: 'cust-3', name: 'ベイサイドモール', address: '神奈川県横浜市金沢区白帆5-2', latitude: 35.3813, longitude: 139.6455 },
-  { id: 'cust-4', name: 'レイクサイド・アパートメンツ', address: '神奈川県横浜市旭区上白根町123', latitude: 35.5011, longitude: 139.5241 },
-  { id: 'cust-5', name: '横浜ビジネスパーク', address: '神奈川県横浜市保土ケ谷区神戸町134', latitude: 35.4593, longitude: 139.5962 },
-  { id: 'cust-6', name: '京浜工業地帯 倉庫', address: '神奈川県横浜市鶴見区大黒ふ頭15', latitude: 35.4782, longitude: 139.6781 },
+    { id: 'cust-1', userCode: 'C001', storeName: '桜ヶ丘中央病院', address: '神奈川県横浜市中区桜木町1-1-1', latitude: 35.4513, longitude: 139.6322 },
+    { id: 'cust-2', userCode: 'C002', storeName: 'みなとみらい高校', address: '神奈川県横浜市西区みなとみらい3-5-1', latitude: 35.4658, longitude: 139.6353 },
+    { id: 'cust-3', userCode: 'C003', storeName: 'ベイサイドモール', address: '神奈川県横浜市金沢区白帆5-2', latitude: 35.3813, longitude: 139.6455 },
+    { id: 'cust-4', userCode: 'C004', storeName: 'レイクサイド・アパートメンツ', address: '神奈川県横浜市旭区上白根町123', latitude: 35.5011, longitude: 139.5241 },
+    { id: 'cust-5', userCode: 'C005', storeName: '横浜ビジネスパーク', address: '神奈川県横浜市保土ケ谷区神戸町134', latitude: 35.4593, longitude: 139.5962 },
+    { id: 'cust-6', userCode: 'C006', storeName: '京浜工業地帯 倉庫', address: '神奈川県横浜市鶴見区大黒ふ頭15', latitude: 35.4782, longitude: 139.6781 },
+    { id: 'cust-41195', userCode: '41195', storeName: '保土ヶ谷', address: '横浜市保土ケ谷区宮田町 ２－１６０－７', latitude: 35.4646, longitude: 139.587, phoneNumber: '0453331331', businessHours: '9時45分～18時00分'},
 ];
 
 const today = new Date();
@@ -25,11 +26,11 @@ const setTime = (date: Date, hours: number, minutes: number) => {
 };
 
 export const scheduleData: ScheduleEvent[] = [
-  { id: 'event-1', title: '定期メンテナンス', customerId: 'cust-1', staffId: 'staff-1', start: setTime(today, 9, 0), end: setTime(today, 11, 0) },
-  { id: 'event-2', title: 'システムアップグレード', customerId: 'cust-3', staffId: 'staff-2', start: setTime(today, 10, 0), end: setTime(today, 14, 0) },
-  { id: 'event-3', title: '緊急修理', customerId: 'cust-2', staffId: 'staff-3', start: setTime(today, 11, 30), end: setTime(today, 13, 0) },
-  { id: 'event-4', title: '新規設置', customerId: 'cust-5', staffId: 'staff-1', start: setTime(today, 14, 0), end: setTime(today, 16, 30) },
-  { id: 'event-5', title: 'オイル交換', customerId: 'cust-4', staffId: 'staff-4', start: setTime(today, 8, 30), end: setTime(today, 9, 30) },
+  { id: 'event-1', title: '定期メンテナンス', locationId: 'cust-1', staffId: 'staff-1', start: setTime(today, 9, 0), end: setTime(today, 11, 0) },
+  { id: 'event-2', title: 'システムアップグレード', locationId: 'cust-3', staffId: 'staff-2', start: setTime(today, 10, 0), end: setTime(today, 14, 0) },
+  { id: 'event-3', title: '緊急修理', locationId: 'cust-2', staffId: 'staff-3', start: setTime(today, 11, 30), end: setTime(today, 13, 0) },
+  { id: 'event-4', title: '新規設置', locationId: 'cust-5', staffId: 'staff-1', start: setTime(today, 14, 0), end: setTime(today, 16, 30) },
+  { id: 'event-5', title: 'オイル交換', locationId: 'cust-4', staffId: 'staff-4', start: setTime(today, 8, 30), end: setTime(today, 9, 30) },
 ];
 
 export const staffStatusData: StaffStatus[] = [
@@ -37,4 +38,10 @@ export const staffStatusData: StaffStatus[] = [
   { staffId: 'staff-2', status: 'On Site', lastAction: 'ベイサイドモールに到着', distanceFromSite: '0 km', latitude: 35.3813, longitude: 139.6455 },
   { staffId: 'staff-3', status: 'En Route', lastAction: 'みなとみらい高校へ向けて出発', distanceFromSite: '3.2 km', latitude: 35.4600, longitude: 139.6300 },
   { staffId: 'staff-4', status: 'Idle', lastAction: '次の指示を待っています', distanceFromSite: undefined, latitude: 35.48, longitude: 139.58 },
+];
+
+export const orderData: Order[] = [
+    { id: 'order-1', customerCode: 'C001', taskDetails: 'サーバールーム点検', estimatedDuration: 120 },
+    { id: 'order-2', customerCode: 'C002', taskDetails: 'プロジェクター設置', estimatedDuration: 90 },
+    { id: 'order-3', customerCode: '41195', taskDetails: 'タイヤ交換', estimatedDuration: 60 },
 ];

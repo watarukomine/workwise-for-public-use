@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -11,7 +12,6 @@ import {
   type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { useCollection, useMemoFirebase, useUser } from '@/firebase';
 import type { ScheduleEvent, Staff, Customer, Order } from '@/lib/types';
 import {
   Card,
@@ -27,12 +27,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { collection, doc, getFirestore, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { addMinutes, differenceInMinutes, format, parseISO } from 'date-fns';
-import { Skeleton } from '../ui/skeleton';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
-import { staffData } from '@/lib/data';
+import { staffData, customerData as staticCustomerData, scheduleData as staticScheduleData } from '@/lib/data';
 
 const hours = Array.from({ length: 11 }, (_, i) => 8 + i); // 8:00 to 18:00
 const timeSlots = Array.from({ length: 21 }, (_, i) => 8 + i * 0.5); // 8:00 to 18:00, 30min increments
@@ -42,8 +38,9 @@ const timelineStartHour = 8;
 
 // --- Helper Functions ---
 
-const formatTime = (date: Date) => {
-  return format(date, 'HH:mm');
+const formatTime = (date: Date | string) => {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  return format(d, 'HH:mm');
 };
 
 const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
@@ -51,8 +48,8 @@ const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
 const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
 
 const getEventDimensions = (event: ScheduleEvent) => {
-  const start = parseISO(event.start);
-  const end = parseISO(event.end);
+  const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+  const end = typeof event.end === 'string' ? parseISO(event.end) : event.end;
   const startOfDay = new Date(start);
   startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
@@ -68,20 +65,8 @@ const getEventDimensions = (event: ScheduleEvent) => {
 // --- Main Component ---
 
 export function ScheduleView() {
-  const firestore = getFirestore();
-  const { user, isLoading: isUserLoading } = useUser();
-
-  const customersCollection = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'customers') : null),
-    [firestore, user]
-  );
-  const { data: customerData, isLoading: isLoadingCustomers } = useCollection<Customer>(customersCollection);
-
-  const workSchedulesCollection = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'workSchedules') : null),
-    [firestore, user]
-  );
-  const { data: scheduleData, isLoading: isLoadingSchedules } = useCollection<ScheduleEvent>(workSchedulesCollection);
+  const [customerData, setCustomerData] = React.useState<Customer[]>(staticCustomerData);
+  const [scheduleData, setScheduleData] = React.useState<ScheduleEvent[]>(staticScheduleData);
   
   const getCustomerByCode = (code: string | undefined): Customer | undefined => customerData?.find(c => c.userCode === code);
   const getCustomerById = (id: string | undefined): Customer | undefined => customerData?.find(c => c.id === id);
@@ -94,17 +79,14 @@ export function ScheduleView() {
     const item = event.active.data.current as ScheduleEvent | Order;
     setActiveItem(item);
     
-    // Check if the dragged item is a new Order from the unassigned list
     if (item && 'estimatedDuration' in item) {
        const node = event.active.node.parent?.children[0]?.node.current;
       if (node) {
         const rect = node.getBoundingClientRect();
-        // Capture the offset from the cursor to the left edge of the item
         const offsetX = event.activatorEvent.clientX - rect.left;
         setDragOffset({ x: offsetX, y: 0 });
       }
     } else {
-      // It's an existing ScheduleEvent, no offset needed
       setDragOffset({ x: 0, y: 0 });
     }
   };
@@ -127,40 +109,24 @@ export function ScheduleView() {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
       
-      const newStart = addMinutes(parseISO(eventToUpdate.start), dragMinutes);
-      const newEnd = addMinutes(parseISO(eventToUpdate.end), dragMinutes);
+      const newStart = addMinutes(parseISO(eventToUpdate.start as string), dragMinutes);
+      const newEnd = addMinutes(parseISO(eventToUpdate.end as string), dragMinutes);
       
       const finalStaffId = newStaffId || eventToUpdate.staffId;
 
-      const updatedData: Partial<ScheduleEvent> = {
+      const updatedEvent: ScheduleEvent = {
+        ...eventToUpdate,
         staffId: finalStaffId,
         start: newStart.toISOString(),
         end: newEnd.toISOString(),
       };
 
-      try {
-          if (!firestore) throw new Error("Firestore not initialized");
-          const eventRef = doc(firestore, 'workSchedules', eventToUpdate.id);
-          
-          updateDoc(eventRef, updatedData).catch((serverError) => {
-            const permissionError = new FirestorePermissionError({
-              path: eventRef.path,
-              operation: 'update',
-              requestResourceData: updatedData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-            throw permissionError;
-          });
-
-      } catch (error) {
-          console.error("Failed to update event:", error);
-      }
+      setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
     }
     // --- Logic for adding new orders as events ---
     else if ('estimatedDuration' in item && newStaffId && over?.rect) {
         const order = item;
         const timelineRect = over.rect;
-        // Adjust drop position by the initial cursor offset within the dragged item
         const dropX = event.activatorEvent.clientX - timelineRect.left - dragOffset.x;
         
         const dropMinutes = pixelsToMinutes(dropX);
@@ -178,7 +144,8 @@ export function ScheduleView() {
             return;
         }
 
-        const newEvent: Omit<ScheduleEvent, 'id'> = {
+        const newEvent: ScheduleEvent = {
+            id: `event-${Date.now()}`,
             title: order.taskDetails,
             staffId: newStaffId,
             locationId: customer.id,
@@ -186,35 +153,14 @@ export function ScheduleView() {
             end: newEnd.toISOString(),
         };
 
-        try {
-            if (!firestore) throw new Error("Firestore not initialized");
-            const schedulesRef = collection(firestore, 'workSchedules');
-            const orderRef = doc(firestore, 'orders', order.id);
-
-            // This should be a transaction in a real app,
-            // but for simplicity, we'll do it sequentially.
-            addDoc(schedulesRef, newEvent).catch(e => {
-                const permissionError = new FirestorePermissionError({ path: schedulesRef.path, operation: 'create', requestResourceData: newEvent });
-                errorEmitter.emit('permission-error', permissionError);
-                throw permissionError;
-            });
-
-            deleteDoc(orderRef).catch(e => {
-                const permissionError = new FirestorePermissionError({ path: orderRef.path, operation: 'delete' });
-                errorEmitter.emit('permission-error', permissionError);
-                throw permissionError;
-            });
-
-        } catch (error) {
-            console.error("Failed to create event from order:", error);
-        }
+        setScheduleData(prev => [...prev, newEvent]);
+        // Note: In a real app, you'd also remove the order from the unassigned list.
+        // For this static version, we'll just leave it.
     }
 
     setActiveItem(null);
     setCurrentOverStaffId(null);
   };
-
-  const isLoading = isUserLoading || isLoadingCustomers || isLoadingSchedules;
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
@@ -224,44 +170,30 @@ export function ScheduleView() {
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。ドラッグ＆ドロップで予定を編集できます。</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 select-none h-[calc(100%-4rem)] overflow-y-auto pr-6">
-          {isLoading ? (
-             Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="grid items-center" style={{ gridTemplateColumns: '8rem 1fr' }}>
-                <div className="flex items-center gap-2 pr-2">
-                  <Skeleton className="h-8 w-8 rounded-full" />
-                  <Skeleton className="h-4 w-20" />
+          <div className="grid sticky top-0 bg-card z-10 py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
+            <div />
+            <div className="relative grid grid-cols-11 border-l border-border text-xs text-muted-foreground">
+              {hours.map((hour) => (
+                <div key={hour} className="text-center border-r border-border py-1">
+                  {hour}:00
                 </div>
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ))
-          ) : (
-            <>
-              <div className="grid sticky top-0 bg-card z-10 py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
-                <div />
-                <div className="relative grid grid-cols-11 border-l border-border text-xs text-muted-foreground">
-                  {hours.map((hour) => (
-                    <div key={hour} className="text-center border-r border-border py-1">
-                      {hour}:00
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              <div className="space-y-2">
-                <TooltipProvider>
-                  {(staffData || []).map((staff) => (
-                    <StaffRow
-                      key={staff.id}
-                      staff={staff}
-                      events={(scheduleData || []).filter(e => e.staffId === staff.id)}
-                      getCustomer={getCustomerById}
-                      isOver={currentOverStaffId === staff.id}
-                    />
-                  ))}
-                </TooltipProvider>
-              </div>
-            </>
-          )}
+          <div className="space-y-2">
+            <TooltipProvider>
+              {(staffData || []).map((staff) => (
+                <StaffRow
+                  key={staff.id}
+                  staff={staff}
+                  events={(scheduleData || []).filter(e => e.staffId === staff.id)}
+                  getCustomer={getCustomerById}
+                  isOver={currentOverStaffId === staff.id}
+                />
+              ))}
+            </TooltipProvider>
+          </div>
         </CardContent>
       </Card>
     </DndContext>
@@ -351,7 +283,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       <TooltipContent>
         <p className="font-bold">{event.title || '未定のタスク'}</p>
         <p>顧客: {customer?.storeName || '未定'}</p>
-        <p>時間: {formatTime(parseISO(event.start))} - {formatTime(parseISO(event.end))}</p>
+        <p>時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
         <p>担当: {staff.name}</p>
       </TooltipContent>
     </Tooltip>

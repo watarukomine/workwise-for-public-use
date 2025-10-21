@@ -34,8 +34,8 @@ export type ScheduleEvent = {
   title?: string;
   locationId: string;
   staffId: string;
-  start: string;
-  end: string;
+  start: Date | string;
+  end: Date | string;
 };
 
 export type StaffStatus = {

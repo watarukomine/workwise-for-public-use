@@ -1,8 +1,8 @@
+
 'use client';
 import * as React from 'react';
-import { useCollection, useMemoFirebase, useUser } from '@/firebase';
 import type { Order, Customer } from '@/lib/types';
-import { collection, getFirestore } from 'firebase/firestore';
+import { orderData, customerData } from '@/lib/data';
 import {
   Card,
   CardContent,
@@ -11,7 +11,6 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -57,28 +56,12 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer }) => {
 };
 
 export function UnassignedOrders() {
-  const firestore = getFirestore();
-  const { user, isLoading: isUserLoading } = useUser();
-
-  const ordersCollection = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'orders') : null),
-    [firestore, user]
-  );
-  const { data: ordersData, isLoading: isLoadingOrders } =
-    useCollection<Order>(ordersCollection);
-
-  const customersCollection = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'customers') : null),
-    [firestore, user]
-  );
-  const { data: customersData, isLoading: isLoadingCustomers } =
-    useCollection<Customer>(customersCollection);
+  const orders: Order[] = orderData;
+  const customers: Customer[] = customerData;
 
   const getCustomerByCode = (code: string) => {
-    return customersData?.find((c) => c.userCode === code);
+    return customers?.find((c) => c.userCode === code);
   };
-
-  const isLoading = isUserLoading || isLoadingOrders || isLoadingCustomers;
 
   return (
     <Card>
@@ -91,15 +74,9 @@ export function UnassignedOrders() {
       <CardContent>
         <ScrollArea className="w-full whitespace-nowrap">
           <div className="pr-4">
-            {isLoading ? (
-              <div className="flex gap-2">
-                <Skeleton className="h-12 w-[120px]" />
-                <Skeleton className="h-12 w-[120px]" />
-                <Skeleton className="h-12 w-[120px]" />
-              </div>
-            ) : ordersData && ordersData.length > 0 ? (
+            {orders && orders.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {ordersData.map((order) => (
+                {orders.map((order) => (
                   <DraggableOrder
                     key={order.id}
                     order={order}
