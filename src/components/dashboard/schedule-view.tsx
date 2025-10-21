@@ -63,15 +63,16 @@ const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUT
 const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
   const start = eventStart instanceof Date ? eventStart : parseISO(eventStart);
   const end = eventEnd instanceof Date ? eventEnd : parseISO(eventEnd);
+  
   const startOfDay = new Date(start);
   startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
-  const left = differenceInMinutes(start, startOfDay);
-  const width = differenceInMinutes(end, start);
+  const leftInMinutes = differenceInMinutes(start, startOfDay);
+  const widthInMinutes = differenceInMinutes(end, start);
 
   return {
-    left: minutesToPixels(left),
-    width: minutesToPixels(width),
+    left: minutesToPixels(leftInMinutes),
+    width: minutesToPixels(widthInMinutes),
   };
 };
 
@@ -363,7 +364,7 @@ export function ScheduleView() {
         <CardContent className="space-y-4 select-none h-[calc(100%-14rem)] overflow-y-auto pr-6">
           <div className="grid sticky top-0 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
             <div />
-            <div className="relative grid border-l border-border text-xs text-muted-foreground" style={{ gridTemplateColumns: `repeat(${timelineTotalHours}, 1fr)` }}>
+            <div className="relative grid border-l border-border text-xs text-muted-foreground" style={{ gridTemplateColumns: `repeat(${timelineTotalHours}, ${minutesToPixels(60)}px)` }}>
               {Array.from({ length: timelineTotalHours }, (_, i) => timelineStartHour + i).map((hour) => (
                 <div key={hour} className="text-center border-r border-border py-1">
                   {hour}:00
@@ -512,7 +513,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
         className="relative h-14 rounded-md border-l border-border"
         style={{ backgroundColor: isOver ? 'hsl(var(--accent))' : 'hsl(var(--muted) / 0.5)' }}
       >
-        <div className="absolute inset-0 grid" style={{gridTemplateColumns: `repeat(${timelineTotalHours * 2}, 1fr)`}}>
+        <div className="absolute inset-y-0 left-0 grid" style={{gridTemplateColumns: `repeat(${timelineTotalHours * 2}, ${minutesToPixels(30)}px)`}}>
           {Array.from({ length: timelineTotalHours * 2 }).map((_, i) => (
             <div key={i} className={`h-full ${i % 2 === 0 ? 'border-r border-border/80' : 'border-r border-dashed border-border/40'}`}></div>
           ))}
