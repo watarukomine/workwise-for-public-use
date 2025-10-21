@@ -27,7 +27,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { addMinutes, differenceInMinutes, format, parseISO } from 'date-fns';
+import { addMinutes, differenceInMinutes, format, parse, parseISO } from 'date-fns';
 import { staffData, customerData as staticCustomerData, scheduleData as staticScheduleData, orderData as staticOrderData } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
@@ -123,6 +123,12 @@ type DialogState =
   | { mode: 'edit'; event: ScheduleEvent }
   | { mode: 'new'; staffId: string; start: Date };
 
+type EditedEventDetails = {
+    title: string;
+    startTime: string;
+    endTime: string;
+};
+
 // --- Main Component ---
 
 export function ScheduleView() {
@@ -132,7 +138,12 @@ export function ScheduleView() {
   const [unassignedOrders, setUnassignedOrders] = React.useState<Order[]>(staticOrderData);
   
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
-  const [newEventTitle, setNewEventTitle] = React.useState('');
+  
+  const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({
+    title: '',
+    startTime: '',
+    endTime: '',
+  });
 
 
   const genericTasks: Order[] = [
@@ -229,6 +240,11 @@ export function ScheduleView() {
   };
 
   const handleDoubleClickEvent = (event: ScheduleEvent) => {
+    setEditedEventDetails({
+        title: event.title || '',
+        startTime: formatTime(event.start),
+        endTime: formatTime(event.end),
+    });
     setDialogState({ mode: 'edit', event });
   };
   
@@ -242,25 +258,40 @@ export function ScheduleView() {
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
     const newStart = addMinutes(startOfDay, clickMinutes);
 
-    setNewEventTitle('');
+    setEditedEventDetails({ title: '', startTime: formatTime(newStart), endTime: formatTime(addMinutes(newStart, 60)) });
     setDialogState({ mode: 'new', staffId, start: newStart });
   };
   
-  const handleSaveNewEvent = () => {
-    if (dialogState.mode !== 'new' || !newEventTitle) return;
+  const handleSaveEvent = () => {
+    if (dialogState.mode === 'closed') return;
     
-    const newEvent: ScheduleEvent = {
-      id: `event-${Date.now()}`,
-      title: newEventTitle,
-      staffId: dialogState.staffId,
-      locationId: '',
-      start: dialogState.start,
-      end: addMinutes(dialogState.start, 60), // Default to 60 mins
+    const today = new Date();
+    const parseTime = (timeStr: string) => {
+        return parse(timeStr, 'HH:mm', today);
     };
 
-    setScheduleData(prev => [...prev, newEvent]);
+    if (dialogState.mode === 'new') {
+        const newEvent: ScheduleEvent = {
+            id: `event-${Date.now()}`,
+            title: editedEventDetails.title,
+            staffId: dialogState.staffId,
+            locationId: '',
+            start: parseTime(editedEventDetails.startTime),
+            end: parseTime(editedEventDetails.endTime),
+        };
+        setScheduleData(prev => [...prev, newEvent]);
+    } else if (dialogState.mode === 'edit') {
+        const updatedEvent: ScheduleEvent = {
+            ...dialogState.event,
+            title: editedEventDetails.title,
+            start: parseTime(editedEventDetails.startTime),
+            end: parseTime(editedEventDetails.endTime),
+        };
+        setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+    }
     setDialogState({ mode: 'closed' });
   };
+
 
   const handleDeleteEvent = () => {
     if (dialogState.mode !== 'edit') return;
@@ -282,16 +313,16 @@ export function ScheduleView() {
       const { event } = dialogState;
       const staff = staffData.find(s => s.id === event.staffId);
       const customer = getCustomerById(event.locationId);
-      return { event, staff, customer };
+      return { event, staff, customer, title: '予定の編集' };
     }
     if (dialogState.mode === 'new') {
       const staff = staffData.find(s => s.id === dialogState.staffId);
-      return { staff, start: dialogState.start };
+      return { staff, start: dialogState.start, title: '新規予定の作成' };
     }
-    return {};
+    return { title: '' };
   };
 
-  const { event, staff, customer, start } = getDialogDetails();
+  const { event, staff, customer, start, title } = getDialogDetails();
 
 
   const content = (
@@ -330,7 +361,7 @@ export function ScheduleView() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 select-none h-[calc(100%-14rem)] overflow-y-auto pr-6">
-          <div className="grid sticky top-0 bg-card py-2 z-10" style={{ gridTemplateColumns: '8rem 1fr' }}>
+          <div className="grid sticky top-0 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
             <div />
             <div className="relative grid border-l border-border text-xs text-muted-foreground" style={{ gridTemplateColumns: `repeat(${timelineTotalHours}, 1fr)` }}>
               {Array.from({ length: timelineTotalHours }, (_, i) => timelineStartHour + i).map((hour) => (
@@ -361,51 +392,70 @@ export function ScheduleView() {
       
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={(open) => !open && setDialogState({ mode: 'closed' })}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{dialogState.mode === 'edit' ? '予定の編集' : '新規予定の作成'}</DialogTitle>
-             <DialogDescription>
-                {dialogState.mode === 'edit' ? 'この予定を削除しますか？' : '新しい予定の詳細を入力してください。'}
-            </DialogDescription>
-          </DialogHeader>
-
-          {dialogState.mode === 'edit' && event && (
-            <div className="text-sm space-y-2">
-              <p><span className="font-semibold">タスク:</span> {event.title}</p>
-              <p><span className="font-semibold">顧客:</span> {customer?.storeName || 'N/A'}</p>
-              <p><span className="font-semibold">時間:</span> {formatTime(event.start)} - {formatTime(event.end)}</p>
-              <p><span className="font-semibold">担当:</span> {staff?.name || 'N/A'}</p>
-            </div>
-          )}
-          
-          {dialogState.mode === 'new' && (
+            <DialogHeader>
+                <DialogTitle>{title}</DialogTitle>
+                <DialogDescription>
+                    {dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}
+                </DialogDescription>
+            </DialogHeader>
+    
             <div className="space-y-4 py-4">
-                <div className="text-sm space-y-2">
-                    <p><span className="font-semibold">担当:</span> {staff?.name}</p>
-                    <p><span className="font-semibold">開始時間:</span> {start ? formatTime(start) : 'N/A'}</p>
-                </div>
+                {dialogState.mode === 'edit' && (
+                    <div className="text-sm space-y-1">
+                        <p><span className="font-semibold">担当:</span> {staff?.name}</p>
+                        <p><span className="font-semibold">顧客:</span> {customer?.storeName || 'N/A'}</p>
+                    </div>
+                )}
+                 {dialogState.mode === 'new' && (
+                    <div className="text-sm space-y-1">
+                        <p><span className="font-semibold">担当:</span> {staff?.name}</p>
+                    </div>
+                )}
                 <div className="space-y-2">
                     <Label htmlFor="event-title">タスク名</Label>
-                    <Input 
-                        id="event-title" 
-                        value={newEventTitle} 
-                        onChange={(e) => setNewEventTitle(e.target.value)} 
+                    <Input
+                        id="event-title"
+                        value={editedEventDetails.title}
+                        onChange={(e) => setEditedEventDetails(prev => ({ ...prev, title: e.target.value }))}
                         placeholder="例：定期メンテナンス"
+                        disabled={!!(dialogState.mode === 'edit' && event?.orderId)}
                     />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="start-time">開始時間</Label>
+                        <Input
+                            id="start-time"
+                            type="time"
+                            value={editedEventDetails.startTime}
+                            onChange={(e) => setEditedEventDetails(prev => ({ ...prev, startTime: e.target.value }))}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="end-time">終了時間</Label>
+                        <Input
+                            id="end-time"
+                            type="time"
+                            value={editedEventDetails.endTime}
+                            onChange={(e) => setEditedEventDetails(prev => ({ ...prev, endTime: e.target.value }))}
+                        />
+                    </div>
+                </div>
             </div>
-          )}
 
-          <DialogFooter>
-            <DialogClose asChild>
-                <Button variant="outline">キャンセル</Button>
-            </DialogClose>
-            {dialogState.mode === 'edit' && (
-                <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
-            )}
-             {dialogState.mode === 'new' && (
-                <Button onClick={handleSaveNewEvent} disabled={!newEventTitle}>保存</Button>
-            )}
-          </DialogFooter>
+            <DialogFooter className="justify-between">
+                <div>
+                  {dialogState.mode === 'edit' && (
+                      <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <DialogClose asChild>
+                      <Button variant="outline">キャンセル</Button>
+                  </DialogClose>
+                  <Button onClick={handleSaveEvent} disabled={!editedEventDetails.title}>保存</Button>
+                </div>
+            </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
@@ -541,4 +591,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
