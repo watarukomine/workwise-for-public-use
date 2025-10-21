@@ -31,6 +31,18 @@ import { addMinutes, differenceInMinutes, format, parseISO } from 'date-fns';
 import { staffData, customerData as staticCustomerData, scheduleData as staticScheduleData, orderData as staticOrderData } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 const PIXELS_PER_MINUTE = 2;
 const timelineStartHour = 8;
@@ -112,6 +124,7 @@ export function ScheduleView() {
   const [customerData] = React.useState<Customer[]>(staticCustomerData);
   const [scheduleData, setScheduleData] = React.useState<ScheduleEvent[]>(staticScheduleData);
   const [unassignedOrders, setUnassignedOrders] = React.useState<Order[]>(staticOrderData);
+  const [eventToEdit, setEventToEdit] = React.useState<ScheduleEvent | null>(null);
 
   const genericTasks: Order[] = [
       { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30 },
@@ -183,9 +196,11 @@ export function ScheduleView() {
         const newStart = addMinutes(startOfDay, dropMinutes);
         const newEnd = addMinutes(newStart, order.estimatedDuration);
         const customer = getCustomerByCode(order.customerCode);
+        const isGeneric = order.id.startsWith('generic-');
 
         const newEvent: ScheduleEvent = {
             id: `event-${Date.now()}`,
+            orderId: isGeneric ? undefined : order.id,
             title: order.taskDetails,
             staffId: newStaffId,
             locationId: customer?.id || '',
@@ -195,8 +210,7 @@ export function ScheduleView() {
 
         setScheduleData(prev => [...prev, newEvent]);
 
-        // If the dragged item was not a generic task, remove it from unassigned list
-        if (!order.id.startsWith('generic-')) {
+        if (!isGeneric) {
           setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
         }
     }
@@ -204,68 +218,119 @@ export function ScheduleView() {
     setActiveItem(null);
     setCurrentOverStaffId(null);
   };
-  
-  const content = (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle>本日のスケジュール</CardTitle>
-        <CardDescription>タスクを下のタイムラインにドラッグして割り当てます。既存の予定もドラッグで変更できます。</CardDescription>
-        <div className="pt-4">
-             <CardTitle className="text-lg mb-2">ドラッグ可能なタスク</CardTitle>
-            <ScrollArea className="w-full whitespace-nowrap">
-              <div className="pr-4">
-                <div className="flex flex-wrap gap-2">
-                  {genericTasks.map((task) => (
-                     <DraggableOrder
-                        key={task.id}
-                        order={task}
-                        className={task.id === 'generic-travel' ? 'bg-yellow-500 text-black' : 'bg-gray-400 text-white'}
-                      />
-                  ))}
-                  {unassignedOrders.map((order) => (
-                    <DraggableOrder
-                      key={order.id}
-                      order={order}
-                      customer={getCustomerByCode(order.customerCode)}
-                    />
-                  ))}
-                  {unassignedOrders.length === 0 && genericTasks.length === 0 && (
-                    <div className="flex items-center justify-center h-24 text-center text-muted-foreground">
-                        <p>利用可能なタスクはありません。</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </ScrollArea>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4 select-none h-[calc(100%-14rem)] overflow-y-auto pr-6">
-        <div className="grid sticky top-0 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
-          <div />
-          <div className="relative grid grid-cols-11 border-l border-border text-xs text-muted-foreground">
-            {Array.from({ length: 11 }, (_, i) => 8 + i).map((hour) => (
-              <div key={hour} className="text-center border-r border-border py-1">
-                {hour}:00
-              </div>
-            ))}
-          </div>
-        </div>
 
-        <div className="space-y-2">
-          <TooltipProvider>
-            {(staffData || []).map((staff) => (
-              <StaffRow
-                key={staff.id}
-                staff={staff}
-                events={(scheduleData || []).filter(e => e.staffId === staff.id)}
-                getCustomer={getCustomerById}
-                isOver={currentOverStaffId === staff.id}
-              />
-            ))}
-          </TooltipProvider>
-        </div>
-      </CardContent>
-    </Card>
+  const handleDoubleClickEvent = (event: ScheduleEvent) => {
+    setEventToEdit(event);
+  };
+
+  const handleDeleteEvent = () => {
+    if (!eventToEdit) return;
+
+    setScheduleData(prev => prev.filter(e => e.id !== eventToEdit.id));
+
+    // If the event was created from an unassigned order, add it back to the list
+    if (eventToEdit.orderId) {
+        const originalOrder = staticOrderData.find(o => o.id === eventToEdit.orderId);
+        if (originalOrder && !unassignedOrders.find(o => o.id === originalOrder.id)) {
+            setUnassignedOrders(prev => [...prev, originalOrder]);
+        }
+    }
+
+    setEventToEdit(null);
+  };
+  
+  const editingStaff = staffData.find(s => s.id === eventToEdit?.staffId);
+  const editingCustomer = getCustomerById(eventToEdit?.locationId);
+
+  const content = (
+    <>
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle>本日のスケジュール</CardTitle>
+          <CardDescription>タスクを下のタイムラインにドラッグして割り当てます。既存の予定もドラッグで変更できます。</CardDescription>
+          <div className="pt-4">
+               <CardTitle className="text-lg mb-2">ドラッグ可能なタスク</CardTitle>
+              <ScrollArea className="w-full whitespace-nowrap">
+                <div className="pr-4">
+                  <div className="flex flex-wrap gap-2">
+                    {genericTasks.map((task) => (
+                       <DraggableOrder
+                          key={task.id}
+                          order={task}
+                          className={task.id === 'generic-travel' ? 'bg-yellow-500 text-black' : 'bg-gray-400 text-white'}
+                        />
+                    ))}
+                    {unassignedOrders.map((order) => (
+                      <DraggableOrder
+                        key={order.id}
+                        order={order}
+                        customer={getCustomerByCode(order.customerCode)}
+                      />
+                    ))}
+                    {unassignedOrders.length === 0 && genericTasks.length === 0 && (
+                      <div className="flex items-center justify-center h-24 text-center text-muted-foreground">
+                          <p>利用可能なタスクはありません。</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </ScrollArea>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 select-none h-[calc(100%-14rem)] overflow-y-auto pr-6">
+          <div className="grid sticky top-0 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
+            <div />
+            <div className="relative grid grid-cols-11 border-l border-border text-xs text-muted-foreground">
+              {Array.from({ length: 11 }, (_, i) => 8 + i).map((hour) => (
+                <div key={hour} className="text-center border-r border-border py-1">
+                  {hour}:00
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <TooltipProvider>
+              {(staffData || []).map((staff) => (
+                <StaffRow
+                  key={staff.id}
+                  staff={staff}
+                  events={(scheduleData || []).filter(e => e.staffId === staff.id)}
+                  getCustomer={getCustomerById}
+                  isOver={currentOverStaffId === staff.id}
+                  onDoubleClickEvent={handleDoubleClickEvent}
+                />
+              ))}
+            </TooltipProvider>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <AlertDialog open={!!eventToEdit} onOpenChange={(open) => !open && setEventToEdit(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>予定を編集</AlertDialogTitle>
+            <AlertDialogDescription>
+              この予定を削除しますか？この操作は元に戻せません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {eventToEdit && (
+            <div className="text-sm space-y-2">
+              <p><span className="font-semibold">タスク:</span> {eventToEdit.title}</p>
+              <p><span className="font-semibold">顧客:</span> {editingCustomer?.storeName || 'N/A'}</p>
+              <p><span className="font-semibold">時間:</span> {formatTime(eventToEdit.start)} - {formatTime(eventToEdit.end)}</p>
+              <p><span className="font-semibold">担当:</span> {editingStaff?.name || 'N/A'}</p>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction asChild>
+                <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 
   if (!isClient) {
@@ -297,9 +362,10 @@ interface StaffRowProps {
   events: ScheduleEvent[];
   getCustomer: (id: string | undefined) => Customer | undefined;
   isOver: boolean;
+  onDoubleClickEvent: (event: ScheduleEvent) => void;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver, onDoubleClickEvent }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   return (
@@ -319,7 +385,13 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver 
         </div>
         <div className="absolute inset-0 h-full p-1">
           {events.map((event) => (
-            <DraggableEvent key={event.id} event={event} staff={staff} getCustomer={getCustomer} />
+            <DraggableEvent 
+              key={event.id} 
+              event={event} 
+              staff={staff} 
+              getCustomer={getCustomer}
+              onDoubleClick={() => onDoubleClickEvent(event)}
+            />
           ))}
         </div>
       </div>
@@ -331,9 +403,10 @@ interface DraggableEventProps {
   event: ScheduleEvent;
   staff: Staff;
   getCustomer: (id: string | undefined) => Customer | undefined;
+  onDoubleClick: () => void;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomer }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomer, onDoubleClick }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
@@ -357,6 +430,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           ref={setNodeRef}
           {...listeners}
           {...attributes}
+          onDoubleClick={onDoubleClick}
           className="absolute h-12 rounded-md px-2 flex items-center cursor-move"
           style={{
             ...style,
@@ -378,5 +452,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-    
