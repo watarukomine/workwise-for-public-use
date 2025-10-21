@@ -151,6 +151,7 @@ export function ScheduleView() {
   const genericTasks: Order[] = [
       { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30 },
       { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60 },
+      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60 },
   ];
 
   React.useEffect(() => {
@@ -222,7 +223,7 @@ export function ScheduleView() {
              const newEnd = addMinutes(newStart, order.estimatedDuration);
              const newEvent: ScheduleEvent = {
                 id: `event-${Date.now()}`,
-                title: order.id === 'generic-travel' ? `移動: ` : order.taskDetails,
+                title: order.taskDetails,
                 staffId: newStaffId,
                 locationId: '',
                 start: newStart,
@@ -359,6 +360,13 @@ export function ScheduleView() {
 
   const { event, staff, customer, start, title } = getDialogDetails();
 
+  const getDraggableClassName = (task: Order) => {
+    if (task.id === 'generic-travel') return 'bg-yellow-500 text-black';
+    if (task.id === 'generic-work') return 'bg-gray-400 text-white';
+    if (task.id === 'generic-break') return 'bg-green-500 text-white';
+    return 'bg-primary text-primary-foreground';
+  };
+
 
   const content = (
     <>
@@ -375,7 +383,7 @@ export function ScheduleView() {
                        <DraggableOrder
                           key={task.id}
                           order={task}
-                          className={task.id === 'generic-travel' ? 'bg-yellow-500 text-black' : 'bg-gray-400 text-white'}
+                          className={getDraggableClassName(task)}
                         />
                     ))}
                     {unassignedOrders.map((order) => (
@@ -597,8 +605,9 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     onDoubleClick();
   };
 
-  const isTravelEvent = event.title?.startsWith('移動:');
-  
+  const isTravelEvent = event.title?.startsWith('移動');
+  const isBreakEvent = event.title === '休憩';
+
   let backgroundColor = staff.color;
   let color = 'white';
 
@@ -612,6 +621,9 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       backgroundColor = 'hsl(210, 14%, 88%)'; // Muted color fallback
       color = 'hsl(var(--foreground))';
     }
+  } else if (isBreakEvent) {
+    backgroundColor = `hsl(120, 40%, 85%)`;
+    color = 'hsl(var(--foreground))';
   }
 
 
@@ -645,5 +657,4 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   );
 };
 
-    
     
