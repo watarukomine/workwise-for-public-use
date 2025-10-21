@@ -85,7 +85,6 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        console.warn("useCollection failed:", error);
         // This logic extracts the path from either a ref or a query
         const path: string =
           memoizedTargetRefOrQuery.type === 'collection'
@@ -102,7 +101,7 @@ export function useCollection<T = any>(
         setIsLoading(false)
 
         // DO NOT trigger global error propagation for list views to avoid app crashing
-        // errorEmitter.emit('permission-error', contextualError);
+        errorEmitter.emit('permission-error', contextualError);
       }
     );
 
