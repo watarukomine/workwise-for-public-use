@@ -7,6 +7,7 @@ import {
   Building2,
   Route,
   Briefcase,
+  LogIn,
 } from 'lucide-react';
 
 import {
@@ -31,6 +32,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAuth } from './auth-provider';
+import { signInWithGoogle, signOut } from '@/lib/auth';
 
 const navItems = [
   { href: '/', label: '本日の予定', icon: CalendarDays },
@@ -41,6 +44,7 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user } = useAuth();
 
   return (
     <SidebarProvider>
@@ -73,28 +77,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="w-full justify-start items-center gap-3 p-2 h-auto text-left">
-                 <Avatar className="h-9 w-9">
-                  <AvatarImage src="https://picsum.photos/seed/admin/100/100" data-ai-hint="person" />
-                  <AvatarFallback>A</AvatarFallback>
-                </Avatar>
-                <div className="flex-1 -space-y-1">
-                  <p className="text-sm font-semibold">Admin User</p>
-                  <p className="text-xs text-muted-foreground">admin@workwise.app</p>
-                </div>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent side="right" align="start" className="w-56">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Log out</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="w-full justify-start items-center gap-3 p-2 h-auto text-left">
+                   <Avatar className="h-9 w-9">
+                    <AvatarImage src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} data-ai-hint="person" />
+                    <AvatarFallback>{user.displayName?.charAt(0) ?? 'A'}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 -space-y-1">
+                    <p className="text-sm font-semibold">{user.displayName}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" className="w-56">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>Profile</DropdownMenuItem>
+                <DropdownMenuItem>Settings</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => signOut()}>Log out</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button onClick={() => signInWithGoogle()} variant="outline" className="w-full">
+              <LogIn className="mr-2 h-4 w-4" />
+              Sign In with Google
+            </Button>
+          )}
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
