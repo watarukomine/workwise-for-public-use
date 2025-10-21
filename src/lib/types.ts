@@ -28,10 +28,10 @@ export type Customer = {
 export type ScheduleEvent = {
   id: string;
   title?: string;
-  customerId: string;
+  locationId: string;
   staffId: string;
-  start: Date;
-  end: Date;
+  start: string;
+  end: string;
 };
 
 export type StaffStatus = {

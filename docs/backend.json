@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Staff": {
@@ -95,6 +96,10 @@
         "id": {
           "type": "string",
           "description": "Unique identifier for the work schedule entry."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title of the task or event."
         },
         "staffId": {
           "type": "string",
@@ -244,18 +249,14 @@
         }
       },
       {
-        "path": "/staff/{staffId}/workSchedules/{workScheduleId}",
+        "path": "/workSchedules/{workScheduleId}",
         "definition": {
           "entityName": "WorkSchedule",
           "schema": {
             "$ref": "#/backend/entities/WorkSchedule"
           },
-          "description": "Stores work schedule entries for each staff member. Accessible only to the respective staff member.",
+          "description": "Stores work schedule entries. Accessible to authenticated users.",
           "params": [
-            {
-              "name": "staffId",
-              "description": "The unique identifier of the staff member."
-            },
             {
               "name": "workScheduleId",
               "description": "The unique identifier of the work schedule entry."
