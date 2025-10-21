@@ -27,22 +27,35 @@ interface RouteMapProps {
 function RoutePolyline({ path }: { path: google.maps.LatLngLiteral[] }) {
   const map = useMap();
   const maps = useMapsLibrary('maps');
+  const polylineRef = React.useRef<google.maps.Polyline | null>(null);
+
 
   React.useEffect(() => {
-    if (!map || !maps || path.length === 0) return;
+    if (!map || !maps) return;
 
-    const polyline = new maps.Polyline({
-      path: path,
-      geodesic: true,
-      strokeColor: '#0000FF',
-      strokeOpacity: 0.8,
-      strokeWeight: 5,
-    });
+    // Clear existing polyline
+    if (polylineRef.current) {
+      polylineRef.current.setMap(null);
+    }
+    
+    if (path.length > 0) {
+      const polyline = new maps.Polyline({
+        path: path,
+        geodesic: true,
+        strokeColor: '#4285F4',
+        strokeOpacity: 0.8,
+        strokeWeight: 5,
+      });
 
-    polyline.setMap(map);
+      polyline.setMap(map);
+      polylineRef.current = polyline;
+    }
+
 
     return () => {
-      polyline.setMap(null);
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null);
+      }
     };
   }, [map, maps, path]);
 
@@ -54,7 +67,7 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
   // Calculate center of the map
   const allCoordinates = [
     ...staff.filter(s => s.latitude && s.longitude).map(s => ({ lat: s.latitude!, lng: s.longitude! })),
-    ...customers.filter(c => c.緯度 && c.経度).map(c => ({ lat: c.緯度!, lng: c.経度! }))
+    ...customers.filter(c => c.緯度 && c.経度).map(c => ({ lat: typeof c.緯度! === 'string' ? parseFloat(c.緯度!) : c.緯度!, lng: typeof c.経度! === 'string' ? parseFloat(c.経度!) : c.経度! }))
   ];
 
   const center = React.useMemo(() => {
@@ -104,7 +117,10 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
                c.緯度 && c.経度 ? (
                 <Marker
                   key={`customer-${c.id}`}
-                  position={{ lat: c.緯度, lng: c.経度 }}
+                  position={{ 
+                    lat: typeof c.緯度 === 'string' ? parseFloat(c.緯度) : c.緯度, 
+                    lng: typeof c.経度 === 'string' ? parseFloat(c.経度) : c.経度
+                  }}
                 />
               ) : null
             )}
