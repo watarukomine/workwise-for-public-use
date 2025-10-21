@@ -60,9 +60,9 @@ const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
 
 const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
 
-const getEventDimensions = (event: ScheduleEvent) => {
-  const start = event.start instanceof Date ? event.start : parseISO(event.start);
-  const end = event.end instanceof Date ? event.end : parseISO(event.end);
+const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
+  const start = eventStart instanceof Date ? eventStart : parseISO(eventStart);
+  const end = eventEnd instanceof Date ? eventEnd : parseISO(eventEnd);
   const startOfDay = new Date(start);
   startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
@@ -453,7 +453,7 @@ export function ScheduleView() {
                   <DialogClose asChild>
                       <Button variant="outline">キャンセル</Button>
                   </DialogClose>
-                  <Button onClick={handleSaveEvent} disabled={!editedEventDetails.title}>保存</Button>
+                  <Button onClick={handleSaveEvent} disabled={!editedEventDetails.title && !(dialogState.mode === 'edit' && dialogState.event.orderId)}>保存</Button>
                 </div>
             </DialogFooter>
         </DialogContent>
@@ -547,7 +547,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   });
 
   const customer = getCustomer(event.locationId);
-  const { left, width } = getEventDimensions(event);
+  const { left, width } = getEventDimensions(event.start, event.end);
 
   const style = {
     left: `${left}px`,
