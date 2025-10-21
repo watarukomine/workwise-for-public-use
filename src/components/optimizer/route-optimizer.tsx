@@ -98,10 +98,10 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
 
   const allLocations = React.useMemo(() => {
     const customerLocations: Location[] = customers
-      .filter(c => c.latitude && c.longitude && c.name)
+      .filter(c => c.緯度 && c.経度 && c.店舗)
       .map(c => ({ 
         id: c.id, 
-        name: c.name!, 
+        name: c.店舗!, 
         address: c.住所, 
         latitude: c.緯度!, 
         longitude: c.経度!,
@@ -158,7 +158,7 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
                     <CommandInput placeholder="Search location..." />
                     <CommandList>
                       <CommandEmpty>No geocoded locations found.</CommandEmpty>
-                      <CommandGroup heading="Customers">
+                      <CommandGroup heading="販売店">
                         {allLocations.customers.map((location) => (
                           <CommandItem
                             key={location.id}
@@ -182,7 +182,7 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
                           </CommandItem>
                         ))}
                       </CommandGroup>
-                       <CommandGroup heading="Staff">
+                       <CommandGroup heading="スタッフ">
                         {allLocations.staff.map((location) => (
                           <CommandItem
                             key={location.id}
@@ -296,3 +296,5 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
     </div>
   );
 }
+
+    
