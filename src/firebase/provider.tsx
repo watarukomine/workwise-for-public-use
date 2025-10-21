@@ -1,10 +1,10 @@
 'use client';
 
-import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, DependencyList } from 'react';
+import React, { createContext, useContext, ReactNode, useMemo, DependencyList } from 'react';
 import { Auth, User } from 'firebase/auth';
 import { getFirebase } from '@/firebase'; // Import the new centralized getter
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
-import { useUser as useAuthUser } from './auth/use-user';
+import { useUser as useAuthUserHook } from './auth/use-user';
 
 // Extract the instances from the central getter.
 const { auth: authInstance } = getFirebase();
@@ -25,7 +25,7 @@ export const FirebaseContext = createContext<FirebaseContextState | undefined>(u
  * Firebase services (app, auth, firestore) are now managed by getFirebase().
  */
 export const FirebaseProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user, isLoading, error } = useAuthUser(authInstance);
+  const { user, isLoading, error } = useAuthUserHook(authInstance);
 
   const contextValue = useMemo(() => ({
     auth: authInstance, // Provide the singleton auth instance
@@ -50,14 +50,15 @@ const useFirebaseContext = () => {
   return context;
 };
 
-// Hooks to access context values
+// Hooks to access context values are now in index.ts for better organization
 export const useAuth = (): Auth => useFirebaseContext().auth;
 export const useUser = () => {
     const { user, isLoading, error } = useFirebaseContext();
     return { user, isLoading, error };
 };
 
-// Memoization hook remains the same, but App and Firestore hooks are removed as they are no longer part of this provider
+
+// Memoization hook remains the same
 type MemoFirebase <T> = T & {__memo?: boolean};
 
 export function useMemoFirebase<T>(factory: () => T, deps: DependencyList): T | (MemoFirebase<T>) {

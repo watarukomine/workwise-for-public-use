@@ -9,10 +9,8 @@ import { firebaseConfig } from './config';
 export * from './provider';
 export * from './firestore/use-collection';
 export * from './firestore/use-doc';
-export * from './auth/use-user';
 export * from './errors';
 export * from './error-emitter';
-
 
 // --- Centralized Firebase Initialization ---
 
@@ -20,20 +18,22 @@ let firebaseApp: FirebaseApp;
 let auth: Auth;
 let firestore: Firestore;
 
-// Initialize Firebase app and services only once.
-if (!getApps().length) {
-  firebaseApp = initializeApp(firebaseConfig);
-} else {
-  firebaseApp = getApp();
-}
-
-auth = getAuth(firebaseApp);
-firestore = getFirestore(firebaseApp);
-
 /**
  * Returns the singleton instances of Firebase services.
  * This function ensures that Firebase is initialized only once.
  */
 export const getFirebase = () => {
+  if (!firebaseApp) {
+    if (!getApps().length) {
+      firebaseApp = initializeApp(firebaseConfig);
+    } else {
+      firebaseApp = getApp();
+    }
+    auth = getAuth(firebaseApp);
+    firestore = getFirestore(firebaseApp);
+  }
   return { firebaseApp, auth, firestore };
 };
+
+// Re-export useUser after getFirebase is defined
+export { useUser } from './auth/use-user';
