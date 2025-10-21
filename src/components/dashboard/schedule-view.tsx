@@ -109,16 +109,19 @@ export function ScheduleView() {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
       
-      const newStart = addMinutes(parseISO(eventToUpdate.start as string), dragMinutes);
-      const newEnd = addMinutes(parseISO(eventToUpdate.end as string), dragMinutes);
+      const originalStart = typeof eventToUpdate.start === 'string' ? parseISO(eventToUpdate.start) : eventToUpdate.start;
+      const originalEnd = typeof eventToUpdate.end === 'string' ? parseISO(eventToUpdate.end) : eventToUpdate.end;
+
+      const newStart = addMinutes(originalStart, dragMinutes);
+      const newEnd = addMinutes(originalEnd, dragMinutes);
       
       const finalStaffId = newStaffId || eventToUpdate.staffId;
 
       const updatedEvent: ScheduleEvent = {
         ...eventToUpdate,
         staffId: finalStaffId,
-        start: newStart.toISOString(),
-        end: newEnd.toISOString(),
+        start: newStart,
+        end: newEnd,
       };
 
       setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
@@ -149,8 +152,8 @@ export function ScheduleView() {
             title: order.taskDetails,
             staffId: newStaffId,
             locationId: customer.id,
-            start: newStart.toISOString(),
-            end: newEnd.toISOString(),
+            start: newStart,
+            end: newEnd,
         };
 
         setScheduleData(prev => [...prev, newEvent]);
