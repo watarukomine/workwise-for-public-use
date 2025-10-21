@@ -35,23 +35,55 @@
       "type": "object",
       "description": "Represents a customer in the customer directory.",
       "properties": {
-        "id": {
+        "No": {
           "type": "string",
-          "description": "Unique identifier for the customer."
+          "description": "The customer number."
         },
-        "name": {
+        "ユーザーコード": {
           "type": "string",
-          "description": "The name of the customer."
+          "description": "The user code for the customer."
         },
-        "address": {
+        "旧チャネルSEQ": {
+          "type": "string",
+          "description": "The old channel sequence number."
+        },
+        "店舗": {
+          "type": "string",
+          "description": "The store associated with the customer."
+        },
+        "管理C": {
+          "type": "string",
+          "description": "The management code for the customer."
+        },
+        "機材 有無": {
+          "type": "string",
+          "description": "Indicates the presence of equipment."
+        },
+        "住所": {
           "type": "string",
           "description": "The address of the customer."
+        },
+        "緯度": {
+          "type": "number",
+          "description": "The latitude of the customer's location."
+        },
+        "経度": {
+          "type": "number",
+          "description": "The longitude of the customer's location."
+        },
+        "電話番号": {
+          "type": "string",
+          "description": "The phone number of the customer."
+        },
+        "営業時間": {
+          "type": "string",
+          "description": "The business hours of the customer."
         }
       },
       "required": [
-        "id",
-        "name",
-        "address"
+        "No",
+        "ユーザーコード",
+        "住所"
       ]
     },
     "WorkSchedule": {

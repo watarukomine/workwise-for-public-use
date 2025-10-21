@@ -15,7 +15,6 @@ import { Progress } from '@/components/ui/progress';
 import { Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { errorEmitter, FirestorePermissionError } from '@/firebase';
-import { useUser } from '@/firebase';
 
 type DataType = 'customers' | 'staff' | 'schedules';
 type Status = 'idle' | 'parsing' | 'importing' | 'success' | 'error';
@@ -24,7 +23,6 @@ const { firestore, auth } = getFirebase(); // Get the singleton instances
 
 export function DataImporter() {
   const { toast } = useToast();
-  const { user, isLoading: isUserLoading } = useUser();
   const [file, setFile] = React.useState<File | null>(null);
   const [dataType, setDataType] = React.useState<DataType>('customers');
   const [status, setStatus] = React.useState<Status>('idle');
@@ -89,14 +87,14 @@ export function DataImporter() {
            try {
             const collectionName = dataType === 'schedules' ? `staff/${record.staffId}/workSchedules` : dataType;
             const collectionRef = collection(firestore, collectionName);
-            const recordId = record.id || doc(collectionRef).id;
+            const recordId = record.id || record['ユーザーコード'] || doc(collectionRef).id;
             const docRef = doc(collectionRef, recordId);
 
             let dataToImport: any = { ...record };
 
             if (dataType === 'customers' && record.緯度 && record.経度) {
-              dataToImport.latitude = parseFloat(record.緯度) || null;
-              dataToImport.longitude = parseFloat(record.経度) || null;
+              dataToImport['緯度'] = parseFloat(record.緯度) || null;
+              dataToImport['経度'] = parseFloat(record.経度) || null;
             } else if (dataType === 'schedules') {
               dataToImport.startTime = new Date(record.startTime);
               dataToImport.endTime = new Date(record.endTime);
