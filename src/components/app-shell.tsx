@@ -43,7 +43,8 @@ const navItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList },
   { href: '/customers', label: '販売店一覧', icon: Building2 },
   { href: '/staff', label: 'スタッフ一覧', icon: Users },
-  { href: '/optimizer', label: 'ルート最適化', icon: Map },
+  { href: '/optimizer', label: 'ルート最適化', icon: Route },
+  { href: '/tracking', label: 'スタッフ追跡', icon: Map },
   { href: '/import', label: 'データ取込', icon: Upload },
 ];
 
