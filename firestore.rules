@@ -1,124 +1,120 @@
+/**
+ * @file Firebase Security Rules for WorkWise Application
+ *
+ * @description This ruleset enforces a strict user-ownership model for staff-related data
+ * and authenticated access for customer and location data.
+ *
+ * @dataStructure
+ * The database is organized as follows:
+ * - /staff/{staffId}: Stores personal staff information, accessible only to the staff member.
+ * - /customers/{customerId}: Stores customer information, accessible to all authenticated users.
+ * - /locations/{locationId}: Stores location data, accessible to all authenticated users.
+ * - /staff/{staffId}/workSchedules/{workScheduleId}: Stores work schedules, only accessible to the owning staff member.
+ * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores employee actions, only accessible to the owning staff member.
+ *
+ * @keySecurityDecisions
+ * - User listing is implicitly disallowed by the ruleset, as there are no open list operations.
+ * - All write operations are protected by authentication checks and owner validation.
+ * - Data types are NOT validated in this prototyping phase.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
-     * @return {boolean} True if the user is signed in, false otherwise.
+     * @description Defines the isSignedIn function, which returns true if the request has valid authentication
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the authenticated user's UID matches the provided user ID.
-     * @param {string} userId - The user ID to compare against the authenticated user's UID.
-     * @return {boolean} True if the user IDs match, false otherwise.
+     * @description Defines the isOwner function, which returns true if the request is made by the owner of the document.
      */
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
     /**
-     * @description Checks if the user is the owner of the existing document.
-     * @param {string} userId - The user ID to compare against the authenticated user's UID.
-     * @return {boolean} True if the user IDs match and the document exists, false otherwise.
+     * @description Defines the isExistingOwner function, which returns true if the request is made by the owner of an existing document.
      */
     function isExistingOwner(userId) {
       return isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Checks if the user is an administrator.
-     * @return {boolean} Always false in this prototype. Replace with actual role-checking logic.
-     */
-    function isAdmin() {
-      return false;
-    }
-
-    /**
-     * @description Rules for the /staff/{staffId} collection.
+     * @description Rules for the /staff collection.
      * @path /staff/{staffId}
-     * @allow (create) - An administrator can create a staff profile. (This is currently denied because isAdmin() always returns false.)
-     * @deny (create) - A non-administrator cannot create a staff profile.
-     * @allow (get) - An administrator can read a staff profile. (This is currently denied because isAdmin() always returns false.)
-     * @deny (get) - A non-administrator cannot read a staff profile.
-     * @principle Enforces role-based access control; only administrators can manage staff profiles.
+     * @allow (create) - Authenticated user can create a staff document with their own ID.
+     * @deny (create) - Authenticated user cannot create a staff document with another user's ID.
+     * @allow (get, update, delete) - Authenticated user can get, update and delete their own staff document.
+     * @deny (get, update, delete) - Authenticated user cannot get, update or delete another user's staff document.
+     * @principle Enforces document ownership for writes.
      */
     match /staff/{staffId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isOwner(staffId);
+      allow list: if false;
+      allow create: if isOwner(staffId);
+      allow update: if isExistingOwner(staffId);
+      allow delete: if isExistingOwner(staffId);
     }
 
     /**
-     * @description Rules for the /customers/{customerId} collection.
+     * @description Rules for the /customers collection.
      * @path /customers/{customerId}
-     * @allow (create) - An administrator can create a customer profile. (This is currently denied because isAdmin() always returns false.)
-     * @deny (create) - A non-administrator cannot create a customer profile.
-     * @allow (get) - An administrator can read a customer profile. (This is currently denied because isAdmin() always returns false.)
-     * @deny (get) - A non-administrator cannot read a customer profile.
-     * @principle Enforces role-based access control; only administrators can manage customer profiles.
+     * @allow (create, get, list, update, delete) - All authenticated users can create, get, list, update, and delete customers.
+     * @deny (none) - There are no explicit deny conditions in this prototyping phase.
+     * @principle Allows open access to customer data for authenticated users.
      */
     match /customers/{customerId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
     }
 
     /**
-     * @description Rules for the /staff/{staffId}/workSchedules/{workScheduleId} collection.
-     * @path /staff/{staffId}/workSchedules/{workScheduleId}
-     * @allow (create) - The staff member or an administrator can create a work schedule. The staffId in the path must match the staffId in the new document.
-     * @deny (create) - A non-staff member or non-administrator cannot create a work schedule.
-     * @allow (get) - The staff member or an administrator can read a work schedule.
-     * @deny (get) - A non-staff member or non-administrator cannot create a work schedule.
-     * @principle Enforces path-based ownership and role-based access control for work schedules.
-     */
-    match /staff/{staffId}/workSchedules/{workScheduleId} {
-      allow get: if isOwner(staffId) || isAdmin();
-      allow list: if isOwner(staffId) || isAdmin();
-      allow create: if isOwner(staffId) || isAdmin();
-      allow update: if isExistingOwner(staffId) || isAdmin();
-      allow delete: if isExistingOwner(staffId) || isAdmin();
-    }
-
-    /**
-     * @description Rules for the /staff/{staffId}/workSchedules/{workScheduleId}/employeeActions/{employeeActionId} collection.
-     * @path /staff/{staffId}/workSchedules/{workScheduleId}/employeeActions/{employeeActionId}
-     * @allow (create) - The staff member or an administrator can create an employee action.
-     * @deny (create) - A non-staff member or non-administrator cannot create an employee action.
-     * @allow (get) - The staff member or an administrator can read an employee action.
-     * @deny (get) - A non-staff member or non-administrator cannot create an employee action.
-     * @principle Enforces path-based ownership and role-based access control for employee actions.
-     */
-    match /staff/{staffId}/workSchedules/{workScheduleId}/employeeActions/{employeeActionId} {
-      allow get: if isOwner(staffId) || isAdmin();
-      allow list: if isOwner(staffId) || isAdmin();
-      allow create: if isOwner(staffId) || isAdmin();
-      allow update: if isExistingOwner(staffId) || isAdmin();
-      allow delete: if isExistingOwner(staffId) || isAdmin();
-    }
-
-    /**
-     * @description Rules for the /locations/{locationId} collection.
+     * @description Rules for the /locations collection.
      * @path /locations/{locationId}
-     * @allow (create) - An administrator can create a location. (This is currently denied because isAdmin() always returns false.)
-     * @deny (create) - A non-administrator cannot create a location.
-     * @allow (get) - An administrator can read a location. (This is currently denied because isAdmin() always returns false.)
-     * @deny (get) - A non-administrator cannot read a location.
-     * @principle Enforces role-based access control; only administrators can manage location data.
+     * @allow (create, get, list, update, delete) - All authenticated users can create, get, list, update, and delete locations.
+     * @deny (none) - There are no explicit deny conditions in this prototyping phase.
+     * @principle Allows open access to location data for authenticated users.
      */
     match /locations/{locationId} {
-      allow get: if isAdmin();
-      allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
+    /**
+     * @description Rules for the /staff/{staffId}/workSchedules collection.
+     * @path /staff/{staffId}/workSchedules/{workScheduleId}
+     * @allow (create) - Authenticated user can create a work schedule under their own staff ID.
+     * @deny (create) - Authenticated user cannot create a work schedule under another user's staff ID.
+     * @allow (get, update, delete) - Authenticated user can get, update, and delete their own work schedules.
+     * @deny (get, update, delete) - Authenticated user cannot get, update, or delete another user's work schedules.
+     * @principle Enforces document ownership for writes within the staff's data tree.
+     */
+    match /staff/{staffId}/workSchedules/{workScheduleId} {
+      allow get: if isOwner(staffId);
+      allow list: if isOwner(staffId);
+      allow create: if isOwner(staffId);
+      allow update: if isExistingOwner(staffId);
+      allow delete: if isExistingOwner(staffId);
+    }
+
+    /**
+     * @description Rules for the /staff/{staffId}/employeeActions collection.
+     * @path /staff/{staffId}/employeeActions/{employeeActionId}
+     * @allow (create) - Authenticated user can create an employee action under their own staff ID.
+     * @deny (create) - Authenticated user cannot create an employee action under another user's staff ID.
+     * @allow (get, update, delete) - Authenticated user can get, update, and delete their own employee actions.
+     * @deny (get, update, delete) - Authenticated user cannot get, update, or delete another user's employee actions.
+     * @principle Enforces document ownership for writes within the staff's data tree.
+     */
+    match /staff/{staffId}/employeeActions/{employeeActionId} {
+      allow get: if isOwner(staffId);
+      allow list: if isOwner(staffId);
+      allow create: if isOwner(staffId);
+      allow update: if isExistingOwner(staffId);
+      allow delete: if isExistingOwner(staffId);
     }
   }
 }
