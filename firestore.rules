@@ -1,134 +1,122 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict authenticated-user access model for all collections.
- * All data is stored in top-level collections: /staff/{staffId}, /customers/{customerId}, /jobsites/{jobsiteId}, /workSchedules/{workScheduleId}, and /employeeActions/{employeeActionId}.
+ * @fileoverview Firestore Security Rules for Prototyping.
+ *
+ * Core Philosophy:
+ * This ruleset prioritizes strict authentication and authorization, ensuring only signed-in users can access data. It avoids complex data validation to enable rapid prototyping.
+ *
+ * Data Structure:
+ * The database consists of top-level collections for 'staff', 'customers', 'jobsites', 'workSchedules', and 'employeeActions'.
+ * Each collection contains documents identified by unique IDs.
+ *
  * Key Security Decisions:
- *  - Listing of any collection is forbidden unless explicitly allowed. This prevents unauthorized data discovery.
- *  - All write operations require the user to be authenticated.
- *  - Read operations require the user to be authenticated.
+ * - All collections require authentication.
+ * - List operations are only permitted to authenticated users.
+ * - No data shape validation is performed in this prototype.
+ *
+ * To improve security and performance, always denormalize authorization data directly onto the documents being secured.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Manages staff member data. Only authenticated users can access staff data.
+     * @description Controls access to the 'staff' collection.
      * @path /staff/{staffId}
-     * @allow (create) - Authenticated user can create staff data.
-     * @deny (create) - Unauthenticated user attempts to create staff data.
-     * @allow (get) - Authenticated user can get staff data.
-     * @deny (get) - Unauthenticated user attempts to get staff data.
-     * @allow (list) - Authenticated user can list staff data.
-     * @deny (list) - Unauthenticated user attempts to list staff data.
-     * @allow (update) - Authenticated user can update staff data.
-     * @deny (update) - Unauthenticated user attempts to update staff data.
-     * @allow (delete) - Authenticated user can delete staff data.
-     * @deny (delete) - Unauthenticated user attempts to delete staff data.
-     * @principle Authenticated users only.
+     * @allow (create) Authenticated user can create a staff document.
+     * @deny (create) Non-authenticated user cannot create a staff document.
+     * @allow (get, list) Authenticated user can read a staff document.
+     * @deny (get, list) Non-authenticated user cannot read a staff document.
+     * @allow (update, delete) Authenticated user can update or delete a staff document if it exists.
+     * @deny (update, delete) Non-authenticated user cannot update or delete a staff document.
+     * @principle Requires authentication for all operations.
      */
     match /staff/{staffId} {
       allow get: if isSignedIn();
-      allow list: if false;
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn() && resource != null;
       allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Manages customer data. Only authenticated users can access customer data.
+     * @description Controls access to the 'customers' collection.
      * @path /customers/{customerId}
-     * @allow (create) - Authenticated user can create customer data.
-     * @deny (create) - Unauthenticated user attempts to create customer data.
-     * @allow (get) - Authenticated user can get customer data.
-     * @deny (get) - Unauthenticated user attempts to get customer data.
-     * @allow (list) - Authenticated user can list customer data.
-     * @deny (list) - Unauthenticated user attempts to list customer data.
-     * @allow (update) - Authenticated user can update customer data.
-     * @deny (update) - Unauthenticated user attempts to update customer data.
-     * @allow (delete) - Authenticated user can delete customer data.
-     * @deny (delete) - Unauthenticated user attempts to delete customer data.
-     * @principle Authenticated users only.
+     * @allow (create) Authenticated user can create a customer document.
+     * @deny (create) Non-authenticated user cannot create a customer document.
+     * @allow (get, list) Authenticated user can read a customer document.
+     * @deny (get, list) Non-authenticated user cannot read a customer document.
+     * @allow (update, delete) Authenticated user can update or delete a customer document if it exists.
+     * @deny (update, delete) Non-authenticated user cannot update or delete a customer document.
+     * @principle Requires authentication for all operations.
      */
     match /customers/{customerId} {
       allow get: if isSignedIn();
-      allow list: if false;
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn() && resource != null;
       allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Manages jobsite data. Only authenticated users can access jobsite data.
+     * @description Controls access to the 'jobsites' collection.
      * @path /jobsites/{jobsiteId}
-     * @allow (create) - Authenticated user can create jobsite data.
-     * @deny (create) - Unauthenticated user attempts to create jobsite data.
-     * @allow (get) - Authenticated user can get jobsite data.
-     * @deny (get) - Unauthenticated user attempts to get jobsite data.
-     * @allow (list) - Authenticated user can list jobsite data.
-     * @deny (list) - Unauthenticated user attempts to list jobsite data.
-     * @allow (update) - Authenticated user can update jobsite data.
-     * @deny (update) - Unauthenticated user attempts to update jobsite data.
-     * @allow (delete) - Authenticated user can delete jobsite data.
-     * @deny (delete) - Unauthenticated user attempts to delete jobsite data.
-     * @principle Authenticated users only.
+     * @allow (create) Authenticated user can create a jobsite document.
+     * @deny (create) Non-authenticated user cannot create a jobsite document.
+     * @allow (get, list) Authenticated user can read a jobsite document.
+     * @deny (get, list) Non-authenticated user cannot read a jobsite document.
+     * @allow (update, delete) Authenticated user can update or delete a jobsite document if it exists.
+     * @deny (update, delete) Non-authenticated user cannot update or delete a jobsite document.
+     * @principle Requires authentication for all operations.
      */
     match /jobsites/{jobsiteId} {
       allow get: if isSignedIn();
-      allow list: if false;
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn() && resource != null;
       allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Manages work schedule data. Only authenticated users can access work schedule data.
+     * @description Controls access to the 'workSchedules' collection.
      * @path /workSchedules/{workScheduleId}
-     * @allow (create) - Authenticated user can create work schedule data.
-     * @deny (create) - Unauthenticated user attempts to create work schedule data.
-     * @allow (get) - Authenticated user can get work schedule data.
-     * @deny (get) - Unauthenticated user attempts to get work schedule data.
-     * @allow (list) - Authenticated user can list work schedule data.
-     * @deny (list) - Unauthenticated user attempts to list work schedule data.
-     * @allow (update) - Authenticated user can update work schedule data.
-     * @deny (update) - Unauthenticated user attempts to update work schedule data.
-     * @allow (delete) - Authenticated user can delete work schedule data.
-     * @deny (delete) - Unauthenticated user attempts to delete work schedule data.
-     * @principle Authenticated users only.
+     * @allow (create) Authenticated user can create a workSchedule document.
+     * @deny (create) Non-authenticated user cannot create a workSchedule document.
+     * @allow (get, list) Authenticated user can read a workSchedule document.
+     * @deny (get, list) Non-authenticated user cannot read a workSchedule document.
+     * @allow (update, delete) Authenticated user can update or delete a workSchedule document if it exists.
+     * @deny (update, delete) Non-authenticated user cannot update or delete a workSchedule document.
+     * @principle Requires authentication for all operations.
      */
     match /workSchedules/{workScheduleId} {
       allow get: if isSignedIn();
-      allow list: if false;
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn() && resource != null;
       allow delete: if isSignedIn() && resource != null;
     }
 
     /**
-     * @description Manages employee action data. Only authenticated users can access employee action data.
+     * @description Controls access to the 'employeeActions' collection.
      * @path /employeeActions/{employeeActionId}
-     * @allow (create) - Authenticated user can create employee action data.
-     * @deny (create) - Unauthenticated user attempts to create employee action data.
-     * @allow (get) - Authenticated user can get employee action data.
-     * @deny (get) - Unauthenticated user attempts to get employee action data.
-     * @allow (list) - Authenticated user can list employee action data.
-     * @deny (list) - Unauthenticated user attempts to list employee action data.
-     * @allow (update) - Authenticated user can update employee action data.
-     * @deny (update) - Unauthenticated user attempts to update employee action data.
-     * @allow (delete) - Authenticated user can delete employee action data.
-     * @deny (delete) - Unauthenticated user attempts to delete employee action data.
-     * @principle Authenticated users only.
+     * @allow (create) Authenticated user can create a employeeAction document.
+     * @deny (create) Non-authenticated user cannot create a employeeAction document.
+     * @allow (get, list) Authenticated user can read a employeeAction document.
+     * @deny (get, list) Non-authenticated user cannot read a employeeAction document.
+     * @allow (update, delete) Authenticated user can update or delete a employeeAction document if it exists.
+     * @deny (update, delete) Non-authenticated user cannot update or delete a employeeAction document.
+     * @principle Requires authentication for all operations.
      */
     match /employeeActions/{employeeActionId} {
       allow get: if isSignedIn();
-      allow list: if false;
+      allow list: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isSignedIn() && resource != null;
       allow delete: if isSignedIn() && resource != null;
     }
 
-  }
-
-  function isSignedIn() {
-    return request.auth != null;
+    // Helper function to determine if a user is signed in.
+    function isSignedIn() {
+      return request.auth != null;
+    }
   }
 }
