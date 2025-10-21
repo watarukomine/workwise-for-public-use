@@ -7,7 +7,7 @@ import type { Customer, Staff, StaffStatus } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon } from 'lucide-react';
+import { Check, ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -29,27 +29,38 @@ type Location = {
   type: 'customer' | 'staff';
 };
 
-
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
-  const selectedLocationIds = formData.getAll('locations') as string[];
+  const startLocationId = formData.get('startLocation') as string;
+  const endLocationId = formData.get('endLocation') as string;
+  const waypointIds = formData.getAll('waypoints') as string[];
   const optimizeFor = formData.get('optimizeFor') as OptimizeRouteInput['optimizeFor'];
   const allLocations = JSON.parse(formData.get('allLocations') as string) as Location[];
 
-  if (selectedLocationIds.length < 2) {
-    return { data: null, error: 'Please select at least two locations to optimize.' };
+  if (!startLocationId || !endLocationId) {
+    return { data: null, error: '出発地と目的地を選択してください。' };
   }
-  
-  const selectedLocations = allLocations.filter(c => selectedLocationIds.includes(c.id));
+
+  const findLocation = (id: string) => allLocations.find(loc => loc.id === id);
+
+  const startLocation = findLocation(startLocationId);
+  const endLocation = findLocation(endLocationId);
+  const waypoints = waypointIds.map(findLocation).filter((loc): loc is Location => !!loc);
+
+  if (!startLocation || !endLocation) {
+    return { data: null, error: '有効な出発地と目的地が見つかりません。' };
+  }
 
   try {
     const result = await optimizeRoute({
-      locations: selectedLocations,
+      startLocation,
+      endLocation,
+      waypoints,
       optimizeFor: optimizeFor,
     });
     return { data: result, error: null };
   } catch (e) {
     console.error(e);
-    return { data: null, error: 'Failed to optimize route. Please try again.' };
+    return { data: null, error: 'ルートの最適化に失敗しました。もう一度お試しください。' };
   }
 }
 
@@ -66,7 +77,6 @@ function SubmitButton() {
     
     const handleFormSubmit = () => setPending(true);
 
-    // A bit of a hack to get form pending state without experimental useFormStatus
     const button = document.getElementById('optimizer-submit-button');
     if (button) {
       form = findForm(button);
@@ -84,28 +94,77 @@ function SubmitButton() {
   return (
     <Button id="optimizer-submit-button" type="submit" disabled={pending} className="w-full sm:w-auto">
       {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RouteIcon className="mr-2 h-4 w-4" />}
-      Optimize Route
+      ルートを最適化
     </Button>
   );
 }
 
 type StaffWithStatus = Staff & StaffStatus;
 
-export function RouteOptimizer({ customers, staff }: { customers: Customer[], staff: StaffWithStatus[] }) {
+const LocationSelector: React.FC<{
+  locations: Location[];
+  selectedValue: string | undefined;
+  onSelect: (id: string | undefined) => void;
+  placeholder: string;
+}> = ({ locations, selectedValue, onSelect, placeholder }) => {
   const [open, setOpen] = React.useState(false);
-  const [selected, setSelected] = React.useState<string[]>([]);
+  const staffLocations = locations.filter(l => l.type === 'staff');
+  const customerLocations = locations.filter(l => l.type === 'customer');
+  const selectedLocationName = locations.find(l => l.id === selectedValue)?.name;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
+          <span className="truncate">{selectedLocationName || placeholder}</span>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+        <Command>
+          <CommandInput placeholder="ロケーションを検索..." />
+          <CommandList>
+            <CommandEmpty>該当するロケーションが見つかりません。</CommandEmpty>
+            <CommandGroup heading="スタッフ">
+              {staffLocations.map(location => (
+                <CommandItem key={location.id} value={location.name} onSelect={() => { onSelect(location.id); setOpen(false); }}>
+                  <Check className={cn("mr-2 h-4 w-4", selectedValue === location.id ? "opacity-100" : "opacity-0")} />
+                  {location.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandGroup heading="販売店">
+              {customerLocations.map(location => (
+                <CommandItem key={location.id} value={location.name} onSelect={() => { onSelect(location.id); setOpen(false); }}>
+                  <Check className={cn("mr-2 h-4 w-4", selectedValue === location.id ? "opacity-100" : "opacity-0")} />
+                  {location.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+
+export function RouteOptimizer({ customers, staff }: { customers: Customer[], staff: StaffWithStatus[] }) {
+  const [startLocation, setStartLocation] = React.useState<string | undefined>();
+  const [endLocation, setEndLocation] = React.useState<string | undefined>();
+  const [waypoints, setWaypoints] = React.useState<string[]>([]);
   const [state, formActionWithState] = useActionState(formAction, { data: null, error: null });
 
   const allLocations = React.useMemo(() => {
     const customerLocations: Location[] = customers
       .filter(c => c.緯度 && c.経度 && c.店舗)
-      .map(c => ({ 
-        id: c.id, 
-        name: c.店舗!, 
-        address: c.住所, 
-        latitude: typeof c.緯度 === 'string' ? parseFloat(c.緯度) : c.緯度!, 
+      .map(c => ({
+        id: c.id,
+        name: c.店舗!,
+        address: c.住所,
+        latitude: typeof c.緯度 === 'string' ? parseFloat(c.緯度) : c.緯度!,
         longitude: typeof c.経度 === 'string' ? parseFloat(c.経度) : c.経度!,
-        type: 'customer' 
+        type: 'customer'
       }));
 
     const staffLocations: Location[] = staff
@@ -119,109 +178,89 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
         type: 'staff'
       }));
 
-    return {
-      customers: customerLocations,
-      staff: staffLocations
-    }
+    return [...customerLocations, ...staffLocations];
   }, [customers, staff]);
+  
+  const availableWaypointLocations = allLocations.filter(
+    loc => loc.id !== startLocation && loc.id !== endLocation
+  );
 
-  const combinedLocations = [...allLocations.customers, ...allLocations.staff];
+  const addWaypoint = () => {
+    setWaypoints(prev => [...prev, '']);
+  };
+
+  const updateWaypoint = (index: number, id: string) => {
+    setWaypoints(prev => {
+        const newWaypoints = [...prev];
+        newWaypoints[index] = id;
+        return newWaypoints;
+    });
+  };
+
+  const removeWaypoint = (index: number) => {
+    setWaypoints(prev => prev.filter((_, i) => i !== index));
+  };
+
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Route Details</CardTitle>
-          <CardDescription>Select locations and optimization criteria.</CardDescription>
+          <CardTitle>ルート詳細</CardTitle>
+          <CardDescription>出発地、目的地、経由地、最適化の基準を選択してください。</CardDescription>
         </CardHeader>
         <form action={formActionWithState}>
           <CardContent className="space-y-6">
+             <input type="hidden" name="allLocations" value={JSON.stringify(allLocations)} />
+             {startLocation && <input type="hidden" name="startLocation" value={startLocation} />}
+             {endLocation && <input type="hidden" name="endLocation" value={endLocation} />}
+             {waypoints.map((id, index) => id && <input key={index} type="hidden" name="waypoints" value={id} />)}
+
             <div className="space-y-2">
-              <Label>Locations</Label>
-              <input type="hidden" name="allLocations" value={JSON.stringify(combinedLocations)} />
-              {selected.map(id => <input key={id} type="hidden" name="locations" value={id} />)}
-              
-              <Popover open={open} onOpenChange={setOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-full justify-between"
-                  >
-                    <span className="truncate">{selected.length > 0 ? `${selected.length} location(s) selected` : "Select locations..."}</span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search location..." />
-                    <CommandList>
-                      <CommandEmpty>No geocoded locations found.</CommandEmpty>
-                      <CommandGroup heading="販売店">
-                        {allLocations.customers.map((location) => (
-                          <CommandItem
-                            key={location.id}
-                            value={location.name}
-                            onSelect={() => {
-                              setSelected(current => 
-                                current.includes(location.id) 
-                                  ? current.filter(id => id !== location.id) 
-                                  : [...current, location.id]
-                              );
-                              setOpen(true);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selected.includes(location.id) ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {location.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                       <CommandGroup heading="スタッフ">
-                        {allLocations.staff.map((location) => (
-                          <CommandItem
-                            key={location.id}
-                            value={location.name}
-                            onSelect={() => {
-                              setSelected(current => 
-                                current.includes(location.id) 
-                                  ? current.filter(id => id !== location.id) 
-                                  : [...current, location.id]
-                              );
-                              setOpen(true);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selected.includes(location.id) ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {location.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                <Label>出発地</Label>
+                <LocationSelector locations={allLocations} selectedValue={startLocation} onSelect={setStartLocation} placeholder="出発地を選択..." />
             </div>
-            
+
             <div className="space-y-2">
-              <Label>Optimize For</Label>
+                <Label>経由地</Label>
+                 <div className="space-y-2">
+                    {waypoints.map((waypointId, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                            <div className="flex-grow">
+                                <LocationSelector 
+                                    locations={availableWaypointLocations} 
+                                    selectedValue={waypointId} 
+                                    onSelect={(id) => updateWaypoint(index, id!)} 
+                                    placeholder="経由地を選択..."
+                                />
+                            </div>
+                            <Button type="button" variant="ghost" size="icon" onClick={() => removeWaypoint(index)} aria-label="経由地を削除">
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={addWaypoint} className="mt-2">
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    経由地を追加
+                </Button>
+            </div>
+
+            <div className="space-y-2">
+                <Label>目的地</Label>
+                <LocationSelector locations={allLocations} selectedValue={endLocation} onSelect={setEndLocation} placeholder="目的地を選択..." />
+            </div>
+
+            <div className="space-y-2">
+              <Label>最適化の基準</Label>
               <RadioGroup name="optimizeFor" defaultValue="time" className="flex gap-4">
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="time" id="time" />
-                  <Label htmlFor="time">Travel Time</Label>
+                  <Label htmlFor="time">移動時間</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="distance" id="distance" />
-                  <Label htmlFor="distance">Distance</Label>
+                  <Label htmlFor="distance">距離</Label>
                 </div>
               </RadioGroup>
             </div>
@@ -231,10 +270,10 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
           </CardFooter>
         </form>
       </Card>
-      
+
       {state.error && (
         <Alert variant="destructive">
-          <AlertTitle>Error</AlertTitle>
+          <AlertTitle>エラー</AlertTitle>
           <AlertDescription>{state.error}</AlertDescription>
         </Alert>
       )}
@@ -243,7 +282,7 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
         <Card className="h-full">
             <CardContent className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 pt-6">
                 <MapPinned className="h-12 w-12 mb-4" />
-                <p>Your optimized route will appear here.</p>
+                <p>最適化されたルートがここに表示されます。</p>
             </CardContent>
         </Card>
       )}
@@ -251,23 +290,23 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
       {state.data && (
         <Card>
           <CardHeader>
-            <CardTitle>Optimized Route</CardTitle>
-            <CardDescription>The most efficient path based on your selection.</CardDescription>
+            <CardTitle>最適化されたルート</CardTitle>
+            <CardDescription>選択に基づいた最も効率的な経路です。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
               <div>
-                <h3 className="font-semibold mb-2">Summary</h3>
+                <h3 className="font-semibold mb-2">概要</h3>
                 <p className="text-sm text-muted-foreground">{state.data.summary}</p>
                 <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
                   {state.data.estimatedTravelTime && (
                     <div className="flex flex-col p-3 bg-muted rounded-md">
-                      <span className="text-muted-foreground text-xs">Est. Time</span>
+                      <span className="text-muted-foreground text-xs">推定時間</span>
                       <span className="font-semibold text-lg">{state.data.estimatedTravelTime}</span>
                     </div>
                   )}
                   {state.data.estimatedTravelDistance && (
                      <div className="flex flex-col p-3 bg-muted rounded-md">
-                      <span className="text-muted-foreground text-xs">Est. Distance</span>
+                      <span className="text-muted-foreground text-xs">推定距離</span>
                       <span className="font-semibold text-lg">{state.data.estimatedTravelDistance}</span>
                     </div>
                   )}
@@ -275,7 +314,7 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
               </div>
 
               <div>
-                <h3 className="font-semibold mb-2">Route Order</h3>
+                <h3 className="font-semibold mb-2">巡回順</h3>
                 <ol className="relative border-l border-border space-y-4">
                   {state.data.optimizedRoute.map((location, index) => (
                     <li key={location.id} className="ml-6">
@@ -296,5 +335,3 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
     </div>
   );
 }
-
-    

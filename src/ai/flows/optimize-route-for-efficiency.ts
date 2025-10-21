@@ -12,19 +12,19 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+const LocationSchema = z.object({
+  id: z.string().describe('The unique identifier for the location.'),
+  name: z.string().describe('The name of the location.'),
+  address: z.string().describe('The street address of the location.'),
+  latitude: z.number().describe('The latitude of the location.'),
+  longitude: z.number().describe('The longitude of the location.'),
+  type: z.enum(['customer', 'staff']).describe('The type of location.'),
+});
+
 const OptimizeRouteInputSchema = z.object({
-  locations: z
-    .array(
-      z.object({
-        id: z.string().describe('The unique identifier for the location.'),
-        name: z.string().describe('The name of the location.'),
-        address: z.string().describe('The street address of the location.'),
-        latitude: z.number().describe('The latitude of the location.'),
-        longitude: z.number().describe('The longitude of the location.'),
-        type: z.enum(['customer', 'staff']).describe('The type of location.'),
-      })
-    )
-    .describe('An array of work locations, including ID, name, address, latitude, and longitude.'),
+  startLocation: LocationSchema.describe('The starting location for the route.'),
+  endLocation: LocationSchema.describe('The ending location for the route.'),
+  waypoints: z.array(LocationSchema).describe('An array of locations to visit between the start and end locations.'),
   optimizeFor:
     z.enum(['time', 'distance'])
       .default('time')
@@ -43,7 +43,7 @@ const OptimizeRouteOutputSchema = z.object({
         longitude: z.number().describe('The longitude of the location.'),
       })
     )
-    .describe('An array of work locations in the optimized order.'),
+    .describe('An array of work locations in the optimized order, starting with the start location and ending with the end location.'),
   estimatedTravelTime: z
     .string()
     .optional()
@@ -68,16 +68,24 @@ const prompt = ai.definePrompt({
   output: {schema: OptimizeRouteOutputSchema},
   prompt: `You are an expert route optimizer, skilled at finding the most efficient routes between multiple locations.
 
-  Given a list of work locations, your task is to determine the optimal route to minimize travel time and fuel costs.
+  Given a starting location, an ending location, and a list of intermediate waypoints, your task is to determine the optimal route that starts at the start location, visits all waypoints, and ends at the end location. The goal is to minimize travel time and fuel costs.
   The optimization is based on {{{optimizeFor}}}.
 
-  Locations:
-  {{#each locations}}
-  - ID: {{this.id}}, Name: {{this.name}}, Address: {{this.address}}, Latitude: {{this.latitude}}, Longitude: {{this.longitude}}, Type: {{this.type}}
-  {{/each}}
+  Start Location:
+  - ID: {{startLocation.id}}, Name: {{startLocation.name}}, Address: {{startLocation.address}}, Latitude: {{startLocation.latitude}}, Longitude: {{startLocation.longitude}}
 
-  Please provide the optimized route, estimated travel time, estimated travel distance, and a summary of the route optimization.
-  Ensure that the locations in optimizedRoute array contains all the original fields (id, name, address, latitude, longitude) from the input.
+  Waypoints:
+  {{#each waypoints}}
+  - ID: {{this.id}}, Name: {{this.name}}, Address: {{this.address}}, Latitude: {{this.latitude}}, Longitude: {{this.longitude}}
+  {{else}}
+  No waypoints provided.
+  {{/each}}
+  
+  End Location:
+  - ID: {{endLocation.id}}, Name: {{endLocation.name}}, Address: {{endLocation.address}}, Latitude: {{endLocation.latitude}}, Longitude: {{endLocation.longitude}}
+
+  Please provide the optimized route as an ordered list of all locations (start, waypoints, and end). Also include the estimated travel time, estimated travel distance, and a summary of the route optimization.
+  Ensure that the locations in the optimizedRoute array contain all the original fields (id, name, address, latitude, longitude) from the input. The final optimizedRoute array must include the start location, all waypoints, and the end location in the calculated optimal order.
   `,
 });
 
