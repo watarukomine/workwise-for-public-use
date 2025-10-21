@@ -1,133 +1,112 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model for all data.
+ * @fileoverview Firestore Security Rules for the application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a secure, authenticated-user-centric model.
+ * All data access requires a user to be signed in.
  *
  * Data Structure:
- * - /staff/{staffId}: Stores staff member data.
- * - /customers/{customerId}: Stores customer data.
- * - /jobsites/{jobsiteId}: Stores jobsite data.
- * - /workSchedules/{workScheduleId}: Stores work schedule data.
- * - /employeeActions/{employeeActionId}: Stores employee action data.
+ * The database consists of several top-level collections: /staff, /customers, /jobsites, /workSchedules, and /employeeActions.
+ * Each collection stores data related to its respective entity.
  *
  * Key Security Decisions:
- * - All collections are restricted to authenticated users.
- * - No user listing is allowed.
- * - Write operations are restricted to authenticated users.
+ * - Only authenticated users can access any data.
+ * - There is currently no role based access control.
+ * - All write operations are disallowed as a default.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Checks if the user is signed in.
-     * @returns {boolean} True if the user is signed in, false otherwise.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the authenticated user's ID matches the provided user ID.
-     * @param {string} userId - The user ID to compare against.
-     * @returns {boolean} True if the user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user's ID matches the provided user ID and the resource exists
-     * @param {string} userId - The user ID to compare against.
-     * @returns {boolean} True if the user is the owner, false otherwise.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Rules for the /staff/{staffId} collection.
+     * @description Rules for the /staff collection. Only authenticated users can read. Writes are disabled.
      * @path /staff/{staffId}
-     * @allow (create) Signed-in user creates a staff document with their own ID.
-     * @deny (create) Signed-in user tries to create a staff document with someone else's ID.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, list) User is signed in.
+     * @deny (create, update, delete) Always.  Writes are not permitted.
+     * @principle Requires authentication for reads and disables writes.
      */
     match /staff/{staffId} {
       allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn() && isOwner(staffId);
-      allow update: if isExistingOwner(staffId);
-      allow delete: if isExistingOwner(staffId);
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Rules for the /customers/{customerId} collection.
+     * @description Rules for the /customers collection. Only authenticated users can read. Writes are disabled.
      * @path /customers/{customerId}
-     * @allow (create) Signed-in user creates a customer document with their own ID.
-     * @deny (create) Signed-in user tries to create a customer document with someone else's ID.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, list) User is signed in.
+     * @deny (create, update, delete) Always.  Writes are not permitted.
+     * @principle Requires authentication for reads and disables writes.
      */
     match /customers/{customerId} {
       allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Rules for the /jobsites/{jobsiteId} collection.
+     * @description Rules for the /jobsites collection. Only authenticated users can read. Writes are disabled.
      * @path /jobsites/{jobsiteId}
-     * @allow (create) Signed-in user creates a jobsite document with their own ID.
-     * @deny (create) Signed-in user tries to create a jobsite document with someone else's ID.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, list) User is signed in.
+     * @deny (create, update, delete) Always.  Writes are not permitted.
+     * @principle Requires authentication for reads and disables writes.
      */
     match /jobsites/{jobsiteId} {
       allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Rules for the /workSchedules/{workScheduleId} collection.
+     * @description Rules for the /workSchedules collection. Only authenticated users can read. Writes are disabled.
      * @path /workSchedules/{workScheduleId}
-     * @allow (create) Signed-in user creates a workSchedule document with their own ID.
-     * @deny (create) Signed-in user tries to create a workSchedule document with someone else's ID.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, list) User is signed in.
+     * @deny (create, update, delete) Always.  Writes are not permitted.
+     * @principle Requires authentication for reads and disables writes.
      */
     match /workSchedules/{workScheduleId} {
       allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
     /**
-     * @description Rules for the /employeeActions/{employeeActionId} collection.
+     * @description Rules for the /employeeActions collection. Only authenticated users can read. Writes are disabled.
      * @path /employeeActions/{employeeActionId}
-     * @allow (create) Signed-in user creates a employeeAction document with their own ID.
-     * @deny (create) Signed-in user tries to create a employeeAction document with someone else's ID.
-     * @principle Enforces document ownership for writes.
+     * @allow (get, list) User is signed in.
+     * @deny (create, update, delete) Always.  Writes are not permitted.
+     * @principle Requires authentication for reads and disables writes.
      */
     match /employeeActions/{employeeActionId} {
       allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
 
-        /**
-     * @description Rules for the /orders collection.
+    /**
+     * @description Rules for the /orders collection. Only authenticated users can read. Writes are disabled.
      * @path /orders
-     * @allow (list) No one can list orders.
-     * @principle  Denies all listing of orders due to explicit error in application.
+     * @allow (get, list) User is signed in.
+     * @deny (create, update, delete) Always.  Writes are not permitted.
+     * @principle Requires authentication for reads and disables writes.
      */
-    match /orders/{orderId} {
-      allow get: if false;
-      allow list: if false; // This rule addresses the original error report.
+    match /orders {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
