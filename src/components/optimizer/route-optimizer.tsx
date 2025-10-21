@@ -103,8 +103,8 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
         id: c.id, 
         name: c.店舗!, 
         address: c.住所, 
-        latitude: c.緯度!, 
-        longitude: c.経度!,
+        latitude: typeof c.緯度 === 'string' ? parseFloat(c.緯度) : c.緯度!, 
+        longitude: typeof c.経度 === 'string' ? parseFloat(c.経度) : c.経度!,
         type: 'customer' 
       }));
 
