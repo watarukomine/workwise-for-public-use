@@ -222,7 +222,7 @@ export function ScheduleView() {
              const newEnd = addMinutes(newStart, order.estimatedDuration);
              const newEvent: ScheduleEvent = {
                 id: `event-${Date.now()}`,
-                title: order.taskDetails,
+                title: order.id === 'generic-travel' ? `移動: ` : order.taskDetails,
                 staffId: newStaffId,
                 locationId: '',
                 start: newStart,
@@ -325,10 +325,17 @@ export function ScheduleView() {
     if (dialogState.mode !== 'edit') return;
     const eventToDelete = dialogState.event;
 
-    setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id));
+    // If the event is part of a trip, delete both travel and task
+    if (eventToDelete.tripId) {
+        setScheduleData(prev => prev.filter(e => e.tripId !== eventToDelete.tripId));
+    } else {
+        setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id));
+    }
 
-    if (eventToDelete.orderId) {
-        const originalOrder = staticOrderData.find(o => o.id === eventToDelete.orderId);
+    // If the deleted event was from an order, add it back to unassigned orders
+    const orderId = eventToDelete.orderId || (scheduleData.find(e => e.tripId === eventToDelete.tripId && e.orderId))?.orderId;
+    if (orderId) {
+        const originalOrder = staticOrderData.find(o => o.id === orderId);
         if (originalOrder && !unassignedOrders.find(o => o.id === originalOrder.id)) {
             setUnassignedOrders(prev => [...prev, originalOrder]);
         }
@@ -596,16 +603,13 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let color = 'white';
 
   if (isTravelEvent) {
-    // This regex extracts the H, S, L values from hsl(H, S%, L%)
     const hslMatch = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
     if (hslMatch) {
       const [_, h] = hslMatch;
-      // Use the original hue, but set saturation to 15% and lightness to 85%
-      backgroundColor = `hsl(${h}, 15%, 85%)`;
-      color = 'hsl(var(--foreground))';
+      backgroundColor = `hsl(${h}, 50%, 50%)`;
+      color = 'white';
     } else {
-      // Fallback for non-hsl colors
-      backgroundColor = 'hsl(210, 14%, 88%)'; // Muted color
+      backgroundColor = 'hsl(210, 14%, 88%)'; // Muted color fallback
       color = 'hsl(var(--foreground))';
     }
   }
@@ -627,7 +631,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           }}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
-            {event.title || '未定のタスク'} @ {customer?.storeName || '未定'}
+            {event.title || '未定のタスク'} {customer ? `@ ${customer.storeName}` : ''}
           </p>
         </div>
       </TooltipTrigger>
@@ -641,3 +645,4 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   );
 };
 
+    
