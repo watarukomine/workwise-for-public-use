@@ -33,19 +33,22 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 
 const PIXELS_PER_MINUTE = 2;
 const timelineStartHour = 8;
+const timelineEndHour = 19;
+const timelineTotalHours = timelineEndHour - timelineStartHour;
 
 // --- Helper Functions ---
 const formatTime = (date: Date | string) => {
@@ -71,7 +74,6 @@ const getEventDimensions = (event: ScheduleEvent) => {
     width: minutesToPixels(width),
   };
 };
-
 
 // --- Draggable Task Components ---
 
@@ -116,6 +118,10 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   );
 };
 
+type DialogState = 
+  | { mode: 'closed' }
+  | { mode: 'edit'; event: ScheduleEvent }
+  | { mode: 'new'; staffId: string; start: Date };
 
 // --- Main Component ---
 
@@ -124,7 +130,10 @@ export function ScheduleView() {
   const [customerData] = React.useState<Customer[]>(staticCustomerData);
   const [scheduleData, setScheduleData] = React.useState<ScheduleEvent[]>(staticScheduleData);
   const [unassignedOrders, setUnassignedOrders] = React.useState<Order[]>(staticOrderData);
-  const [eventToEdit, setEventToEdit] = React.useState<ScheduleEvent | null>(null);
+  
+  const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
+  const [newEventTitle, setNewEventTitle] = React.useState('');
+
 
   const genericTasks: Order[] = [
       { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30 },
@@ -220,34 +229,77 @@ export function ScheduleView() {
   };
 
   const handleDoubleClickEvent = (event: ScheduleEvent) => {
-    setEventToEdit(event);
+    setDialogState({ mode: 'edit', event });
+  };
+  
+  const handleDoubleClickTimeline = (staffId: string, e: React.MouseEvent) => {
+    const timelineRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const clickX = e.clientX - timelineRect.left;
+    const clickMinutes = pixelsToMinutes(clickX);
+    
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(timelineStartHour, 0, 0, 0);
+    const newStart = addMinutes(startOfDay, clickMinutes);
+
+    setNewEventTitle('');
+    setDialogState({ mode: 'new', staffId, start: newStart });
+  };
+  
+  const handleSaveNewEvent = () => {
+    if (dialogState.mode !== 'new' || !newEventTitle) return;
+    
+    const newEvent: ScheduleEvent = {
+      id: `event-${Date.now()}`,
+      title: newEventTitle,
+      staffId: dialogState.staffId,
+      locationId: '',
+      start: dialogState.start,
+      end: addMinutes(dialogState.start, 60), // Default to 60 mins
+    };
+
+    setScheduleData(prev => [...prev, newEvent]);
+    setDialogState({ mode: 'closed' });
   };
 
   const handleDeleteEvent = () => {
-    if (!eventToEdit) return;
+    if (dialogState.mode !== 'edit') return;
+    const eventToDelete = dialogState.event;
 
-    setScheduleData(prev => prev.filter(e => e.id !== eventToEdit.id));
+    setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id));
 
-    // If the event was created from an unassigned order, add it back to the list
-    if (eventToEdit.orderId) {
-        const originalOrder = staticOrderData.find(o => o.id === eventToEdit.orderId);
+    if (eventToDelete.orderId) {
+        const originalOrder = staticOrderData.find(o => o.id === eventToDelete.orderId);
         if (originalOrder && !unassignedOrders.find(o => o.id === originalOrder.id)) {
             setUnassignedOrders(prev => [...prev, originalOrder]);
         }
     }
-
-    setEventToEdit(null);
+    setDialogState({ mode: 'closed' });
   };
   
-  const editingStaff = staffData.find(s => s.id === eventToEdit?.staffId);
-  const editingCustomer = getCustomerById(eventToEdit?.locationId);
+  const getDialogDetails = () => {
+    if (dialogState.mode === 'edit') {
+      const { event } = dialogState;
+      const staff = staffData.find(s => s.id === event.staffId);
+      const customer = getCustomerById(event.locationId);
+      return { event, staff, customer };
+    }
+    if (dialogState.mode === 'new') {
+      const staff = staffData.find(s => s.id === dialogState.staffId);
+      return { staff, start: dialogState.start };
+    }
+    return {};
+  };
+
+  const { event, staff, customer, start } = getDialogDetails();
+
 
   const content = (
     <>
       <Card className="h-full">
         <CardHeader>
           <CardTitle>本日のスケジュール</CardTitle>
-          <CardDescription>タスクを下のタイムラインにドラッグして割り当てます。既存の予定もドラッグで変更できます。</CardDescription>
+          <CardDescription>タスクを下のタイムラインにドラッグして割り当てます。空白部分をダブルクリックして新規作成もできます。</CardDescription>
           <div className="pt-4">
                <CardTitle className="text-lg mb-2">ドラッグ可能なタスク</CardTitle>
               <ScrollArea className="w-full whitespace-nowrap">
@@ -278,10 +330,10 @@ export function ScheduleView() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4 select-none h-[calc(100%-14rem)] overflow-y-auto pr-6">
-          <div className="grid sticky top-0 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
+          <div className="grid sticky top-0 bg-card py-2 z-10" style={{ gridTemplateColumns: '8rem 1fr' }}>
             <div />
-            <div className="relative grid grid-cols-11 border-l border-border text-xs text-muted-foreground">
-              {Array.from({ length: 11 }, (_, i) => 8 + i).map((hour) => (
+            <div className="relative grid border-l border-border text-xs text-muted-foreground" style={{ gridTemplateColumns: `repeat(${timelineTotalHours}, 1fr)` }}>
+              {Array.from({ length: timelineTotalHours }, (_, i) => timelineStartHour + i).map((hour) => (
                 <div key={hour} className="text-center border-r border-border py-1">
                   {hour}:00
                 </div>
@@ -299,6 +351,7 @@ export function ScheduleView() {
                   getCustomer={getCustomerById}
                   isOver={currentOverStaffId === staff.id}
                   onDoubleClickEvent={handleDoubleClickEvent}
+                  onDoubleClickTimeline={handleDoubleClickTimeline}
                 />
               ))}
             </TooltipProvider>
@@ -306,30 +359,55 @@ export function ScheduleView() {
         </CardContent>
       </Card>
       
-      <AlertDialog open={!!eventToEdit} onOpenChange={(open) => !open && setEventToEdit(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>予定を編集</AlertDialogTitle>
-            <AlertDialogDescription>
-              この予定を削除しますか？この操作は元に戻せません。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {eventToEdit && (
+      <Dialog open={dialogState.mode !== 'closed'} onOpenChange={(open) => !open && setDialogState({ mode: 'closed' })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{dialogState.mode === 'edit' ? '予定の編集' : '新規予定の作成'}</DialogTitle>
+             <DialogDescription>
+                {dialogState.mode === 'edit' ? 'この予定を削除しますか？' : '新しい予定の詳細を入力してください。'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {dialogState.mode === 'edit' && event && (
             <div className="text-sm space-y-2">
-              <p><span className="font-semibold">タスク:</span> {eventToEdit.title}</p>
-              <p><span className="font-semibold">顧客:</span> {editingCustomer?.storeName || 'N/A'}</p>
-              <p><span className="font-semibold">時間:</span> {formatTime(eventToEdit.start)} - {formatTime(eventToEdit.end)}</p>
-              <p><span className="font-semibold">担当:</span> {editingStaff?.name || 'N/A'}</p>
+              <p><span className="font-semibold">タスク:</span> {event.title}</p>
+              <p><span className="font-semibold">顧客:</span> {customer?.storeName || 'N/A'}</p>
+              <p><span className="font-semibold">時間:</span> {formatTime(event.start)} - {formatTime(event.end)}</p>
+              <p><span className="font-semibold">担当:</span> {staff?.name || 'N/A'}</p>
             </div>
           )}
-          <AlertDialogFooter>
-            <AlertDialogCancel>キャンセル</AlertDialogCancel>
-            <AlertDialogAction asChild>
+          
+          {dialogState.mode === 'new' && (
+            <div className="space-y-4 py-4">
+                <div className="text-sm space-y-2">
+                    <p><span className="font-semibold">担当:</span> {staff?.name}</p>
+                    <p><span className="font-semibold">開始時間:</span> {start ? formatTime(start) : 'N/A'}</p>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="event-title">タスク名</Label>
+                    <Input 
+                        id="event-title" 
+                        value={newEventTitle} 
+                        onChange={(e) => setNewEventTitle(e.target.value)} 
+                        placeholder="例：定期メンテナンス"
+                    />
+                </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <DialogClose asChild>
+                <Button variant="outline">キャンセル</Button>
+            </DialogClose>
+            {dialogState.mode === 'edit' && (
                 <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            )}
+             {dialogState.mode === 'new' && (
+                <Button onClick={handleSaveNewEvent} disabled={!newEventTitle}>保存</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 
@@ -363,13 +441,14 @@ interface StaffRowProps {
   getCustomer: (id: string | undefined) => Customer | undefined;
   isOver: boolean;
   onDoubleClickEvent: (event: ScheduleEvent) => void;
+  onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver, onDoubleClickEvent }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   return (
-     <div ref={setNodeRef} className="grid items-center transition-colors duration-200 rounded-md" style={{ gridTemplateColumns: '8rem 1fr', backgroundColor: isOver ? 'hsl(var(--accent))' : 'transparent' }}>
+     <div className="grid items-center transition-colors duration-200 rounded-md" style={{ gridTemplateColumns: '8rem 1fr' }}>
       <div className="flex items-center gap-2 pr-2">
         <Avatar className="h-8 w-8">
           <AvatarImage src={staff.avatarUrl} alt={staff.name} />
@@ -377,9 +456,14 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
         </Avatar>
         <span className="text-sm font-medium truncate">{staff.name}</span>
       </div>
-      <div className="relative h-14 bg-muted/50 rounded-md border-l border-border">
-        <div className="absolute inset-0 grid" style={{gridTemplateColumns: `repeat(${11 * 2}, 1fr)`}}>
-          {Array.from({ length: 11 * 2 }).map((_, i) => (
+      <div 
+        ref={setNodeRef} 
+        onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
+        className="relative h-14 rounded-md border-l border-border"
+        style={{ backgroundColor: isOver ? 'hsl(var(--accent))' : 'hsl(var(--muted) / 0.5)' }}
+      >
+        <div className="absolute inset-0 grid" style={{gridTemplateColumns: `repeat(${timelineTotalHours * 2}, 1fr)`}}>
+          {Array.from({ length: timelineTotalHours * 2 }).map((_, i) => (
             <div key={i} className={`h-full ${i % 2 === 0 ? 'border-r border-border/80' : 'border-r border-dashed border-border/40'}`}></div>
           ))}
         </div>
@@ -423,6 +507,11 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     opacity: isDragging ? 0.8 : 1,
   };
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent timeline's dblclick from firing
+    onDoubleClick();
+  };
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -430,7 +519,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           ref={setNodeRef}
           {...listeners}
           {...attributes}
-          onDoubleClick={onDoubleClick}
+          onDoubleClick={handleDoubleClick}
           className="absolute h-12 rounded-md px-2 flex items-center cursor-move"
           style={{
             ...style,
@@ -452,3 +541,4 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
