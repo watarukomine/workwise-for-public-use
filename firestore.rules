@@ -2,73 +2,80 @@
  * @fileoverview Firestore Security Rules for WorkWise application.
  *
  * Core Philosophy:
- * This ruleset enforces a hybrid security model. Staff members have ownership-based access to their own profiles and actions, while administrative access is granted for managing customers, work schedules, and locations.
+ * This ruleset enforces a hybrid security model. Staff members have ownership-based access to their own profile data and employee action history, while access to customer, work schedule, and location data is restricted to admins.  This approach balances individual privacy with centralized management capabilities.
  *
  * Data Structure:
- * - /staff/{staffId}: Stores individual staff profiles.  Only the staff member themselves (or an admin) can read and write their own profile.
- * - /customers/{customerId}: Stores customer data. Only admins can manage customers.
- * - /workSchedules/{workScheduleId}: Stores work schedules. Only admins can manage work schedules.
- * - /locations/{locationId}: Stores location data. Only admins can manage locations.
- * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores employee action logs. Only the staff member themselves (or an admin) can access their own action history.
- * - /roles_admin/{uid}: Indicates admin role for the user with the matching uid. Existence of the document grants admin privileges.
+ * - /staff/{staffId}: Stores individual staff profiles. Only the staff member can access their own profile.
+ * - /customers/{customerId}: Stores customer data. Only admins can manage customer data.
+ * - /workSchedules/{workScheduleId}: Stores work schedule information. Only admins can manage work schedules.
+ * - /locations/{locationId}: Stores location data. Only admins can manage location data.
+ * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores a staff member's action history. Only the staff member can access their own action history.
+ * - /roles_admin/{uid}: Indicates admin role for the user. Existence of the document grants admin privileges.
  *
  * Key Security Decisions:
- * - User listing is generally disallowed except for the specific case of listing a staff member's own employee actions.
- * - Admin privileges are determined by the existence of a document in the `roles_admin` collection matching the user's UID.
+ * - Listing of customers, work schedules, and locations is implicitly denied because there is no rule allowing it. Admin access is required to read these collections at all.
+ * - Staff members cannot list all employee actions; they can only access actions associated with their own staffId.
+ * - The default security posture for ambiguous relationships is strict owner-only access.
  *
  * Denormalization for Authorization:
- * - The data model does not lend itself to denormalization. All role checks will be implemented by checking the existence of a `/roles_admin/{uid}` document.
+ *  N/A
  *
  * Structural Segregation:
- * - Private user data (staff profiles, employee actions) is stored under the `/staff/{staffId}` path, while public/shared data is stored in top-level collections.
+ *  N/A
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the user is signed in.
+     * @description Checks if the current user is signed in.
+     * @return {boolean} True if the user is signed in, false otherwise.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the user is the owner of the document, based on the staffId.
+     * @description Checks if the current user's UID matches the provided userId.
+     * @param {string} userId - The user ID to compare against.
+     * @return {boolean} True if the user is signed in and the UID matches, false otherwise.
      */
-    function isOwner(staffId) {
-      return isSignedIn() && request.auth.uid == staffId;
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    /**
-     * @description Checks if the user is an existing owner of the document.
-     */
-    function isExistingOwner(staffId) {
-      return isOwner(staffId) && resource != null;
+     /**
+      * @description Checks if the user exists and is the owner.
+      * @param {string} userId - The user ID to compare against.
+      * @return {boolean} True if the user is signed in, the UID matches, and the resource exists, false otherwise.
+      */
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
     }
-
+    
     /**
-     * @description Checks if the user is an admin.
+     * @description Checks if the current user is an admin.
+     * @return {boolean} True if the user is an admin, false otherwise.
      */
     function isAdmin() {
       return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
 
     /**
-     * @description Rules for /staff/{staffId} collection.
+     * @description Rules for staff documents.
      * @path /staff/{staffId}
-     * @allow (get) User 'SoYoYTKtacdwxlsnKJKj7YCBrOo1' can get their own profile: request.auth.uid == staffId
-     * @allow (create) User 'SoYoYTKtacdwxlsnKJKj7YCBrOo1' can create their own profile: request.auth.uid == staffId
-     * @allow (update) User 'SoYoYTKtacdwxlsnKJKj7YCBrOo1' can update their own profile: request.auth.uid == staffId
-     * @allow (delete) User 'SoYoYTKtacdwxlsnKJKj7YCBrOo1' can delete their own profile: request.auth.uid == staffId
-     * @deny (get) User 'randomId' cannot get another user's profile: request.auth.uid != staffId
-     * @deny (create) User 'randomId' cannot create a profile with a different ID: request.auth.uid != staffId
-     * @deny (update) User 'randomId' cannot update another user's profile: request.auth.uid != staffId
-     * @deny (delete) User 'randomId' cannot delete another user's profile: request.auth.uid != staffId
-     * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+     * @allow (get) User with UID 'staffId' can read their own staff document.
+     * @allow (create) User with UID 'staffId' can create their own staff document.
+     * @allow (update) User with UID 'staffId' can update their own staff document.
+     * @allow (delete) User with UID 'staffId' can delete their own staff document.
+     * @deny (get) User with UID 'otherUserId' cannot read staff document with ID 'staffId'.
+     * @deny (create) User with UID 'otherUserId' cannot create staff document with ID 'staffId'.
+     * @deny (update) User with UID 'otherUserId' cannot update staff document with ID 'staffId'.
+     * @deny (delete) User with UID 'otherUserId' cannot delete staff document with ID 'staffId'.
+     * @principle Enforces document ownership for writes and reads.
      */
     match /staff/{staffId} {
-      allow get: if isOwner(staffId) || isAdmin();
+      allow get: if isOwner(staffId);
       allow list: if false;
       allow create: if isOwner(staffId) && request.resource.data.id == staffId;
       allow update: if isExistingOwner(staffId) && request.resource.data.id == resource.data.id;
@@ -76,101 +83,120 @@ service cloud.firestore {
     }
 
     /**
-     * @description Rules for /customers/{customerId} collection.
+     * @description Rules for customer documents.
      * @path /customers/{customerId}
-     * @allow (get) Admin can get customer information.
-     * @allow (create) Admin can create customer information.
-     * @allow (update) Admin can update customer information.
-     * @allow (delete) Admin can delete customer information.
-     * @deny (get) Non-admin cannot get customer information.
-     * @deny (create) Non-admin cannot create customer information.
-     * @deny (update) Non-admin cannot update customer information.
-     * @deny (delete) Non-admin cannot delete customer information.
-     * @principle Restricts access to customer data to admins only.
+     * @allow (get) Admin users can read customer documents.
+     * @allow (create) Admin users can create customer documents.
+     * @allow (update) Admin users can update customer documents.
+     * @allow (delete) Admin users can delete customer documents.
+     * @deny (get) Non-admin users cannot read customer documents.
+     * @deny (create) Non-admin users cannot create customer documents.
+     * @deny (update) Non-admin users cannot update customer documents.
+     * @deny (delete) Non-admin users cannot delete customer documents.
+     * @principle Restricts access to customer data to admin users.
      */
     match /customers/{customerId} {
       allow get: if isAdmin();
-      allow list: if isAdmin();
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin() && resource != null;
       allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Rules for /workSchedules/{workScheduleId} collection.
+     * @description Rules for work schedule documents.
      * @path /workSchedules/{workScheduleId}
-     * @allow (get) Admin can get work schedule information.
-     * @allow (create) Admin can create work schedule information.
-     * @allow (update) Admin can update work schedule information.
-     * @allow (delete) Admin can delete work schedule information.
-     * @deny (get) Non-admin cannot get work schedule information.
-     * @deny (create) Non-admin cannot create work schedule information.
-     * @deny (update) Non-admin cannot update work schedule information.
-     * @deny (delete) Non-admin cannot delete work schedule information.
-     * @principle Restricts access to work schedule data to admins only.
+     * @allow (get) Admin users can read work schedule documents.
+     * @allow (create) Admin users can create work schedule documents.
+     * @allow (update) Admin users can update work schedule documents.
+     * @allow (delete) Admin users can delete work schedule documents.
+     * @deny (get) Non-admin users cannot read work schedule documents.
+     * @deny (create) Non-admin users cannot create work schedule documents.
+     * @deny (update) Non-admin users cannot update work schedule documents.
+     * @deny (delete) Non-admin users cannot delete work schedule documents.
+     * @principle Restricts access to work schedule data to admin users.
      */
     match /workSchedules/{workScheduleId} {
       allow get: if isAdmin();
-      allow list: if isAdmin();
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin() && resource != null;
       allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Rules for /locations/{locationId} collection.
+     * @description Rules for location documents.
      * @path /locations/{locationId}
-     * @allow (get) Admin can get location information.
-     * @allow (create) Admin can create location information.
-     * @allow (update) Admin can update location information.
-     * @allow (delete) Admin can delete location information.
-     * @deny (get) Non-admin cannot get location information.
-     * @deny (create) Non-admin cannot create location information.
-     * @deny (update) Non-admin cannot update location information.
-     * @deny (delete) Non-admin cannot delete location information.
-     * @principle Restricts access to location data to admins only.
+     * @allow (get) Admin users can read location documents.
+     * @allow (create) Admin users can create location documents.
+     * @allow (update) Admin users can update location documents.
+     * @allow (delete) Admin users can delete location documents.
+     * @deny (get) Non-admin users cannot read location documents.
+     * @deny (create) Non-admin users cannot create location documents.
+     * @deny (update) Non-admin users cannot update location documents.
+     * @deny (delete) Non-admin users cannot delete location documents.
+     * @principle Restricts access to location data to admin users.
      */
     match /locations/{locationId} {
       allow get: if isAdmin();
-      allow list: if isAdmin();
+      allow list: if false;
       allow create: if isAdmin();
       allow update: if isAdmin() && resource != null;
       allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Rules for /staff/{staffId}/employeeActions/{employeeActionId} collection.
+     * @description Rules for employee action documents.
      * @path /staff/{staffId}/employeeActions/{employeeActionId}
-     * @allow (get) User 'SoYoYTKtacdwxlsnKJKj7YCBrOo1' can get their own employee actions: request.auth.uid == staffId
-     * @allow (list) User 'SoYoYTKtacdwxlsnKJKj7YCBrOo1' can list their own employee actions: request.auth.uid == staffId
-     * @allow (create) User 'SoYoYTKtacdwxlsnKJKj7YCBrOo1' can create employee actions under their own profile: request.auth.uid == staffId
-     * @allow (update) User 'SoYoYTKtacdwxlsnKJKj7YCBrOo1' can update their own employee actions: request.auth.uid == staffId
-     * @allow (delete) User 'SoYoYTKtacdwxlsnKJKj7YCBrOo1' can delete their own employee actions: request.auth.uid == staffId
-     * @deny (get) User 'randomId' cannot get another user's employee actions: request.auth.uid != staffId
-     * @deny (list) User 'randomId' cannot list another user's employee actions: request.auth.uid != staffId
-     * @deny (create) User 'randomId' cannot create employee actions under another user's profile: request.auth.uid != staffId
-     * @deny (update) User 'randomId' cannot update another user's employee actions: request.auth.uid != staffId
-     * @deny (delete) User 'randomId' cannot delete another user's employee actions: request.auth.uid != staffId
-     * @principle Enforces document ownership for writes and restricts access to a user's own employee action history.
+     * @allow (get) User with UID 'staffId' can read their own employee action documents.
+     * @allow (create) User with UID 'staffId' can create employee action documents under their staff ID.
+     * @allow (update) User with UID 'staffId' can update their own employee action documents.
+     * @allow (delete) User with UID 'staffId' can delete their own employee action documents.
+     * @deny (get) User with UID 'otherUserId' cannot read employee action documents under staff ID 'staffId'.
+     * @deny (create) User with UID 'otherUserId' cannot create employee action documents under staff ID 'staffId'.
+     * @deny (update) User with UID 'otherUserId' cannot update employee action documents under staff ID 'staffId'.
+     * @deny (delete) User with UID 'otherUserId' cannot delete employee action documents under staff ID 'staffId'.
+     * @principle Enforces document ownership for writes and reads within the employee action subcollection.
      */
     match /staff/{staffId}/employeeActions/{employeeActionId} {
-      allow get: if isOwner(staffId) || isAdmin();
-      allow list: if isOwner(staffId) || isAdmin();
-      allow create: if isOwner(staffId) && request.resource.data.staffId == staffId;
-      allow update: if isExistingOwner(staffId) && request.resource.data.staffId == resource.data.staffId;
-      allow delete: if isExistingOwner(staffId);
+      allow get: if isOwner(staffId);
+      allow list: if isOwner(staffId);
+      allow create: if isOwner(staffId);
+      allow update: if isOwner(staffId) && resource != null;
+      allow delete: if isOwner(staffId) && resource != null;
     }
 
     /**
-     * @description Rules for /roles_admin/{uid} collection.
+     * @description Rules for admin role documents.
      * @path /roles_admin/{uid}
+     * @allow (get) Any signed-in user can check if they have an admin role (for UI purposes).
+     * @allow (create) Only callable from a trusted environment
+     * @allow (update) Only callable from a trusted environment
+     * @allow (delete) Only callable from a trusted environment
+     * @deny (create) Users cannot grant themselves admin privileges.
+     * @deny (update) Users cannot modify admin role documents.
+     * @principle Restricts creation and modification of admin roles to prevent privilege escalation.
      */
     match /roles_admin/{uid} {
-      allow get: if isAdmin(); // Only admins can check for other admins.
-      allow list: if false; // No listing of admins.
-      allow create: if isAdmin(); // Only admins can create other admins.
-      allow update: if false; // Admin role cannot be updated.
-      allow delete: if isAdmin(); // Only admins can remove other admins.
+        allow get: if isSignedIn();
+        allow list: if false;
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
     }
+
+     /**
+      * @description Open Read - DO NOT MODIFY
+      * @path /orders
+      * @allow (list) All users can list orders
+      * @allow (get) All users can get orders
+      */
+    match /orders/{document} {
+       allow list: if true;
+       allow get: if true;
+       allow create: if false;
+       allow update: if false;
+       allow delete: if false;
+     }
   }
 }
