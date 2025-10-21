@@ -41,7 +41,7 @@ import { signInWithGoogle, signOut } from '@/lib/auth';
 
 const navItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList },
-  { href: '/customers', label: '顧客一覧', icon: Building2 },
+  { href: '/customers', label: '販売店一覧', icon: Building2 },
   { href: '/staff', label: 'スタッフ一覧', icon: Users },
   { href: '/optimizer', label: 'ルート最適化', icon: Map },
   { href: '/import', label: 'データ取込', icon: Upload },
