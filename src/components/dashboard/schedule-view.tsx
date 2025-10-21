@@ -32,6 +32,7 @@ import { addMinutes, differenceInMinutes, format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { Skeleton } from '../ui/skeleton';
 import { errorEmitter, FirestorePermissionError } from '@/firebase';
+import { staffData } from '@/lib/data';
 
 const hours = Array.from({ length: 11 }, (_, i) => 8 + i); // 8:00 to 18:00
 const PIXELS_PER_MINUTE = 2;
@@ -67,12 +68,7 @@ const getEventDimensions = (event: ScheduleEvent) => {
 
 export function ScheduleView() {
   const firestore = getFirestore();
-
-  const staffCollection = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'staff') : null),
-    [firestore]
-  );
-  const { data: staffData, isLoading: isLoadingStaff } = useCollection<Staff>(staffCollection);
+  const isLoadingStaff = false;
 
   const customersCollection = useMemoFirebase(
     () => (firestore ? collection(firestore, 'customers') : null),
