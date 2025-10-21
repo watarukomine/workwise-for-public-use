@@ -23,7 +23,7 @@ export function CustomerTable({ customers }: { customers: Customer[] }) {
   const rowsPerPage = 10;
 
   const filteredCustomers = customers.filter(customer =>
-    customer.name.toLowerCase().includes(searchTerm.toLowerCase())
+    customer && customer.name && customer.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const paginatedCustomers = filteredCustomers.slice(
