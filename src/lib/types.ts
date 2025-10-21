@@ -16,7 +16,7 @@ export type Customer = {
 
 export type ScheduleEvent = {
   id: string;
-  title: string;
+  title?: string;
   customerId: string;
   staffId: string;
   start: Date;

@@ -22,14 +22,22 @@ const statusColors: Record<StaffStatus['status'], string> = {
   'Departing': 'bg-orange-500',
 };
 
+const statusJapanese: Record<StaffStatus['status'], string> = {
+  'Idle': '待機中',
+  'En Route': '移動中',
+  'On Site': '現場到着',
+  'Working': '作業中',
+  'Departing': '出発',
+}
+
 export function StatusUpdates() {
   const statuses: StaffStatus[] = staffStatusData;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Staff Status</CardTitle>
-        <CardDescription>Live updates on staff activity.</CardDescription>
+        <CardTitle>スタッフ現況</CardTitle>
+        <CardDescription>スタッフのリアルタイム活動状況</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -39,23 +47,23 @@ export function StatusUpdates() {
 
             return (
               <div key={staff.id}>
-                <div className="flex items-start gap-4">
+                <div className="flex items-center gap-4">
                   <Avatar className="h-10 w-10 border">
                     <AvatarImage src={staff.avatarUrl} alt={staff.name} data-ai-hint="person" />
                     <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
                   </Avatar>
-                  <div className="flex-1">
+                  <div className="flex-1 space-y-1">
                     <div className="flex justify-between items-center">
                       <p className="font-semibold">{staff.name}</p>
-                      <Badge variant="outline" className="flex items-center gap-2">
-                        <span className={cn("h-2 w-2 rounded-full", statusColors[status.status])}></span>
-                        {status.status}
+                      <Badge variant="outline" className="flex items-center gap-2 text-xs">
+                        <span className={cn("h-2 w-2 rounded-full", statusColors[status.status])} />
+                        {statusJapanese[status.status]}
                       </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">{status.lastAction}</p>
                     {status.distanceFromSite && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Distance: {status.distanceFromSite}
+                      <p className="text-xs text-muted-foreground">
+                        現場から: {status.distanceFromSite}
                       </p>
                     )}
                   </div>

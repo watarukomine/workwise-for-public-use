@@ -8,6 +8,9 @@ import {
   Route,
   Briefcase,
   LogIn,
+  Home,
+  Map,
+  ClipboardList
 } from 'lucide-react';
 
 import {
@@ -36,15 +39,15 @@ import { useUser } from '@/firebase';
 import { signInWithGoogle, signOut } from '@/lib/auth';
 
 const navItems = [
-  { href: '/', label: '本日の予定', icon: CalendarDays },
-  { href: '/customers', label: 'Customers', icon: Building2 },
-  { href: '/staff', label: 'Staff', icon: Users },
-  { href: '/optimizer', label: 'Optimizer', icon: Route },
+  { href: '/', label: '本日の予定', icon: ClipboardList },
+  { href: '/customers', label: '顧客一覧', icon: Building2 },
+  { href: '/staff', label: 'スタッフ一覧', icon: Users },
+  { href: '/optimizer', label: 'ルート最適化', icon: Map },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
 
   return (
     <SidebarProvider>
@@ -77,7 +80,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-2">
-          {user ? (
+          {isUserLoading ? (
+             <div className="flex items-center gap-3 p-2">
+                <Avatar className="h-9 w-9 shimmer" />
+                <div className="flex-1 space-y-2">
+                    <div className="h-3 w-3/4 rounded bg-gray-200 shimmer" />
+                    <div className="h-2 w-1/2 rounded bg-gray-200 shimmer" />
+                </div>
+            </div>
+          ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-start items-center gap-3 p-2 h-auto text-left">
