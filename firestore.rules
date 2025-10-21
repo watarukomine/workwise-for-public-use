@@ -1,0 +1,146 @@
+/**
+ * @fileoverview Firestore Security Rules for the application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a user-ownership model for staff data and status updates,
+ * allows public read access to customer data, and uses a dedicated collection
+ * to manage admin roles. The rules prioritize authorization independence and aim for
+ * clarity and maintainability.
+ *
+ * Data Structure:
+ * - /staff/{staffId}: Stores staff member data. Only the staff member can read/write.
+ * - /customers/{customerId}: Stores customer data. Publicly readable.
+ * - /schedules/{scheduleId}: Stores schedule data. Open write, read only.
+ * - /staff/{staffId}/statusUpdates/{statusUpdateId}: Stores status updates for staff members.
+ *   Only the staff member can read/write their own updates.
+ * - /roles_admin/{userId}: Stores admin roles. Existence of a document grants admin access.
+ *
+ * Key Security Decisions:
+ * - Customer data is publicly readable to support searching the customer directory.
+ * - Staff data and status updates are strictly user-owned.
+ * - Listing of status updates is restricted to the owner.
+ * - Admin roles are managed through a dedicated collection.
+ * - Write operations on schedules are open.
+ *
+ * Denormalization for Authorization:
+ * The rules assume that foreign keys like `staffId` and `customerId` are present
+ * in the relevant documents to avoid costly `get()` calls.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Allows staff members to read and write their own data.
+     * @path /staff/{staffId}
+     * @allow (create) - User with UID 'user_abc' can create a staff document with ID 'user_abc'.
+     * @allow (get, update, delete) - User with UID 'user_abc' can get, update, or delete their staff document with ID 'user_abc'.
+     * @deny (create, get, update, delete) - User with UID 'user_xyz' cannot access staff document with ID 'user_abc'.
+     * @principle Enforces document ownership for staff data.
+     */
+    match /staff/{staffId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(staffId);
+      allow list: if false;
+      allow create: if isSignedIn() && isOwner(staffId);
+      allow update: if isExistingOwner(staffId);
+      allow delete: if isExistingOwner(staffId);
+    }
+
+    /**
+     * @description Allows anyone to read customer data, but only allows authenticated users to create new customer accounts.
+     * @path /customers/{customerId}
+     * @allow (get, list) - Any user (or no user) can read customer data.
+     * @allow (create) - Any signed-in user can create customer data.
+     * @deny (update, delete) - Updating and deleting of customer data is disallowed.
+     * @principle Allows public read access to customer data and restricts updates/deletes.
+     */
+    match /customers/{customerId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      allow get: if true;
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Allows anyone to read schedules, but only allow authenticated users to create new schedules.
+     * @path /schedules/{scheduleId}
+     * @allow (get, list) - Any user (or no user) can read schedule data.
+     * @allow (create) - Any signed-in user can create schedule data.
+     * @deny (update, delete) - Updating and deleting of schedule data is disallowed.
+     * @principle Allows public read access to schedule data and restricts updates/deletes.
+     */
+    match /schedules/{scheduleId} {
+        function isSignedIn() {
+          return request.auth != null;
+        }
+        allow get: if true;
+        allow list: if true;
+        allow create: if isSignedIn();
+        allow update: if false;
+        allow delete: if false;
+      }
+
+    /**
+     * @description Allows staff members to read and write their own status updates.
+     * @path /staff/{staffId}/statusUpdates/{statusUpdateId}
+     * @allow (create) - User with UID 'user_abc' can create a status update under their staff document with ID 'user_abc'.
+     * @allow (get, update, delete) - User with UID 'user_abc' can get, update, or delete their status update under their staff document with ID 'user_abc'.
+     * @deny (create, get, update, delete) - User with UID 'user_xyz' cannot access status updates under staff document with ID 'user_abc'.
+     * @principle Enforces document ownership for status updates.
+     */
+    match /staff/{staffId}/statusUpdates/{statusUpdateId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isOwner(staffId) {
+        return request.auth.uid == staffId;
+      }
+
+      function isExistingOwner(staffId) {
+        return isOwner(staffId) && resource != null;
+      }
+
+      allow get: if isOwner(staffId);
+      allow list: if isOwner(staffId);
+      allow create: if isSignedIn() && isOwner(staffId);
+      allow update: if isExistingOwner(staffId);
+      allow delete: if isExistingOwner(staffId);
+    }
+
+    /**
+     * @description Allows admins to be defined by the presence of a document in this collection.
+     * @path /roles_admin/{userId}
+     * @allow (create, get, update, delete) - Only the existence of the document is checked. No data validation is performed in this prototype.
+     * @deny (create, get, update, delete) - Non-admins cannot create, get, update, or delete admin roles.
+     * @principle Implements role-based access control (RBAC) for admins.
+     */
+    match /roles_admin/{userId} {
+      function isAdmin() {
+        return exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      }
+
+      allow get: if isAdmin();
+      allow list: if false;
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}
