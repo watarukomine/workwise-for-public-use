@@ -41,7 +41,7 @@ function Directions({ route }: { route: OptimizedRouteLocation[] }) {
         strokeOpacity: 0.8,
         strokeWeight: 6
       },
-      suppressMarkers: true, // We can add custom markers if needed
+      suppressMarkers: true, // We add our own custom markers
     }));
   }, [routesLibrary, map]);
 
@@ -118,7 +118,7 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
             disableDefaultUI={true}
             mapId="f85764b3939b85c8"
           >
-            {!showRoute && staff.map((s) =>
+            {staff.map((s) =>
               s.latitude && s.longitude ? (
                 <AdvancedMarker key={`staff-${s.id}`} position={{ lat: s.latitude, lng: s.longitude }}>
                    <Tooltip>
@@ -135,7 +135,7 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
                 </AdvancedMarker>
               ) : null
             )}
-            {!showRoute && customers.map((c) => 
+            {customers.map((c) => 
                c.緯度 && c.経度 ? (
                 <AdvancedMarker
                   key={`customer-${c.id}`}
