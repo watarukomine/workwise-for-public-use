@@ -40,6 +40,9 @@ export function getSdks(firebaseApp: FirebaseApp) {
   };
 }
 
+// Kept for compatibility with existing auth.ts
+export const getFirebase = initializeFirebase;
+
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';

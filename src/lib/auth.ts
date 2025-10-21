@@ -3,14 +3,17 @@
 import { 
   GoogleAuthProvider, 
   signInWithPopup,
-  signOut as firebaseSignOut
+  signOut as firebaseSignOut,
+  type Auth
 } from 'firebase/auth';
-import { getFirebase } from '@/firebase'; // Import the central getter
+import { initializeFirebase } from '@/firebase'; // Import the central getter
 
 const provider = new GoogleAuthProvider();
-const { auth } = getFirebase(); // Get the singleton auth instance
+// Initialize Firebase and get the auth instance.
+// This is done once and the instance is reused.
+const { auth } = initializeFirebase();
 
-export const getAuthInstance = () => auth;
+export const getAuthInstance = (): Auth => auth;
 
 export const signInWithGoogle = async () => {
   try {
