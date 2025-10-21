@@ -66,8 +66,13 @@ const getEventDimensions = (event: ScheduleEvent) => {
 // --- Main Component ---
 
 export function ScheduleView() {
+  const [isClient, setIsClient] = React.useState(false);
   const [customerData, setCustomerData] = React.useState<Customer[]>(staticCustomerData);
   const [scheduleData, setScheduleData] = React.useState<ScheduleEvent[]>(staticScheduleData);
+  
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   const getCustomerByCode = (code: string | undefined): Customer | undefined => customerData?.find(c => c.userCode === code);
   const getCustomerById = (id: string | undefined): Customer | undefined => customerData?.find(c => c.id === id);
@@ -167,6 +172,20 @@ export function ScheduleView() {
     setActiveItem(null);
     setCurrentOverStaffId(null);
   };
+  
+  if (!isClient) {
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <CardTitle>本日のスケジュール</CardTitle>
+          <CardDescription>各スタッフのタイムライン形式のスケジュールです。ドラッグ＆ドロップで予定を編集できます。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 select-none h-[calc(100%-4rem)] overflow-y-auto pr-6">
+          {/* You can render a skeleton loader here */}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
@@ -295,5 +314,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-    
