@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const navItems = [
-  { href: '/', label: 'Schedule', icon: CalendarDays },
+  { href: '/', label: '本日の予定', icon: CalendarDays },
   { href: '/customers', label: 'Customers', icon: Building2 },
   { href: '/staff', label: 'Staff', icon: Users },
   { href: '/optimizer', label: 'Optimizer', icon: Route },
