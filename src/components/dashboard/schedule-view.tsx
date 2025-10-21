@@ -91,18 +91,21 @@ export function ScheduleView() {
   const [dragOffset, setDragOffset] = React.useState({ x: 0, y: 0 });
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveItem(event.active.data.current as ScheduleEvent | Order);
-    if ('start' in event.active.data.current!) {
-      // It's a ScheduleEvent
-       setDragOffset({ x: 0, y: 0 });
-    } else {
-      // It's an Order
-      const node = event.active.node.parent?.children[0]?.node.current;
+    const item = event.active.data.current as ScheduleEvent | Order;
+    setActiveItem(item);
+    
+    // Check if the dragged item is a new Order from the unassigned list
+    if (item && 'estimatedDuration' in item) {
+       const node = event.active.node.parent?.children[0]?.node.current;
       if (node) {
         const rect = node.getBoundingClientRect();
+        // Capture the offset from the cursor to the left edge of the item
         const offsetX = event.activatorEvent.clientX - rect.left;
         setDragOffset({ x: offsetX, y: 0 });
       }
+    } else {
+      // It's an existing ScheduleEvent, no offset needed
+      setDragOffset({ x: 0, y: 0 });
     }
   };
 
@@ -157,6 +160,7 @@ export function ScheduleView() {
     else if (newStaffId && over?.rect) {
         const order = item;
         const timelineRect = over.rect;
+        // Adjust drop position by the initial cursor offset within the dragged item
         const dropX = event.activatorEvent.clientX - timelineRect.left - dragOffset.x;
         
         const dropMinutes = pixelsToMinutes(dropX);

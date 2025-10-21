@@ -24,7 +24,7 @@ interface DraggableOrderProps {
 
 const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer }) => {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-        id: `order-${order.id}`,
+        id: order.id,
         data: order,
     });
     
