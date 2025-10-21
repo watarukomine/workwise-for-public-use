@@ -123,8 +123,11 @@ export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
                 <AdvancedMarker key={`staff-${s.id}`} position={{ lat: s.latitude, lng: s.longitude }}>
                    <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="w-8 h-8 rounded-full bg-white border-2 border-primary flex items-center justify-center">
-                            <User className="w-5 h-5 text-primary" />
+                        <div 
+                          className="w-8 h-8 rounded-full bg-white border-2 flex items-center justify-center"
+                          style={{ borderColor: s.color }}
+                        >
+                            <User className="w-5 h-5" style={{ color: s.color }} />
                         </div>
                       </TooltipTrigger>
                       <TooltipContent>
