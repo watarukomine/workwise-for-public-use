@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Papa from 'papaparse';
-import { useFirebase } from '@/firebase';
+import { useFirestore, useUser, useAuth } from '@/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,13 +20,21 @@ type DataType = 'customers' | 'staff' | 'schedules';
 type Status = 'idle' | 'parsing' | 'importing' | 'success' | 'error';
 
 export function DataImporter() {
-  const { firestore, user, isUserLoading } = useFirebase();
+  const firestore = useFirestore();
+  const { user, isLoading: isUserLoading } = useUser();
+  const auth = useAuth();
   const { toast } = useToast();
   const [file, setFile] = React.useState<File | null>(null);
   const [dataType, setDataType] = React.useState<DataType>('customers');
   const [status, setStatus] = React.useState<Status>('idle');
   const [progress, setProgress] = React.useState(0);
   const [results, setResults] = React.useState({ success: 0, failed: 0 });
+
+  const handleSignIn = async () => {
+    if (auth) {
+      await signInWithGoogle(auth);
+    }
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -67,27 +75,30 @@ export function DataImporter() {
         let failedCount = 0;
         const totalRecords = data.length;
 
-        const promises = data.map(async (record) => {
-          try {
-            const collectionRef = collection(firestore, dataType);
+        for (const record of data) {
+           try {
+            const collectionName = dataType === 'schedules' ? `staff/${record.staffId}/workSchedules` : dataType;
+            const collectionRef = collection(firestore, collectionName);
             const recordId = record.id || doc(collectionRef).id;
             const docRef = doc(collectionRef, recordId);
-            
+
             let dataToImport: any = { ...record };
-            if (dataType === 'customers') {
-                dataToImport.latitude = parseFloat(record.latitude) || null;
-                dataToImport.longitude = parseFloat(record.longitude) || null;
+
+            if (dataType === 'customers' && record.緯度 && record.経度) {
+              dataToImport.latitude = parseFloat(record.緯度) || null;
+              dataToImport.longitude = parseFloat(record.経度) || null;
             } else if (dataType === 'schedules') {
-                dataToImport.startTime = new Date(record.startTime);
-                dataToImport.endTime = new Date(record.endTime);
+              dataToImport.startTime = new Date(record.startTime);
+              dataToImport.endTime = new Date(record.endTime);
             }
+            delete dataToImport.id; 
             
-            await setDoc(docRef, dataToImport, { merge: true });
+            await setDoc(docRef, dataToImport, { merge: true })
             successCount++;
           } catch (serverError) {
             failedCount++;
-            // Assuming docRef is available or can be constructed
-            const collectionRef = collection(firestore, dataType);
+            const collectionName = dataType === 'schedules' ? `staff/${record.staffId}/workSchedules` : dataType;
+            const collectionRef = collection(firestore, collectionName);
             const recordId = record.id || 'unknown-id';
             const docRef = doc(collectionRef, recordId);
             const permissionError = new FirestorePermissionError({
@@ -100,9 +111,7 @@ export function DataImporter() {
             const processedCount = successCount + failedCount;
             setProgress((processedCount / totalRecords) * 100);
           }
-        });
-
-        await Promise.all(promises);
+        }
 
         setResults({ success: successCount, failed: failedCount });
         setStatus(failedCount > 0 ? 'error' : 'success');
@@ -150,7 +159,7 @@ export function DataImporter() {
                 You must be signed in with a Google account to perform this action.
               </AlertDescription>
             </Alert>
-            <Button onClick={() => signInWithGoogle()} className="mt-4">
+            <Button onClick={handleSignIn} className="mt-4">
               <LogIn className="mr-2 h-4 w-4" />
               Sign In with Google
             </Button>

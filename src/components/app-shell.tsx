@@ -36,7 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useUser } from '@/firebase';
+import { useUser, useAuth } from '@/firebase';
 import { signInWithGoogle, signOut } from '@/lib/auth';
 
 const navItems = [
@@ -49,7 +49,20 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, isUserLoading } = useUser();
+  const { user, isLoading } = useUser();
+  const auth = useAuth();
+
+  const handleSignIn = async () => {
+    if (auth) {
+      await signInWithGoogle(auth);
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (auth) {
+      await signOut(auth);
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -82,7 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="p-2">
-          {isUserLoading ? (
+          {isLoading ? (
              <div className="flex items-center gap-3 p-2 animate-pulse">
                 <div className="h-9 w-9 rounded-full bg-muted" />
                 <div className="flex-1 space-y-2">
@@ -110,11 +123,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <DropdownMenuItem>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut()}>Log out</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button onClick={() => signInWithGoogle()} variant="outline" className="w-full">
+            <Button onClick={handleSignIn} variant="outline" className="w-full">
               <LogIn className="mr-2 h-4 w-4" />
               Sign In with Google
             </Button>
