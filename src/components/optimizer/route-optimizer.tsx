@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useActionState } from 'react';
 
-import type { Customer } from '@/lib/types';
+import type { Customer, Staff, StaffStatus } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,33 +20,30 @@ type State = {
   error: string | null;
 };
 
+type Location = {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  type: 'customer' | 'staff';
+};
+
+
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
   const selectedLocationIds = formData.getAll('locations') as string[];
   const optimizeFor = formData.get('optimizeFor') as OptimizeRouteInput['optimizeFor'];
-  const allCustomers = JSON.parse(formData.get('allCustomers') as string) as Customer[];
+  const allLocations = JSON.parse(formData.get('allLocations') as string) as Location[];
 
   if (selectedLocationIds.length < 2) {
     return { data: null, error: 'Please select at least two locations to optimize.' };
   }
   
-  const selectedCustomers = allCustomers.filter(c => selectedLocationIds.includes(c.id));
-
-  const locationsWithCoords = selectedCustomers.map(loc => {
-    if (loc.latitude && loc.longitude) {
-      return loc as Required<Customer>;
-    }
-    // This is a fallback and shouldn't happen if data is clean
-    // In a real app, you would geocode the address here.
-    return {
-      ...loc,
-      latitude: 35.45, // Defaulting to Yokohama's general area
-      longitude: 139.63,
-    };
-  })
+  const selectedLocations = allLocations.filter(c => selectedLocationIds.includes(c.id));
 
   try {
     const result = await optimizeRoute({
-      locations: locationsWithCoords.map(c => ({...c, name: c.name})),
+      locations: selectedLocations,
       optimizeFor: optimizeFor,
     });
     return { data: result, error: null };
@@ -92,13 +89,43 @@ function SubmitButton() {
   );
 }
 
-export function RouteOptimizer({ customers }: { customers: Customer[] }) {
+type StaffWithStatus = Staff & StaffStatus;
+
+export function RouteOptimizer({ customers, staff }: { customers: Customer[], staff: StaffWithStatus[] }) {
   const [open, setOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<string[]>([]);
   const [state, formActionWithState] = useActionState(formAction, { data: null, error: null });
 
-  const customersWithCoords = React.useMemo(() => customers.filter(c => c.latitude && c.longitude), [customers]);
+  const allLocations = React.useMemo(() => {
+    const customerLocations: Location[] = customers
+      .filter(c => c.latitude && c.longitude && c.name)
+      .map(c => ({ 
+        id: c.id, 
+        name: c.name!, 
+        address: c.住所, 
+        latitude: c.緯度!, 
+        longitude: c.経度!,
+        type: 'customer' 
+      }));
 
+    const staffLocations: Location[] = staff
+      .filter(s => s.latitude && s.longitude)
+      .map(s => ({
+        id: s.id,
+        name: `${s.name} (現在地)`,
+        address: s.lastAction,
+        latitude: s.latitude!,
+        longitude: s.longitude!,
+        type: 'staff'
+      }));
+
+    return {
+      customers: customerLocations,
+      staff: staffLocations
+    }
+  }, [customers, staff]);
+
+  const combinedLocations = [...allLocations.customers, ...allLocations.staff];
 
   return (
     <div className="space-y-4">
@@ -111,7 +138,7 @@ export function RouteOptimizer({ customers }: { customers: Customer[] }) {
           <CardContent className="space-y-6">
             <div className="space-y-2">
               <Label>Locations</Label>
-              <input type="hidden" name="allCustomers" value={JSON.stringify(customersWithCoords)} />
+              <input type="hidden" name="allLocations" value={JSON.stringify(combinedLocations)} />
               {selected.map(id => <input key={id} type="hidden" name="locations" value={id} />)}
               
               <Popover open={open} onOpenChange={setOpen}>
@@ -131,16 +158,16 @@ export function RouteOptimizer({ customers }: { customers: Customer[] }) {
                     <CommandInput placeholder="Search location..." />
                     <CommandList>
                       <CommandEmpty>No geocoded locations found.</CommandEmpty>
-                      <CommandGroup>
-                        {customersWithCoords.map((customer) => (
+                      <CommandGroup heading="Customers">
+                        {allLocations.customers.map((location) => (
                           <CommandItem
-                            key={customer.id}
-                            value={customer.name}
+                            key={location.id}
+                            value={location.name}
                             onSelect={() => {
                               setSelected(current => 
-                                current.includes(customer.id) 
-                                  ? current.filter(id => id !== customer.id) 
-                                  : [...current, customer.id]
+                                current.includes(location.id) 
+                                  ? current.filter(id => id !== location.id) 
+                                  : [...current, location.id]
                               );
                               setOpen(true);
                             }}
@@ -148,10 +175,34 @@ export function RouteOptimizer({ customers }: { customers: Customer[] }) {
                             <Check
                               className={cn(
                                 "mr-2 h-4 w-4",
-                                selected.includes(customer.id) ? "opacity-100" : "opacity-0"
+                                selected.includes(location.id) ? "opacity-100" : "opacity-0"
                               )}
                             />
-                            {customer.name}
+                            {location.name}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                       <CommandGroup heading="Staff">
+                        {allLocations.staff.map((location) => (
+                          <CommandItem
+                            key={location.id}
+                            value={location.name}
+                            onSelect={() => {
+                              setSelected(current => 
+                                current.includes(location.id) 
+                                  ? current.filter(id => id !== location.id) 
+                                  : [...current, location.id]
+                              );
+                              setOpen(true);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                selected.includes(location.id) ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {location.name}
                           </CommandItem>
                         ))}
                       </CommandGroup>

@@ -28,7 +28,7 @@ export default function OptimizerPage() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
-          <RouteOptimizer customers={customerData} />
+          <RouteOptimizer customers={customerData} staff={staffWithStatus} />
         </div>
         <div className="lg:col-span-2">
           {apiKey ? (

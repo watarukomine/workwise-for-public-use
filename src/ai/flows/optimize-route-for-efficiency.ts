@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -20,6 +21,7 @@ const OptimizeRouteInputSchema = z.object({
         address: z.string().describe('The street address of the location.'),
         latitude: z.number().describe('The latitude of the location.'),
         longitude: z.number().describe('The longitude of the location.'),
+        type: z.enum(['customer', 'staff']).describe('The type of location.'),
       })
     )
     .describe('An array of work locations, including ID, name, address, latitude, and longitude.'),
@@ -71,7 +73,7 @@ const prompt = ai.definePrompt({
 
   Locations:
   {{#each locations}}
-  - ID: {{this.id}}, Name: {{this.name}}, Address: {{this.address}}, Latitude: {{this.latitude}}, Longitude: {{this.longitude}}
+  - ID: {{this.id}}, Name: {{this.name}}, Address: {{this.address}}, Latitude: {{this.latitude}}, Longitude: {{this.longitude}}, Type: {{this.type}}
   {{/each}}
 
   Please provide the optimized route, estimated travel time, estimated travel distance, and a summary of the route optimization.
