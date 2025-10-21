@@ -591,6 +591,25 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   const isTravelEvent = event.title?.startsWith('移動:');
+  
+  let backgroundColor = staff.color;
+  let color = 'white';
+
+  if (isTravelEvent) {
+    // This regex extracts the H, S, L values from hsl(H, S%, L%)
+    const hslMatch = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+    if (hslMatch) {
+      const [_, h] = hslMatch;
+      // Use the original hue, but set saturation to 15% and lightness to 85%
+      backgroundColor = `hsl(${h}, 15%, 85%)`;
+      color = 'hsl(var(--foreground))';
+    } else {
+      // Fallback for non-hsl colors
+      backgroundColor = 'hsl(210, 14%, 88%)'; // Muted color
+      color = 'hsl(var(--foreground))';
+    }
+  }
+
 
   return (
     <Tooltip>
@@ -603,8 +622,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           className="absolute h-12 rounded-md px-2 flex items-center cursor-move"
           style={{
             ...style,
-            backgroundColor: isTravelEvent ? 'hsl(48, 96%, 86%)' : staff.color,
-            color: isTravelEvent ? 'hsl(var(--foreground))' : 'white',
+            backgroundColor,
+            color,
           }}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
@@ -621,3 +640,4 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
