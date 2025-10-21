@@ -3,57 +3,60 @@
  *
  * Core Philosophy:
  * This ruleset enforces a strict user-ownership model for staff-related data
- * (work schedules, employee actions) and allows public read access to other collections.
+ * (work schedules, employee actions).  Customer and location data is publicly readable.
  *
  * Data Structure:
- * - `/staff/{staffId}`: Stores staff member profiles.
- * - `/customers/{customerId}`: Stores customer profiles.
- * - `/staff/{staffId}/workSchedules/{workScheduleId}`: Stores work schedules for each staff member.
- * - `/locations/{locationId}`: Stores location information.
- * - `/staff/{staffId}/employeeActions/{employeeActionId}`: Stores employee actions for each staff member.
+ * - /staff/{staffId}: Stores staff member profiles. Only the staff member can read/write their own profile.
+ * - /customers/{customerId}: Stores customer profiles. Publicly readable.
+ * - /staff/{staffId}/workSchedules/{workScheduleId}: Stores work schedules for each staff member. Only the staff member can read/write their schedules.
+ * - /locations/{locationId}: Stores location information. Publicly readable.
+ * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores employee actions for each staff member. Only the staff member can read/write their actions.
  *
  * Key Security Decisions:
- * - Staff members can only access their own work schedules and employee actions.
- * - Listing of customer and location documents is allowed for all users.
- * - All write operations are restricted based on ownership or explicit denial.
+ * - User listing is disallowed.
+ * - Public read access is granted to the /customers and /locations collections.
+ * - All write operations on staff-owned data are restricted to the owning staff member.
  *
  * Denormalization for Authorization:
- *  - No denormalization is required as we are enforcing path based ownership.
+ *  - Not required due to path-based ownership.
+ *
+ * Structural Segregation:
+ *  - Private staff data is stored under /staff/{staffId}, while public data (customers, locations) resides in top-level collections.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Grants access to staff profiles based on ownership.
+     * @description Rule for staff member profiles.
      * @path /staff/{staffId}
-     * @allow (create) - Authenticated user can create their own staff profile.
-     * @allow (get, list, update, delete) - Authenticated user can access their own staff profile.
-     * @deny (create, get, list, update, delete) - Any user other than the staff member themselves.
-     * @principle Enforces document ownership for writes.
+     * @allow (create, update, delete) if the request is made by the staff member (isOwner).
+     * @allow (get, list) if the request is made by the staff member (isOwner).
+     * @deny (create, update, delete) if the request is not made by the staff member.
+     * @deny (get, list) if the request is not made by the staff member.
+     * @principle Enforces document ownership for staff profiles.
      */
     match /staff/{staffId} {
       function isOwner(userId) {
-        return request.auth.uid == userId;
+        return request.auth != null && request.auth.uid == userId;
       }
-
       function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+          return isOwner(userId) && resource != null;
       }
 
       allow get: if isOwner(staffId);
-      allow list: if false;
+      allow list: if false; // Explicitly disallowing listing of staff members.
       allow create: if isOwner(staffId) && request.resource.data.id == staffId;
       allow update: if isExistingOwner(staffId) && request.resource.data.id == resource.data.id;
       allow delete: if isExistingOwner(staffId);
     }
 
     /**
-     * @description Grants public read access to customer profiles.
+     * @description Rule for customer profiles.
      * @path /customers/{customerId}
-     * @allow (get, list) - Any user can read customer profiles.
-     * @deny (create, update, delete) - No user can create, update, or delete customer profiles.
-     * @principle Allows public read with owner-only writes, but writes are explicitly denied since there is no clear owner.
+     * @allow (get, list) to everyone.
+     * @deny (create, update, delete) to everyone.
+     * @principle Allows public read access to customer profiles.
      */
     match /customers/{customerId} {
       allow get, list: if true;
@@ -61,19 +64,20 @@ service cloud.firestore {
     }
 
     /**
-     * @description Grants access to work schedules based on staff ownership.
+     * @description Rule for work schedules belonging to a staff member.
      * @path /staff/{staffId}/workSchedules/{workScheduleId}
-     * @allow (create, get, list, update, delete) - Authenticated user can access their own work schedules.
-     * @deny (create, get, list, update, delete) - Any user other than the staff member themselves.
-     * @principle Enforces document ownership for writes, enforces relational integrity.
+     * @allow (create, update, delete) if the request is made by the staff member (isOwner).
+     * @allow (get, list) if the request is made by the staff member (isOwner).
+     * @deny (create, update, delete) if the request is not made by the staff member.
+     * @deny (get, list) if the request is not made by the staff member.
+     * @principle Enforces document ownership for work schedules.
      */
     match /staff/{staffId}/workSchedules/{workScheduleId} {
       function isOwner(userId) {
-        return request.auth.uid == userId;
+        return request.auth != null && request.auth.uid == userId;
       }
-
       function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+          return isOwner(userId) && resource != null;
       }
 
       allow get: if isOwner(staffId);
@@ -84,11 +88,11 @@ service cloud.firestore {
     }
 
     /**
-     * @description Grants public read access to location information.
+     * @description Rule for location information.
      * @path /locations/{locationId}
-     * @allow (get, list) - Any user can read location information.
-     * @deny (create, update, delete) - No user can create, update, or delete location information.
-     * @principle Allows public read with owner-only writes, but writes are explicitly denied since there is no clear owner.
+     * @allow (get, list) to everyone.
+     * @deny (create, update, delete) to everyone.
+     * @principle Allows public read access to location information.
      */
     match /locations/{locationId} {
       allow get, list: if true;
@@ -96,19 +100,20 @@ service cloud.firestore {
     }
 
     /**
-     * @description Grants access to employee actions based on staff ownership.
+     * @description Rule for employee actions belonging to a staff member.
      * @path /staff/{staffId}/employeeActions/{employeeActionId}
-     * @allow (create, get, list, update, delete) - Authenticated user can access their own employee actions.
-     * @deny (create, get, list, update, delete) - Any user other than the staff member themselves.
-     * @principle Enforces document ownership for writes, enforces relational integrity.
+     * @allow (create, update, delete) if the request is made by the staff member (isOwner).
+     * @allow (get, list) if the request is made by the staff member (isOwner).
+     * @deny (create, update, delete) if the request is not made by the staff member.
+     * @deny (get, list) if the request is not made by the staff member.
+     * @principle Enforces document ownership for employee actions.
      */
     match /staff/{staffId}/employeeActions/{employeeActionId} {
       function isOwner(userId) {
-        return request.auth.uid == userId;
+        return request.auth != null && request.auth.uid == userId;
       }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+        function isExistingOwner(userId) {
+          return isOwner(userId) && resource != null;
       }
 
       allow get: if isOwner(staffId);
@@ -117,20 +122,5 @@ service cloud.firestore {
       allow update: if isExistingOwner(staffId);
       allow delete: if isExistingOwner(staffId);
     }
-
-     /**
-      * @description Denies all access to the `staffStatus` collection.
-      * @path /staffStatus
-      * @allow None
-      * @deny All
-      * @principle: Explicitly deny access to prevent unintended data exposure.
-      */
-     match /staffStatus/{document} {
-       allow get: if false;
-       allow list: if false;
-       allow create: if false;
-       allow update: if false;
-       allow delete: if false;
-     }
   }
 }
