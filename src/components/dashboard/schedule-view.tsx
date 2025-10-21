@@ -137,9 +137,8 @@ export function ScheduleView() {
         const order = item;
         const timelineRect = over.rect;
         
-        // Use delta.x to determine drop position relative to the start of the timeline
         const dropX = active.rect.current.initial!.left - timelineRect.left + delta.x;
-
+        
         const dropMinutes = pixelsToMinutes(dropX);
 
         const today = new Date();
@@ -150,29 +149,57 @@ export function ScheduleView() {
         const newEnd = addMinutes(newStart, order.estimatedDuration);
         const customer = getCustomerByCode(order.customerCode);
 
-        if (!customer) {
-            console.error("Could not find customer for order", order);
-            return;
-        }
-
         const newEvent: ScheduleEvent = {
             id: `event-${Date.now()}`,
             title: order.taskDetails,
             staffId: newStaffId,
-            locationId: customer.id,
+            locationId: customer?.id || '',
             start: newStart,
             end: newEnd,
         };
 
         setScheduleData(prev => [...prev, newEvent]);
-        // Note: In a real app, you'd also remove the order from the unassigned list.
-        // For this static version, we'll just leave it.
     }
 
     setActiveItem(null);
     setCurrentOverStaffId(null);
   };
   
+  const content = (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle>本日のスケジュール</CardTitle>
+        <CardDescription>各スタッフのタイムライン形式のスケジュールです。ドラッグ＆ドロップで予定を編集できます。</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 select-none h-[calc(100%-4rem)] overflow-y-auto pr-6">
+        <div className="grid sticky top-0 bg-card z-10 py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
+          <div />
+          <div className="relative grid grid-cols-11 border-l border-border text-xs text-muted-foreground">
+            {hours.map((hour) => (
+              <div key={hour} className="text-center border-r border-border py-1">
+                {hour}:00
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <TooltipProvider>
+            {(staffData || []).map((staff) => (
+              <StaffRow
+                key={staff.id}
+                staff={staff}
+                events={(scheduleData || []).filter(e => e.staffId === staff.id)}
+                getCustomer={getCustomerById}
+                isOver={currentOverStaffId === staff.id}
+              />
+            ))}
+          </TooltipProvider>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   if (!isClient) {
     return (
       <Card className="h-full">
@@ -181,7 +208,7 @@ export function ScheduleView() {
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。ドラッグ＆ドロップで予定を編集できます。</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 select-none h-[calc(100%-4rem)] overflow-y-auto pr-6">
-          {/* You can render a skeleton loader here */}
+           {/* Skeleton loader can be placed here */}
         </CardContent>
       </Card>
     );
@@ -189,38 +216,7 @@ export function ScheduleView() {
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle>本日のスケジュール</CardTitle>
-          <CardDescription>各スタッフのタイムライン形式のスケジュールです。ドラッグ＆ドロップで予定を編集できます。</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4 select-none h-[calc(100%-4rem)] overflow-y-auto pr-6">
-          <div className="grid sticky top-0 bg-card z-10 py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
-            <div />
-            <div className="relative grid grid-cols-11 border-l border-border text-xs text-muted-foreground">
-              {hours.map((hour) => (
-                <div key={hour} className="text-center border-r border-border py-1">
-                  {hour}:00
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <TooltipProvider>
-              {(staffData || []).map((staff) => (
-                <StaffRow
-                  key={staff.id}
-                  staff={staff}
-                  events={(scheduleData || []).filter(e => e.staffId === staff.id)}
-                  getCustomer={getCustomerById}
-                  isOver={currentOverStaffId === staff.id}
-                />
-              ))}
-            </TooltipProvider>
-          </div>
-        </CardContent>
-      </Card>
+      {content}
     </DndContext>
   );
 }
