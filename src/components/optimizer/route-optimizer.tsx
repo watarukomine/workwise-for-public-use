@@ -29,6 +29,12 @@ type Location = {
   type: 'customer' | 'staff';
 };
 
+interface RouteOptimizerProps {
+  customers: Customer[];
+  staff: StaffWithStatus[];
+  onRouteOptimized: (data: OptimizeRouteOutput | null) => void;
+}
+
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
   const startLocationId = formData.get('startLocation') as string;
   const endLocationId = formData.get('endLocation') as string;
@@ -76,18 +82,26 @@ function SubmitButton() {
     }
     
     const handleFormSubmit = () => setPending(true);
+    const observer = new MutationObserver(() => {
+        setPending(false);
+    });
 
     const button = document.getElementById('optimizer-submit-button');
     if (button) {
       form = findForm(button);
       if (form) {
         form.addEventListener('submit', handleFormSubmit);
+        const resultsContainer = document.getElementById('optimizer-results');
+        if(resultsContainer) {
+            observer.observe(resultsContainer, { childList: true, subtree: true });
+        }
       }
     }
     return () => {
       if (form) {
         form.removeEventListener('submit', handleFormSubmit);
       }
+      observer.disconnect();
     };
   }, []);
 
@@ -149,11 +163,15 @@ const LocationSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ customers, staff }: { customers: Customer[], staff: StaffWithStatus[] }) {
+export function RouteOptimizer({ customers, staff, onRouteOptimized }: RouteOptimizerProps) {
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
   const [waypoints, setWaypoints] = React.useState<string[]>([]);
   const [state, formActionWithState] = useActionState(formAction, { data: null, error: null });
+
+  React.useEffect(() => {
+    onRouteOptimized(state.data);
+  }, [state.data, onRouteOptimized]);
 
   const allLocations = React.useMemo(() => {
     const customerLocations: Location[] = customers
@@ -271,67 +289,69 @@ export function RouteOptimizer({ customers, staff }: { customers: Customer[], st
         </form>
       </Card>
 
-      {state.error && (
-        <Alert variant="destructive">
-          <AlertTitle>エラー</AlertTitle>
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      )}
+      <div id="optimizer-results">
+        {state.error && (
+            <Alert variant="destructive">
+            <AlertTitle>エラー</AlertTitle>
+            <AlertDescription>{state.error}</AlertDescription>
+            </Alert>
+        )}
 
-      {!state.data && !state.error && (
-        <Card className="h-full">
-            <CardContent className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 pt-6">
-                <MapPinned className="h-12 w-12 mb-4" />
-                <p>最適化されたルートがここに表示されます。</p>
-            </CardContent>
-        </Card>
-      )}
+        {!state.data && !state.error && (
+            <Card className="h-full">
+                <CardContent className="flex flex-col items-center justify-center text-center text-muted-foreground h-48 pt-6">
+                    <MapPinned className="h-12 w-12 mb-4" />
+                    <p>最適化されたルートがここに表示されます。</p>
+                </CardContent>
+            </Card>
+        )}
 
-      {state.data && (
-        <Card>
-          <CardHeader>
-            <CardTitle>最適化されたルート</CardTitle>
-            <CardDescription>選択に基づいた最も効率的な経路です。</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-              <div>
-                <h3 className="font-semibold mb-2">概要</h3>
-                <p className="text-sm text-muted-foreground">{state.data.summary}</p>
-                <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-                  {state.data.estimatedTravelTime && (
-                    <div className="flex flex-col p-3 bg-muted rounded-md">
-                      <span className="text-muted-foreground text-xs">推定時間</span>
-                      <span className="font-semibold text-lg">{state.data.estimatedTravelTime}</span>
+        {state.data && (
+            <Card>
+            <CardHeader>
+                <CardTitle>最適化されたルート</CardTitle>
+                <CardDescription>選択に基づいた最も効率的な経路です。</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div>
+                    <h3 className="font-semibold mb-2">概要</h3>
+                    <p className="text-sm text-muted-foreground">{state.data.summary}</p>
+                    <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+                    {state.data.estimatedTravelTime && (
+                        <div className="flex flex-col p-3 bg-muted rounded-md">
+                        <span className="text-muted-foreground text-xs">推定時間</span>
+                        <span className="font-semibold text-lg">{state.data.estimatedTravelTime}</span>
+                        </div>
+                    )}
+                    {state.data.estimatedTravelDistance && (
+                        <div className="flex flex-col p-3 bg-muted rounded-md">
+                        <span className="text-muted-foreground text-xs">推定距離</span>
+                        <span className="font-semibold text-lg">{state.data.estimatedTravelDistance}</span>
+                        </div>
+                    )}
                     </div>
-                  )}
-                  {state.data.estimatedTravelDistance && (
-                     <div className="flex flex-col p-3 bg-muted rounded-md">
-                      <span className="text-muted-foreground text-xs">推定距離</span>
-                      <span className="font-semibold text-lg">{state.data.estimatedTravelDistance}</span>
-                    </div>
-                  )}
                 </div>
-              </div>
 
-              <div>
-                <h3 className="font-semibold mb-2">巡回順</h3>
-                <ol className="relative border-l border-border space-y-4">
-                  {state.data.optimizedRoute.map((location, index) => (
-                    <li key={location.id} className="ml-6">
-                      <span className="absolute -left-[10.5px] top-1 flex items-center justify-center w-5 h-5 bg-primary rounded-full text-primary-foreground text-xs font-bold">
-                        {index + 1}
-                      </span>
-                      <div className="pl-2">
-                        <h4 className="font-medium">{location.name}</h4>
-                        <p className="text-sm text-muted-foreground">{location.address}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-          </CardContent>
-        </Card>
-      )}
+                <div>
+                    <h3 className="font-semibold mb-2">巡回順</h3>
+                    <ol className="relative border-l border-border space-y-4">
+                    {state.data.optimizedRoute.map((location, index) => (
+                        <li key={location.id} className="ml-6">
+                        <span className="absolute -left-[10.5px] top-1 flex items-center justify-center w-5 h-5 bg-primary rounded-full text-primary-foreground text-xs font-bold">
+                            {index + 1}
+                        </span>
+                        <div className="pl-2">
+                            <h4 className="font-medium">{location.name}</h4>
+                            <p className="text-sm text-muted-foreground">{location.address}</p>
+                        </div>
+                        </li>
+                    ))}
+                    </ol>
+                </div>
+            </CardContent>
+            </Card>
+        )}
+      </div>
     </div>
   );
 }

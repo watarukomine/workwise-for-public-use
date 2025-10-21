@@ -1,6 +1,6 @@
 
 "use client";
-
+import * as React from 'react';
 import { RouteOptimizer } from "@/components/optimizer/route-optimizer";
 import { staffData, staffStatusData } from "@/lib/data";
 import { RouteMap } from "@/components/optimizer/route-map";
@@ -13,9 +13,13 @@ import { useCollection, useMemoFirebase } from "@/firebase";
 import { collection, getFirestore } from "firebase/firestore";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
+
 
 export default function OptimizerPage() {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
 
   const firestore = getFirestore();
   const customersCollection = useMemoFirebase(
@@ -33,9 +37,9 @@ export default function OptimizerPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Route Optimizer</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">ルート最適化</h1>
         <p className="text-muted-foreground">
-          Generate the most efficient route between multiple work locations.
+          複数の作業場所間の最も効率的なルートを生成します。
         </p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -55,21 +59,29 @@ export default function OptimizerPage() {
               </CardContent>
             </Card>
           ) : (
-            <RouteOptimizer customers={customers || []} staff={staffWithStatus} />
+            <RouteOptimizer 
+              customers={customers || []} 
+              staff={staffWithStatus}
+              onRouteOptimized={setOptimizedRoute}
+            />
           )}
         </div>
         <div className="lg:col-span-2">
           {apiKey ? (
             <APIProvider apiKey={apiKey}>
-              <RouteMap staff={staffWithStatus} customers={customers || []} />
+              <RouteMap 
+                staff={staffWithStatus} 
+                customers={customers || []} 
+                optimizedRoute={optimizedRoute?.optimizedRoute}
+              />
             </APIProvider>
           ) : (
             <div className="flex items-center justify-center h-full rounded-lg border border-dashed shadow-sm">
                 <Alert variant="destructive" className="max-w-md">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Google Maps API Key Missing</AlertTitle>
+                    <AlertTitle>Google Maps APIキーがありません</AlertTitle>
                     <AlertDescription>
-                        The Google Maps API key is not configured. Please add it to your <code>.env</code> file as <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to display the map.
+                        Google Maps APIキーが設定されていません。地図を表示するには、<code>.env</code>ファイルに<code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code>として追加してください。
                     </AlertDescription>
                 </Alert>
             </div>

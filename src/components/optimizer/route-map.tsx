@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { Map, Marker } from '@vis.gl/react-google-maps';
+import { Map, Marker, Polyline } from '@vis.gl/react-google-maps';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Customer, Staff, StaffStatus } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -12,19 +12,23 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 
 type StaffWithStatus = Staff & StaffStatus;
+type OptimizedRouteLocation = OptimizeRouteOutput['optimizedRoute'][0];
+
 
 interface RouteMapProps {
   staff: StaffWithStatus[];
   customers: Customer[];
+  optimizedRoute?: OptimizedRouteLocation[];
 }
 
-export function RouteMap({ staff, customers }: RouteMapProps) {
+export function RouteMap({ staff, customers, optimizedRoute }: RouteMapProps) {
   // Calculate center of the map
   const allCoordinates = [
     ...staff.filter(s => s.latitude && s.longitude).map(s => ({ lat: s.latitude!, lng: s.longitude! })),
-    ...customers.filter(c => c.latitude && c.longitude).map(c => ({ lat: c.latitude!, lng: c.longitude! }))
+    ...customers.filter(c => c.緯度 && c.経度).map(c => ({ lat: c.緯度!, lng: c.経度! }))
   ];
 
   const center = React.useMemo(() => {
@@ -35,6 +39,11 @@ export function RouteMap({ staff, customers }: RouteMapProps) {
     const lngSum = allCoordinates.reduce((sum, coord) => sum + coord.lng, 0);
     return { lat: latSum / allCoordinates.length, lng: lngSum / allCoordinates.length };
   }, [allCoordinates]);
+
+  const routeCoordinates = React.useMemo(() => {
+    if (!optimizedRoute) return [];
+    return optimizedRoute.map(loc => ({ lat: loc.latitude, lng: loc.longitude }));
+  }, [optimizedRoute]);
 
   return (
     <Card className="h-[600px] lg:h-full">
@@ -66,12 +75,20 @@ export function RouteMap({ staff, customers }: RouteMapProps) {
               ) : null
             )}
             {customers.map((c) => 
-               c.latitude && c.longitude ? (
+               c.緯度 && c.経度 ? (
                 <Marker
                   key={`customer-${c.id}`}
-                  position={{ lat: c.latitude, lng: c.longitude }}
+                  position={{ lat: c.緯度, lng: c.経度 }}
                 />
               ) : null
+            )}
+             {routeCoordinates.length > 0 && (
+              <Polyline
+                path={routeCoordinates}
+                strokeColor="#0000FF"
+                strokeOpacity={0.8}
+                strokeWeight={5}
+              />
             )}
           </Map>
         </TooltipProvider>
