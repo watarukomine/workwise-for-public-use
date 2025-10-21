@@ -24,6 +24,12 @@ export function useUser(auth: Auth): UseUserResult {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    // Guard against auth being undefined on initial renders.
+    if (!auth) {
+      setIsLoading(false);
+      return;
+    }
+
     // Set up the real-time listener for authentication state changes.
     const unsubscribe = onAuthStateChanged(
       auth,
