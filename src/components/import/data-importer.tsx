@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Papa from 'papaparse';
 import { useFirebase } from '@/firebase';
-import { collection, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, setDoc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Upload, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { errorEmitter, FirestorePermissionError } from '@/firebase';
 
 type DataType = 'customers' | 'staff' | 'schedules';
 type Status = 'idle' | 'parsing' | 'importing' | 'success' | 'error';
@@ -65,39 +66,50 @@ export function DataImporter() {
 
         for (let i = 0; i < data.length; i++) {
           const record = data[i];
-          try {
-            const collectionRef = collection(firestore, dataType);
-            // Use a specific ID from the CSV or generate a new one
-            const recordId = record.id || doc(collectionRef).id;
-            const docRef = doc(collectionRef, recordId);
-            
-            // Simple data cleaning/transformation
-            let dataToImport: any = { ...record };
-            if (dataType === 'customers') {
-                dataToImport.latitude = parseFloat(record.latitude) || null;
-                dataToImport.longitude = parseFloat(record.longitude) || null;
-            } else if (dataType === 'schedules') {
-                dataToImport.startTime = new Date(record.startTime);
-                dataToImport.endTime = new Date(record.endTime);
-            }
-            
-            await setDoc(docRef, dataToImport, { merge: true });
-            successCount++;
-          } catch (error) {
-            console.error(`Failed to import record ${i + 1}:`, error);
-            failedCount++;
+          const collectionRef = collection(firestore, dataType);
+          // Use a specific ID from the CSV or generate a new one
+          const recordId = record.id || doc(collectionRef).id;
+          const docRef = doc(collectionRef, recordId);
+          
+          // Simple data cleaning/transformation
+          let dataToImport: any = { ...record };
+          if (dataType === 'customers') {
+              dataToImport.latitude = parseFloat(record.latitude) || null;
+              dataToImport.longitude = parseFloat(record.longitude) || null;
+          } else if (dataType === 'schedules') {
+              dataToImport.startTime = new Date(record.startTime);
+              dataToImport.endTime = new Date(record.endTime);
           }
-          setProgress(((i + 1) / data.length) * 100);
+          
+          setDoc(docRef, dataToImport, { merge: true })
+            .then(() => {
+              successCount++;
+            })
+            .catch(async (serverError) => {
+              failedCount++;
+              const permissionError = new FirestorePermissionError({
+                path: docRef.path,
+                operation: 'write',
+                requestResourceData: dataToImport,
+              });
+              errorEmitter.emit('permission-error', permissionError);
+            })
+            .finally(() => {
+                const processedCount = successCount + failedCount;
+                setProgress((processedCount / data.length) * 100);
+
+                if (processedCount === data.length) {
+                    setResults({ success: successCount, failed: failedCount });
+                    setStatus(failedCount > 0 ? 'error' : 'success');
+
+                    toast({
+                        title: 'Import Complete',
+                        description: `${successCount} records imported successfully. ${failedCount} failed.`,
+                        variant: failedCount > 0 ? 'destructive' : 'default',
+                    });
+                }
+            });
         }
-
-        setResults({ success: successCount, failed: failedCount });
-        setStatus(failedCount > 0 ? 'error' : 'success');
-
-        toast({
-          title: 'Import Complete',
-          description: `${successCount} records imported successfully. ${failedCount} failed.`,
-          variant: failedCount > 0 ? 'destructive' : 'default',
-        });
       },
       error: (error: any) => {
         setStatus('error');
@@ -143,7 +155,7 @@ export function DataImporter() {
           {status === 'importing' ? `Importing...` : 'Import Data'}
         </Button>
 
-        {isProcessing && (
+        {(status === 'importing' || status === 'success' || status === 'error') && (
           <div className="space-y-2 pt-4">
             <Label>Import Progress</Label>
             <Progress value={progress} />
@@ -161,12 +173,12 @@ export function DataImporter() {
           </Alert>
         )}
 
-        {status === 'error' && (
+        {status === 'error' && results.failed > 0 && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Import Finished with Errors</AlertTitle>
             <AlertDescription>
-              {results.success} records imported, {results.failed} failed. Check console for details.
+              {results.success} records imported, {results.failed} failed. Check the console for details.
             </AlertDescription>
           </Alert>
         )}
