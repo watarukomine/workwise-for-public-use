@@ -36,7 +36,7 @@ export function StatusUpdates() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>スタッフ現況</CardTitle>
+        <CardTitle>ステータス</CardTitle>
         <CardDescription>スタッフのリアルタイム活動状況</CardDescription>
       </CardHeader>
       <CardContent>

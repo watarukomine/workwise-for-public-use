@@ -11,16 +11,10 @@ export default function DashboardPage() {
           スタッフのスケジュールと現在の状況を一覧で確認できます。
         </p>
       </div>
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
-        <div className="lg:col-span-1">
-          <div className="space-y-8">
-            <UnassignedOrders />
-            <StatusUpdates />
-          </div>
-        </div>
-        <div className="lg:col-span-3">
-          <ScheduleView />
-        </div>
+      <div className="flex flex-col gap-8">
+        <UnassignedOrders />
+        <ScheduleView />
+        <StatusUpdates />
       </div>
     </div>
   );

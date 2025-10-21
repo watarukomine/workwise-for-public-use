@@ -30,10 +30,13 @@ import {
 import { collection, doc, getFirestore, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { addMinutes, differenceInMinutes, format, parseISO } from 'date-fns';
 import { Skeleton } from '../ui/skeleton';
-import { errorEmitter, FirestorePermissionError } from '@/firebase';
+import { errorEmitter } from '@/firebase/error-emitter';
+import { FirestorePermissionError } from '@/firebase/errors';
 import { staffData } from '@/lib/data';
 
 const hours = Array.from({ length: 11 }, (_, i) => 8 + i); // 8:00 to 18:00
+const timeSlots = Array.from({ length: 21 }, (_, i) => 8 + i * 0.5); // 8:00 to 18:00, 30min increments
+
 const PIXELS_PER_MINUTE = 2;
 const timelineStartHour = 8;
 
@@ -186,13 +189,13 @@ export function ScheduleView() {
 
             // This should be a transaction in a real app,
             // but for simplicity, we'll do it sequentially.
-            await addDoc(schedulesRef, newEvent).catch(e => {
+            addDoc(schedulesRef, newEvent).catch(e => {
                 const permissionError = new FirestorePermissionError({ path: schedulesRef.path, operation: 'create', requestResourceData: newEvent });
                 errorEmitter.emit('permission-error', permissionError);
                 throw permissionError;
             });
 
-            await deleteDoc(orderRef).catch(e => {
+            deleteDoc(orderRef).catch(e => {
                 const permissionError = new FirestorePermissionError({ path: orderRef.path, operation: 'delete' });
                 errorEmitter.emit('permission-error', permissionError);
                 throw permissionError;
@@ -284,9 +287,9 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver 
         <span className="text-sm font-medium truncate">{staff.name}</span>
       </div>
       <div className="relative h-14 bg-muted/50 rounded-md border-l border-border">
-        <div className="absolute inset-0 grid grid-cols-11">
-          {hours.slice(0, -1).map((_, i) => (
-            <div key={i} className="border-r border-border/80 h-full"></div>
+        <div className="absolute inset-0 grid grid-cols-22">
+          {timeSlots.slice(0, -1).map((_, i) => (
+            <div key={i} className={`h-full ${i % 2 === 0 ? 'border-r border-border/80' : 'border-r border-dashed border-border/40'}`}></div>
           ))}
         </div>
         <div className="absolute inset-0 h-full p-1">
