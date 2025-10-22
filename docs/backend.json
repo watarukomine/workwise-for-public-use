@@ -4,7 +4,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Staff",
       "type": "object",
-      "description": "Represents a staff member in the WorkWise application.",
+      "description": "Represents a staff member with their details and work schedule associations.",
       "properties": {
         "id": {
           "type": "string",
@@ -16,11 +16,11 @@
         },
         "calendarId": {
           "type": "string",
-          "description": "The ID of the Google Calendar associated with the staff member."
+          "description": "Identifier of the associated Google Calendar."
         },
         "colorKey": {
           "type": "string",
-          "description": "The color key associated with the staff member for calendar visualization."
+          "description": "Color key associated with the staff member's calendar events."
         }
       },
       "required": [
@@ -33,7 +33,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Customer",
       "type": "object",
-      "description": "Represents a customer in the WorkWise application.",
+      "description": "Represents a customer in the customer directory.",
       "properties": {
         "id": {
           "type": "string",
@@ -58,7 +58,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "WorkSchedule",
       "type": "object",
-      "description": "Represents a work schedule entry in the WorkWise application.",
+      "description": "Represents a work schedule entry, linking staff, location, and time.",
       "properties": {
         "id": {
           "type": "string",
@@ -95,7 +95,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Location",
       "type": "object",
-      "description": "Represents a work location in the WorkWise application.",
+      "description": "Represents a work location with address and geographical coordinates.",
       "properties": {
         "id": {
           "type": "string",
@@ -103,15 +103,15 @@
         },
         "address": {
           "type": "string",
-          "description": "The address of the location."
+          "description": "The address of the work location."
         },
         "latitude": {
           "type": "number",
-          "description": "The latitude coordinate of the location."
+          "description": "The latitude of the work location."
         },
         "longitude": {
           "type": "number",
-          "description": "The longitude coordinate of the location."
+          "description": "The longitude of the work location."
         }
       },
       "required": [
@@ -123,7 +123,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "EmployeeAction",
       "type": "object",
-      "description": "Represents an action performed by an employee during a work day.",
+      "description": "Represents an action performed by an employee during the workday (e.g., arrive, begin task).",
       "properties": {
         "id": {
           "type": "string",
@@ -135,7 +135,7 @@
         },
         "actionType": {
           "type": "string",
-          "description": "The type of action performed (e.g., Arrive, Begin Task, Finish Task, Depart)."
+          "description": "The type of action performed (e.g., arrive, begin task, finish task, depart)."
         },
         "timestamp": {
           "type": "string",
@@ -144,7 +144,7 @@
         },
         "locationId": {
           "type": "string",
-          "description": "Reference to Location. (Relationship: Location 1:N EmployeeAction). The location where the action was performed."
+          "description": "Reference to Location, the location at which the action was performed."
         }
       },
       "required": [
@@ -158,8 +158,7 @@
   "auth": {
     "providers": [
       "password",
-      "anonymous",
-      "google.com"
+      "anonymous"
     ]
   },
   "firestore": {
@@ -171,11 +170,11 @@
           "schema": {
             "$ref": "#/backend/entities/Staff"
           },
-          "description": "Stores staff member profiles. Uses path-based ownership.",
+          "description": "Stores staff member data.  Path-based ownership is used. Includes staff ID parameter for identifying individual staff members.",
           "params": [
             {
               "name": "staffId",
-              "description": "The unique identifier of the staff member."
+              "description": "Unique identifier for the staff member."
             }
           ]
         }
@@ -187,31 +186,11 @@
           "schema": {
             "$ref": "#/backend/entities/Customer"
           },
-          "description": "Stores customer profiles.",
+          "description": "Stores customer data. Includes customer ID parameter for identifying individual customers.",
           "params": [
             {
               "name": "customerId",
-              "description": "The unique identifier of the customer."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/staff/{staffId}/workSchedules/{workScheduleId}",
-        "definition": {
-          "entityName": "WorkSchedule",
-          "schema": {
-            "$ref": "#/backend/entities/WorkSchedule"
-          },
-          "description": "Stores work schedules for each staff member. Uses path-based ownership.",
-          "params": [
-            {
-              "name": "staffId",
-              "description": "The unique identifier of the staff member."
-            },
-            {
-              "name": "workScheduleId",
-              "description": "The unique identifier of the work schedule."
+              "description": "Unique identifier for the customer."
             }
           ]
         }
@@ -223,36 +202,48 @@
           "schema": {
             "$ref": "#/backend/entities/Location"
           },
-          "description": "Stores location information.",
+          "description": "Stores location data. Includes location ID parameter for identifying individual locations.",
           "params": [
             {
               "name": "locationId",
-              "description": "The unique identifier of the location."
+              "description": "Unique identifier for the location."
             }
           ]
         }
       },
       {
-        "path": "/staff/{staffId}/employeeActions/{employeeActionId}",
+        "path": "/workSchedules/{workScheduleId}",
+        "definition": {
+          "entityName": "WorkSchedule",
+          "schema": {
+            "$ref": "#/backend/entities/WorkSchedule"
+          },
+          "description": "Stores work schedule data. Denormalizes `staffId` for simplified authorization. Includes work schedule ID parameter for identifying individual work schedules.",
+          "params": [
+            {
+              "name": "workScheduleId",
+              "description": "Unique identifier for the work schedule."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/employeeActions/{employeeActionId}",
         "definition": {
           "entityName": "EmployeeAction",
           "schema": {
             "$ref": "#/backend/entities/EmployeeAction"
           },
-          "description": "Stores employee actions for each staff member. Uses path-based ownership.",
+          "description": "Stores employee action data. Denormalizes `staffId` for simplified authorization.  Includes employee action ID parameter for identifying individual employee actions.",
           "params": [
             {
-              "name": "staffId",
-              "description": "The unique identifier of the staff member."
-            },
-            {
               "name": "employeeActionId",
-              "description": "The unique identifier of the employee action."
+              "description": "Unique identifier for the employee action."
             }
           ]
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to support the WorkWise application's core features, focusing on staff management, customer directory, work scheduling, and real-time employee action tracking. The design prioritizes authorization independence, clarity, and scalability. Path-based ownership is utilized for Staff-owned data (WorkSchedules, EmployeeActions), ensuring simple and secure rules. \n\nTo achieve Authorization Independence (DBAC) with no custom claims, roles will be stored in the database and enforced via rules based on `request.auth.uid`.\n\nTo support the required QAPs (Rules are not Filters), the structure uses segregation to avoid mixing data with different access needs in the same collections. Each top-level collection has clear security requirements. Staff-owned data is nested under the `/staff/{staffId}` path, providing implicit ownership for the data.\n\nDenormalization: There is no apparent need to denormalize any data for Authorization Independence due to the application of Path-Based ownership, which inherently makes each document's access control depend solely on its path, and therefore, independent from other documents in the database."
+    "reasoning": "The Firestore structure is designed to provide a secure, scalable, and easily maintainable data model for the WorkWise application. The structure emphasizes authorization independence by denormalizing relevant authorization data (such as staff IDs in WorkSchedules and EmployeeActions). This avoids the need for `get()` calls in security rules, enabling atomic operations and simplifying debugging. Segregation of data with different access needs is achieved by using dedicated collections for each entity (Staff, Customers, Locations, WorkSchedules, and EmployeeActions). Path-based ownership is used to relate Staff to WorkSchedules and EmployeeActions. This structure allows for efficient and secure `list` operations, fulfilling the QAPs. The design incorporates explicit state modeling using status fields (if applicable in future expansions) and enforces consistent naming conventions for clarity and predictability."
   }
 }
