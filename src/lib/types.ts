@@ -11,13 +11,17 @@ export type Staff = {
 export type Customer = {
   id: string;
   no?: string;
-  userCode: string;
+  userCode?: string; // from sheet
+  usercode?: string; // from sheet, api lowercases it
   storeName?: string;
+  storename?: string;
   address: string;
   latitude?: number;
   longitude?: number;
   phoneNumber?: string;
+  phonenumber?: string;
   businessHours?: string;
+  businesshours?: string;
   name?: string; // for search
 };
 

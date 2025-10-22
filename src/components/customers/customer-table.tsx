@@ -20,7 +20,8 @@ import { Search } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { AlertCircle } from 'lucide-react';
 
-const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyC-It_NusXHTNZO9HjP2AZUWQSNj_VeUJCmbvSnyPVzMsUJ-Ytt_CY5WO7DXyobdVzHg/exec';
+// We will now fetch from our own API route
+const API_URL = '/api/customers';
 
 export function CustomerTable() {
   const [customers, setCustomers] = React.useState<Customer[]>([]);
@@ -32,23 +33,20 @@ export function CustomerTable() {
 
   React.useEffect(() => {
     const fetchCustomers = async () => {
-      // 開発者向け注意：もしGASのURLがダミーのままなら、エラーを表示
-      if (GAS_API_URL.includes('YOUR_DEPLOYMENT_ID')) {
-        setError('Google Apps ScriptのURLが設定されていません。GASをデプロイし、URLを更新してください。');
-        setIsLoading(false);
-        return;
-      }
-      
       try {
-        const response = await fetch(GAS_API_URL);
+        const response = await fetch(API_URL);
         if (!response.ok) {
           throw new Error(`データの取得に失敗しました。ステータス: ${response.status}`);
         }
         const data = await response.json();
+        // The API route now returns an object with a 'data' property
+        if (data.error) {
+            throw new Error(data.message || 'APIからエラーが返されました。');
+        }
         setCustomers(data);
       } catch (e: any) {
-        console.error('Error fetching customers from GAS:', e);
-        setError('スプレッドシートからのデータ取得中にエラーが発生しました。URLやシートの共有設定を確認してください。');
+        console.error('Error fetching customers from API route:', e);
+        setError('顧客データの取得中にエラーが発生しました。しばらくしてから再度お試しください。');
       } finally {
         setIsLoading(false);
       }
@@ -58,8 +56,9 @@ export function CustomerTable() {
   }, []);
 
   const filteredCustomers = React.useMemo(() => {
+    // API returns keys in lowercase, ensure we match that
     return customers.filter(customer =>
-      customer && customer.userCode && customer.userCode.toLowerCase().includes(searchTerm.toLowerCase())
+      customer && customer.usercode && customer.usercode.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [customers, searchTerm]);
 
@@ -112,18 +111,18 @@ export function CustomerTable() {
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    スプレッドシートからデータを読み込んでいます...
+                    データを読み込んでいます...
                   </TableCell>
                 </TableRow>
               ) : paginatedCustomers.length > 0 ? (
-                paginatedCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
+                paginatedCustomers.map((customer, index) => (
+                  <TableRow key={customer.id || index}>
                     <TableCell className="font-medium">{customer.no}</TableCell>
-                    <TableCell>{customer.userCode}</TableCell>
-                    <TableCell>{customer.storeName}</TableCell>
+                    <TableCell>{customer.usercode}</TableCell>
+                    <TableCell>{customer.storename}</TableCell>
                     <TableCell>{customer.address}</TableCell>
-                    <TableCell>{customer.phoneNumber}</TableCell>
-                    <TableCell>{customer.businessHours}</TableCell>
+                    <TableCell>{customer.phonenumber}</TableCell>
+                    <TableCell>{customer.businesshours}</TableCell>
                   </TableRow>
                 ))
               ) : (
