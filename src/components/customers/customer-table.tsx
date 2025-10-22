@@ -20,8 +20,7 @@ import { Search } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { AlertCircle } from 'lucide-react';
 
-// TODO: 後でお客様から提供されたGASのURLに置き換える
-const GAS_API_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbyC-It_NusXHTNZO9HjP2AZUWQSNj_VeUJCmbvSnyPVzMsUJ-Ytt_CY5WO7DXyobdVzHg/exec';
 
 export function CustomerTable() {
   const [customers, setCustomers] = React.useState<Customer[]>([]);
