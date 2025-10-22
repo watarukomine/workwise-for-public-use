@@ -9,26 +9,34 @@ export const revalidate = 60;
 export async function GET() {
   try {
     const response = await fetch(GAS_API_URL, {
-        next: {
-            revalidate: 60 // Re-fetch data every 60 seconds
-        }
+      redirect: 'follow', // Explicitly follow redirects
+      next: {
+          revalidate: 60 // Re-fetch data every 60 seconds
+      }
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('GAS Fetch Error:', errorText);
-      return NextResponse.json({ error: true, message: `GASからのデータ取得に失敗しました。ステータス: ${response.status}` }, { status: 500 });
+      // Try to parse as JSON in case GAS returns a structured error
+      try {
+        const errorJson = JSON.parse(errorText);
+        return NextResponse.json({ error: true, message: errorJson.message || `GASからのデータ取得に失敗しました。ステータス: ${response.status}` }, { status: 500 });
+      } catch {
+        return NextResponse.json({ error: true, message: `GASからのデータ取得に失敗しました。ステータス: ${response.status}` }, { status: 500 });
+      }
     }
 
     const data = await response.json();
 
     // The GAS script might return an object with an error property
-    if (data.error) {
+    if (data && data.error) {
         console.error('GAS Script Error:', data.message);
         return NextResponse.json({ error: true, message: data.message }, { status: 500 });
     }
 
-    return NextResponse.json(data);
+    // Ensure we always return an array, even if GAS returns nothing
+    return NextResponse.json(Array.isArray(data) ? data : []);
 
   } catch (error) {
     console.error('API Route Error:', error);
