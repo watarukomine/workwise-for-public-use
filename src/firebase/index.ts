@@ -3,8 +3,8 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore'
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore'
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -36,21 +36,6 @@ export function initializeFirebase() {
 export function getSdks(firebaseApp: FirebaseApp) {
   const auth = getAuth(firebaseApp);
   const firestore = getFirestore(firebaseApp);
-  
-  // Check if running in the development environment and emulators are intended
-  if (process.env.NODE_ENV === 'development') {
-    // It's common to use a flag to enable/disable emulators
-    // For now, we'll assume they should be connected in dev
-    try {
-      connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-      connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
-      console.log("Connected to Firebase Emulators");
-    } catch (e) {
-      // It's possible for this to fail if the component re-renders and tries to connect again.
-      // We can safely ignore this error.
-    }
-  }
-
 
   return {
     firebaseApp,
