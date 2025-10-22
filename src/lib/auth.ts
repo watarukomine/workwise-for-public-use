@@ -18,11 +18,14 @@ export const getAuthInstance = (): Auth => singletonAuth;
 
 export const signIn = async (auth: Auth = singletonAuth) => {
   try {
+    console.log("Attempting to sign in with Google...");
     // Use the provided or singleton auth instance
-    await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+    console.log("Sign-in successful:", result.user.uid);
   } catch (error: any) {
     // Don't log an error if the user cancels the popup
     if (error && error.code === 'auth/cancelled-popup-request') {
+      console.log("Sign-in popup cancelled by user.");
       return;
     }
     console.error('Error signing in with Google: ', error);
