@@ -2,7 +2,6 @@
 'use client';
 import * as React from 'react';
 import type { Customer } from '@/lib/types';
-import { customerData } from '@/lib/data';
 import {
   Table,
   TableBody,
@@ -18,12 +17,46 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { AlertCircle } from 'lucide-react';
+
+// TODO: 後でお客様から提供されたGASのURLに置き換える
+const GAS_API_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
 
 export function CustomerTable() {
-  const [customers] = React.useState<Customer[]>(customerData);
+  const [customers, setCustomers] = React.useState<Customer[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
+
+  React.useEffect(() => {
+    const fetchCustomers = async () => {
+      // 開発者向け注意：もしGASのURLがダミーのままなら、エラーを表示
+      if (GAS_API_URL.includes('YOUR_DEPLOYMENT_ID')) {
+        setError('Google Apps ScriptのURLが設定されていません。GASをデプロイし、URLを更新してください。');
+        setIsLoading(false);
+        return;
+      }
+      
+      try {
+        const response = await fetch(GAS_API_URL);
+        if (!response.ok) {
+          throw new Error(`データの取得に失敗しました。ステータス: ${response.status}`);
+        }
+        const data = await response.json();
+        setCustomers(data);
+      } catch (e: any) {
+        console.error('Error fetching customers from GAS:', e);
+        setError('スプレッドシートからのデータ取得中にエラーが発生しました。URLやシートの共有設定を確認してください。');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCustomers();
+  }, []);
 
   const filteredCustomers = React.useMemo(() => {
     return customers.filter(customer =>
@@ -39,7 +72,16 @@ export function CustomerTable() {
   }, [filteredCustomers, page, rowsPerPage]);
 
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
-  const isLoading = !customers;
+
+  if (error) {
+    return (
+        <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>エラー</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+        </Alert>
+    );
+  }
 
   return (
     <Card>
@@ -48,7 +90,7 @@ export function CustomerTable() {
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by user code..."
+              placeholder="ユーザーコードで検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -71,7 +113,7 @@ export function CustomerTable() {
               {isLoading ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    Loading customers...
+                    スプレッドシートからデータを読み込んでいます...
                   </TableCell>
                 </TableRow>
               ) : paginatedCustomers.length > 0 ? (
@@ -88,7 +130,7 @@ export function CustomerTable() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    {customers && customers.length === 0 ? "No customers found." : "No matching customers found for your search."}
+                    {customers && customers.length === 0 ? "顧客情報が見つかりません。" : "検索条件に合う顧客が見つかりません。"}
                   </TableCell>
                 </TableRow>
               )}
@@ -97,7 +139,7 @@ export function CustomerTable() {
         </div>
         <div className="flex items-center justify-end space-x-2 py-4">
           <span className="text-sm text-muted-foreground">
-            Page {page} of {totalPages > 0 ? totalPages : 1}
+            {totalPages > 0 ? totalPages : 1}ページ中の{page}ページ
           </span>
           <Button
             variant="outline"
@@ -105,7 +147,7 @@ export function CustomerTable() {
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
           >
-            Previous
+            前へ
           </Button>
           <Button
             variant="outline"
@@ -113,7 +155,7 @@ export function CustomerTable() {
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages || totalPages === 0}
           >
-            Next
+            次へ
           </Button>
         </div>
       </CardContent>
