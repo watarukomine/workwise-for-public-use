@@ -1,7 +1,8 @@
 'use client';
 
 import { 
-  signInAnonymously,
+  signInWithPopup,
+  GoogleAuthProvider,
   signOut as firebaseSignOut,
   type Auth
 } from 'firebase/auth';
@@ -11,14 +12,16 @@ import { initializeFirebase } from '@/firebase'; // Import the central getter
 // This is done once and the instance is reused.
 const { auth: singletonAuth } = initializeFirebase();
 
+const provider = new GoogleAuthProvider();
+
 export const getAuthInstance = (): Auth => singletonAuth;
 
 export const signIn = async (auth: Auth = singletonAuth) => {
   try {
     // Use the provided or singleton auth instance
-    await signInAnonymously(auth);
+    await signInWithPopup(auth, provider);
   } catch (error) {
-    console.error('Error signing in anonymously: ', error);
+    console.error('Error signing in with Google: ', error);
   }
 };
 
