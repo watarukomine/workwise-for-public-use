@@ -1,4 +1,3 @@
-
 "use client";
 import * as React from 'react';
 import { RouteOptimizer } from "@/components/optimizer/route-optimizer";
@@ -26,13 +25,21 @@ export default function OptimizerPage() {
     return allStaff.filter(s => appliedSelectedStaffIds.includes(s.id));
   }, [appliedSelectedStaffIds, allStaff]);
 
+  const filteredStaffStatus = React.useMemo(() => {
+    if (appliedSelectedStaffIds.length === 0) {
+        return staffStatusData;
+    }
+    const selectedIds = new Set(appliedSelectedStaffIds);
+    return staffStatusData.filter(status => selectedIds.has(status.staffId));
+  }, [appliedSelectedStaffIds]);
+
 
   const staffWithStatus = React.useMemo(() => {
-    return staffStatusData.map(status => {
+    return filteredStaffStatus.map(status => {
       const staffDetails = filteredStaff.find(s => s.id === status.staffId);
       return staffDetails ? { ...staffDetails, ...status } as (Staff & StaffStatus) : null;
     }).filter((s): s is (Staff & StaffStatus) => s !== null);
-  }, [filteredStaff]);
+  }, [filteredStaff, filteredStaffStatus]);
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
     setOptimizedRoute(data);
@@ -57,7 +64,7 @@ export default function OptimizerPage() {
             <RouteOptimizer 
               onRouteOptimized={handleRouteOptimized}
               staff={filteredStaff}
-              staffStatus={staffStatusData}
+              staffStatus={filteredStaffStatus}
             />
           )}
         </div>

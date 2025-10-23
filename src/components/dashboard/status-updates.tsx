@@ -1,4 +1,3 @@
-
 'use client';
 import type { StaffStatus, Staff, WithId } from '@/lib/types';
 import {
@@ -37,8 +36,8 @@ interface StatusUpdatesProps {
 
 export function StatusUpdates({ staffData, statuses }: StatusUpdatesProps) {
   
-  const getStaff = (id: string): WithId<Staff> | undefined => {
-    return staffData?.find(s => s.id === id);
+  const getStatus = (staffId: string): StaffStatus | undefined => {
+    return statuses?.find(s => s.staffId === staffId);
   };
   
   const isLoading = !statuses || !staffData;
@@ -53,10 +52,10 @@ export function StatusUpdates({ staffData, statuses }: StatusUpdatesProps) {
         <div className="space-y-4">
           {isLoading ? (
             <p>Loading statuses...</p>
-          ) : statuses && statuses.length > 0 ? (
-            statuses.map((status, index) => {
-              const staff = getStaff(status.staffId);
-              if (!staff) return null;
+          ) : staffData && staffData.length > 0 ? (
+            staffData.map((staff, index) => {
+              const status = getStatus(staff.id);
+              if (!status) return null;
 
               return (
                 <div key={staff.id}>
@@ -81,12 +80,12 @@ export function StatusUpdates({ staffData, statuses }: StatusUpdatesProps) {
                       )}
                     </div>
                   </div>
-                  {index < statuses.length - 1 && <Separator className="mt-4" />}
+                  {index < staffData.length - 1 && <Separator className="mt-4" />}
                 </div>
               );
             })
           ) : (
-            <p>No status updates available.</p>
+            <p className="text-muted-foreground text-center py-4">表示するスタッフが選択されていません。</p>
           )}
         </div>
       </CardContent>
