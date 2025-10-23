@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Firestore, collection, doc, writeBatch, getDoc, serverTimestamp } from 'firebase/firestore';
+import { Firestore, collection, doc, writeBatch, getDoc, serverTimestamp, FirestoreError } from 'firebase/firestore';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useEffect } from 'react';
 import { useFirestore } from './provider';
@@ -71,25 +71,7 @@ const eventsSeed: any[] = [
 ];
 
 export async function seedData(db: Firestore) {
-  const seededFlagRef = doc(db, 'internal', 'seeded');
-  
-  try {
-    const docSnap = await getDoc(seededFlagRef);
-    if (docSnap.exists()) {
-      console.log("Data has already been seeded. Skipping.");
-      return;
-    }
-  } catch (error: any) {
-    const contextualError = new FirestorePermissionError({
-      operation: 'get',
-      path: seededFlagRef.path,
-    });
-    errorEmitter.emit('permission-error', contextualError);
-    // Don't proceed with seeding if we can't even check the flag
-    return;
-  }
-
-  console.log("Seeding data to Firestore...");
+  console.log("Attempting to seed data to Firestore...");
   const batch = writeBatch(db);
 
   const getAvatarUrl = (avatarId: string) => {
@@ -137,17 +119,24 @@ export async function seedData(db: Firestore) {
   });
 
   // Set the flag to indicate data has been seeded
+  const seededFlagRef = doc(db, 'internal', 'seeded');
   batch.set(seededFlagRef, { seeded: true, timestamp: serverTimestamp() });
 
   try {
     await batch.commit();
     console.log("Data seeding successful.");
   } catch (error) {
-    // This can happen if rules are not yet permissive enough.
-    // The error will be caught by the global error listener.
-    console.error("Data seeding failed. This may be due to restrictive Firestore rules.", error);
-    // We are not re-throwing or emitting here to avoid loops.
-    // The failure to read data will be caught by the respective hooks.
+    // If the error code is 'already-exists', it means our seeding flag document
+    // was already created, which implies the data is seeded. We can safely ignore this.
+    if ((error as FirestoreError).code === 'already-exists') {
+      console.log("Data has already been seeded. Skipping.");
+    } else {
+      // For any other errors, we log them. This could still be a permission error
+      // if the rules are not set up at all, but it won't crash the app.
+      console.error("Data seeding failed:", error);
+      // We don't emit a global error here to avoid error loops on startup.
+      // The individual data hooks will report errors if they fail to fetch data.
+    }
   }
 }
 
@@ -162,3 +151,5 @@ export function DataSeeder() {
 
   return null; // This component does not render anything
 }
+
+    
