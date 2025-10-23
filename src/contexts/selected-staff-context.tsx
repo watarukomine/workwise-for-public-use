@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
@@ -22,15 +23,20 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
+    // appliedSelectedStaffIdsが変更されたら、pendingSelectedStaffIdsもそれに追従させる
+    // これにより、スタッフ一覧ページに戻ったときに、最後に適用された選択状態が復元されます。
     setPendingSelectedStaffIds(appliedSelectedStaffIds);
   }, [appliedSelectedStaffIds]);
   
   const setAllStaff = (staff: Staff[]) => {
     setAllStaffState(staff);
     // Initialize pending and applied selections with all staff IDs by default
-    const allStaffIds = staff.map(s => s.id);
-    setPendingSelectedStaffIds(allStaffIds);
-    setAppliedSelectedStaffIds(allStaffIds);
+    // This should only happen on the very first load.
+    if (appliedSelectedStaffIds.length === 0 && staff.length > 0) {
+      const allStaffIds = staff.map(s => s.id);
+      setPendingSelectedStaffIds(allStaffIds);
+      setAppliedSelectedStaffIds(allStaffIds);
+    }
   };
 
   const togglePendingStaffSelection = (staffId: string) => {
