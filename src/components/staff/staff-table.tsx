@@ -31,7 +31,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Calendar ID</TableHead>
-                <TableHead>Color Key</TableHead>
+                <TableHead>Color</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

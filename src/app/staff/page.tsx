@@ -33,13 +33,12 @@ export default function StaffPage() {
         }
 
         if (staffData !== null) {
-          // The data from sheet might not have id, avatarUrl. We will add them.
           const formattedStaff = staffData.map((member, index) => ({
-            id: member.id || String(index + 1),
-            name: member.name || member['Name'] || '',
-            calendarId: member.calendarId || member['Calendar ID'] || '',
-            color: member.color || member['Color Key'] || 'hsl(210 14% 88%)',
-            avatarUrl: member.avatarUrl || `https://picsum.photos/seed/${member.id || index}/100/100`
+            id: member['スタッフID'] || String(index + 1),
+            name: member['スタッフ名'] || '',
+            calendarId: member['カレンダーID'] || '',
+            color: member['カラー'] || 'hsl(210 14% 88%)',
+            avatarUrl: member.avatarUrl || `https://picsum.photos/seed/${member['スタッフID'] || index}/100/100`
           }));
           setStaff(formattedStaff);
         } else {
@@ -89,4 +88,3 @@ export default function StaffPage() {
     </div>
   );
 }
-
