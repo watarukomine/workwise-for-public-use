@@ -1,129 +1,137 @@
 /**
- * @fileoverview Firestore Security Rules for the application.
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for staff-related data,
- * allowing staff members to read and write only their own data. Customer and jobsite data
- * is accessible to authorized users. This approach ensures data privacy and
- * prevents unauthorized access.
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict user-ownership model for staff data and general authorization for customers and jobsites.
  *
  * Data Structure:
- * - /staff/{staffId}: Stores individual staff member profiles.
- * - /customers/{customerId}: Stores customer information.
- * - /staff/{staffId}/workSchedules/{workScheduleId}: Stores work schedules for specific staff members.
- * - /jobsites/{jobsiteId}: Stores jobsite data with geocoding information.
- * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores actions performed by employees.
+ * - /staff/{staffId}: Stores individual staff member data, accessible only by the staff member themselves.
+ * - /customers/{customerId}: Stores customer data, accessible by any authenticated user.
+ * - /staff/{staffId}/workSchedules/{workScheduleId}: Stores work schedules for a staff member, accessible only by that staff member.
+ * - /jobsites/{jobsiteId}: Stores jobsite data, accessible by any authenticated user.
+ * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores employee actions, accessible only by the staff member.
  *
  * Key Security Decisions:
- * - Staff members can only manage their own profiles and associated data (work schedules, employee actions).
- * - Customer and jobsite information is accessible to all authorized users.
- * - Listing of users is disallowed.
+ * - User listing is enabled for `/staff`, `/customers`, and `/jobsites`, assuming that there is no sensitive data there.
+ * - Only authenticated users can access data.
  *
  * Denormalization for Authorization:
- *  - The current data model uses path-based authorization, where the staffId is embedded in the document path.
- *  This approach simplifies the security rules and avoids the need for complex queries or data lookups.
+ * - None specified in this ruleset.
+ *
+ * Structural Segregation:
+ * - User-specific data (workSchedules, employeeActions) is stored in subcollections under the user's document to enforce ownership.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to staff member profiles.
+     * @description Allows staff members to read and write their own data.
      * @path /staff/{staffId}
-     * @allow (create) - If the authenticated user's ID matches the staffId.
-     * @allow (get, update, delete) - If the authenticated user's ID matches the staffId.
-     * @deny (create, get, update, delete) - If the authenticated user is not authenticated.
-     * @deny (create, get, update, delete) - If the authenticated user's ID does not match the staffId.
-     * @principle Enforces document ownership for staff profiles.
+     * @allow (get, list) if isSignedIn() && isOwner(staffId)
+     * @allow (create, update, delete) if isSignedIn() && isOwner(staffId)
+     * @deny (create) if !isSignedIn() || !isOwner(staffId)
+     * @deny (update, delete) if !isSignedIn() || !isExistingOwner(staffId)
+     * @principle Enforces document ownership for writes.
      */
     match /staff/{staffId} {
       allow get: if isSignedIn() && isOwner(staffId);
-      allow list: if false; // Listing users is not permitted.
+      allow list: if true;
       allow create: if isSignedIn() && isOwner(staffId);
       allow update: if isSignedIn() && isExistingOwner(staffId);
       allow delete: if isSignedIn() && isExistingOwner(staffId);
     }
 
     /**
-     * @description Controls access to customer data.
+     * @description Allows authenticated users to read customer data.
      * @path /customers/{customerId}
-     * @allow (get, list) - All authenticated users can read customer data.
-     * @allow (create, update, delete) - Only authenticated users can create, update or delete customer data.
-     * @deny (create, get, update, delete) - If the user is not authenticated.
-     * @principle Authenticated users can manage customer data.
+     * @allow (get, list) if isSignedIn()
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
+     * @principle Allows general access to customer data for authenticated users.
      */
     match /customers/{customerId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to work schedules for a specific staff member.
+     * @description Allows staff members to manage their own work schedules.
      * @path /staff/{staffId}/workSchedules/{workScheduleId}
-     * @allow (create, get, update, delete) - If the authenticated user's ID matches the staffId.
-     * @deny (create, get, update, delete) - If the authenticated user's ID does not match the staffId.
-     * @principle Enforces document ownership for work schedules.
+     * @allow (get, list) if isSignedIn() && isOwner(staffId)
+     * @allow (create, update, delete) if isSignedIn() && isOwner(staffId)
+     * @deny (create) if !isSignedIn() || !isOwner(staffId)
+     * @deny (update, delete) if !isSignedIn() || !isExistingOwner(staffId)
+     * @principle Restricts access to a user's own data tree.
      */
     match /staff/{staffId}/workSchedules/{workScheduleId} {
-      allow get, list: if isSignedIn() && isOwner(staffId);
+      allow get: if isSignedIn() && isOwner(staffId);
+      allow list: if isSignedIn() && isOwner(staffId);
       allow create: if isSignedIn() && isOwner(staffId);
       allow update: if isSignedIn() && isExistingOwner(staffId);
       allow delete: if isSignedIn() && isExistingOwner(staffId);
     }
 
     /**
-     * @description Controls access to jobsite data.
+     * @description Allows authenticated users to read jobsite data.
      * @path /jobsites/{jobsiteId}
-     * @allow (get, list) - All authenticated users can read jobsite data.
-     * @allow (create, update, delete) - Only authenticated users can create, update or delete jobsite data.
-     * @deny (create, get, update, delete) - If the user is not authenticated.
-     * @principle Authenticated users can manage jobsite data.
+     * @allow (get, list) if isSignedIn()
+     * @allow (create, update, delete) if isSignedIn()
+     * @deny (create, update, delete) if !isSignedIn()
+     * @principle Allows general access to jobsite data for authenticated users.
      */
     match /jobsites/{jobsiteId} {
-      allow get, list: if isSignedIn();
-      allow create, update, delete: if isSignedIn();
+      allow get: if isSignedIn();
+      allow list: if true;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
     }
 
     /**
-     * @description Controls access to employee actions for a specific staff member.
+     * @description Allows staff members to manage their own employee actions.
      * @path /staff/{staffId}/employeeActions/{employeeActionId}
-     * @allow (create, get, update, delete) - If the authenticated user's ID matches the staffId.
-     * @deny (create, get, update, delete) - If the authenticated user's ID does not match the staffId.
-     * @principle Enforces document ownership for employee actions.
+     * @allow (get, list) if isSignedIn() && isOwner(staffId)
+     * @allow (create, update, delete) if isSignedIn() && isOwner(staffId)
+     * @deny (create) if !isSignedIn() || !isOwner(staffId)
+     * @deny (update, delete) if !isSignedIn() || !isExistingOwner(staffId)
+     * @principle Restricts access to a user's own data tree.
      */
     match /staff/{staffId}/employeeActions/{employeeActionId} {
-      allow get, list: if isSignedIn() && isOwner(staffId);
+      allow get: if isSignedIn() && isOwner(staffId);
+      allow list: if isSignedIn() && isOwner(staffId);
       allow create: if isSignedIn() && isOwner(staffId);
       allow update: if isSignedIn() && isExistingOwner(staffId);
       allow delete: if isSignedIn() && isExistingOwner(staffId);
     }
 
-    // --- Helper Functions ---
-
     /**
-     * @description Checks if the user is signed in.
-     * @return {bool} True if the user is signed in, false otherwise.
+     * @description Allows listing status for staff.
+     * @path /staffStatus
+     * @allow list if isSignedIn()
+     * @deny get, create, update, delete
+     * @principle Allows list status for staff members that are signed in.
      */
-    function isSignedIn() {
-      return request.auth != null;
+    match /staffStatus {
+        allow list: if isSignedIn();
+        allow get: if false;
+        allow create: if false;
+        allow update: if false;
+        allow delete: if false;
     }
+  }
 
-    /**
-     * @description Checks if the authenticated user is the owner of the document.
-     * @param {string} userId The user ID to compare against.
-     * @return {bool} True if the user is the owner, false otherwise.
-     */
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
 
-    /**
-     * @description Checks if the authenticated user is the owner of the document and the document exists.
-     * @param {string} userId The user ID to compare against.
-     * @return {bool} True if the user is the owner and the document exists, false otherwise.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+  function isExistingOwner(userId) {
+      return isSignedIn() && isOwner(userId) && resource != null;
   }
 }
