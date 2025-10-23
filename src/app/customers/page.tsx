@@ -23,13 +23,24 @@ export default function CustomersPage() {
         if (!response.ok) {
           throw new Error(`HTTPエラー: ${response.status}`);
         }
-        const data = await response.json();
-        // The GAS script returns an object with a 'data' property containing the array
-        if (data && Array.isArray(data.data)) {
-          setCustomers(data.data);
-        } else {
-          throw new Error('データ形式が正しくありません。JSON配列を取得できませんでした。');
+        const result = await response.json();
+        
+        let customerData: any[] | null = null;
+
+        // Check if the result itself is an array
+        if (Array.isArray(result)) {
+            customerData = result;
+        // Check if the result is an object containing a 'data' array
+        } else if (result && typeof result === 'object' && Array.isArray(result.data)) {
+            customerData = result.data;
         }
+
+        if (customerData !== null) {
+          setCustomers(customerData);
+        } else {
+          throw new Error('データ形式が正しくありません。GASからの応答がJSON配列または{data: [...]}オブジェクトではありません。');
+        }
+
       } catch (e: unknown) {
         console.error('Failed to fetch customer data:', e);
         if (e instanceof Error) {
