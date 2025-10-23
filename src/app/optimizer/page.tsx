@@ -9,6 +9,7 @@ import { AlertCircle } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import type { Customer, Staff, StaffStatus } from '@/lib/types';
 import { customerData, staffData, staffStatusData } from '@/lib/data';
+import { useSelectedStaff } from '@/contexts/selected-staff-context';
 
 export default function OptimizerPage() {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -16,21 +17,29 @@ export default function OptimizerPage() {
   const [avoidHighways, setAvoidHighways] = React.useState(false);
 
   const [customers] = React.useState<Customer[]>(customerData);
-  const [staff] = React.useState<Staff[]>(staffData);
+  const { selectedStaffIds } = useSelectedStaff();
+
+  const filteredStaff = React.useMemo(() => {
+    if (selectedStaffIds.length === 0) {
+      return staffData; // No selection, show all
+    }
+    return staffData.filter(s => selectedStaffIds.includes(s.id));
+  }, [selectedStaffIds]);
+
 
   const staffWithStatus = React.useMemo(() => {
     return staffStatusData.map(status => {
-      const staffDetails = staff.find(s => s.id === status.staffId);
-      return { ...staffDetails, ...status } as (Staff & StaffStatus);
-    }).filter(s => s.id); // filter out cases where staffDetails was not found
-  }, [staff]);
+      const staffDetails = filteredStaff.find(s => s.id === status.staffId);
+      return staffDetails ? { ...staffDetails, ...status } as (Staff & StaffStatus) : null;
+    }).filter((s): s is (Staff & StaffStatus) => s !== null);
+  }, [filteredStaff]);
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
     setOptimizedRoute(data);
     setAvoidHighways(options.avoidHighways);
   }
   
-  const isLoading = !customers || !staff;
+  const isLoading = !customers || !staffData;
 
   return (
     <div className="space-y-8">
@@ -47,6 +56,8 @@ export default function OptimizerPage() {
           ) : (
             <RouteOptimizer 
               onRouteOptimized={handleRouteOptimized}
+              staff={filteredStaff}
+              staffStatus={staffStatusData}
             />
           )}
         </div>

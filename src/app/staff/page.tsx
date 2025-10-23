@@ -104,7 +104,7 @@ export default function StaffPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">スタッフ一覧</h1>
         <p className="text-muted-foreground">
-          スプレッドシートから取得したチームメンバーの一覧です。
+          チームメンバーの一覧です。チェックを入れたスタッフが他のページに表示されます。
         </p>
       </div>
       {error && (

@@ -6,13 +6,22 @@ import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
 import { customerData, staffData, scheduleData as initialScheduleData, unassignedOrdersData, staffStatusData } from '@/lib/data';
 import type { Customer, Order, ScheduleEvent, Staff, StaffStatus, WithId } from '@/lib/types';
+import { useSelectedStaff } from '@/contexts/selected-staff-context';
 
 export default function DashboardPage() {
-  const [staff] = React.useState<WithId<Staff>[]>(staffData);
   const [customers] = React.useState<WithId<Customer>[]>(customerData);
   const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>(initialScheduleData);
   const [orders, setOrders] = React.useState<WithId<Order>[]>(unassignedOrdersData);
   const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
+  const { selectedStaffIds } = useSelectedStaff();
+
+  const filteredStaff = React.useMemo(() => {
+    if (selectedStaffIds.length === 0) {
+      return staffData; // If no staff are selected, show all
+    }
+    return staffData.filter(staff => selectedStaffIds.includes(staff.id));
+  }, [selectedStaffIds]);
+
 
   return (
     <div className="space-y-8">
@@ -24,14 +33,14 @@ export default function DashboardPage() {
       </div>
       <div className="flex flex-col gap-8">
         <ScheduleView 
-            staffData={staff} 
+            staffData={filteredStaff} 
             customerData={customers} 
             scheduleData={scheduleData}
             ordersData={orders}
             setScheduleData={setScheduleData}
             setOrdersData={setOrders}
         />
-        <StatusUpdates staffData={staff} statuses={statuses} />
+        <StatusUpdates staffData={filteredStaff} statuses={statuses} />
       </div>
     </div>
   );

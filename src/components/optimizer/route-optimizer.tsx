@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import { customerData, staffData, staffStatusData } from '@/lib/data';
+import { customerData } from '@/lib/data';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -36,6 +36,8 @@ type Location = {
 
 interface RouteOptimizerProps {
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
+  staff: Staff[];
+  staffStatus: StaffStatus[];
 }
 
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
@@ -166,11 +168,9 @@ const LocationSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses }: RouteOptimizerProps) {
   const [customers] = React.useState<Customer[]>(customerData);
-  const [staff] = React.useState<Staff[]>(staffData);
-  const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
-
+  
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
   const [waypoints, setWaypoints] = React.useState<string[]>([]);
@@ -193,7 +193,7 @@ export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
       .map(c => ({
         id: c.id,
         name: c.storeName!,
-        address: c.address,
+        address: c.address as string,
         latitude: c.latitude!,
         longitude: c.longitude!,
         type: 'customer'
