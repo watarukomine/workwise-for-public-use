@@ -7,8 +7,36 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import type { Customer, Staff, StaffStatus } from '@/lib/types';
-import { customerData, staffStatusData } from '@/lib/data';
+import { customerData } from '@/lib/data';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
+
+// This function simulates fetching or generating dynamic status for staff
+const generateStaffStatus = (staff: Staff[]): StaffStatus[] => {
+  // In a real app, this might come from a database or a real-time service.
+  // For this demo, we'll assign some mock statuses based on staff ID.
+  const statuses: StaffStatus['status'][] = ['Idle', 'En Route', 'Working', 'On Site'];
+  const locations = [
+    { lat: 35.4658, lng: 139.622 }, // Yokohama Station area
+    { lat: 35.45,   lng: 139.635 }, // Near Minato Mirai
+    { lat: 35.48,   lng: 139.636 }, // Higashi-Kanagawa
+    { lat: 35.465,  lng: 139.622 }, // Another Yokohama spot
+  ];
+  const lastActions = [
+      'オフィスで待機中',
+      'ABCストアへ移動中',
+      'さくら商店で新商品の陳列中',
+      'ベイサイドカフェに到着'
+  ];
+
+  return staff.map((s, index) => ({
+    staffId: s.id,
+    status: statuses[index % statuses.length],
+    lastAction: lastActions[index % lastActions.length],
+    latitude: locations[index % locations.length].lat,
+    longitude: locations[index % locations.length].lng,
+    distanceFromSite: s.id === '2' ? '約15分' : undefined,
+  }));
+};
 
 export default function OptimizerPage() {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -17,29 +45,33 @@ export default function OptimizerPage() {
 
   const [customers] = React.useState<Customer[]>(customerData);
   const { appliedSelectedStaffIds, allStaff } = useSelectedStaff();
+  
+  const [staffStatuses, setStaffStatuses] = React.useState<StaffStatus[]>([]);
 
   const filteredStaff = React.useMemo(() => {
     if (appliedSelectedStaffIds.length === 0) {
-      return allStaff; // No selection, show all from context
+      return allStaff;
     }
     return allStaff.filter(s => appliedSelectedStaffIds.includes(s.id));
   }, [appliedSelectedStaffIds, allStaff]);
 
-  const filteredStaffStatus = React.useMemo(() => {
+  // Generate and filter statuses based on the currently selected staff
+  React.useEffect(() => {
+    const allGeneratedStatuses = generateStaffStatus(allStaff);
     if (appliedSelectedStaffIds.length === 0) {
-        return staffStatusData;
+      setStaffStatuses(allGeneratedStatuses);
+    } else {
+      const selectedIds = new Set(appliedSelectedStaffIds);
+      setStaffStatuses(allGeneratedStatuses.filter(status => selectedIds.has(status.staffId)));
     }
-    const selectedIds = new Set(appliedSelectedStaffIds);
-    return staffStatusData.filter(status => selectedIds.has(status.staffId));
-  }, [appliedSelectedStaffIds]);
-
-
+  }, [appliedSelectedStaffIds, allStaff]);
+  
   const staffWithStatus = React.useMemo(() => {
-    return filteredStaffStatus.map(status => {
-      const staffDetails = filteredStaff.find(s => s.id === status.staffId);
-      return staffDetails ? { ...staffDetails, ...status } as (Staff & StaffStatus) : null;
+    return filteredStaff.map(staffMember => {
+      const status = staffStatuses.find(s => s.staffId === staffMember.id);
+      return status ? { ...staffMember, ...status } : null;
     }).filter((s): s is (Staff & StaffStatus) => s !== null);
-  }, [filteredStaff, filteredStaffStatus]);
+  }, [filteredStaff, staffStatuses]);
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
     setOptimizedRoute(data);
@@ -64,7 +96,7 @@ export default function OptimizerPage() {
             <RouteOptimizer 
               onRouteOptimized={handleRouteOptimized}
               staff={filteredStaff}
-              staffStatus={filteredStaffStatus}
+              staffStatus={staffStatuses}
             />
           )}
         </div>
