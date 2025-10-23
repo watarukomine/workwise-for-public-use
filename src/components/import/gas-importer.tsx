@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, AlertCircle, Download } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // A simple type guard to check if the error is a fetch error
 function isFetchError(error: unknown): error is TypeError {
@@ -16,7 +17,8 @@ function isFetchError(error: unknown): error is TypeError {
 
 export function GasImporter() {
   const [gasUrl, setGasUrl] = React.useState('');
-  const [data, setData] = React.useState<any[] | null>(null);
+  const [rawData, setRawData] = React.useState<any>(null);
+  const [tableData, setTableData] = React.useState<any[] | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -28,24 +30,32 @@ export function GasImporter() {
 
     setIsLoading(true);
     setError(null);
-    setData(null);
+    setTableData(null);
+    setRawData(null);
 
     try {
-      // Using a CORS proxy for development if direct fetch fails.
-      // In a real scenario, the GAS script needs to be configured correctly.
-      const response = await fetch(gasUrl);
+      const response = await fetch(gasUrl, { cache: 'no-store' });
 
       if (!response.ok) {
         throw new Error(`HTTPエラー: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
+      setRawData(result);
       
-      if (Array.isArray(result) && result.length > 0) {
-        setData(result);
+      let dataToDisplay: any[] | null = null;
+
+      if (Array.isArray(result)) {
+        dataToDisplay = result;
+      } else if (result && typeof result === 'object' && Array.isArray(result.data)) {
+        dataToDisplay = result.data;
+      }
+
+      if (dataToDisplay && dataToDisplay.length > 0) {
+        setTableData(dataToDisplay);
       } else {
-        setData([]);
-        setError('データが空か、無効な形式です。GASはJSON配列を返す必要があります。');
+        setTableData([]);
+        // Don't set an error here if the data is just empty, the raw view is more important.
       }
     } catch (e: unknown) {
       console.error('GAS Fetch Error:', e);
@@ -65,7 +75,7 @@ export function GasImporter() {
     }
   };
   
-  const headers = data && data.length > 0 ? Object.keys(data[0]) : [];
+  const headers = tableData && tableData.length > 0 ? Object.keys(tableData[0]) : [];
 
   return (
     <div className="space-y-4">
@@ -105,12 +115,28 @@ export function GasImporter() {
         </Alert>
       )}
 
-      {data && (
+      {rawData && (
+        <Card>
+          <CardHeader>
+            <CardTitle>生データ（Raw Response）</CardTitle>
+            <CardDescription>GASから返された生のJSONデータです。この内容が空や意図しない形式の場合、GAS側に問題がある可能性があります。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-48 w-full rounded-md border bg-muted p-4">
+              <pre className="text-sm">
+                <code>{JSON.stringify(rawData, null, 2)}</code>
+              </pre>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
+
+      {tableData && (
          <Card>
            <CardHeader>
              <CardTitle>取得データプレビュー</CardTitle>
               <CardDescription>
-                {data.length > 0 ? `最初の${data.length}件のデータを表示しています。` : '表示するデータがありません。'}
+                {tableData.length > 0 ? `最初の${tableData.length}件のデータを表示しています。` : '表示するデータがありません。'}
               </CardDescription>
            </CardHeader>
            <CardContent>
@@ -124,12 +150,12 @@ export function GasImporter() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.length > 0 ? (
-                    data.map((row, rowIndex) => (
+                  {tableData.length > 0 ? (
+                    tableData.map((row, rowIndex) => (
                       <TableRow key={rowIndex}>
                         {headers.map((header) => (
                           <TableCell key={`${rowIndex}-${header}`}>
-                            {typeof row[header] === 'object' ? JSON.stringify(row[header]) : row[header]}
+                            {typeof row[header] === 'object' ? JSON.stringify(row[header]) : String(row[header])}
                           </TableCell>
                         ))}
                       </TableRow>
