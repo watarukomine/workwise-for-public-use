@@ -9,6 +9,7 @@ import { initializeFirebase } from '@/firebase';
 
 // This function should be called within a component or another client-side function.
 const getAuthInstance = (): Auth => {
+  // Directly initialize and get auth instance to ensure it's always available.
   const { auth } = initializeFirebase();
   return auth;
 };

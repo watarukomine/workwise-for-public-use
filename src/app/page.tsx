@@ -21,7 +21,7 @@ export default function DashboardPage() {
       toast({
         variant: "destructive",
         title: "ログインに失敗しました",
-        description: error.message || "匿名ログインに失敗しました。",
+        description: error.message || "匿名ログインに失敗しました。コンソールで詳細を確認してください。",
       });
     }
   };
