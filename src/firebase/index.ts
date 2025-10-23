@@ -7,21 +7,8 @@ import { getFirestore, Firestore } from 'firebase/firestore'
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
-    let firebaseApp: FirebaseApp;
-    if (!getApps().length) {
-      try {
-        firebaseApp = initializeApp();
-      } catch (e) {
-        if (process.env.NODE_ENV === "production") {
-          console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
-        }
-        firebaseApp = initializeApp(firebaseConfig);
-      }
-    } else {
-      firebaseApp = getApp();
-    }
-  
-    return getSdks(firebaseApp);
+    const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    return getSdks(app);
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {

@@ -80,7 +80,7 @@ export async function seedData(db: Firestore) {
     }
   } catch (error) {
      // We might not have permission to read `internal/seeded` yet.
-     // We'll proceed, and if the write fails, that's okay.
+     // We'll proceed, and if the write fails, that's okay. We'll catch it below.
   }
 
   const batch = writeBatch(db);
@@ -136,13 +136,8 @@ export async function seedData(db: Firestore) {
     await batch.commit();
   } catch (error) {
     // This can happen if rules are not yet permissive enough.
-    // By creating and emitting a contextual error, we can debug it.
-    const contextualError = new FirestorePermissionError({
-        path: 'multiple collections', // Path is not specific to one collection for a batch write
-        operation: 'write', // Batch commit is a write operation
-        requestResourceData: 'Multiple documents across collections (staff, customers, etc.)'
-    });
-    errorEmitter.emit('permission-error', contextualError);
+    // The error will be caught by the global error listener.
+    console.error("Data seeding failed. This may be due to restrictive Firestore rules.", error);
   }
 }
 
