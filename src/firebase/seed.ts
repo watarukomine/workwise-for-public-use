@@ -71,66 +71,63 @@ const eventsSeed: any[] = [
 ];
 
 export async function seedData(db: Firestore) {
-  console.log("Attempting to seed data to Firestore by writing...");
-  
-  const batch = writeBatch(db);
-
-  const getAvatarUrl = (avatarId: string) => {
-    return PlaceHolderImages.find(img => img.id === avatarId)?.imageUrl || '';
-  };
-
-  // Seed staff
-  const staffCollectionRef = collection(db, 'staff');
-  staffDataSeed.forEach(staffMember => {
-    const docRef = doc(staffCollectionRef, staffMember.id);
-    const avatarUrl = getAvatarUrl(staffMember.avatarId);
-    batch.set(docRef, { ...staffMember, avatarUrl });
-  });
-
-  // Seed customers
-  const customersCollectionRef = collection(db, 'customers');
-  customerDataSeed.forEach(customer => {
-    const docRef = doc(customersCollectionRef, customer.id);
-    batch.set(docRef, customer);
-  });
-
-  // Seed orders
-  const ordersCollectionRef = collection(db, 'orders');
-  ordersDataSeed.forEach(order => {
-      const docRef = doc(ordersCollectionRef, order.id);
-      batch.set(docRef, order);
-  });
-
-  // Seed staff status
-  const staffStatusCollectionRef = collection(db, 'staffStatus');
-  staffStatusSeed.forEach(status => {
-      const docRef = doc(staffStatusCollectionRef, status.staffId);
-      batch.set(docRef, status);
-  });
-
-  // Seed events (if any)
-  const eventsCollectionRef = collection(db, 'events');
-  eventsSeed.forEach((event: any) => {
-      const docRef = doc(eventsCollectionRef, event.id);
-      batch.set(docRef, {
-        ...event,
-        start: new Date(event.start),
-        end: new Date(event.end)
-      });
-  });
-  
-  // Also set a flag to indicate data has been seeded.
-  // The security rules should prevent this from being overwritten by non-admins.
-  const seededFlagRef = doc(db, 'internal', 'seeded');
-  batch.set(seededFlagRef, { seeded: true, timestamp: serverTimestamp() });
+  console.log("Attempting to seed data to Firestore...");
 
   try {
+    const batch = writeBatch(db);
+
+    const getAvatarUrl = (avatarId: string) => {
+      return PlaceHolderImages.find(img => img.id === avatarId)?.imageUrl || '';
+    };
+
+    // Seed staff
+    const staffCollectionRef = collection(db, 'staff');
+    staffDataSeed.forEach(staffMember => {
+      const docRef = doc(staffCollectionRef, staffMember.id);
+      const avatarUrl = getAvatarUrl(staffMember.avatarId);
+      batch.set(docRef, { ...staffMember, avatarUrl });
+    });
+
+    // Seed customers
+    const customersCollectionRef = collection(db, 'customers');
+    customerDataSeed.forEach(customer => {
+      const docRef = doc(customersCollectionRef, customer.id);
+      batch.set(docRef, customer);
+    });
+
+    // Seed orders
+    const ordersCollectionRef = collection(db, 'orders');
+    ordersDataSeed.forEach(order => {
+        const docRef = doc(ordersCollectionRef, order.id);
+        batch.set(docRef, order);
+    });
+
+    // Seed staff status
+    const staffStatusCollectionRef = collection(db, 'staffStatus');
+    staffStatusSeed.forEach(status => {
+        const docRef = doc(staffStatusCollectionRef, status.staffId);
+        batch.set(docRef, status);
+    });
+
+    // Seed events (if any)
+    const eventsCollectionRef = collection(db, 'events');
+    eventsSeed.forEach((event: any) => {
+        const docRef = doc(eventsCollectionRef, event.id);
+        batch.set(docRef, {
+          ...event,
+          start: new Date(event.start),
+          end: new Date(event.end)
+        });
+    });
+    
+    const seededFlagRef = doc(db, 'internal', 'seeded');
+    batch.set(seededFlagRef, { seeded: true, timestamp: serverTimestamp() });
+
     await batch.commit();
     console.log("Data seeding successful.");
   } catch (error) {
-    // If the error is 'permission-denied', it's likely because the seededFlagRef already exists
-    // and rules prevent modification, which implies data is already seeded.
-    // We can safely ignore this specific error.
+    // If permission is denied, it's likely because the data (and the flag) already exists.
+    // This is an expected outcome on subsequent runs, so we can ignore it.
     if ((error as FirestoreError).code === 'permission-denied') {
         console.log("Data likely already seeded. Skipping write.");
     } else {
