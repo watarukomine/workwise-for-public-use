@@ -16,27 +16,53 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
+import type { Customer } from '@/lib/types';
 
 interface CustomerTableProps {
-  customers: any[]; // Use any[] to be flexible with GAS data
+  customers: any[]; // Use any[] to be flexible with raw GAS data
   isLoading: boolean;
 }
 
-export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
+// Function to map raw data from GAS to the Customer type
+const mapRawDataToCustomers = (rawData: any[]): Customer[] => {
+  if (!Array.isArray(rawData)) {
+    return [];
+  }
+  return rawData.map(item => ({
+    id: item['ユーザーコード'] || item['id'] || String(item['No'] || Math.random()),
+    No: item['No'],
+    userCode: item['ユーザーコード'],
+    '旧 チャネル SEQ': item['旧 チャネル SEQ'],
+    storeName: item['店舗'],
+    '管理C': item['管理C'],
+    '機材有無': item['機材有無'],
+    address: item['住所'],
+    latitude: Number(item['緯度']),
+    longitude: Number(item['経度']),
+    '電話番号': item['電話番号'],
+    '営業時間': item['営業時間'],
+    // Keep original keys for compatibility if needed elsewhere
+    ...item
+  }));
+};
+
+
+export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
 
-  const validCustomers = Array.isArray(customers) ? customers : [];
+  // Map the raw data to structured Customer data
+  const mappedCustomers = React.useMemo(() => mapRawDataToCustomers(rawCustomers), [rawCustomers]);
 
   const filteredCustomers = React.useMemo(() => {
     if (searchTerm.trim() === '') {
-      return validCustomers;
+      return mappedCustomers;
     }
-    return validCustomers.filter(customer =>
-      customer && customer['ユーザーコード'] && String(customer['ユーザーコード']).toLowerCase().includes(searchTerm.toLowerCase())
+    return mappedCustomers.filter(customer =>
+      customer.userCode && String(customer.userCode).toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [validCustomers, searchTerm]);
+  }, [mappedCustomers, searchTerm]);
 
   const paginatedCustomers = React.useMemo(() => {
     return filteredCustomers.slice(
@@ -48,8 +74,17 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
 
   const headers = [
-    'No', 'ユーザーコード', '旧 チャネル SEQ', '店舗', '管理C', '機材有無', 
-    '住所', '緯度', '経度', '電話番号', '営業時間'
+    { key: 'No', label: 'No' },
+    { key: 'userCode', label: 'ユーザーコード' },
+    { key: '旧 チャネル SEQ', label: '旧 チャネル SEQ' },
+    { key: 'storeName', label: '店舗' },
+    { key: '管理C', label: '管理C' },
+    { key: '機材有無', label: '機材有無' },
+    { key: 'address', label: '住所' },
+    { key: 'latitude', label: '緯度' },
+    { key: 'longitude', label: '経度' },
+    { key: '電話番号', label: '電話番号' },
+    { key: '営業時間', label: '営業時間' }
   ];
 
   return (
@@ -70,7 +105,7 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                {headers.map(header => <TableHead key={header}>{header}</TableHead>)}
+                {headers.map(header => <TableHead key={header.key}>{header.label}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -82,10 +117,10 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
                 </TableRow>
               ) : paginatedCustomers.length > 0 ? (
                 paginatedCustomers.map((customer, index) => (
-                  <TableRow key={customer['ユーザーコード'] || index}>
+                  <TableRow key={customer.id || index}>
                     {headers.map(header => (
-                      <TableCell key={header}>
-                        {customer[header] !== undefined && customer[header] !== null ? String(customer[header]) : ''}
+                      <TableCell key={header.key}>
+                        {customer[header.key as keyof Customer] !== undefined && customer[header.key as keyof Customer] !== null ? String(customer[header.key as keyof Customer]) : ''}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -93,7 +128,7 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
               ) : (
                 <TableRow>
                   <TableCell colSpan={headers.length} className="h-24 text-center">
-                    {validCustomers.length === 0 && !searchTerm ? "販売店情報が見つかりません。" : "検索条件に合う販売店が見つかりません。"}
+                    {mappedCustomers.length === 0 && !searchTerm ? "販売店情報が見つかりません。" : "検索条件に合う販売店が見つかりません。"}
                   </TableCell>
                 </TableRow>
               )}
