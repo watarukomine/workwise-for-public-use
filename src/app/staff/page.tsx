@@ -9,6 +9,27 @@ import { AlertCircle } from 'lucide-react';
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbywC5IoTryeIFRyo7rU4hBaTb7u9p4aK1p0UBvYeuzJiyVDaHqfjYeyA61seoH9LpeQYw/exec?sheet=スタッフマスタ';
 
+// A simple hash function to generate a number from a string
+const stringToHash = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return hash;
+};
+
+// Function to generate a pleasant HSL color from a string
+const generateHslColorFromString = (str: string) => {
+  const hash = stringToHash(str);
+  const h = (hash % 360 + 360) % 360; // Hue (0-359)
+  const s = 70 + (hash % 10); // Saturation (70-80%)
+  const l = 50 + (hash % 10); // Lightness (50-60%)
+  return `hsl(${h}, ${s}%, ${l}%)`;
+};
+
+
 export default function StaffPage() {
   const [staff, setStaff] = React.useState<Staff[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -33,13 +54,19 @@ export default function StaffPage() {
         }
 
         if (staffData !== null) {
-          const formattedStaff = staffData.map((member, index) => ({
-            id: member['スタッフID'] || String(index + 1),
-            name: member['スタッフ名'] || '',
-            calendarId: member['カレンダーID'] || '',
-            color: member['カラー'] || 'hsl(210 14% 88%)',
-            avatarUrl: member.avatarUrl || `https://picsum.photos/seed/${member['スタッフID'] || index}/100/100`
-          }));
+          const formattedStaff = staffData.map((member, index) => {
+            const staffId = member['スタッフID'] || String(index + 1);
+            // Assign a color automatically if it's not provided in the sheet
+            const color = member['カラー'] || generateHslColorFromString(staffId);
+            
+            return {
+              id: staffId,
+              name: member['スタッフ名'] || '',
+              calendarId: member['カレンダーID'] || '',
+              color: color,
+              avatarUrl: member.avatarUrl || `https://picsum.photos/seed/${staffId}/100/100`
+            };
+          });
           setStaff(formattedStaff);
         } else {
           if (result && typeof result === 'object') {
