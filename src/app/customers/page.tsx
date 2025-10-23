@@ -38,16 +38,12 @@ export default function CustomersPage() {
         if (customerData !== null) {
           setCustomers(customerData);
         } else {
-          // If the format is still unexpected, pass the raw result if it's an array-like object,
-          // otherwise set to empty array and log an error.
-          if (result && typeof result === 'object') {
-            // Check for common spreadsheet-to-json conversion formats
-             setCustomers(Array.isArray(result) ? result : []);
-          } else {
-             setCustomers([]);
-          }
-           console.log('GAS response received, but in an unexpected format:', result);
-           setError('GASから受信したデータの形式が予期せぬものです。開発者コンソールで内容を確認してください。');
+          // If the format is still unexpected, log an error message but try to render anyway if it's an object.
+          // This prevents the app from crashing and allows for inspection.
+          console.error('GAS response received, but in an unexpected format:', result);
+          setError('GASから受信したデータの形式が予期せぬものです。開発者コンソールで内容を確認してください。');
+          // Try to set the data anyway if it's an array-like structure, otherwise an empty array.
+          setCustomers(result && typeof result === 'object' ? Object.values(result).find(Array.isArray) || [] : []);
         }
 
       } catch (e: unknown) {
