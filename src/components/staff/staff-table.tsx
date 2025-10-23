@@ -1,6 +1,6 @@
 
 'use client';
-import type { Staff } from '@/lib/types';
+import type { Staff, WithId } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -48,7 +48,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
                           <AvatarImage src={member.avatarUrl} alt={member.name} data-ai-hint="person" />
-                          <AvatarFallback>{member.name.slice(0, 2)}</AvatarFallback>
+                          <AvatarFallback>{member.name?.slice(0, 2)}</AvatarFallback>
                         </Avatar>
                         <span className="font-medium">{member.name}</span>
                       </div>
