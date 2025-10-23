@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import { customerData } from '@/lib/data';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -38,6 +37,7 @@ interface RouteOptimizerProps {
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
   staff: Staff[];
   staffStatus: StaffStatus[];
+  customers: Customer[];
 }
 
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
@@ -144,22 +144,26 @@ const LocationSelector: React.FC<{
           <CommandInput placeholder="ロケーションを検索..." />
           <CommandList>
             <CommandEmpty>該当するロケーションが見つかりません。</CommandEmpty>
-            <CommandGroup heading="スタッフ">
-              {staffLocations.map(location => (
-                <CommandItem key={location.id} value={location.name} onSelect={() => { onSelect(location.id); setOpen(false); }}>
-                  <Check className={cn("mr-2 h-4 w-4", selectedValue === location.id ? "opacity-100" : "opacity-0")} />
-                  {location.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-            <CommandGroup heading="販売店">
-              {customerLocations.map(location => (
-                <CommandItem key={location.id} value={location.name} onSelect={() => { onSelect(location.id); setOpen(false); }}>
-                  <Check className={cn("mr-2 h-4 w-4", selectedValue === location.id ? "opacity-100" : "opacity-0")} />
-                  {location.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
+            {staffLocations.length > 0 && (
+              <CommandGroup heading="スタッフ">
+                {staffLocations.map(location => (
+                  <CommandItem key={location.id} value={location.name} onSelect={() => { onSelect(location.id); setOpen(false); }}>
+                    <Check className={cn("mr-2 h-4 w-4", selectedValue === location.id ? "opacity-100" : "opacity-0")} />
+                    {location.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+            {customerLocations.length > 0 && (
+              <CommandGroup heading="販売店">
+                {customerLocations.map(location => (
+                  <CommandItem key={location.id} value={location.name} onSelect={() => { onSelect(location.id); setOpen(false); }}>
+                    <Check className={cn("mr-2 h-4 w-4", selectedValue === location.id ? "opacity-100" : "opacity-0")} />
+                    {location.name}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
@@ -168,8 +172,7 @@ const LocationSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses }: RouteOptimizerProps) {
-  const [customers] = React.useState<Customer[]>(customerData);
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses, customers }: RouteOptimizerProps) {
   
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
@@ -189,10 +192,10 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses 
     }).filter(s => s.id);
 
     const customerLocations: Location[] = customers
-      .filter(c => c.latitude && c.longitude && c.storeName)
+      .filter(c => c.latitude && c.longitude && (c.storeName || c.name))
       .map(c => ({
         id: c.id,
-        name: c.storeName!,
+        name: c.storeName || c.name!,
         address: c.address as string,
         latitude: c.latitude!,
         longitude: c.longitude!,
@@ -389,3 +392,5 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses 
     </div>
   );
 }
+
+    
