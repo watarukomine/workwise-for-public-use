@@ -1,3 +1,4 @@
+
 'use client';
 
 import { StaffTable } from "@/components/staff/staff-table";
@@ -55,7 +56,6 @@ export default function StaffPage() {
         if (staffData !== null) {
           const formattedStaff = staffData.map((member, index) => {
             const staffId = member['スタッフID'] || String(index + 1);
-            // Assign a color automatically if it's not provided in the sheet
             const color = member['カラー'] || generateHslColorFromString(staffId);
             
             return {

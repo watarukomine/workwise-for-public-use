@@ -39,7 +39,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
               {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
-                      Loading staff...
+                      スタッフ情報を読み込んでいます...
                     </TableCell>
                   </TableRow>
               ) : staff && staff.length > 0 ? (
@@ -67,7 +67,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
               ) : (
                 <TableRow>
                     <TableCell colSpan={4} className="h-24 text-center">
-                      No staff members found.
+                      スタッフが見つかりません。
                     </TableCell>
                 </TableRow>
               )}
