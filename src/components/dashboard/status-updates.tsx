@@ -1,7 +1,8 @@
 
 'use client';
-import { staffData, staffStatusData } from '@/lib/data';
-import type { StaffStatus, Staff } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import type { StaffStatus, Staff, WithId } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -32,13 +33,18 @@ const statusJapanese: Record<StaffStatus['status'], string> = {
 }
 
 export function StatusUpdates() {
-  const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
+  const firestore = useFirestore();
+  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  const statusCollection = useMemoFirebase(() => collection(firestore, 'staffStatus'), [firestore]);
   
-  const getStaff = (id: string): Staff | undefined => {
-    return staffData.find(s => s.id === id);
+  const { data: staffData } = useCollection<Staff>(staffCollection);
+  const { data: statuses } = useCollection<StaffStatus>(statusCollection);
+  
+  const getStaff = (id: string): WithId<Staff> | undefined => {
+    return staffData?.find(s => s.id === id);
   };
   
-  const isLoading = !statuses;
+  const isLoading = !statuses || !staffData;
 
   return (
     <Card>

@@ -1,7 +1,10 @@
+
 'use client';
 
-import { Firestore, collection, doc, writeBatch } from 'firebase/firestore';
+import { Firestore, collection, doc, writeBatch, getDoc } from 'firebase/firestore';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { useEffect } from 'react';
+import { useFirestore } from './provider';
 
 const staffDataSeed = [
   {
@@ -61,20 +64,18 @@ const staffStatusSeed = [
     { staffId: '4', status: 'Idle', lastAction: 'オフィスで待機中', latitude: 35.4658, longitude: 139.622 },
 ];
 
-const eventsSeed = [
+const eventsSeed: any[] = [
   // Initially empty, will be populated via drag and drop
 ];
 
 export async function seedData(db: Firestore) {
   const seededFlagRef = doc(db, 'internal', 'seeded');
   
-  // For the purpose of this example, we always re-seed the data on startup.
-  // In a real app, you would check if the data has already been seeded.
-  // const docSnap = await getDoc(seededFlagRef);
-  // if (docSnap.exists()) {
-  //   console.log("Data has already been seeded.");
-  //   return;
-  // }
+  const docSnap = await getDoc(seededFlagRef);
+  if (docSnap.exists()) {
+    console.log("Data has already been seeded.");
+    return;
+  }
 
   console.log("Seeding data...");
 
@@ -126,7 +127,7 @@ export async function seedData(db: Firestore) {
   });
 
   // Set the flag to indicate data has been seeded
-  // batch.set(seededFlagRef, { seeded: true, timestamp: new Date() });
+  batch.set(seededFlagRef, { seeded: true, timestamp: new Date() });
 
   try {
     await batch.commit();
@@ -134,4 +135,16 @@ export async function seedData(db: Firestore) {
   } catch (error) {
     console.error("Error seeding data: ", error);
   }
+}
+
+export function DataSeeder() {
+  const firestore = useFirestore();
+
+  useEffect(() => {
+    if (firestore) {
+      seedData(firestore);
+    }
+  }, [firestore]);
+
+  return null; // This component does not render anything
 }

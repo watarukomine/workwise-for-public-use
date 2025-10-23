@@ -12,8 +12,7 @@ import {
   type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { staffData, customerData, scheduleData, unassignedOrdersData } from '@/lib/data';
-import type { ScheduleEvent, Staff, Customer, Order } from '@/lib/types';
+import type { ScheduleEvent, Staff, Customer, Order, WithId } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -28,7 +27,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { addMinutes, differenceInMinutes, format, parse, parseISO, subMinutes } from 'date-fns';
+import { addMinutes, differenceInMinutes, format, parse, parseISO, subMinutes, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -43,6 +42,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useCollection, useFirestore, useMemoFirebase, setDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, doc, serverTimestamp, Timestamp } from 'firebase/firestore';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 8;
@@ -51,7 +52,17 @@ const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 
 // --- Helper Functions ---
-const formatTime = (date: Date | string) => {
+const timeStringToDate = (timeStr: string) => {
+    const today = new Date();
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    today.setHours(hours, minutes, 0, 0);
+    return today;
+};
+
+const formatTime = (date: Date | string | Timestamp) => {
+  if (date instanceof Timestamp) {
+    date = date.toDate();
+  }
   const d = typeof date === 'string' ? parseISO(date) : date;
   return format(d, 'HH:mm');
 };
@@ -60,9 +71,9 @@ const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
 
 const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
 
-const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
-  const start = eventStart instanceof Date ? eventStart : parseISO(eventStart);
-  const end = eventEnd instanceof Date ? eventEnd : parseISO(eventEnd);
+const getEventDimensions = (eventStart: Date | string | Timestamp, eventEnd: Date | string | Timestamp) => {
+  const start = eventStart instanceof Timestamp ? eventStart.toDate() : (typeof eventStart === 'string' ? parseISO(eventStart) : eventStart);
+  const end = eventEnd instanceof Timestamp ? eventEnd.toDate() : (typeof eventEnd === 'string' ? parseISO(eventEnd) : eventEnd);
   
   const startOfDay = new Date(start);
   startOfDay.setHours(timelineStartHour, 0, 0, 0);
@@ -79,15 +90,15 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 // --- Draggable Task Components ---
 
 interface DraggableOrderProps {
-  order: Order;
-  customer?: Customer;
+  order: WithId<Order>;
+  customer?: WithId<Customer>;
   className?: string;
 }
 
 const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
-      id: order.id,
+      id: `order-${order.id}`,
       data: order,
     });
 
@@ -121,7 +132,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
 
 type DialogState = 
   | { mode: 'closed' }
-  | { mode: 'edit'; event: ScheduleEvent }
+  | { mode: 'edit'; event: WithId<ScheduleEvent> }
   | { mode: 'new'; staffId: string; start: Date };
 
 type EditedEventDetails = {
@@ -134,9 +145,18 @@ type EditedEventDetails = {
 
 export function ScheduleView() {
   const [isClient, setIsClient] = React.useState(false);
-  const [internalScheduleData, setInternalScheduleData] = React.useState<ScheduleEvent[]>(scheduleData);
-  const [internalUnassignedOrders, setInternalUnassignedOrders] = React.useState<Order[]>(unassignedOrdersData);
   
+  const firestore = useFirestore();
+  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  const customersCollection = useMemoFirebase(() => collection(firestore, 'customers'), [firestore]);
+  const scheduleCollection = useMemoFirebase(() => collection(firestore, 'events'), [firestore]);
+  const ordersCollection = useMemoFirebase(() => collection(firestore, 'orders'), [firestore]);
+
+  const { data: staffData } = useCollection<Staff>(staffCollection);
+  const { data: customerData } = useCollection<Customer>(customersCollection);
+  const { data: scheduleData } = useCollection<ScheduleEvent>(scheduleCollection);
+  const { data: ordersData } = useCollection<Order>(ordersCollection);
+
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({
@@ -145,7 +165,7 @@ export function ScheduleView() {
     endTime: '',
   });
 
-  const genericTasks: Order[] = [
+  const genericTasks: (Order & {id: string})[] = [
       { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30 },
       { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60 },
       { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60 },
@@ -155,14 +175,23 @@ export function ScheduleView() {
     setIsClient(true);
   }, []);
   
-  const getCustomerByCode = (code: string | undefined): Customer | undefined => customerData.find(c => c.userCode === code);
-  const getCustomerById = (id: string | undefined): Customer | undefined => customerData.find(c => c.id === id);
+  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customerData?.find(c => c.userCode === code);
+  const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => customerData?.find(c => c.id === id);
+  const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
-  const [activeItem, setActiveItem] = React.useState<ScheduleEvent | Order | null>(null);
+
+  const unassignedOrders = React.useMemo(() => {
+    if (!ordersData || !scheduleData) return [];
+    const assignedOrderIds = new Set(scheduleData.map(e => e.orderId).filter(Boolean));
+    return ordersData.filter(order => !assignedOrderIds.has(order.id));
+  }, [ordersData, scheduleData]);
+
+
+  const [activeItem, setActiveItem] = React.useState<WithId<ScheduleEvent> | WithId<Order> | null>(null);
   const [currentOverStaffId, setCurrentOverStaffId] = React.useState<UniqueIdentifier | null>(null);
 
   const handleDragStart = (event: DragStartEvent) => {
-    const item = event.active.data.current as ScheduleEvent | Order;
+    const item = event.active.data.current as WithId<ScheduleEvent> | WithId<Order>;
     setActiveItem(item);
   };
 
@@ -173,7 +202,7 @@ export function ScheduleView() {
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, delta, over } = event;
-    const item = active.data.current as ScheduleEvent | Order;
+    const item = active.data.current as WithId<ScheduleEvent> | WithId<Order>;
     
     if (!item) return;
     
@@ -184,22 +213,22 @@ export function ScheduleView() {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
       
-      const originalStart = eventToUpdate.start instanceof Date ? eventToUpdate.start : parseISO(eventToUpdate.start);
-      const originalEnd = eventToUpdate.end instanceof Date ? eventToUpdate.end : parseISO(eventToUpdate.end);
+      const originalStart = eventToUpdate.start instanceof Timestamp ? eventToUpdate.start.toDate() : parseISO(eventToUpdate.start as string);
+      const originalEnd = eventToUpdate.end instanceof Timestamp ? eventToUpdate.end.toDate() : parseISO(eventToUpdate.end as string);
 
       const newStart = addMinutes(originalStart, dragMinutes);
       const newEnd = addMinutes(originalEnd, dragMinutes);
       
       const finalStaffId = newStaffId || eventToUpdate.staffId;
 
-      const updatedEvent: ScheduleEvent = {
-        ...eventToUpdate,
+      const updatedEventData = {
         staffId: finalStaffId,
         start: newStart,
         end: newEnd,
       };
 
-      setInternalScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+      const eventRef = doc(firestore, 'events', eventToUpdate.id);
+      setDocumentNonBlocking(eventRef, updatedEventData, { merge: true });
     }
     // --- Logic for adding new orders as events ---
     else if ('estimatedDuration' in item && newStaffId && over?.rect) {
@@ -218,15 +247,14 @@ export function ScheduleView() {
         if (isGeneric) {
              const newStart = addMinutes(startOfDay, dropMinutes);
              const newEnd = addMinutes(newStart, order.estimatedDuration);
-             const newEvent: ScheduleEvent = {
-                id: `event-${Date.now()}`,
+             const newEvent: Omit<ScheduleEvent, 'id'> = {
                 title: order.taskDetails,
                 staffId: newStaffId,
                 locationId: '',
                 start: newStart,
                 end: newEnd,
              };
-             setInternalScheduleData(prev => [...prev, newEvent]);
+             addDocumentNonBlocking(collection(firestore, 'events'), newEvent);
         } else {
             // This is a customer order, so add travel time
             const taskStart = addMinutes(startOfDay, dropMinutes);
@@ -235,8 +263,7 @@ export function ScheduleView() {
             const customer = getCustomerByCode(order.customerCode);
             const tripId = `trip-${Date.now()}`;
 
-            const travelEvent: ScheduleEvent = {
-                id: `event-${Date.now()}-travel`,
+            const travelEvent: Omit<ScheduleEvent, 'id'> = {
                 tripId: tripId,
                 title: `移動: ${customer?.storeName || order.customerCode}`,
                 staffId: newStaffId,
@@ -245,8 +272,7 @@ export function ScheduleView() {
                 end: taskStart,
             };
 
-            const taskEvent: ScheduleEvent = {
-                id: `event-${Date.now()}-task`,
+            const taskEvent: Omit<ScheduleEvent, 'id'> = {
                 tripId: tripId,
                 orderId: order.id,
                 title: order.taskDetails,
@@ -256,8 +282,8 @@ export function ScheduleView() {
                 end: taskEnd,
             };
 
-            setInternalScheduleData(prev => [...prev, travelEvent, taskEvent]);
-            setInternalUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
+            addDocumentNonBlocking(collection(firestore, 'events'), travelEvent);
+            addDocumentNonBlocking(collection(firestore, 'events'), taskEvent);
         }
     }
 
@@ -265,7 +291,7 @@ export function ScheduleView() {
     setCurrentOverStaffId(null);
   };
 
-  const handleDoubleClickEvent = (event: ScheduleEvent) => {
+  const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
     setEditedEventDetails({
         title: event.title || '',
         startTime: formatTime(event.start),
@@ -290,30 +316,24 @@ export function ScheduleView() {
   
   const handleSaveEvent = () => {
     if (dialogState.mode === 'closed') return;
-    
-    const today = new Date();
-    const parseTime = (timeStr: string) => {
-        return parse(timeStr, 'HH:mm', today);
-    };
 
     if (dialogState.mode === 'new') {
-        const newEvent: ScheduleEvent = {
-            id: `event-${Date.now()}`,
+        const newEvent: Omit<ScheduleEvent, 'id'> = {
             title: editedEventDetails.title,
             staffId: dialogState.staffId,
             locationId: '',
-            start: parseTime(editedEventDetails.startTime),
-            end: parseTime(editedEventDetails.endTime),
+            start: timeStringToDate(editedEventDetails.startTime),
+            end: timeStringToDate(editedEventDetails.endTime),
         };
-        setInternalScheduleData(prev => [...prev, newEvent]);
+        addDocumentNonBlocking(collection(firestore, 'events'), newEvent);
     } else if (dialogState.mode === 'edit') {
-        const updatedEvent: ScheduleEvent = {
-            ...dialogState.event,
+        const updatedEventData = {
             title: editedEventDetails.title,
-            start: parseTime(editedEventDetails.startTime),
-            end: parseTime(editedEventDetails.endTime),
+            start: timeStringToDate(editedEventDetails.startTime),
+            end: timeStringToDate(editedEventDetails.endTime),
         };
-        setInternalScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+        const eventRef = doc(firestore, 'events', dialogState.event.id);
+        setDocumentNonBlocking(eventRef, updatedEventData, { merge: true });
     }
     setDialogState({ mode: 'closed' });
   };
@@ -323,35 +343,31 @@ export function ScheduleView() {
     if (dialogState.mode !== 'edit') return;
     const eventToDelete = dialogState.event;
 
-    // If the event is part of a trip, delete both travel and task
     if (eventToDelete.tripId) {
-        setInternalScheduleData(prev => prev.filter(e => e.tripId !== eventToDelete.tripId));
+        scheduleData?.forEach(e => {
+            if (e.tripId === eventToDelete.tripId) {
+                deleteDocumentNonBlocking(doc(firestore, 'events', e.id));
+            }
+        });
     } else {
-        setInternalScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id));
+        deleteDocumentNonBlocking(doc(firestore, 'events', eventToDelete.id));
     }
 
-    // If the deleted event was from an order, add it back to unassigned orders
-    if (eventToDelete.orderId) {
-        const originalOrder = unassignedOrdersData.find(o => o.id === eventToDelete.orderId);
-        if (originalOrder && !internalUnassignedOrders.find(o => o.id === originalOrder.id)) {
-            setInternalUnassignedOrders(prev => [...prev, originalOrder]);
-        }
-    }
     setDialogState({ mode: 'closed' });
   };
   
   const getDialogDetails = () => {
     if (dialogState.mode === 'edit') {
       const { event } = dialogState;
-      const staff = staffData.find(s => s.id === event.staffId);
+      const staff = getStaffById(event.staffId);
       const customer = getCustomerById(event.locationId);
       return { event, staff, customer, title: '予定の編集' };
     }
     if (dialogState.mode === 'new') {
-      const staff = staffData.find(s => s.id === dialogState.staffId);
+      const staff = getStaffById(dialogState.staffId);
       return { staff, start: dialogState.start, title: '新規予定の作成' };
     }
-    return { title: '' };
+    return { event: undefined, staff: undefined, customer: undefined, start: undefined, title: '' };
   };
 
   const { event, staff, customer, start, title } = getDialogDetails();
@@ -363,6 +379,13 @@ export function ScheduleView() {
     return 'bg-primary text-primary-foreground';
   };
 
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleData) return [];
+      return scheduleData.filter(event => {
+          const eventDate = event.start instanceof Timestamp ? event.start.toDate() : parseISO(event.start as string);
+          return isToday(eventDate);
+      });
+  }, [scheduleData]);
 
   const content = (
     <>
@@ -378,18 +401,18 @@ export function ScheduleView() {
                     {genericTasks.map((task) => (
                        <DraggableOrder
                           key={task.id}
-                          order={task}
+                          order={task as WithId<Order>}
                           className={getDraggableClassName(task)}
                         />
                     ))}
-                    {internalUnassignedOrders.map((order) => (
+                    {unassignedOrders.map((order) => (
                       <DraggableOrder
                         key={order.id}
                         order={order}
                         customer={getCustomerByCode(order.customerCode)}
                       />
                     ))}
-                    {internalUnassignedOrders.length === 0 && genericTasks.length === 0 && (
+                    {unassignedOrders.length === 0 && genericTasks.length === 0 && (
                       <div className="flex items-center justify-center h-24 text-center text-muted-foreground">
                           <p>利用可能なタスクはありません。</p>
                       </div>
@@ -413,11 +436,11 @@ export function ScheduleView() {
 
           <div className="space-y-2">
             <TooltipProvider>
-              {staffData.map((staff) => (
+              {staffData?.map((staff) => (
                 <StaffRow
                   key={staff.id}
                   staff={staff}
-                  events={internalScheduleData.filter(e => e.staffId === staff.id)}
+                  events={dailySchedule.filter(e => e.staffId === staff.id)}
                   getCustomer={getCustomerById}
                   isOver={currentOverStaffId === staff.id}
                   onDoubleClickEvent={handleDoubleClickEvent}
@@ -528,11 +551,11 @@ export function ScheduleView() {
 // --- Sub-components ---
 
 interface StaffRowProps {
-  staff: Staff;
-  events: ScheduleEvent[];
-  getCustomer: (id: string | undefined) => Customer | undefined;
+  staff: WithId<Staff>;
+  events: WithId<ScheduleEvent>[];
+  getCustomer: (id: string | undefined) => WithId<Customer> | undefined;
   isOver: boolean;
-  onDoubleClickEvent: (event: ScheduleEvent) => void;
+  onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
 }
 
@@ -576,9 +599,9 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
 };
 
 interface DraggableEventProps {
-  event: ScheduleEvent;
-  staff: Staff;
-  getCustomer: (id: string | undefined) => Customer | undefined;
+  event: WithId<ScheduleEvent>;
+  staff: WithId<Staff>;
+  getCustomer: (id: string | undefined) => WithId<Customer> | undefined;
   onDoubleClick: () => void;
 }
 

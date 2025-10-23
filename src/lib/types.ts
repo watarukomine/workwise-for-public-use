@@ -1,4 +1,7 @@
 
+import type { Timestamp } from 'firebase/firestore';
+
+export type WithId<T> = T & { id: string };
 
 export type Staff = {
   id: string;
@@ -28,8 +31,8 @@ export type ScheduleEvent = {
   title?: string;
   locationId: string;
   staffId: string;
-  start: Date | string;
-  end: Date | string;
+  start: Date | string | Timestamp;
+  end: Date | string | Timestamp;
 };
 
 export type StaffStatus = {

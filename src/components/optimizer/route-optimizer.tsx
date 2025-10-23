@@ -2,9 +2,10 @@
 'use client';
 import * as React from 'react';
 import { useActionState } from 'react';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 import type { Customer, Staff, StaffStatus } from '@/lib/types';
-import { customerData, staffData, staffStatusData } from '@/lib/data';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -167,8 +168,14 @@ const LocationSelector: React.FC<{
 
 
 export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
-  const [customers] = React.useState<Customer[]>(customerData);
-  const [staff] = React.useState<Staff[]>(staffData);
+  const firestore = useFirestore();
+  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
+  const customersCollection = useMemoFirebase(() => collection(firestore, 'customers'), [firestore]);
+  const staffStatusCollection = useMemoFirebase(() => collection(firestore, 'staffStatus'), [firestore]);
+  
+  const { data: customers } = useCollection<Customer>(customersCollection);
+  const { data: staff } = useCollection<Staff>(staffCollection);
+  const { data: staffStatusData } = useCollection<StaffStatus>(staffStatusCollection);
   
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
@@ -180,9 +187,11 @@ export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
   }, [state.data, state.options, onRouteOptimized]);
 
   const allLocations = React.useMemo(() => {
+    if (!customers || !staff || !staffStatusData) return [];
+
     const staffWithStatus = staffStatusData.map(status => {
         const staffDetails = staff.find(s => s.id === status.staffId);
-        return { ...staffDetails, ...status } as (Staff & StaffStatus);
+        return { ...staffDetails, ...status };
     }).filter(s => s.id);
 
     const customerLocations: Location[] = customers
@@ -208,7 +217,7 @@ export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
       }));
 
     return [...customerLocations, ...staffLocations];
-  }, [customers, staff]);
+  }, [customers, staff, staffStatusData]);
   
   const availableWaypointLocations = allLocations.filter(
     loc => loc.id !== startLocation && loc.id !== endLocation
@@ -230,7 +239,7 @@ export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
   
-  const isLoading = !customers || !staff;
+  const isLoading = !customers || !staff || !staffStatusData;
 
   if (isLoading) {
     return (

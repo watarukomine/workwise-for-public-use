@@ -1,8 +1,9 @@
 
 'use client';
 import * as React from 'react';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 import type { Customer } from '@/lib/types';
-import { customerData } from '@/lib/data'; // Import local data
 import {
   Table,
   TableBody,
@@ -20,14 +21,16 @@ import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 
 export function CustomerTable() {
-  // Use local data directly
-  const [customers] = React.useState<Customer[]>(customerData);
-  const [isLoading, setIsLoading] = React.useState(false); // No real fetching, so set to false
+  const firestore = useFirestore();
+  const customersCollection = useMemoFirebase(() => collection(firestore, 'customers'), [firestore]);
+  const { data: customers, isLoading } = useCollection<Customer>(customersCollection);
+
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
 
   const filteredCustomers = React.useMemo(() => {
+    if (!customers) return [];
     return customers.filter(customer =>
       customer && customer.userCode && customer.userCode.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -89,7 +92,7 @@ export function CustomerTable() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    {customers.length === 0 ? "顧客情報が見つかりません。" : "検索条件に合う顧客が見つかりません。"}
+                    {customers && customers.length === 0 ? "顧客情報が見つかりません。" : "検索条件に合う顧客が見つかりません。"}
                   </TableCell>
                 </TableRow>
               )}

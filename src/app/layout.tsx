@@ -7,11 +7,7 @@ import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import React from 'react';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
-
-// This can't be in the same file as the metadata export if it's a client component.
-// But for now, we will add 'use client' to the whole file to fix the immediate error.
-// A better solution would be to move DataSeeder to its own file.
-
+import { DataSeeder } from '@/firebase/seed';
 
 export default function RootLayout({
   children,
@@ -29,6 +25,7 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
+          <DataSeeder />
           <AppShell>{children}</AppShell>
           <Toaster />
         </FirebaseClientProvider>
