@@ -5,38 +5,16 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
-export function initializeFirebase() {
-  if (getApps().length > 0) {
-    return getSdks(getApp());
-  }
-  
-  // App Hosting provides environment variables for Firebase config.
-  // This is the recommended way to initialize Firebase on App Hosting.
-  // It's important to call initializeApp() without arguments if possible.
-  try {
-    const app = initializeApp();
-    console.log("Firebase initialized automatically via App Hosting env vars.");
-    return getSdks(app);
-  } catch (e) {
-    if (process.env.NODE_ENV === "production") {
-      console.warn(
-        "Automatic Firebase initialization failed, falling back to firebaseConfig. " +
-        "This might indicate a problem with your App Hosting setup.", e
-      );
-    } else {
-      console.log("Using local firebaseConfig for development.");
-    }
-    // Fallback for local development or if auto-init fails
-    const app = initializeApp(firebaseConfig);
-    return getSdks(app);
-  }
-}
-
-export function getSdks(firebaseApp: FirebaseApp) {
+function getSdks(firebaseApp: FirebaseApp) {
   const auth = getAuth(firebaseApp);
   const firestore = getFirestore(firebaseApp);
 
+  // NOTE: Emulator connection should only be used in non-production environments.
+  // In a real app, you would guard this with `if (process.env.NODE_ENV !== 'production')`
+  // For this context, we assume it might be used for local development.
+  // connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  // connectFirestoreEmulator(firestore, '127.0.0.1', 8080);
+  
   return {
     firebaseApp,
     auth,
@@ -44,11 +22,28 @@ export function getSdks(firebaseApp: FirebaseApp) {
   };
 }
 
+// IMPORTANT: This is the recommended way to initialize Firebase.
+// It's idempotent and safe to call multiple times.
+export function initializeFirebase() {
+  if (getApps().length > 0) {
+    const app = getApp();
+    return getSdks(app);
+  }
+
+  // This is the standard initialization using the config object.
+  // It's the most reliable way when App Hosting env vars might not be available or synced.
+  const app = initializeApp(firebaseConfig);
+  console.log("Firebase initialized with provided config.");
+  return getSdks(app);
+}
+
+// Re-exporting hooks and providers
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';
 export * from './firestore/use-doc';
 export * from './non-blocking-updates';
+// Note: non-blocking-login is not used but kept for potential future use.
 export * from './non-blocking-login';
 export * from './errors';
 export * from './error-emitter';

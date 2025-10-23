@@ -33,6 +33,8 @@ export const signIn = async () => {
       return;
     }
     console.error('Error signing in with Google: ', error);
+    // Re-throw the error to be caught by the caller if needed
+    throw error;
   }
 };
 
