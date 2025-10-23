@@ -38,7 +38,7 @@ export default function StaffPage() {
   React.useEffect(() => {
     const fetchStaff = async () => {
       setIsLoading(true);
-setError(null);
+      setError(null);
       try {
         const response = await fetch(GAS_URL, { cache: 'no-store' });
         if (!response.ok) {
