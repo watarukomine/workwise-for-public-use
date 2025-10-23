@@ -40,7 +40,7 @@ export default function StaffPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(GAS_URL);
+        const response = await fetch(GAS_URL, { cache: 'no-store' });
         if (!response.ok) {
           throw new Error(`HTTPエラー: ${response.status}`);
         }

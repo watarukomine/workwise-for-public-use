@@ -19,7 +19,7 @@ export default function CustomersPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await fetch(GAS_URL);
+        const response = await fetch(GAS_URL, { cache: 'no-store' });
         if (!response.ok) {
           throw new Error(`HTTPエラー: ${response.status}`);
         }
@@ -41,7 +41,7 @@ export default function CustomersPage() {
           // If the format is still unexpected, but it's an object (like {}),
           // don't throw an error. Just set customers to an empty array.
           // The table will then show "No data".
-          if (result && typeof result === 'object') {
+          if (result && typeof result === 'object' && Object.keys(result).length === 0) {
             setCustomers([]);
           } else {
              setError('GASから受信したデータの形式が予期せぬものです。');
