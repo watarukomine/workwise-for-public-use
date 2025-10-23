@@ -1,7 +1,6 @@
 
 'use client';
 import * as React from 'react';
-import type { Customer } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -35,7 +34,7 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
       return validCustomers;
     }
     return validCustomers.filter(customer =>
-      customer && customer.ユーザーコード && String(customer.ユーザーコード).toLowerCase().includes(searchTerm.toLowerCase())
+      customer && customer['ユーザーコード'] && String(customer['ユーザーコード']).toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [validCustomers, searchTerm]);
 
@@ -47,6 +46,11 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
   }, [filteredCustomers, page, rowsPerPage]);
 
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
+
+  const headers = [
+    'No', 'ユーザーコード', '旧 チャネル SEQ', '店舗', '管理C', '機材有無', 
+    '住所', '緯度', '経度', '電話番号', '営業時間'
+  ];
 
   return (
     <Card>
@@ -66,35 +70,29 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>No</TableHead>
-                <TableHead>ユーザーコード</TableHead>
-                <TableHead>店舗</TableHead>
-                <TableHead>住所</TableHead>
-                <TableHead>電話番号</TableHead>
-                <TableHead>営業時間</TableHead>
+                {headers.map(header => <TableHead key={header}>{header}</TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={headers.length} className="h-24 text-center">
                     データを読み込んでいます...
                   </TableCell>
                 </TableRow>
               ) : paginatedCustomers.length > 0 ? (
                 paginatedCustomers.map((customer, index) => (
-                  <TableRow key={customer.ユーザーコード || index}>
-                    <TableCell className="font-medium">{customer.No}</TableCell>
-                    <TableCell>{customer.ユーザーコード}</TableCell>
-                    <TableCell>{customer.店舗}</TableCell>
-                    <TableCell>{customer.住所}</TableCell>
-                    <TableCell>{customer.電話番号}</TableCell>
-                    <TableCell>{customer.営業時間}</TableCell>
+                  <TableRow key={customer['ユーザーコード'] || index}>
+                    {headers.map(header => (
+                      <TableCell key={header}>
+                        {customer[header] !== undefined && customer[header] !== null ? String(customer[header]) : ''}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={headers.length} className="h-24 text-center">
                     {validCustomers.length === 0 && !searchTerm ? "販売店情報が見つかりません。" : "検索条件に合う販売店が見つかりません。"}
                   </TableCell>
                 </TableRow>

@@ -12,16 +12,25 @@ export type Staff = {
 };
 
 export type Customer = {
-  id: string;
-  no?: string;
-  userCode?: string;
-  storeName?: string;
-  address: string;
+  id:string;
+  No?: string;
+  'ユーザーコード'?: string;
+  '旧 チャネル SEQ'?: string;
+  '店舗'?: string;
+  '管理C'?: string;
+  '機材有無'?: string;
+  '住所'?: string;
+  '緯度'?: number;
+  '経度'?: number;
+  '電話番号'?: string;
+  '営業時間'?: string;
+  // for compatibility
+  name?: string; 
+  address?: string;
   latitude?: number;
   longitude?: number;
-  phoneNumber?: string;
-  businessHours?: string;
-  name?: string; 
+  storeName?: string;
+  userCode?: string;
 };
 
 export type ScheduleEvent = {
