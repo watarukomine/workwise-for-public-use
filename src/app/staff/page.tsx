@@ -38,7 +38,7 @@ export default function StaffPage() {
   React.useEffect(() => {
     const fetchStaff = async () => {
       setIsLoading(true);
-      setError(null);
+setError(null);
       try {
         const response = await fetch(GAS_URL, { cache: 'no-store' });
         if (!response.ok) {
@@ -69,12 +69,10 @@ export default function StaffPage() {
           });
           setStaff(formattedStaff);
         } else {
-          if (result && typeof result === 'object') {
-            setStaff([]);
-          } else {
-             setError('GASから受信したデータの形式が予期せぬものです。');
-             setStaff([]);
-          }
+          // If the data format is unexpected, set an error.
+          // This handles cases like `{}`, `null`, or other non-array responses.
+          setError('GASから受信したデータの形式が予期せぬものです。');
+          setStaff([]);
         }
 
       } catch (e: unknown) {
