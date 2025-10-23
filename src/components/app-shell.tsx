@@ -36,7 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useUser, useAuth } from '@/firebase';
+import { useUser } from '@/firebase';
 import { signIn, signOut } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 
@@ -59,7 +59,7 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, isUserLoading: isLoading } = useUser();
+  const { user, isLoading } = useUser();
   const { toast } = useToast();
 
   const handleSignIn = async () => {
@@ -70,7 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       toast({
         variant: "destructive",
         title: "ログインに失敗しました",
-        description: "Firebaseの設定でGoogleログインが有効になっていない可能性があります。Firebaseコンソールをご確認ください。",
+        description: error.message || "Firebaseの設定でGoogleログインが有効になっていない可能性があります。Firebaseコンソールをご確認ください。",
       });
     }
   };

@@ -7,6 +7,7 @@ import { useUser } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { signIn } from '@/lib/auth';
 import { Briefcase, Loader2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="16px" height="16px" {...props}>
@@ -19,12 +20,18 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export default function DashboardPage() {
   const { user, isLoading } = useUser();
+  const { toast } = useToast();
 
   const handleSignIn = async () => {
     try {
       await signIn();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Sign in failed:", error);
+      toast({
+        variant: "destructive",
+        title: "ログインに失敗しました",
+        description: error.message || "Googleログインが有効になっていない可能性があります。",
+      });
     }
   };
 

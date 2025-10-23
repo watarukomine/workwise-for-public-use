@@ -5,18 +5,13 @@ import {
   GoogleAuthProvider,
   signOut as firebaseSignOut,
   type Auth,
-  getAuth,
 } from 'firebase/auth';
 import { initializeFirebase } from '@/firebase';
 
 const provider = new GoogleAuthProvider();
 
-/**
- * Returns a fresh Auth instance.
- * Ensures that the most up-to-date Firebase app instance is used.
- */
-export const getAuthInstance = (): Auth => {
-  // initializeFirebase handles getting the existing app instance if already initialized.
+// This function should be called within a component or another client-side function.
+const getAuthInstance = (): Auth => {
   const { auth } = initializeFirebase();
   return auth;
 };
@@ -28,12 +23,17 @@ export const signIn = async () => {
     const result = await signInWithPopup(auth, provider);
     console.log("Sign-in successful:", result.user.uid);
   } catch (error: any) {
-    if (error && error.code === 'auth/cancelled-popup-request') {
-      console.log("Sign-in popup cancelled by user.");
-      return;
+    if (error && error.code === 'auth/popup-closed-by-user') {
+        console.log("Sign-in popup closed by user.");
+        return;
+    }
+    // Specific check for 'auth/operation-not-allowed'
+    if (error.code === 'auth/operation-not-allowed') {
+        console.error("Google Sign-In is not enabled in the Firebase console. Please enable it in the 'Authentication' > 'Sign-in method' tab.");
+        // We can throw a more specific error for the UI to catch
+        throw new Error("GoogleログインがFirebaseプロジェクトで有効になっていません。");
     }
     console.error('Error signing in with Google: ', error);
-    // Re-throw the error to be caught by the caller if needed
     throw error;
   }
 };
