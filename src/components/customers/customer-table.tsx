@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import type { Customer } from '@/lib/types';
@@ -19,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 
 interface CustomerTableProps {
-  customers: Customer[];
+  customers: any[]; // Use any[] to be flexible with GAS data
   isLoading: boolean;
 }
 
@@ -31,7 +30,7 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
   const filteredCustomers = React.useMemo(() => {
     if (!customers) return [];
     return customers.filter(customer =>
-      customer && customer.userCode && customer.userCode.toLowerCase().includes(searchTerm.toLowerCase())
+      customer && customer.ユーザーコード && String(customer.ユーザーコード).toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [customers, searchTerm]);
 
@@ -79,19 +78,19 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
                 </TableRow>
               ) : paginatedCustomers.length > 0 ? (
                 paginatedCustomers.map((customer, index) => (
-                  <TableRow key={customer.id || index}>
-                    <TableCell className="font-medium">{customer.no}</TableCell>
-                    <TableCell>{customer.userCode}</TableCell>
-                    <TableCell>{customer.storeName}</TableCell>
-                    <TableCell>{customer.address}</TableCell>
-                    <TableCell>{customer.phoneNumber}</TableCell>
-                    <TableCell>{customer.businessHours}</TableCell>
+                  <TableRow key={customer.ユーザーコード || index}>
+                    <TableCell className="font-medium">{customer.No}</TableCell>
+                    <TableCell>{customer.ユーザーコード}</TableCell>
+                    <TableCell>{customer.店舗}</TableCell>
+                    <TableCell>{customer.住所}</TableCell>
+                    <TableCell>{customer.電話番号}</TableCell>
+                    <TableCell>{customer.営業時間}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    {customers && customers.length === 0 ? "顧客情報が見つかりません。" : "検索条件に合う顧客が見つかりません。"}
+                    {customers && customers.length === 0 ? "販売店情報が見つかりません。" : "検索条件に合う販売店が見つかりません。"}
                   </TableCell>
                 </TableRow>
               )}
