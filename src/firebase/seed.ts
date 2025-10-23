@@ -71,12 +71,8 @@ const eventsSeed: any[] = [
 ];
 
 export async function seedData(db: Firestore) {
-  console.log("Attempting to seed data to Firestore...");
-  const seededFlagRef = doc(db, 'internal', 'seeded');
-
-  // We are removing the check for the seeded flag to ensure that the write operation is always attempted.
-  // The catch block will handle the case where the data already exists.
-
+  console.log("Attempting to seed data to Firestore by writing...");
+  
   const batch = writeBatch(db);
 
   const getAvatarUrl = (avatarId: string) => {
@@ -123,21 +119,23 @@ export async function seedData(db: Firestore) {
       });
   });
   
-  // Set the flag to indicate data has been seeded
+  // Also set a flag to indicate data has been seeded.
+  // The security rules should prevent this from being overwritten by non-admins.
+  const seededFlagRef = doc(db, 'internal', 'seeded');
   batch.set(seededFlagRef, { seeded: true, timestamp: serverTimestamp() });
 
   try {
     await batch.commit();
     console.log("Data seeding successful.");
   } catch (error) {
-    const fError = error as FirestoreError;
-    // A 'permission-denied' error on a batch write that includes the seededFlagRef often means it already exists.
-    // In a production scenario, you might want more granular checks, but for this seeding script,
-    // we can infer that if the write is denied, the data likely is already there.
-    if (fError.code === 'permission-denied' || fError.code === 'already-exists') {
-        console.log("Data likely already seeded. Skipping.");
+    // If the error is 'permission-denied', it's likely because the seededFlagRef already exists
+    // and rules prevent modification, which implies data is already seeded.
+    // We can safely ignore this specific error.
+    if ((error as FirestoreError).code === 'permission-denied') {
+        console.log("Data likely already seeded. Skipping write.");
     } else {
         // For other errors, we still want to see the detailed context.
+        console.error("Error during data seeding batch commit:", error);
         const contextualError = new FirestorePermissionError({
             operation: 'write',
             path: 'batch operation', // Path is not specific to one doc in a batch
@@ -162,3 +160,5 @@ export function DataSeeder() {
 
   return null; // This component does not render anything
 }
+
+    
