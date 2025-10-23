@@ -1,4 +1,3 @@
-
 'use client';
 
 import { CustomerTable } from '@/components/customers/customer-table';
@@ -36,9 +35,8 @@ export default function CustomersPage() {
         if (customerData !== null) {
           setCustomers(customerData);
         } else {
-          // If the format is still unexpected, but it's an object (like {}),
-          // don't throw an error. Just set customers to an empty array.
-          // The table will then show "No data".
+          // Handle unexpected formats without crashing, e.g., {}
+          // This prevents errors if GAS returns an empty object for an empty sheet.
           if (result && typeof result === 'object' && Object.keys(result).length === 0) {
             setCustomers([]);
           } else {

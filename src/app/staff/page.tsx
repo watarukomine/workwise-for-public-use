@@ -1,4 +1,3 @@
-
 'use client';
 
 import { StaffTable } from "@/components/staff/staff-table";
@@ -69,10 +68,13 @@ export default function StaffPage() {
           });
           setStaff(formattedStaff);
         } else {
-          // If the data format is unexpected, set an error.
-          // This handles cases like `{}`, `null`, or other non-array responses.
-          setError('GASから受信したデータの形式が予期せぬものです。');
-          setStaff([]);
+          // Handle unexpected formats without crashing
+          if (result && typeof result === 'object' && Object.keys(result).length === 0) {
+            setStaff([]);
+          } else {
+            setError('GASから受信したデータの形式が予期せぬものです。');
+            setStaff([]);
+          }
         }
 
       } catch (e: unknown) {
