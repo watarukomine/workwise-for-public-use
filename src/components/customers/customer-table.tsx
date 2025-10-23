@@ -29,6 +29,9 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
 
   const filteredCustomers = React.useMemo(() => {
     if (!customers) return [];
+    if (searchTerm.trim() === '') {
+      return customers;
+    }
     return customers.filter(customer =>
       customer && customer.ユーザーコード && String(customer.ユーザーコード).toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -90,7 +93,7 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    {customers && customers.length === 0 ? "販売店情報が見つかりません。" : "検索条件に合う販売店が見つかりません。"}
+                    {customers && customers.length === 0 && !searchTerm ? "販売店情報が見つかりません。" : "検索条件に合う販売店が見つかりません。"}
                   </TableCell>
                 </TableRow>
               )}
