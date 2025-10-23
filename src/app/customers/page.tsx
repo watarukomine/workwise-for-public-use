@@ -7,7 +7,7 @@ import React from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbw-QyW8LgFU1iiwipAhauNqukcd6hLxV8cDsdh0MmwIsgbP89pSsH58p680ZOB2etc8cA/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbywC5IoTryeIFRyo7rU4hBaTb7u9p4aK1p0UBvYeuzJiyVDaHqfjYeyA61seoH9LpeQYw/exec';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = React.useState<any[]>([]);
