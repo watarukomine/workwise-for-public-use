@@ -1,4 +1,3 @@
-
 'use client';
 import type { Staff } from '@/lib/types';
 import {
@@ -12,10 +11,14 @@ import {
 import {
   Card,
   CardContent,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
+import { Button } from '@/components/ui/button';
+import { Check } from 'lucide-react';
 
 interface StaffTableProps {
     staff: Staff[];
@@ -23,31 +26,49 @@ interface StaffTableProps {
 }
 
 export function StaffTable({ staff, isLoading }: StaffTableProps) {
-  const { selectedStaffIds, toggleStaffSelection } = useSelectedStaff();
-  const isAllSelected = staff.length > 0 && selectedStaffIds.length === staff.length;
+  const { 
+    pendingSelectedStaffIds, 
+    togglePendingStaffSelection,
+    applyPendingSelection,
+    appliedSelectedStaffIds,
+  } = useSelectedStaff();
+  
+  const isAllSelected = staff.length > 0 && pendingSelectedStaffIds.length === staff.length;
 
   const handleSelectAll = () => {
     const allStaffIds = staff.map(s => s.id);
     if (isAllSelected) {
       // Deselect all
       allStaffIds.forEach(id => {
-        if (selectedStaffIds.includes(id)) {
-          toggleStaffSelection(id);
+        if (pendingSelectedStaffIds.includes(id)) {
+          togglePendingStaffSelection(id);
         }
       });
     } else {
       // Select all
       allStaffIds.forEach(id => {
-        if (!selectedStaffIds.includes(id)) {
-          toggleStaffSelection(id);
+        if (!pendingSelectedStaffIds.includes(id)) {
+          togglePendingStaffSelection(id);
         }
       });
     }
   };
 
+  const isSelectionChanged = JSON.stringify(pendingSelectedStaffIds.sort()) !== JSON.stringify(appliedSelectedStaffIds.sort());
+
   return (
     <Card>
-      <CardContent className="pt-6">
+      <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>スタッフ一覧</CardTitle>
+          <Button 
+            onClick={applyPendingSelection}
+            disabled={!isSelectionChanged}
+          >
+            <Check className="mr-2 h-4 w-4" />
+            選択を適用
+          </Button>
+      </CardHeader>
+      <CardContent>
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -73,11 +94,11 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   </TableRow>
               ) : staff && staff.length > 0 ? (
                 staff.map((member) => (
-                  <TableRow key={member.id} data-state={selectedStaffIds.includes(member.id) ? 'selected' : ''}>
+                  <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) ? 'selected' : ''}>
                     <TableCell>
                        <Checkbox
-                          checked={selectedStaffIds.includes(member.id)}
-                          onCheckedChange={() => toggleStaffSelection(member.id)}
+                          checked={pendingSelectedStaffIds.includes(member.id)}
+                          onCheckedChange={() => togglePendingStaffSelection(member.id)}
                           aria-label={`${member.name}を選択`}
                         />
                     </TableCell>

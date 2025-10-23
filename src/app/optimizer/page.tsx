@@ -16,14 +16,14 @@ export default function OptimizerPage() {
   const [avoidHighways, setAvoidHighways] = React.useState(false);
 
   const [customers] = React.useState<Customer[]>(customerData);
-  const { selectedStaffIds } = useSelectedStaff();
+  const { appliedSelectedStaffIds } = useSelectedStaff();
 
   const filteredStaff = React.useMemo(() => {
-    if (selectedStaffIds.length === 0) {
+    if (appliedSelectedStaffIds.length === 0) {
       return staffData; // No selection, show all
     }
-    return staffData.filter(s => selectedStaffIds.includes(s.id));
-  }, [selectedStaffIds]);
+    return staffData.filter(s => appliedSelectedStaffIds.includes(s.id));
+  }, [appliedSelectedStaffIds]);
 
 
   const staffWithStatus = React.useMemo(() => {

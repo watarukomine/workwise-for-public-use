@@ -12,14 +12,14 @@ export default function DashboardPage() {
   const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>(initialScheduleData);
   const [orders, setOrders] = React.useState<WithId<Order>[]>(unassignedOrdersData);
   const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
-  const { selectedStaffIds } = useSelectedStaff();
+  const { appliedSelectedStaffIds } = useSelectedStaff();
 
   const filteredStaff = React.useMemo(() => {
-    if (selectedStaffIds.length === 0) {
+    if (appliedSelectedStaffIds.length === 0) {
       return staffData; // If no staff are selected, show all
     }
-    return staffData.filter(staff => selectedStaffIds.includes(staff.id));
-  }, [selectedStaffIds]);
+    return staffData.filter(staff => appliedSelectedStaffIds.includes(staff.id));
+  }, [appliedSelectedStaffIds]);
 
 
   return (
