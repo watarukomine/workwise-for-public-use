@@ -17,16 +17,18 @@ const stringToHash = (str: string) => {
     hash = (hash << 5) - hash + char;
     hash |= 0; // Convert to 32bit integer
   }
-  return hash;
+  return Math.abs(hash);
 };
 
-// Function to generate a pleasant HSL color from a string
+// Function to generate a more distinct HSL color from a string
 const generateHslColorFromString = (str: string) => {
   const hash = stringToHash(str);
-  const h = (hash % 360 + 360) % 360; // Hue (0-359)
-  const s = 70 + (hash % 10); // Saturation (70-80%)
-  const l = 50 + (hash % 10); // Lightness (50-60%)
-  return `hsl(${h}, ${s}%, ${l}%)`;
+  // Use a golden angle ratio to generate more distinct hues.
+  // This ensures that successive colors are far apart on the color wheel.
+  const hue = (hash * 137.508) % 360; 
+  const saturation = 70 + (hash % 15); // Saturation (70-85%)
+  const lightness = 55 + (hash % 10); // Lightness (55-65%) for good contrast
+  return `hsl(${hue.toFixed(0)}, ${saturation.toFixed(0)}%, ${lightness.toFixed(0)}%)`;
 };
 
 
