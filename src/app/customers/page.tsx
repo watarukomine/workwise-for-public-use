@@ -38,12 +38,15 @@ export default function CustomersPage() {
         if (customerData !== null) {
           setCustomers(customerData);
         } else {
-          // If the format is still unexpected, log an error message but try to render anyway if it's an object.
-          // This prevents the app from crashing and allows for inspection.
-          console.error('GAS response received, but in an unexpected format:', result);
-          setError('GASから受信したデータの形式が予期せぬものです。開発者コンソールで内容を確認してください。');
-          // Try to set the data anyway if it's an array-like structure, otherwise an empty array.
-          setCustomers(result && typeof result === 'object' ? Object.values(result).find(Array.isArray) || [] : []);
+          // If the format is still unexpected, but it's an object (like {}),
+          // don't throw an error. Just set customers to an empty array.
+          // The table will then show "No data".
+          if (result && typeof result === 'object') {
+            setCustomers([]);
+          } else {
+             setError('GASから受信したデータの形式が予期せぬものです。');
+             setCustomers([]);
+          }
         }
 
       } catch (e: unknown) {
