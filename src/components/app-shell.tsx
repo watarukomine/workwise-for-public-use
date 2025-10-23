@@ -142,7 +142,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button onClick={handleSignIn} variant="outline" className="w-full">
+            <Button onClick={handleSignIn} className="w-full">
               <GoogleIcon className="mr-2 h-4 w-4" />
               Sign In with Google
             </Button>
