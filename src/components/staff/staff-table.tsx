@@ -1,6 +1,6 @@
 
 'use client';
-import type { Staff, WithId } from '@/lib/types';
+import type { Staff } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -29,15 +29,16 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Calendar ID</TableHead>
-                <TableHead>Color</TableHead>
+                <TableHead>スタッフ名</TableHead>
+                <TableHead>スタッフID</TableHead>
+                <TableHead>カレンダーID</TableHead>
+                <TableHead>カラー</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center">
+                    <TableCell colSpan={4} className="h-24 text-center">
                       Loading staff...
                     </TableCell>
                   </TableRow>
@@ -53,6 +54,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                         <span className="font-medium">{member.name}</span>
                       </div>
                     </TableCell>
+                    <TableCell className="text-muted-foreground">{member.id}</TableCell>
                     <TableCell className="text-muted-foreground">{member.calendarId}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -64,7 +66,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                 ))
               ) : (
                 <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center">
+                    <TableCell colSpan={4} className="h-24 text-center">
                       No staff members found.
                     </TableCell>
                 </TableRow>
