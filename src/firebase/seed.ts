@@ -79,10 +79,14 @@ export async function seedData(db: Firestore) {
       console.log("Data has already been seeded. Skipping.");
       return;
     }
-  } catch (error) {
-     // We might not have permission to read `internal/seeded` yet.
-     // We'll proceed, and if the write fails, that's okay. We'll catch it below.
-     console.warn("Could not check for seeded flag, proceeding with seeding attempt.");
+  } catch (error: any) {
+    const contextualError = new FirestorePermissionError({
+      operation: 'get',
+      path: seededFlagRef.path,
+    });
+    errorEmitter.emit('permission-error', contextualError);
+    // Don't proceed with seeding if we can't even check the flag
+    return;
   }
 
   console.log("Seeding data to Firestore...");
