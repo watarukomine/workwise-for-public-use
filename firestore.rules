@@ -1,121 +1,126 @@
 /**
  * @file Firestore Security Rules
- * @description This ruleset enforces a strict user-ownership model for staff-related data and broader access for customers and jobsites.
+ * @description This ruleset enforces a strict user-ownership model for staff-related data and public read access for customer and jobsite data.
  *
  * Data Structure:
- * - /staff/{staffId}: Stores individual staff member data, accessible only by the staff member themselves.
- * - /customers/{customerId}: Stores customer data. Access is open (in this prototype).
- * - /jobsites/{jobsiteId}: Stores jobsite data. Access is open (in this prototype).
- * - /staff/{staffId}/workSchedules/{workScheduleId}: Stores work schedules, accessible only by the associated staff member.
- * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores employee actions, accessible only by the associated staff member.
+ * - /staff/{staffId}: Stores staff member data, accessible only to the staff member themselves.
+ * - /customers/{customerId}: Stores customer data, publicly readable.
+ * - /staff/{staffId}/workSchedules/{workScheduleId}: Stores work schedules for a staff member, accessible only to that staff member.
+ * - /jobsites/{jobsiteId}: Stores jobsite data, publicly readable.
+ * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores employee actions, accessible only to the staff member.
  *
  * Key Security Decisions:
- * - Staff members can only read and write their own staff document and related subcollections (workSchedules, employeeActions).
- * - Listing of the `/staff` collection is denied to all users.
- * - Customer and Jobsite data is publicly readable (get, list). Writes are currently open (in this prototype) but should be secured in a production environment.
+ * - Staff members can only access their own data (ownership model).
+ * - Listing of staff and employee action collections is restricted to the owner.
+ * - Customer and jobsite data are publicly readable.
  *
  * Denormalization for Authorization:
- * - The rules rely on path-based authorization to ensure that a staff member can only access data under their own `staffId`. No `get()` calls are needed.
+ * - The `staffId` is used in the path to establish ownership, avoiding the need for `get()` calls.
  *
  * Structural Segregation:
- * - Private data (workSchedules, employeeActions) is stored under user-specific subcollections, while potentially public data (customers, jobsites) resides in top-level collections.
+ * - Publicly readable data (customers, jobsites) is stored in top-level collections, separate from private user data.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to the /staff collection. Staff members can only read/write their own document.
+     * @description Controls access to staff member data.
      * @path /staff/{staffId}
+     * @allow (get, list) if request.auth.uid == staffId; (read)
+     * @allow (create, update, delete) if request.auth.uid == staffId; (write)
+     * @deny (get, list) if request.auth.uid != staffId; (read)
+     * @deny (create, update, delete) if request.auth.uid != staffId; (write)
+     * @principle Enforces document ownership for writes.
      */
     match /staff/{staffId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+      allow get: if isSignedIn() && isOwner(staffId);
+      allow list: if false; // Listing staff is disabled
 
-      function isOwner(staffId) {
-        return isSignedIn() && request.auth.uid == staffId;
-      }
-
-      function isExistingOwner(staffId) {
-        return isOwner(staffId) && resource.data != null;
-      }
-
-      allow get: if isOwner(staffId);
-      // Deny listing the staff collection
-      allow list: if false;
-      allow create: if isOwner(staffId);
-      allow update: if isExistingOwner(staffId);
-      allow delete: if isExistingOwner(staffId);
+      allow create: if isSignedIn() && isOwner(staffId) && request.resource.data.id == staffId;
+      allow update: if isSignedIn() && isExistingOwner(staffId) && request.resource.data.id == resource.data.id;
+      allow delete: if isSignedIn() && isExistingOwner(staffId);
     }
 
     /**
-     * @description Controls access to the /customers collection. Accessible by authorized users.
+     * @description Controls access to customer data.
      * @path /customers/{customerId}
+     * @allow (get, list) if true; (read)
+     * @allow (create, update, delete) if false; (write)
+     * @deny (create, update, delete) if true; (write)
+     * @principle Allows public read access.
      */
     match /customers/{customerId} {
-      allow get, list: if true;
-      // CRITICAL: In a production environment, writes to the customer collection should be restricted.
-      allow create, update, delete: if true; // TODO: Add authorization checks for customer writes.
+      allow get, list: if true; // Public read
+
+      allow create: if false; // TODO: Add authorization logic for creating customers
+      allow update: if false; // TODO: Add authorization logic for updating customers
+      allow delete: if false; // TODO: Add authorization logic for deleting customers
     }
 
     /**
-     * @description Controls access to the /staff/{staffId}/workSchedules collection. Only the staff member can access their schedules.
+     * @description Controls access to work schedule data for a specific staff member.
      * @path /staff/{staffId}/workSchedules/{workScheduleId}
+     * @allow (get, list) if request.auth.uid == staffId; (read)
+     * @allow (create, update, delete) if request.auth.uid == staffId; (write)
+     * @deny (get, list) if request.auth.uid != staffId; (read)
+     * @deny (create, update, delete) if request.auth.uid != staffId; (write)
+     * @principle Restricts access to a user's own data tree.
      */
     match /staff/{staffId}/workSchedules/{workScheduleId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+      allow get: if isSignedIn() && isOwner(staffId);
+      allow list: if isSignedIn() && isOwner(staffId);
 
-      function isOwner(staffId) {
-        return isSignedIn() && request.auth.uid == staffId;
-      }
-
-       function isExistingOwner(staffId) {
-        return isOwner(staffId) && resource.data != null;
-      }
-
-
-      allow get: if isOwner(staffId);
-      allow list: if isOwner(staffId);
-      allow create: if isOwner(staffId);
-      allow update: if isExistingOwner(staffId);
-      allow delete: if isExistingOwner(staffId);
+      allow create: if isSignedIn() && isOwner(staffId) && request.resource.data.staffId == staffId;
+      allow update: if isSignedIn() && isExistingOwner(staffId) && request.resource.data.staffId == staffId;
+      allow delete: if isSignedIn() && isExistingOwner(staffId);
     }
 
     /**
-     * @description Controls access to the /jobsites collection. Accessible by authorized users.
+     * @description Controls access to jobsite data.
      * @path /jobsites/{jobsiteId}
+     * @allow (get, list) if true; (read)
+     * @allow (create, update, delete) if false; (write)
+     * @deny (create, update, delete) if true; (write)
+     * @principle Allows public read access.
      */
     match /jobsites/{jobsiteId} {
       allow get, list: if true;
-      // CRITICAL: In a production environment, writes to the jobsite collection should be restricted.
-      allow create, update, delete: if true; // TODO: Add authorization checks for jobsite writes.
+
+      allow create: if false; // TODO: Add authorization logic for creating jobsites
+      allow update: if false; // TODO: Add authorization logic for updating jobsites
+      allow delete: if false; // TODO: Add authorization logic for deleting jobsites
     }
 
     /**
-     * @description Controls access to the /staff/{staffId}/employeeActions collection. Only the staff member and admins can access the actions.
+     * @description Controls access to employee actions for a specific staff member.
      * @path /staff/{staffId}/employeeActions/{employeeActionId}
+     * @allow (get, list) if request.auth.uid == staffId; (read)
+     * @allow (create, update, delete) if request.auth.uid == staffId; (write)
+     * @deny (get, list) if request.auth.uid != staffId; (read)
+     * @deny (create, update, delete) if request.auth.uid != staffId; (write)
+     * @principle Restricts access to a user's own data tree.
      */
     match /staff/{staffId}/employeeActions/{employeeActionId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
+      allow get: if isSignedIn() && isOwner(staffId);
+      allow list: if isSignedIn() && isOwner(staffId);
 
-      function isOwner(staffId) {
-        return isSignedIn() && request.auth.uid == staffId;
-      }
-
-      function isExistingOwner(staffId) {
-        return isOwner(staffId) && resource.data != null;
-      }
-
-      allow get: if isOwner(staffId);
-      allow list: if isOwner(staffId);
-      allow create: if isOwner(staffId);
-      allow update: if isExistingOwner(staffId);
-      allow delete: if isExistingOwner(staffId);
+      allow create: if isSignedIn() && isOwner(staffId) && request.resource.data.staffId == staffId;
+      allow update: if isSignedIn() && isExistingOwner(staffId) && request.resource.data.staffId == staffId;
+      allow delete: if isSignedIn() && isExistingOwner(staffId);
     }
+  }
+
+  // Helper functions
+  function isSignedIn() {
+    return request.auth != null;
+  }
+
+  function isOwner(userId) {
+    return request.auth.uid == userId;
+  }
+
+    function isExistingOwner(userId) {
+    return isOwner(userId) && resource != null;
   }
 }
