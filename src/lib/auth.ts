@@ -1,7 +1,9 @@
+
 'use client';
 
 import { 
-  signInAnonymously,
+  GoogleAuthProvider,
+  signInWithPopup,
   signOut as firebaseSignOut,
   type Auth,
 } from 'firebase/auth';
@@ -16,12 +18,19 @@ const getAuthInstance = (): Auth => {
 
 export const signIn = async () => {
   const auth = getAuthInstance();
+  const provider = new GoogleAuthProvider();
   try {
-    console.log("Attempting to sign in anonymously...");
-    const result = await signInAnonymously(auth);
-    console.log("Anonymous sign-in successful:", result.user.uid);
+    console.log("Attempting to sign in with Google...");
+    const result = await signInWithPopup(auth, provider);
+    console.log("Google sign-in successful:", result.user.uid);
   } catch (error: any) {
-    console.error('Error signing in anonymously: ', error);
+    // Specific check for 'auth/operation-not-allowed'
+    if (error.code === 'auth/operation-not-allowed') {
+        console.error("Google Sign-In is not enabled in the Firebase console. Please enable it in the 'Authentication' > 'Sign-in method' tab.");
+        // We can throw a more specific error for the UI to catch
+        throw new Error("GoogleログインがFirebaseプロジェクトで有効になっていません。");
+    }
+    console.error('Error signing in with Google: ', error);
     throw error;
   }
 };

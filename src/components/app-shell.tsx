@@ -1,3 +1,4 @@
+
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -40,6 +41,12 @@ import { useUser } from '@/firebase';
 import { signIn, signOut } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 
+const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.05 1.05-2.86 2.25-5.02 2.25-4.33 0-7.87-3.55-7.87-7.95s3.54-7.95 7.87-7.95c2.43 0 3.97 1.02 4.88 1.94l2.6-2.58C18.44 1.56 15.82 0 12.48 0 5.6 0 0 5.6 0 12.5S5.6 25 12.48 25c7.2 0 12.04-4.92 12.04-12.16 0-.8-.08-1.44-.2-2.02h-11.84z" />
+    </svg>
+);
+
 const navItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList },
   { href: '/customers', label: '販売店情報', icon: Building2 },
@@ -61,7 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       toast({
         variant: "destructive",
         title: "ログインに失敗しました",
-        description: error.message || "匿名ログインに失敗しました。",
+        description: error.message || "Googleログインに失敗しました。",
       });
     }
   };
@@ -134,8 +141,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </DropdownMenu>
           ) : (
             <Button onClick={handleSignIn} className="w-full">
-              <LogIn className="mr-2 h-4 w-4" />
-              Sign In
+              <GoogleIcon className="mr-2 h-4 w-4 fill-white" />
+              Sign In with Google
             </Button>
           )}
         </SidebarFooter>
