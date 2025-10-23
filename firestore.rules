@@ -1,131 +1,91 @@
 /**
  * @file Firebase Security Rules for Firestore.
- * @description This ruleset enforces a strict user-ownership model for staff-related data and allows broader access to customer and jobsite information.
+ * @description This ruleset enforces a strict user-ownership model for staff-related data and allows open access to customer and jobsite data.
  *
  * Data Structure:
  * - /staff/{staffId}: Stores staff member data, accessible only by the staff member themselves.
- * - /customers/{customerId}: Stores customer data, accessible to all authenticated users.
- * - /staff/{staffId}/workSchedules/{workScheduleId}: Stores work schedules, accessible only by the associated staff member.
- * - /jobsites/{jobsiteId}: Stores jobsite data, accessible to all authenticated users.
+ * - /customers/{customerId}: Stores customer data, accessible by any authenticated user.
+ * - /staff/{staffId}/workSchedules/{workScheduleId}: Stores work schedule data, accessible only by the associated staff member.
+ * - /jobsites/{jobsiteId}: Stores jobsite data, accessible by any authenticated user.
  * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores employee actions, accessible only by the associated staff member.
  *
  * Key Security Decisions:
- * - User data is strictly segregated and accessible only by the owning user.
- * - Listing of staff, work schedules and employee actions is restricted to the owning user.
- * - Customer and jobsite data are publicly readable, but write access is not defined in this prototype.
- * - The rules prioritize security and assume that any unspecified access should be denied.
+ * - Staff members can only access their own data.
+ * - Customers and Jobsites data is publicly accessible to any authenticated user.
+ * - Listing of staff is not permitted; the query was denied.
  *
  * Denormalization for Authorization:
- * - Data is nested under the staff ID to avoid complex queries for authorization.
+ *  N/A - The current structure relies on path-based authorization, avoiding the need for denormalization.
+ *
+ * Structural Segregation:
+ *  N/A - There is no need for segregation of public and private data. All data for staff members is private and nested under their respective user ID.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    //  Helper function to determine if a user is signed in
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Utility function to check if the request is made by the owner
+    function isOwner(staffId) {
+      return request.auth != null && request.auth.uid == staffId;
+    }
+
+    // Utility function to check if the request is made by the owner and the resource exists
+    function isExistingOwner(staffId) {
+      return isOwner(staffId) && exists(resource);
+    }
+
     /**
-     * @description Controls access to staff member documents.
+     * @description Manages access to staff member documents.
      * @path /staff/{staffId}
-     * @allow (get, create, update, delete, list) if the user is the owner of the document.
-     * @deny (get, create, update, delete, list) if the user is not authenticated.
-     * @principle Enforces document ownership for writes.
      */
     match /staff/{staffId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-      allow get: if true;
-      allow list: if false;
-
+      allow get: if isOwner(staffId);
+      allow list: if false; // Listing staff is not permitted.
       allow create: if isOwner(staffId);
       allow update: if isExistingOwner(staffId);
       allow delete: if isExistingOwner(staffId);
     }
 
     /**
-     * @description Controls access to customer documents.
+     * @description Manages access to customer documents.
      * @path /customers/{customerId}
-     * @allow (get, list) if true.
-     * @deny (create, update, delete) since write access is not defined in this prototype.
-     * @principle Allows public read access, restricts write access.
      */
     match /customers/{customerId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false; 
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to work schedule documents nested under a staff member.
+     * @description Manages access to work schedule documents nested under a specific staff member.
      * @path /staff/{staffId}/workSchedules/{workScheduleId}
-     * @allow (get, create, update, delete, list) if the user is the owner of the parent staff document.
-     * @deny (get, create, update, delete, list) if the user is not authenticated or not the owner.
-     * @principle Enforces document ownership for writes and restricts access to user-specific data.
      */
     match /staff/{staffId}/workSchedules/{workScheduleId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-
-      allow get: if isOwner(staffId);
-      allow list: if isOwner(staffId);
+      allow get, list: if isOwner(staffId);
       allow create: if isOwner(staffId);
       allow update: if isExistingOwner(staffId);
       allow delete: if isExistingOwner(staffId);
     }
 
     /**
-     * @description Controls access to jobsite documents.
+     * @description Manages access to jobsite documents.
      * @path /jobsites/{jobsiteId}
-     * @allow (get, list) if true.
-     * @deny (create, update, delete) since write access is not defined in this prototype.
-     * @principle Allows public read access, restricts write access.
      */
     match /jobsites/{jobsiteId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
     }
 
     /**
-     * @description Controls access to employee action documents nested under a staff member.
+     * @description Manages access to employee actions documents nested under a specific staff member.
      * @path /staff/{staffId}/employeeActions/{employeeActionId}
-     * @allow (get, create, update, delete, list) if the user is the owner of the parent staff document.
-     * @deny (get, create, update, delete, list) if the user is not authenticated or not the owner.
-     * @principle Enforces document ownership for writes and restricts access to user-specific data.
      */
     match /staff/{staffId}/employeeActions/{employeeActionId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isOwner(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-      }
-
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
-      }
-      allow get: if isOwner(staffId);
-      allow list: if isOwner(staffId);
+      allow get, list: if isOwner(staffId);
       allow create: if isOwner(staffId);
       allow update: if isExistingOwner(staffId);
       allow delete: if isExistingOwner(staffId);
