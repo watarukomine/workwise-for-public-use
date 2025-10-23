@@ -38,7 +38,9 @@ export default function CustomersPage() {
         if (customerData !== null) {
           setCustomers(customerData);
         } else {
-          throw new Error('データ形式が正しくありません。GASからの応答がJSON配列または{data: [...]}オブジェクトではありません。');
+          // Log the unexpected format to the console for debugging instead of throwing an error
+          console.log('GAS response received, but in an unexpected format:', result);
+          setError('GASから受信したデータの形式が予期せぬものです。開発者コンソールで内容を確認してください。');
         }
 
       } catch (e: unknown) {
