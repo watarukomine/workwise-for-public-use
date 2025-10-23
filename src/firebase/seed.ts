@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Firestore, collection, doc, writeBatch, getDoc } from 'firebase/firestore';
+import { Firestore, collection, doc, writeBatch, getDoc, serverTimestamp } from 'firebase/firestore';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useEffect } from 'react';
 import { useFirestore } from './provider';
@@ -71,11 +71,18 @@ const eventsSeed: any[] = [
 export async function seedData(db: Firestore) {
   const seededFlagRef = doc(db, 'internal', 'seeded');
   
-  const docSnap = await getDoc(seededFlagRef);
-  if (docSnap.exists()) {
-    console.log("Data has already been seeded.");
-    return;
+  try {
+    const docSnap = await getDoc(seededFlagRef);
+    if (docSnap.exists()) {
+      console.log("Data has already been seeded.");
+      return;
+    }
+  } catch (error) {
+     console.error("Error checking if data is seeded: ", error);
+     // We might not have permission to read `internal/seeded` yet.
+     // We'll proceed, and if the write fails, that's okay.
   }
+
 
   console.log("Seeding data...");
 
@@ -127,13 +134,15 @@ export async function seedData(db: Firestore) {
   });
 
   // Set the flag to indicate data has been seeded
-  batch.set(seededFlagRef, { seeded: true, timestamp: new Date() });
+  batch.set(seededFlagRef, { seeded: true, timestamp: serverTimestamp() });
 
   try {
     await batch.commit();
     console.log("Data seeding successful!");
   } catch (error) {
     console.error("Error seeding data: ", error);
+    // This can happen if rules are not yet permissive enough.
+    // The next time the user logs in with the correct rules, it might not be seeded.
   }
 }
 
@@ -148,3 +157,5 @@ export function DataSeeder() {
 
   return null; // This component does not render anything
 }
+
+    
