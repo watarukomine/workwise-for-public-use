@@ -1,4 +1,18 @@
+
+// This file is part of the disabled Firebase functionality.
+// It is kept for potential future re-integration.
 'use client';
+
+export const useUser = () => ({ user: null, isLoading: false, error: null });
+export const useFirestore = () => null;
+export const useAuth = () => null;
+export const useFirebase = () => ({});
+export const useMemoFirebase = <T>(factory: () => T) => factory();
+export const useCollection = () => ({ data: null, isLoading: false, error: null });
+export const useDoc = () => ({ data: null, isLoading: false, error: null });
+
+/*
+// Original implementation:
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
@@ -41,3 +55,5 @@ export * from './auth/use-user';
 export * from './non-blocking-updates';
 export * from './errors';
 export * from './error-emitter';
+
+*/

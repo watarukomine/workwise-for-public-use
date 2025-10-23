@@ -1,5 +1,6 @@
 
 import { StaffTable } from "@/components/staff/staff-table";
+import { staffData } from "@/lib/data";
 
 export default function StaffPage() {
   return (
@@ -10,7 +11,7 @@ export default function StaffPage() {
           View and manage your team members.
         </p>
       </div>
-      <StaffTable />
+      <StaffTable staff={staffData} isLoading={false} />
     </div>
   );
 }

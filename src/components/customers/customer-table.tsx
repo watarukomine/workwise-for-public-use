@@ -1,8 +1,6 @@
 
 'use client';
 import * as React from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
 import type { Customer } from '@/lib/types';
 import {
   Table,
@@ -20,11 +18,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 
-export function CustomerTable() {
-  const firestore = useFirestore();
-  const customersCollection = useMemoFirebase(() => collection(firestore, 'customers'), [firestore]);
-  const { data: customers, isLoading } = useCollection<Customer>(customersCollection);
+interface CustomerTableProps {
+  customers: Customer[];
+  isLoading: boolean;
+}
 
+export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;

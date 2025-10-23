@@ -2,8 +2,6 @@
 'use client';
 import * as React from 'react';
 import { useActionState } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
 
 import type { Customer, Staff, StaffStatus } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
@@ -17,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
+import { customerData, staffData, staffStatusData } from '@/lib/data';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -168,15 +167,10 @@ const LocationSelector: React.FC<{
 
 
 export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
-  const firestore = useFirestore();
-  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
-  const customersCollection = useMemoFirebase(() => collection(firestore, 'customers'), [firestore]);
-  const staffStatusCollection = useMemoFirebase(() => collection(firestore, 'staffStatus'), [firestore]);
-  
-  const { data: customers } = useCollection<Customer>(customersCollection);
-  const { data: staff } = useCollection<Staff>(staffCollection);
-  const { data: staffStatusData } = useCollection<StaffStatus>(staffStatusCollection);
-  
+  const [customers] = React.useState<Customer[]>(customerData);
+  const [staff] = React.useState<Staff[]>(staffData);
+  const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
+
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
   const [waypoints, setWaypoints] = React.useState<string[]>([]);
@@ -187,9 +181,9 @@ export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
   }, [state.data, state.options, onRouteOptimized]);
 
   const allLocations = React.useMemo(() => {
-    if (!customers || !staff || !staffStatusData) return [];
+    if (!customers || !staff || !statuses) return [];
 
-    const staffWithStatus = staffStatusData.map(status => {
+    const staffWithStatus = statuses.map(status => {
         const staffDetails = staff.find(s => s.id === status.staffId);
         return { ...staffDetails, ...status };
     }).filter(s => s.id);
@@ -217,7 +211,7 @@ export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
       }));
 
     return [...customerLocations, ...staffLocations];
-  }, [customers, staff, staffStatusData]);
+  }, [customers, staff, statuses]);
   
   const availableWaypointLocations = allLocations.filter(
     loc => loc.id !== startLocation && loc.id !== endLocation
@@ -239,7 +233,7 @@ export function RouteOptimizer({ onRouteOptimized }: RouteOptimizerProps) {
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
   
-  const isLoading = !customers || !staff || !staffStatusData;
+  const isLoading = !customers || !staff || !statuses;
 
   if (isLoading) {
     return (

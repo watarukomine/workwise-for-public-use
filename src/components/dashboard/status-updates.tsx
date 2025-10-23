@@ -1,7 +1,5 @@
 
 'use client';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
 import type { StaffStatus, Staff, WithId } from '@/lib/types';
 import {
   Card,
@@ -32,13 +30,12 @@ const statusJapanese: Record<StaffStatus['status'], string> = {
   'Departing': '出発',
 }
 
-export function StatusUpdates() {
-  const firestore = useFirestore();
-  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
-  const statusCollection = useMemoFirebase(() => collection(firestore, 'staffStatus'), [firestore]);
-  
-  const { data: staffData } = useCollection<Staff>(staffCollection);
-  const { data: statuses } = useCollection<StaffStatus>(statusCollection);
+interface StatusUpdatesProps {
+    staffData: WithId<Staff>[];
+    statuses: StaffStatus[];
+}
+
+export function StatusUpdates({ staffData, statuses }: StatusUpdatesProps) {
   
   const getStaff = (id: string): WithId<Staff> | undefined => {
     return staffData?.find(s => s.id === id);

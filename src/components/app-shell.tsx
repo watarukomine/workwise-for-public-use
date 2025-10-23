@@ -37,9 +37,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useUser } from '@/firebase';
-import { signIn, signOut } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
+import React from 'react';
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -55,26 +54,40 @@ const navItems = [
   { href: '/import', label: 'データ取込', icon: Upload },
 ];
 
+const mockUser = {
+  uid: 'mock-user-123',
+  displayName: 'デモユーザー',
+  email: 'demo@example.com',
+  photoURL: `https://picsum.photos/seed/mock-user-123/100/100`,
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, isLoading } = useUser();
   const { toast } = useToast();
+  const [user, setUser] = React.useState(mockUser);
+  const [isLoading, setIsLoading] = React.useState(false);
+
 
   const handleSignIn = async () => {
-    try {
-      await signIn();
-    } catch (error: any) {
-      console.error("Sign in failed:", error);
-      toast({
-        variant: "destructive",
-        title: "ログインに失敗しました",
-        description: error.message || "Googleログインに失敗しました。",
-      });
-    }
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setUser(mockUser);
+    setIsLoading(false);
+    toast({
+      title: "ログインしました",
+      description: "デモモードへようこそ！",
+    });
   };
 
   const handleSignOut = async () => {
-    await signOut();
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    // @ts-ignore
+    setUser(null);
+    setIsLoading(false);
+    toast({
+      title: "ログアウトしました",
+    });
   };
 
   return (

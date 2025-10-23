@@ -1,7 +1,5 @@
 
 'use client';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
 import type { Staff } from '@/lib/types';
 import {
   Table,
@@ -18,11 +16,12 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import React from 'react';
 
-export function StaffTable() {
-  const firestore = useFirestore();
-  const staffCollection = useMemoFirebase(() => collection(firestore, 'staff'), [firestore]);
-  const { data: staff, isLoading } = useCollection<Staff>(staffCollection);
+interface StaffTableProps {
+    staff: Staff[];
+    isLoading: boolean;
+}
 
+export function StaffTable({ staff, isLoading }: StaffTableProps) {
   return (
     <Card>
       <CardContent className="pt-6">
