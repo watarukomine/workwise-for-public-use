@@ -118,7 +118,7 @@ export function GasImporter() {
       {rawData && (
         <Card>
           <CardHeader>
-            <CardTitle>生データ（Raw Response）</CardTitle>
+            <CardTitle>生のデータ（Raw Response）</CardTitle>
             <CardDescription>GASから返された生のJSONデータです。この内容が空や意図しない形式の場合、GAS側に問題がある可能性があります。</CardDescription>
           </CardHeader>
           <CardContent>
