@@ -37,7 +37,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useUser } from '@/firebase';
-import { signIn, signOut } from '@/lib/auth';
+import { signIn, signOut, getAuthInstance } from '@/lib/auth';
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="16px" height="16px" {...props}>
@@ -58,6 +58,8 @@ const navItems = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  // We don't need to pass the auth instance to useUser anymore
+  // as the provider handles it.
   const { user, isLoading } = useUser();
 
   const handleSignIn = async () => {
