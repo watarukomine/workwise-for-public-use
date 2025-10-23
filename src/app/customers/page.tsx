@@ -24,10 +24,12 @@ export default function CustomersPage() {
           throw new Error(`HTTPエラー: ${response.status}`);
         }
         const data = await response.json();
-        if (!Array.isArray(data)) {
+        // The GAS script returns an object with a 'data' property containing the array
+        if (data && Array.isArray(data.data)) {
+          setCustomers(data.data);
+        } else {
           throw new Error('データ形式が正しくありません。JSON配列を取得できませんでした。');
         }
-        setCustomers(data);
       } catch (e: unknown) {
         console.error('Failed to fetch customer data:', e);
         if (e instanceof Error) {
