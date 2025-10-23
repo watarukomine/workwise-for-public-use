@@ -76,13 +76,16 @@ export async function seedData(db: Firestore) {
   try {
     const docSnap = await getDoc(seededFlagRef);
     if (docSnap.exists()) {
+      console.log("Data has already been seeded. Skipping.");
       return;
     }
   } catch (error) {
      // We might not have permission to read `internal/seeded` yet.
      // We'll proceed, and if the write fails, that's okay. We'll catch it below.
+     console.warn("Could not check for seeded flag, proceeding with seeding attempt.");
   }
 
+  console.log("Seeding data to Firestore...");
   const batch = writeBatch(db);
 
   const getAvatarUrl = (avatarId: string) => {
@@ -134,10 +137,13 @@ export async function seedData(db: Firestore) {
 
   try {
     await batch.commit();
+    console.log("Data seeding successful.");
   } catch (error) {
     // This can happen if rules are not yet permissive enough.
     // The error will be caught by the global error listener.
     console.error("Data seeding failed. This may be due to restrictive Firestore rules.", error);
+    // We are not re-throwing or emitting here to avoid loops.
+    // The failure to read data will be caught by the respective hooks.
   }
 }
 
