@@ -33,18 +33,17 @@ export function CustomerTable() {
 
   React.useEffect(() => {
     const fetchCustomers = async () => {
+      setIsLoading(true);
+      setError(null);
       try {
         const response = await fetch(API_URL);
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => null);
-          const errorMessage = errorData?.message || `データの取得に失敗しました。ステータス: ${response.status}`;
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          const errorMessage = data.message || `データの取得に失敗しました。ステータス: ${response.status}`;
           throw new Error(errorMessage);
         }
-        const data = await response.json();
-        // The API route now returns an array or an object with an error
-        if (data.error) {
-            throw new Error(data.message || 'APIからエラーが返されました。');
-        }
+        
         setCustomers(data);
       } catch (e: any) {
         console.error('Error fetching customers from API route:', e);

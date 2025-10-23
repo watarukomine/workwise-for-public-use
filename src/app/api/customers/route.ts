@@ -18,13 +18,15 @@ export async function GET() {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('GAS Fetch Error Response Text:', errorText);
-      // Try to parse as JSON in case GAS returns a structured error
-      try {
-        const errorJson = JSON.parse(errorText);
-        return NextResponse.json({ error: true, message: errorJson.message || `GASからのデータ取得に失敗しました。ステータス: ${response.status}` }, { status: 500 });
-      } catch {
-        return NextResponse.json({ error: true, message: `GASからのデータ取得に失敗しました。ステータス: ${response.status}` }, { status: 500 });
-      }
+      return NextResponse.json({ error: true, message: `GASからのデータ取得に失敗しました。ステータス: ${response.status}` }, { status: response.status });
+    }
+    
+    // Check content type before parsing
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+        const responseText = await response.text();
+        console.error("Expected JSON, but received HTML/Text from GAS:", responseText);
+        return NextResponse.json({ error: true, message: 'GASから予期しない形式の応答がありました。GASのアクセス権限を確認してください。' }, { status: 500 });
     }
 
     const data = await response.json();
