@@ -46,21 +46,21 @@ export default function StaffPage() {
         }
         const result = await response.json();
         
-        let staffData: any[] | null = null;
+        let rawData: any[] | null = null;
         if (Array.isArray(result)) {
-            staffData = result;
+            rawData = result;
         } else if (result && typeof result === 'object' && Array.isArray(result.data)) {
-            staffData = result.data;
+            rawData = result.data;
         }
 
-        if (staffData !== null) {
-          const formattedStaff = staffData.map((member, index) => {
-            const staffId = member['スタッフID'] || String(index + 1);
+        if (rawData !== null && Array.isArray(rawData)) {
+          const formattedStaff = rawData.map((member, index) => {
+            const staffId = member['スタッフID'] || `temp-id-${index}`;
             const color = member['カラー'] || generateHslColorFromString(staffId);
             
             return {
               id: staffId,
-              name: member['スタッフ名'] || '',
+              name: member['スタッフ名'] || '名前なし',
               calendarId: member['カレンダーID'] || '',
               color: color,
               avatarUrl: member.avatarUrl || `https://picsum.photos/seed/${staffId}/100/100`
@@ -70,8 +70,9 @@ export default function StaffPage() {
         } else {
           // Handle unexpected formats without crashing
           if (result && typeof result === 'object' && Object.keys(result).length === 0) {
-            setStaff([]);
+            setStaff([]); // If GAS returns {}, it means empty sheet.
           } else {
+            console.error('Unexpected data format from GAS:', result);
             setError('GASから受信したデータの形式が予期せぬものです。');
             setStaff([]);
           }
