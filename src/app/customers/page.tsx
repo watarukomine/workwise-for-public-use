@@ -27,10 +27,8 @@ export default function CustomersPage() {
         
         let customerData: any[] | null = null;
 
-        // Check if the result itself is an array
         if (Array.isArray(result)) {
             customerData = result;
-        // Check if the result is an object containing a 'data' array
         } else if (result && typeof result === 'object' && Array.isArray(result.data)) {
             customerData = result.data;
         }
