@@ -17,7 +17,7 @@ export async function GET() {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('GAS Fetch Error:', errorText);
+      console.error('GAS Fetch Error Response Text:', errorText);
       // Try to parse as JSON in case GAS returns a structured error
       try {
         const errorJson = JSON.parse(errorText);
@@ -35,7 +35,7 @@ export async function GET() {
         return NextResponse.json({ error: true, message: data.message }, { status: 500 });
     }
 
-    // Ensure we always return an array, even if GAS returns nothing
+    // Ensure we always return an array, even if GAS returns nothing or a single object
     return NextResponse.json(Array.isArray(data) ? data : []);
 
   } catch (error) {

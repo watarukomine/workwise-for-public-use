@@ -36,17 +36,19 @@ export function CustomerTable() {
       try {
         const response = await fetch(API_URL);
         if (!response.ok) {
-          throw new Error(`データの取得に失敗しました。ステータス: ${response.status}`);
+          const errorData = await response.json().catch(() => null);
+          const errorMessage = errorData?.message || `データの取得に失敗しました。ステータス: ${response.status}`;
+          throw new Error(errorMessage);
         }
         const data = await response.json();
-        // The API route now returns an object with a 'data' property
+        // The API route now returns an array or an object with an error
         if (data.error) {
             throw new Error(data.message || 'APIからエラーが返されました。');
         }
         setCustomers(data);
       } catch (e: any) {
         console.error('Error fetching customers from API route:', e);
-        setError('顧客データの取得中にエラーが発生しました。しばらくしてから再度お試しください。');
+        setError(e.message || '顧客データの取得中にエラーが発生しました。しばらくしてから再度お試しください。');
       } finally {
         setIsLoading(false);
       }
@@ -58,7 +60,7 @@ export function CustomerTable() {
   const filteredCustomers = React.useMemo(() => {
     // API returns keys in lowercase, ensure we match that
     return customers.filter(customer =>
-      customer && customer.usercode && customer.usercode.toLowerCase().includes(searchTerm.toLowerCase())
+      customer && (customer.usercode || customer.userCode) && (customer.usercode || customer.userCode)!.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [customers, searchTerm]);
 
@@ -118,11 +120,11 @@ export function CustomerTable() {
                 paginatedCustomers.map((customer, index) => (
                   <TableRow key={customer.id || index}>
                     <TableCell className="font-medium">{customer.no}</TableCell>
-                    <TableCell>{customer.usercode}</TableCell>
-                    <TableCell>{customer.storename}</TableCell>
+                    <TableCell>{customer.usercode || customer.userCode}</TableCell>
+                    <TableCell>{customer.storename || customer.storeName}</TableCell>
                     <TableCell>{customer.address}</TableCell>
-                    <TableCell>{customer.phonenumber}</TableCell>
-                    <TableCell>{customer.businesshours}</TableCell>
+                    <TableCell>{customer.phonenumber || customer.phoneNumber}</TableCell>
+                    <TableCell>{customer.businesshours || customer.businessHours}</TableCell>
                   </TableRow>
                 ))
               ) : (
