@@ -126,16 +126,18 @@ export async function seedData(db: Firestore) {
     await batch.commit();
     console.log("Data seeding successful.");
   } catch (error) {
-    // If the error code is 'already-exists', it means our seeding flag document
-    // was already created, which implies the data is seeded. We can safely ignore this.
-    if ((error as FirestoreError).code === 'already-exists') {
-      console.log("Data has already been seeded. Skipping.");
+    if ((error as FirestoreError).code === 'permission-denied') {
+        const contextualError = new FirestorePermissionError({
+            operation: 'write',
+            path: 'batch operation', // Path is not specific to one doc in a batch
+            requestResourceData: {
+                description: 'Batch write for initial data seed failed.',
+                collections: ['staff', 'customers', 'orders', 'staffStatus', 'events', 'internal']
+            }
+        });
+        errorEmitter.emit('permission-error', contextualError);
     } else {
-      // For any other errors, we log them. This could still be a permission error
-      // if the rules are not set up at all, but it won't crash the app.
-      console.error("Data seeding failed:", error);
-      // We don't emit a global error here to avoid error loops on startup.
-      // The individual data hooks will report errors if they fail to fetch data.
+      console.error("Data seeding failed with an unexpected error:", error);
     }
   }
 }
@@ -151,5 +153,3 @@ export function DataSeeder() {
 
   return null; // This component does not render anything
 }
-
-    
