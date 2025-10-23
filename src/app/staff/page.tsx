@@ -7,7 +7,7 @@ import React from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbywC5IoTryeIFRyo7rU4hBaTb7u9p4aK1p0UBvYeuzJiyVDaHqfjYeyA61seoH9LpeQYw/exec?sheet=スタッフマスタ';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwipZ4CT_SEppWgiE4PQ1gkXtpFgaMskWbMPCNqBr_GPIrXggTbkGHjoe0jsLPgqWB-ZQ/exec';
 
 // A simple hash function to generate a number from a string
 const stringToHash = (str: string) => {
