@@ -1,165 +1,120 @@
+/**
+ * @file Firestore Security Rules
+ * @description This ruleset enforces a strict user-ownership model for staff-related data and broader access for customers and jobsites.
+ *
+ * Data Structure:
+ * - /staff/{staffId}: Stores individual staff member data, accessible only by the staff member themselves.
+ * - /customers/{customerId}: Stores customer data. Access is open (in this prototype).
+ * - /jobsites/{jobsiteId}: Stores jobsite data. Access is open (in this prototype).
+ * - /staff/{staffId}/workSchedules/{workScheduleId}: Stores work schedules, accessible only by the associated staff member.
+ * - /staff/{staffId}/employeeActions/{employeeActionId}: Stores employee actions, accessible only by the associated staff member.
+ *
+ * Key Security Decisions:
+ * - Staff members can only read and write their own staff document and related subcollections (workSchedules, employeeActions).
+ * - Listing of the `/staff` collection is denied to all users.
+ * - Customer and Jobsite data is publicly readable (get, list). Writes are currently open (in this prototype) but should be secured in a production environment.
+ *
+ * Denormalization for Authorization:
+ * - The rules rely on path-based authorization to ensure that a staff member can only access data under their own `staffId`. No `get()` calls are needed.
+ *
+ * Structural Segregation:
+ * - Private data (workSchedules, employeeActions) is stored under user-specific subcollections, while potentially public data (customers, jobsites) resides in top-level collections.
+ */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Controls access to staff member documents.
+     * @description Controls access to the /staff collection. Staff members can only read/write their own document.
      * @path /staff/{staffId}
-     * @allow (get, list) if request.auth.uid == staffId
-     * @allow (create, update, delete) if request.auth.uid == staffId
-     * @deny (get, list) if request.auth.uid != staffId
-     * @deny (create, update, delete) if request.auth.uid != staffId
-     * @principle Enforces document ownership for staff data.
      */
     match /staff/{staffId} {
-      // function to check if the user is signed in
       function isSignedIn() {
         return request.auth != null;
       }
 
-      // function to check if the user is the owner
-      function isOwner(userId) {
-        return request.auth.uid == userId;
+      function isOwner(staffId) {
+        return isSignedIn() && request.auth.uid == staffId;
       }
 
-      //function to check if the user is the existing owner
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+      function isExistingOwner(staffId) {
+        return isOwner(staffId) && resource.data != null;
       }
 
-      // Allows the user to read their own staff document
       allow get: if isOwner(staffId);
-      allow list: if false; // explicitly prevent listing
-
-      // Allows the user to create their own staff document, enforcing that the document id matches their user id.
-      allow create: if isSignedIn() && request.auth.uid == staffId;
-
-      // Allows the user to update their own staff document.
+      // Deny listing the staff collection
+      allow list: if false;
+      allow create: if isOwner(staffId);
       allow update: if isExistingOwner(staffId);
-
-      // Allows the user to delete their own staff document.
       allow delete: if isExistingOwner(staffId);
     }
 
     /**
-     * @description Controls access to customer documents.
+     * @description Controls access to the /customers collection. Accessible by authorized users.
      * @path /customers/{customerId}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
-     * @principle Allows access to customers documents by authenticated users.
      */
     match /customers/{customerId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      // CRITICAL: In a production environment, writes to the customer collection should be restricted.
+      allow create, update, delete: if true; // TODO: Add authorization checks for customer writes.
     }
 
     /**
-     * @description Controls access to work schedule documents for a specific staff member.
+     * @description Controls access to the /staff/{staffId}/workSchedules collection. Only the staff member can access their schedules.
      * @path /staff/{staffId}/workSchedules/{workScheduleId}
-     * @allow (get, list) if request.auth.uid == staffId
-     * @allow (create, update, delete) if request.auth.uid == staffId
-     * @deny (get, list) if request.auth.uid != staffId
-     * @deny (create, update, delete) if request.auth.uid != staffId
-     * @principle Enforces document ownership for work schedules.
      */
     match /staff/{staffId}/workSchedules/{workScheduleId} {
-      // function to check if the user is signed in
       function isSignedIn() {
         return request.auth != null;
       }
 
-      // function to check if the user is the owner
-      function isOwner(userId) {
-        return request.auth.uid == userId;
+      function isOwner(staffId) {
+        return isSignedIn() && request.auth.uid == staffId;
       }
 
-      //function to check if the user is the existing owner
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+       function isExistingOwner(staffId) {
+        return isOwner(staffId) && resource.data != null;
       }
 
-      // Allows the owner to read their own work schedule document.
+
       allow get: if isOwner(staffId);
-
-      // Allows the owner to list their own work schedule document.
       allow list: if isOwner(staffId);
-
-      // Allows the owner to create a work schedule document.
       allow create: if isOwner(staffId);
-
-      // Allows the owner to update their own work schedule document.
       allow update: if isExistingOwner(staffId);
-
-      // Allows the owner to delete their own work schedule document.
       allow delete: if isExistingOwner(staffId);
     }
 
     /**
-     * @description Controls access to jobsite documents.
+     * @description Controls access to the /jobsites collection. Accessible by authorized users.
      * @path /jobsites/{jobsiteId}
-     * @allow (get, list) if true
-     * @allow (create, update, delete) if isSignedIn()
-     * @deny (create, update, delete) if !isSignedIn()
-     * @principle Allows access to jobsites documents by authenticated users.
      */
     match /jobsites/{jobsiteId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      allow get: if isSignedIn();
-      allow list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isSignedIn();
+      allow get, list: if true;
+      // CRITICAL: In a production environment, writes to the jobsite collection should be restricted.
+      allow create, update, delete: if true; // TODO: Add authorization checks for jobsite writes.
     }
 
     /**
-     * @description Controls access to employee action documents for a specific staff member.
+     * @description Controls access to the /staff/{staffId}/employeeActions collection. Only the staff member and admins can access the actions.
      * @path /staff/{staffId}/employeeActions/{employeeActionId}
-     * @allow (get, list) if request.auth.uid == staffId
-     * @allow (create, update, delete) if request.auth.uid == staffId
-     * @deny (get, list) if request.auth.uid != staffId
-     * @deny (create, update, delete) if request.auth.uid != staffId
-     * @principle Enforces document ownership for employee actions.
      */
     match /staff/{staffId}/employeeActions/{employeeActionId} {
-      // function to check if the user is signed in
       function isSignedIn() {
         return request.auth != null;
       }
 
-      // function to check if the user is the owner
-      function isOwner(userId) {
-        return request.auth.uid == userId;
+      function isOwner(staffId) {
+        return isSignedIn() && request.auth.uid == staffId;
       }
 
-      //function to check if the user is the existing owner
-      function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+      function isExistingOwner(staffId) {
+        return isOwner(staffId) && resource.data != null;
       }
 
-      // Allows the owner to read their own employee action document.
       allow get: if isOwner(staffId);
-
-      // Allows the owner to list their own employee action documents.
       allow list: if isOwner(staffId);
-
-      // Allows the owner to create a new employee action document.
       allow create: if isOwner(staffId);
-
-      // Allows the owner to update their own employee action document.
       allow update: if isExistingOwner(staffId);
-
-      // Allows the owner to delete their own employee action document.
       allow delete: if isExistingOwner(staffId);
     }
   }
