@@ -49,14 +49,16 @@ export function GasImporter() {
         dataToDisplay = result;
       } else if (result && typeof result === 'object' && Array.isArray(result.data)) {
         dataToDisplay = result.data;
+      } else if (result && typeof result === 'object' && Object.keys(result).length > 0) {
+        // If it's an object, but not the expected format, don't try to make a table out of it
+        // but also don't throw an error. The raw view is what's important here.
+        dataToDisplay = []; 
       }
 
-      if (dataToDisplay && dataToDisplay.length > 0) {
-        setTableData(dataToDisplay);
-      } else {
-        setTableData([]);
-        // Don't set an error here if the data is just empty, the raw view is more important.
+      if (dataToDisplay) {
+         setTableData(dataToDisplay);
       }
+      
     } catch (e: unknown) {
       console.error('GAS Fetch Error:', e);
        if (isFetchError(e)) {
@@ -136,7 +138,7 @@ export function GasImporter() {
            <CardHeader>
              <CardTitle>取得データプレビュー</CardTitle>
               <CardDescription>
-                {tableData.length > 0 ? `最初の${tableData.length}件のデータを表示しています。` : '表示するデータがありません。'}
+                {tableData.length > 0 ? `取得した ${tableData.length} 件のデータを表示しています。` : '表示するテーブルデータがありません。生のデータ（Raw Response）を確認してください。'}
               </CardDescription>
            </CardHeader>
            <CardContent>
