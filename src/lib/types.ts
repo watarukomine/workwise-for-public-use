@@ -11,18 +11,14 @@ export type Staff = {
 export type Customer = {
   id: string;
   no?: string;
-  userCode?: string; // from sheet
-  usercode?: string; // from sheet, api lowercases it
+  userCode?: string;
   storeName?: string;
-  storename?: string;
   address: string;
   latitude?: number;
   longitude?: number;
   phoneNumber?: string;
-  phonenumber?: string;
   businessHours?: string;
-  businesshours?: string;
-  name?: string; // for search
+  name?: string; 
 };
 
 export type ScheduleEvent = {

@@ -2,6 +2,7 @@
 'use client';
 import * as React from 'react';
 import type { Customer } from '@/lib/types';
+import { customerData } from '@/lib/data'; // Import local data
 import {
   Table,
   TableBody,
@@ -17,49 +18,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { AlertCircle } from 'lucide-react';
-
-// We will now fetch from our own API route
-const API_URL = '/api/customers';
 
 export function CustomerTable() {
-  const [customers, setCustomers] = React.useState<Customer[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  // Use local data directly
+  const [customers] = React.useState<Customer[]>(customerData);
+  const [isLoading, setIsLoading] = React.useState(false); // No real fetching, so set to false
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
 
-  React.useEffect(() => {
-    const fetchCustomers = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(API_URL);
-        const data = await response.json();
-
-        if (!response.ok || data.error) {
-          const errorMessage = data.message || `データの取得に失敗しました。ステータス: ${response.status}`;
-          throw new Error(errorMessage);
-        }
-        
-        setCustomers(data);
-      } catch (e: any) {
-        console.error('Error fetching customers from API route:', e);
-        setError(e.message || '顧客データの取得中にエラーが発生しました。しばらくしてから再度お試しください。');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCustomers();
-  }, []);
-
   const filteredCustomers = React.useMemo(() => {
-    // API returns keys in lowercase, ensure we match that
     return customers.filter(customer =>
-      customer && (customer.usercode || customer.userCode) && (customer.usercode || customer.userCode)!.toLowerCase().includes(searchTerm.toLowerCase())
+      customer && customer.userCode && customer.userCode.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [customers, searchTerm]);
 
@@ -71,16 +41,6 @@ export function CustomerTable() {
   }, [filteredCustomers, page, rowsPerPage]);
 
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
-
-  if (error) {
-    return (
-        <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>エラー</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-        </Alert>
-    );
-  }
 
   return (
     <Card>
@@ -119,17 +79,17 @@ export function CustomerTable() {
                 paginatedCustomers.map((customer, index) => (
                   <TableRow key={customer.id || index}>
                     <TableCell className="font-medium">{customer.no}</TableCell>
-                    <TableCell>{customer.usercode || customer.userCode}</TableCell>
-                    <TableCell>{customer.storename || customer.storeName}</TableCell>
+                    <TableCell>{customer.userCode}</TableCell>
+                    <TableCell>{customer.storeName}</TableCell>
                     <TableCell>{customer.address}</TableCell>
-                    <TableCell>{customer.phonenumber || customer.phoneNumber}</TableCell>
-                    <TableCell>{customer.businesshours || customer.businessHours}</TableCell>
+                    <TableCell>{customer.phoneNumber}</TableCell>
+                    <TableCell>{customer.businessHours}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    {customers && customers.length === 0 ? "顧客情報が見つかりません。" : "検索条件に合う顧客が見つかりません。"}
+                    {customers.length === 0 ? "顧客情報が見つかりません。" : "検索条件に合う顧客が見つかりません。"}
                   </TableCell>
                 </TableRow>
               )}
