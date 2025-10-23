@@ -5,6 +5,8 @@ import { Firestore, collection, doc, writeBatch, getDoc, serverTimestamp } from 
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useEffect } from 'react';
 import { useFirestore } from './provider';
+import { errorEmitter } from './error-emitter';
+import { FirestorePermissionError } from './errors';
 
 const staffDataSeed = [
   {
@@ -74,17 +76,12 @@ export async function seedData(db: Firestore) {
   try {
     const docSnap = await getDoc(seededFlagRef);
     if (docSnap.exists()) {
-      console.log("Data has already been seeded.");
       return;
     }
   } catch (error) {
-     console.error("Error checking if data is seeded: ", error);
      // We might not have permission to read `internal/seeded` yet.
      // We'll proceed, and if the write fails, that's okay.
   }
-
-
-  console.log("Seeding data...");
 
   const batch = writeBatch(db);
 
@@ -93,39 +90,38 @@ export async function seedData(db: Firestore) {
   };
 
   // Seed staff
-  const staffCollection = collection(db, 'staff');
+  const staffCollectionRef = collection(db, 'staff');
   staffDataSeed.forEach(staffMember => {
-    const docRef = doc(staffCollection, staffMember.id);
+    const docRef = doc(staffCollectionRef, staffMember.id);
     const avatarUrl = getAvatarUrl(staffMember.avatarId);
     batch.set(docRef, { ...staffMember, avatarUrl });
   });
 
   // Seed customers
-  const customersCollection = collection(db, 'customers');
+  const customersCollectionRef = collection(db, 'customers');
   customerDataSeed.forEach(customer => {
-    const docRef = doc(customersCollection, customer.id);
+    const docRef = doc(customersCollectionRef, customer.id);
     batch.set(docRef, customer);
   });
 
   // Seed orders
-  const ordersCollection = collection(db, 'orders');
+  const ordersCollectionRef = collection(db, 'orders');
   ordersDataSeed.forEach(order => {
-      const docRef = doc(ordersCollection, order.id);
+      const docRef = doc(ordersCollectionRef, order.id);
       batch.set(docRef, order);
   });
 
   // Seed staff status
-  const staffStatusCollection = collection(db, 'staffStatus');
+  const staffStatusCollectionRef = collection(db, 'staffStatus');
   staffStatusSeed.forEach(status => {
-      // Use staffId as document ID for easy lookup
-      const docRef = doc(staffStatusCollection, status.staffId);
+      const docRef = doc(staffStatusCollectionRef, status.staffId);
       batch.set(docRef, status);
   });
 
   // Seed events (if any)
-  const eventsCollection = collection(db, 'events');
+  const eventsCollectionRef = collection(db, 'events');
   eventsSeed.forEach((event: any) => {
-      const docRef = doc(eventsCollection, event.id);
+      const docRef = doc(eventsCollectionRef, event.id);
       batch.set(docRef, {
         ...event,
         start: new Date(event.start),
@@ -138,11 +134,15 @@ export async function seedData(db: Firestore) {
 
   try {
     await batch.commit();
-    console.log("Data seeding successful!");
   } catch (error) {
-    console.error("Error seeding data: ", error);
     // This can happen if rules are not yet permissive enough.
-    // The next time the user logs in with the correct rules, it might not be seeded.
+    // By creating and emitting a contextual error, we can debug it.
+    const contextualError = new FirestorePermissionError({
+        path: 'multiple collections', // Path is not specific to one collection for a batch write
+        operation: 'write', // Batch commit is a write operation
+        requestResourceData: 'Multiple documents across collections (staff, customers, etc.)'
+    });
+    errorEmitter.emit('permission-error', contextualError);
   }
 }
 
@@ -157,5 +157,3 @@ export function DataSeeder() {
 
   return null; // This component does not render anything
 }
-
-    
