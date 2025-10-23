@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Firestore, collection, doc, writeBatch, getDoc, serverTimestamp, FirestoreError } from 'firebase/firestore';
+import { Firestore, collection, doc, writeBatch, serverTimestamp, FirestoreError } from 'firebase/firestore';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useEffect } from 'react';
 import { useFirestore } from './provider';
@@ -162,5 +162,3 @@ export function DataSeeder() {
 
   return null; // This component does not render anything
 }
-
-    
