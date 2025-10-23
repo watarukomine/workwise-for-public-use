@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
-import { customerData, staffData, scheduleData as initialScheduleData, unassignedOrdersData, staffStatusData } from '@/lib/data';
+import { customerData, scheduleData as initialScheduleData, unassignedOrdersData, staffStatusData } from '@/lib/data';
 import type { Customer, Order, ScheduleEvent, Staff, StaffStatus, WithId } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 
@@ -12,14 +12,14 @@ export default function DashboardPage() {
   const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>(initialScheduleData);
   const [orders, setOrders] = React.useState<WithId<Order>[]>(unassignedOrdersData);
   const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
-  const { appliedSelectedStaffIds } = useSelectedStaff();
+  const { appliedSelectedStaffIds, allStaff } = useSelectedStaff();
 
   const filteredStaff = React.useMemo(() => {
     if (appliedSelectedStaffIds.length === 0) {
-      return staffData; // If no staff are selected, show all
+      return allStaff; // If no staff are selected, show all from context
     }
-    return staffData.filter(staff => appliedSelectedStaffIds.includes(staff.id));
-  }, [appliedSelectedStaffIds]);
+    return allStaff.filter(staff => appliedSelectedStaffIds.includes(staff.id));
+  }, [appliedSelectedStaffIds, allStaff]);
 
 
   return (

@@ -7,7 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import type { Customer, Staff, StaffStatus } from '@/lib/types';
-import { customerData, staffData, staffStatusData } from '@/lib/data';
+import { customerData, staffStatusData } from '@/lib/data';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 
 export default function OptimizerPage() {
@@ -16,14 +16,14 @@ export default function OptimizerPage() {
   const [avoidHighways, setAvoidHighways] = React.useState(false);
 
   const [customers] = React.useState<Customer[]>(customerData);
-  const { appliedSelectedStaffIds } = useSelectedStaff();
+  const { appliedSelectedStaffIds, allStaff } = useSelectedStaff();
 
   const filteredStaff = React.useMemo(() => {
     if (appliedSelectedStaffIds.length === 0) {
-      return staffData; // No selection, show all
+      return allStaff; // No selection, show all from context
     }
-    return staffData.filter(s => appliedSelectedStaffIds.includes(s.id));
-  }, [appliedSelectedStaffIds]);
+    return allStaff.filter(s => appliedSelectedStaffIds.includes(s.id));
+  }, [appliedSelectedStaffIds, allStaff]);
 
 
   const staffWithStatus = React.useMemo(() => {
@@ -38,7 +38,7 @@ export default function OptimizerPage() {
     setAvoidHighways(options.avoidHighways);
   }
   
-  const isLoading = !customers || !staffData;
+  const isLoading = !customers || !allStaff;
 
   return (
     <div className="space-y-8">

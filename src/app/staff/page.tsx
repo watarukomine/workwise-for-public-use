@@ -6,34 +6,31 @@ import type { Staff } from '@/lib/types';
 import React from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { useSelectedStaff } from "@/contexts/selected-staff-context";
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzRjvswFbeYdVn_XMDdXFmcE0X--0q8PW-TwQzCWQvBj7JzbswiNDmdchJN68vw7L-oyw/exec';
 
-// A simple hash function to generate a number from a string
 const stringToHash = (str: string) => {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
     hash = (hash << 5) - hash + char;
-    hash |= 0; // Convert to 32bit integer
+    hash |= 0; 
   }
   return Math.abs(hash);
 };
 
-// Function to generate a more distinct HSL color from a string
 const generateHslColorFromString = (str: string) => {
   const hash = stringToHash(str);
-  // Use a golden angle ratio to generate more distinct hues.
-  // This ensures that successive colors are far apart on the color wheel.
   const hue = (hash * 137.508) % 360; 
-  const saturation = 70 + (hash % 15); // Saturation (70-85%)
-  const lightness = 55 + (hash % 10); // Lightness (55-65%) for good contrast
+  const saturation = 70 + (hash % 15);
+  const lightness = 55 + (hash % 10);
   return `hsl(${hue.toFixed(0)}, ${saturation.toFixed(0)}%, ${lightness.toFixed(0)}%)`;
 };
 
 
 export default function StaffPage() {
-  const [staff, setStaff] = React.useState<Staff[]>([]);
+  const { allStaff, setAllStaff } = useSelectedStaff();
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -56,7 +53,7 @@ export default function StaffPage() {
         }
 
         if (rawData !== null && Array.isArray(rawData)) {
-          const formattedStaff = rawData.map((member, index) => {
+          const formattedStaff: Staff[] = rawData.map((member, index) => {
             const staffId = member['スタッフID'] || `temp-id-${index}`;
             const color = member['カラー'] || generateHslColorFromString(staffId);
             
@@ -65,18 +62,17 @@ export default function StaffPage() {
               name: member['スタッフ名'] || '名前なし',
               calendarId: member['カレンダーID'] || '',
               color: color,
-              avatarUrl: member.avatarUrl || `https://picsum.photos/seed/${staffId}/100/100`
+              avatarUrl: member.avatarUrl || '' // Removed picsum photos
             };
           });
-          setStaff(formattedStaff);
+          setAllStaff(formattedStaff);
         } else {
-          // Handle unexpected formats without crashing
           if (result && typeof result === 'object' && Object.keys(result).length === 0) {
-            setStaff([]); // If GAS returns {}, it means empty sheet.
+            setAllStaff([]);
           } else {
             console.error('Unexpected data format from GAS:', result);
             setError('GASから受信したデータの形式が予期せぬものです。');
-            setStaff([]);
+            setAllStaff([]);
           }
         }
 
@@ -97,7 +93,8 @@ export default function StaffPage() {
     };
 
     fetchStaff();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // setAllStaffを依存配列から削除
 
   return (
     <div className="space-y-8">
@@ -114,7 +111,7 @@ export default function StaffPage() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-      <StaffTable staff={staff} isLoading={isLoading} />
+      <StaffTable staff={allStaff} isLoading={isLoading} />
     </div>
   );
 }
