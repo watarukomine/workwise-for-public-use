@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import type { Customer } from '@/lib/types';
@@ -27,15 +28,16 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
 
+  const validCustomers = Array.isArray(customers) ? customers : [];
+
   const filteredCustomers = React.useMemo(() => {
-    if (!customers) return [];
     if (searchTerm.trim() === '') {
-      return customers;
+      return validCustomers;
     }
-    return customers.filter(customer =>
+    return validCustomers.filter(customer =>
       customer && customer.ユーザーコード && String(customer.ユーザーコード).toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [customers, searchTerm]);
+  }, [validCustomers, searchTerm]);
 
   const paginatedCustomers = React.useMemo(() => {
     return filteredCustomers.slice(
@@ -93,7 +95,7 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
-                    {customers && customers.length === 0 && !searchTerm ? "販売店情報が見つかりません。" : "検索条件に合う販売店が見つかりません。"}
+                    {validCustomers.length === 0 && !searchTerm ? "販売店情報が見つかりません。" : "検索条件に合う販売店が見つかりません。"}
                   </TableCell>
                 </TableRow>
               )}

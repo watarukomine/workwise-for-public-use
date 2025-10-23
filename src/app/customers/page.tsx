@@ -10,7 +10,7 @@ import { AlertCircle } from 'lucide-react';
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyodF8JkDDsa94t5duYustImTCASnyk4W3wXlLTL2RJSIL75FihzGkK6oAIg5GEUaxgrw/exec';
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = React.useState<Customer[]>([]);
+  const [customers, setCustomers] = React.useState<any[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -38,9 +38,16 @@ export default function CustomersPage() {
         if (customerData !== null) {
           setCustomers(customerData);
         } else {
-          // Log the unexpected format to the console for debugging instead of throwing an error
-          console.log('GAS response received, but in an unexpected format:', result);
-          setError('GASから受信したデータの形式が予期せぬものです。開発者コンソールで内容を確認してください。');
+          // If the format is still unexpected, pass the raw result if it's an array-like object,
+          // otherwise set to empty array and log an error.
+          if (result && typeof result === 'object') {
+            // Check for common spreadsheet-to-json conversion formats
+             setCustomers(Array.isArray(result) ? result : []);
+          } else {
+             setCustomers([]);
+          }
+           console.log('GAS response received, but in an unexpected format:', result);
+           setError('GASから受信したデータの形式が予期せぬものです。開発者コンソールで内容を確認してください。');
         }
 
       } catch (e: unknown) {
