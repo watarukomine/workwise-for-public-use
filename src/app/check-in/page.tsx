@@ -4,10 +4,10 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2 } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-type ActionType = 'Arrive' | 'Begin Task' | 'Finish Task' | 'Depart';
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task';
 
 export default function CheckInPage() {
   const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
@@ -19,6 +19,22 @@ export default function CheckInPage() {
   const handleAction = (action: ActionType) => {
     setIsLoading(action);
     setError(null);
+
+    // For actions that don't require location, handle them immediately.
+    if (action === 'Clock In' || action === 'Clock Out') {
+        console.log(`Action: ${action}`);
+        setTimeout(() => {
+          const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          setLastAction({ action, time: currentTime });
+          toast({
+            title: 'アクションを記録しました',
+            description: `${action} at ${currentTime}`,
+          });
+          setIsLoading(null);
+        }, 1000);
+        return;
+    }
+
 
     if (!navigator.geolocation) {
       setError('お使いのブラウザは位置情報取得に対応していません。');
@@ -72,11 +88,25 @@ export default function CheckInPage() {
   };
 
   const actionButtons: { action: ActionType; label: string; icon: React.ElementType }[] = [
+    { action: 'Clock In', label: '出勤', icon: LogIn },
+    { action: 'Clock Out', label: '退勤', icon: LogOut },
+    { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },
-    { action: 'Finish Task', label: '作業終了', icon: Clock },
-    { action: 'Depart', label: '現場出発', icon: MapPin },
+    { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
   ];
+
+  const getJapaneseActionName = (action: ActionType) => {
+    const map: Record<ActionType, string> = {
+        'Clock In': '出勤',
+        'Clock Out': '退勤',
+        'Start Travel': '移動開始',
+        'Arrive': '現場到着',
+        'Begin Task': '作業開始',
+        'Finish Task': '作業終了'
+    };
+    return map[action];
+  }
 
   return (
     <div className="max-w-md mx-auto space-y-6">
@@ -120,8 +150,8 @@ export default function CheckInPage() {
               <MapPin className="h-4 w-4" />
               <AlertTitle>最後の記録</AlertTitle>
               <AlertDescription>
-                {lastAction.action} @ {lastAction.time}
-                {location && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
+                {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
+                {location && (lastAction.action !== 'Clock In' && lastAction.action !== 'Clock Out') && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
               </AlertDescription>
             </Alert>
           )}
