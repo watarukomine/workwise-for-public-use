@@ -1,23 +1,5 @@
-
 'use client';
 
-// This file is no longer used due to the removal of Firebase functionality.
-// It is kept for potential future re-integration.
-
-import React, { type ReactNode } from 'react';
-
-interface FirebaseClientProviderProps {
-  children: ReactNode;
-}
-
-export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
-  // Since Firebase is disabled, we just render the children.
-  // The original provider logic is commented out below for reference.
-  return <>{children}</>;
-}
-
-/*
-// Original implementation:
 import React, { useMemo, type ReactNode } from 'react';
 import { FirebaseProvider } from '@/firebase/provider';
 import { initializeFirebase } from '@/firebase';
@@ -42,4 +24,3 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     </FirebaseProvider>
   );
 }
-*/
