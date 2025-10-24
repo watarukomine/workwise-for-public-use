@@ -13,6 +13,7 @@ import {
   Map,
   ClipboardList,
   Upload,
+  MapPin,
 } from 'lucide-react';
 
 import {
@@ -52,6 +53,7 @@ const navItems = [
   { href: '/staff', label: 'スタッフ一覧', icon: Users },
   { href: '/optimizer', label: 'ルート最適化', icon: Map },
   { href: '/import', label: 'データ取込', icon: Upload },
+  { href: '/check-in', label: 'チェックイン', icon: MapPin },
 ];
 
 const mockUser = {
