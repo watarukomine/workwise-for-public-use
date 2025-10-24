@@ -4,7 +4,7 @@
 import React from 'react';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useFirestore } from '@/firebase/provider';
-import { collection } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { StaffTable } from '@/components/staff/staff-table';
 import type { Staff, WithId } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
@@ -21,43 +21,42 @@ export default function StaffPage() {
   const { allStaff: staffFromContext, setAllStaff } = useSelectedStaff();
 
   const isAdmin = profile?.role === 'admin';
+  const isStaff = profile?.role === 'staff';
   const isLoading = isAuthLoading || isProfileLoading;
 
-  const staffCollectionRef = useMemoFirebase(
-    () => (firestore && user && isAdmin && !isLoading ? collection(firestore, 'staff') : null),
-    [firestore, user, isAdmin, isLoading]
-  );
+  const staffQuery = useMemoFirebase(() => {
+    if (!firestore || !user || isLoading) return null;
+    
+    if (isAdmin) {
+      return collection(firestore, 'staff');
+    }
+    
+    if (isStaff && user.email) {
+      return query(collection(firestore, 'staff'), where('email', '==', user.email));
+    }
+
+    return null;
+  }, [firestore, user, isAdmin, isStaff, isLoading]);
   
-  const { data: staffFromHook, isLoading: isStaffLoading, error } = useCollection<WithId<Staff>>(staffCollectionRef);
+  const { data: staffFromHook, isLoading: isStaffLoading, error } = useCollection<WithId<Staff>>(staffQuery);
 
   React.useEffect(() => {
-    if (isAdmin) {
-      if (staffFromHook) {
-        const formattedStaff = staffFromHook.map(s => ({
-          id: s.id,
-          name: s.name,
-          email: s.email || null,
-          avatarUrl: s.avatarUrl,
-          color: s.color,
-          role: s.role === 'admin' || s.role === 'staff' ? s.role : 'staff',
-        }));
-        setAllStaff(formattedStaff);
-      }
-    } else if (!isLoading && profile) {
-      // For non-admins, show only their own profile
-      const selfStaff: WithId<Staff> = {
-        id: profile.uid,
-        name: profile.displayName || 'Unknown',
-        email: profile.email,
-        role: profile.role,
-      };
-      setAllStaff([selfStaff]);
+    if (staffFromHook) {
+      const formattedStaff = staffFromHook.map(s => ({
+        id: s.id,
+        name: s.name,
+        email: s.email || null,
+        avatarUrl: s.avatarUrl,
+        color: s.color,
+        role: s.role === 'admin' || s.role === 'staff' ? s.role : 'staff',
+      }));
+      setAllStaff(formattedStaff);
     } else if (!isLoading && !user) {
         setAllStaff([]);
     }
-  }, [staffFromHook, setAllStaff, isLoading, isAdmin, profile, user]);
+  }, [staffFromHook, setAllStaff, isLoading, user]);
 
-  const effectiveIsLoading = isLoading || (isAdmin && isStaffLoading);
+  const effectiveIsLoading = isLoading || isStaffLoading;
   
   return (
     <div className="space-y-8">
@@ -73,7 +72,7 @@ export default function StaffPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>データ取得エラー</AlertTitle>
           <AlertDescription>
-            スタッフ情報の取得中にエラーが発生しました。管理者権限がない可能性があります。
+            スタッフ情報の取得中にエラーが発生しました。権限を確認してください。
             <pre className="mt-2 text-xs bg-gray-800 p-2 rounded"><code>{error.message}</code></pre>
           </AlertDescription>
         </Alert>

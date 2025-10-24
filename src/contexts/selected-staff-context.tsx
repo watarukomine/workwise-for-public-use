@@ -26,17 +26,26 @@ const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>
 
 export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
+  const { user, isLoading: isAuthLoading } = useUser();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { toast } = useToast();
 
   const isAdmin = profile?.role === 'admin';
-
-  const staffCollectionRef = useMemoFirebase(
-    () => (firestore && isAdmin && !isProfileLoading ? collection(firestore, 'staff') : null),
-    [firestore, isAdmin, isProfileLoading]
-  );
+  const isStaff = profile?.role === 'staff';
+  const isLoading = isAuthLoading || isProfileLoading;
   
-  const { data: staffFromHook } = useCollection<WithId<Staff>>(staffCollectionRef);
+  const staffQuery = useMemoFirebase(() => {
+    if (!firestore || !user || isLoading) return null;
+    if (isAdmin) {
+      return collection(firestore, 'staff');
+    }
+    if (isStaff && user.email) {
+      return query(collection(firestore, 'staff'), where('email', '==', user.email));
+    }
+    return null;
+  }, [firestore, user, isAdmin, isStaff, isLoading]);
+  
+  const { data: staffFromHook } = useCollection<WithId<Staff>>(staffQuery);
 
   const [allStaff, setAllStaff] = useState<WithId<Staff>[]>([]);
   const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
@@ -45,21 +54,10 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (staffFromHook) {
        setAllStaff(staffFromHook);
-    } else if (!isProfileLoading && !isAdmin) {
-      // If the user is not an admin, 'allStaff' should just be their own profile
-      if (profile) {
-        const selfStaff: WithId<Staff> = {
-            id: profile.uid,
-            name: profile.displayName || 'Unknown',
-            email: profile.email,
-            role: profile.role
-        };
-        setAllStaff([selfStaff]);
-      } else {
-        setAllStaff([]);
-      }
+    } else if (!isLoading && !user) {
+       setAllStaff([]);
     }
-  }, [staffFromHook, isAdmin, isProfileLoading, profile]);
+  }, [staffFromHook, isLoading, user]);
 
 
   // On initial mount, load applied IDs from localStorage
