@@ -6,7 +6,7 @@ import { useUser } from '@/firebase/auth/use-user';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import type { UserProfile } from '@/lib/types';
 import { useFirestore } from '@/firebase/provider';
-import { doc } from 'firebase/firestore';
+import { doc, DocumentReference, DocumentData } from 'firebase/firestore';
 
 interface UserProfileContextType {
   profile: UserProfile | null;
@@ -23,12 +23,14 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
   // Create a document reference only when the user ID is available.
   const userProfileRef = React.useMemo(() => {
     if (firestore && user?.uid) {
-      return doc(firestore, 'users', user.uid);
+      return doc(firestore, 'users', user.uid) as DocumentReference<DocumentData>;
     }
-    return undefined; 
+    // Return null if firestore or user is not available
+    return null;
   }, [firestore, user?.uid]);
 
   // Use the useDoc hook to fetch the profile data.
+  // The hook is designed to handle null references gracefully.
   const { data: profile, isLoading: isProfileLoading, error: profileError } = useDoc<UserProfile>(userProfileRef);
 
   const value = {
@@ -43,5 +45,3 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     </UserProfileContext.Provider>
   );
 }
-
-    
