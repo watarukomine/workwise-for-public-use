@@ -1,4 +1,3 @@
-
 'use client';
 
 import { 
@@ -6,23 +5,56 @@ import {
   signInWithPopup,
   signOut as firebaseSignOut,
   type Auth,
+  type User,
 } from 'firebase/auth';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 
 // This function should be called within a component or another client-side function.
-const getAuthInstance = (): Auth => {
-  // Directly initialize and get auth instance to ensure it's always available.
-  const { auth } = initializeFirebase();
-  return auth;
+const getAuthAndFirestore = () => {
+  // Directly initialize and get auth and firestore instances.
+  const { auth, firestore } = initializeFirebase();
+  return { auth, firestore };
 };
 
+const createUserProfileDocument = async (user: User) => {
+    const { firestore } = getAuthAndFirestore();
+    const userRef = doc(firestore, 'users', user.uid);
+    const snapshot = await getDoc(userRef);
+
+    if (!snapshot.exists()) {
+        const { displayName, email, photoURL } = user;
+        const createdAt = serverTimestamp();
+        
+        try {
+            await setDoc(userRef, {
+                uid: user.uid,
+                displayName,
+                email,
+                photoURL,
+                role: 'staff', // Default role for new users
+                createdAt,
+            });
+        } catch (error) {
+            console.error("Error creating user profile document: ", error);
+        }
+    }
+    // If the document already exists, do nothing.
+    // Role escalation should be handled manually in the Firebase console or by a trusted admin function.
+};
+
+
 export const signIn = async () => {
-  const auth = getAuthInstance();
+  const { auth } = getAuthAndFirestore();
   const provider = new GoogleAuthProvider();
   try {
     console.log("Attempting to sign in with Google...");
     const result = await signInWithPopup(auth, provider);
     console.log("Google sign-in successful:", result.user.uid);
+    
+    // Create a user profile document in Firestore if it doesn't exist
+    await createUserProfileDocument(result.user);
+
   } catch (error: any) {
     // Specific check for 'auth/operation-not-allowed'
     if (error.code === 'auth/operation-not-allowed') {
@@ -42,4 +74,10 @@ export const signOut = async () => {
   } catch (error) {
     console.error('Error signing out: ', error);
   }
+};
+
+// Helper function to get only auth instance, used in signOut where firestore is not needed.
+const getAuthInstance = (): Auth => {
+  const { auth } = initializeFirebase();
+  return auth;
 };
