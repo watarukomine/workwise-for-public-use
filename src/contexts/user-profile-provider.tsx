@@ -4,12 +4,12 @@
 import React, { createContext, ReactNode } from 'react';
 import { useUser } from '@/firebase/auth/use-user';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import type { UserProfile } from '@/lib/types';
+import type { Staff } from '@/lib/types'; // Changed from UserProfile to Staff
 import { useFirestore, useMemoFirebase } from '@/firebase/provider';
 import { doc, DocumentReference } from 'firebase/firestore';
 
 interface UserProfileContextType {
-  profile: UserProfile | null;
+  profile: Staff | null; // Changed from UserProfile to Staff
   isLoading: boolean;
   error: Error | null;
 }
@@ -20,18 +20,17 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
   const { user, isLoading: isUserLoading, error: userError } = useUser();
   const firestore = useFirestore();
 
-  // Create a document reference only when the user ID is available.
-  const userProfileRef = useMemoFirebase(() => {
+  // Create a document reference to the 'staff' collection instead of 'users'
+  const staffProfileRef = useMemoFirebase(() => {
     if (firestore && user?.uid) {
-      return doc(firestore, 'users', user.uid) as DocumentReference<UserProfile>;
+      // Point to the 'staff' collection with the user's UID
+      return doc(firestore, 'staff', user.uid) as DocumentReference<Staff>;
     }
-    // Return null if firestore or user is not available
     return null;
   }, [firestore, user?.uid]);
 
-  // Use the useDoc hook to fetch the profile data.
-  // The hook is designed to handle null references gracefully.
-  const { data: profile, isLoading: isProfileLoading, error: profileError } = useDoc<UserProfile>(userProfileRef);
+  // Use the useDoc hook to fetch the profile data from the 'staff' collection
+  const { data: profile, isLoading: isProfileLoading, error: profileError } = useDoc<Staff>(staffProfileRef);
 
   const value = {
     profile: profile || null,
@@ -45,3 +44,5 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     </UserProfileContext.Provider>
   );
 }
+
+    

@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -6,8 +7,9 @@ import {
   signOut as firebaseSignOut,
   type Auth,
   type User,
+  updateProfile,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 
 const getAuthAndFirestore = () => {
@@ -15,55 +17,36 @@ const getAuthAndFirestore = () => {
   return { auth, firestore };
 };
 
-const createUserProfileDocument = async (user: User, name?: string) => {
+const createStaffDocument = async (user: User, name: string) => {
   const { firestore } = getAuthAndFirestore();
   if (!user.uid) return;
 
-  const userRef = doc(firestore, 'users', user.uid);
-  const staffRef = doc(firestore, 'staff', user.uid); // staffドキュメントの参照も作成
+  const staffRef = doc(firestore, 'staff', user.uid);
+  const staffSnapshot = await getDoc(staffRef);
 
-  const userSnapshot = await getDoc(userRef);
-
-  if (!userSnapshot.exists()) {
+  if (!staffSnapshot.exists()) {
     const { email, photoURL } = user;
-    const displayName = name || email?.split('@')[0] || 'New User';
     const createdAt = serverTimestamp();
     
-    // ユーザープロファイルデータ
-    const userProfileData = {
-      uid: user.uid,
-      displayName: displayName,
-      email,
-      photoURL,
-      role: 'staff', // デフォルトの役割
+    // The new unified staff data
+    const staffData = {
+      id: user.uid,
+      name: name,
+      email: email,
+      photoURL: photoURL,
+      role: 'staff', // Default role for new sign-ups
+      color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`,
       createdAt,
     };
 
-    // スタッフデータ
-    const staffData = {
-      id: user.uid,
-      name: displayName,
-      email: email,
-      role: 'staff',
-      color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`, // ランダムな色を割り当て
-    };
-
     try {
-      // usersとstaffの両方にドキュメントを作成
-      await setDoc(userRef, userProfileData);
       await setDoc(staffRef, staffData);
+      // Also update the auth user profile's displayName
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName: name });
+      }
     } catch (error) {
-      console.error("Error creating user profile and staff documents: ", error);
-    }
-  } else {
-    // 既存ユーザーの場合、表示名が指定されていれば更新する
-    if (name) {
-        try {
-            await updateDoc(userRef, { displayName: name });
-            await updateDoc(staffRef, { name: name }); // staffドキュメントも更新
-        } catch (error) {
-            console.error("Error updating display name: ", error);
-        }
+      console.error("Error creating staff document: ", error);
     }
   }
 };
@@ -72,7 +55,7 @@ const createUserProfileDocument = async (user: User, name?: string) => {
 export const signUpWithEmail = async (email: string, password: string, name: string) => {
     const { auth } = getAuthAndFirestore();
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    await createUserProfileDocument(userCredential.user, name);
+    await createStaffDocument(userCredential.user, name);
     return userCredential;
 }
 
@@ -89,3 +72,5 @@ export const signOut = async () => {
     console.error('Error signing out: ', error);
   }
 };
+
+    

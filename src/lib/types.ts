@@ -3,22 +3,24 @@ import type { Timestamp } from 'firebase/firestore';
 
 export type WithId<T> = T & { id: string };
 
-export type UserProfile = {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
-  role: 'admin' | 'staff';
-};
+// This type is no longer needed as we merged UserProfile into Staff
+// export type UserProfile = {
+//   uid: string;
+//   email: string | null;
+//   displayName: string | null;
+//   photoURL: string | null;
+//   role: 'admin' | 'staff';
+// };
 
 export type Staff = {
-  id: string;
+  id: string; // Corresponds to Firebase Auth UID
   name: string;
   email: string | null;
-  calendarId?: string; // Made optional
-  avatarUrl?: string; // Made optional
-  color?: string; // Made optional
-  role?: 'admin' | 'staff';
+  photoURL?: string | null;
+  calendarId?: string; 
+  avatarUrl?: string; 
+  color?: string; 
+  role: 'admin' | 'staff';
 };
 
 export type Customer = {

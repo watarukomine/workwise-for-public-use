@@ -27,31 +27,27 @@ export default function StaffPage() {
   const staffQuery = useMemoFirebase(() => {
     if (!firestore || !user || isLoading) return null;
     
+    // Admin gets all staff
     if (isAdmin) {
       return collection(firestore, 'staff');
     }
     
+    // A regular staff member can only see their own document
     if (isStaff && user.email) {
       return query(collection(firestore, 'staff'), where('email', '==', user.email));
     }
 
-    return null;
+    return null; // Return null if no valid query can be constructed
   }, [firestore, user, isAdmin, isStaff, isLoading]);
   
   const { data: staffFromHook, isLoading: isStaffLoading, error } = useCollection<WithId<Staff>>(staffQuery);
 
   React.useEffect(() => {
     if (staffFromHook) {
-      const formattedStaff = staffFromHook.map(s => ({
-        id: s.id,
-        name: s.name,
-        email: s.email || null,
-        avatarUrl: s.avatarUrl,
-        color: s.color,
-        role: s.role === 'admin' || s.role === 'staff' ? s.role : 'staff',
-      }));
-      setAllStaff(formattedStaff);
+      // The data from the hook is already the correct, filtered list.
+      setAllStaff(staffFromHook);
     } else if (!isLoading && !user) {
+        // If the user logs out, clear the staff list
         setAllStaff([]);
     }
   }, [staffFromHook, setAllStaff, isLoading, user]);
@@ -63,7 +59,9 @@ export default function StaffPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">スタッフ・ユーザー管理</h1>
         <p className="text-muted-foreground">
-          表示するスタッフを選択し、「選択を適用」ボタンでダッシュボードやルート最適化に反映します。
+          {isAdmin 
+            ? "表示するスタッフを選択し、「選択を適用」ボタンでダッシュボードやルート最適化に反映します。" 
+            : "ご自身の情報を確認できます。"}
         </p>
       </div>
 
@@ -92,3 +90,5 @@ export default function StaffPage() {
     </div>
   );
 }
+
+    

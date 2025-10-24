@@ -58,16 +58,18 @@ const allNavItems = [
 
 function NavMenu() {
   const pathname = usePathname();
-  const { profile } = useUserProfile();
-
-  const userRole = profile?.role || 'staff';
+  const { profile, isLoading } = useUserProfile();
 
   const navItems = React.useMemo(() => {
-    if (userRole === 'admin') {
+    if (isLoading || !profile) {
+      // Return a limited set or nothing while loading or if no profile
+      return allNavItems.filter(item => item.roles.includes('staff') && item.href !== '/check-in');
+    }
+    if (profile.role === 'admin') {
         return allNavItems;
     }
-    return allNavItems.filter(item => item.roles.includes(userRole));
-  }, [userRole]);
+    return allNavItems.filter(item => item.roles.includes(profile.role));
+  }, [profile, isLoading]);
 
   return (
       <SidebarMenu>
@@ -93,6 +95,7 @@ function NavMenu() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const { user, isLoading } = useUser();
+  const { profile } = useUserProfile();
   const [isAuthLoading, setIsAuthLoading] = React.useState(false);
 
   const handleSignOut = async () => {
@@ -103,6 +106,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       title: "ログアウトしました",
     });
   };
+  
+  const displayName = profile?.name || user?.displayName || 'Anonymous';
+  const displayEmail = profile?.email || user?.email || `UID: ${user?.uid.slice(0,6)}...`;
 
   return (
     <SidebarProvider>
@@ -128,12 +134,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-start items-center gap-3 p-2 h-auto text-left">
                    <Avatar className="h-9 w-9">
-                    <AvatarImage src={user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} data-ai-hint="person" />
-                    <AvatarFallback>{user.displayName?.charAt(0) ?? 'A'}</AvatarFallback>
+                    <AvatarImage src={profile?.photoURL || user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} data-ai-hint="person" />
+                    <AvatarFallback>{displayName.charAt(0) ?? 'A'}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 -space-y-1">
-                    <p className="text-sm font-semibold">{user.displayName || 'Anonymous User'}</p>
-                    <p className="text-xs text-muted-foreground">{user.email || `UID: ${user.uid.slice(0,6)}...`}</p>
+                    <p className="text-sm font-semibold">{displayName}</p>
+                    <p className="text-xs text-muted-foreground">{displayEmail}</p>
                   </div>
                 </Button>
               </DropdownMenuTrigger>
@@ -165,3 +171,5 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    
