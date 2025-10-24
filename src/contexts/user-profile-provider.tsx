@@ -34,7 +34,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
   const { data: profile, isLoading: isProfileLoading, error: profileError } = useDoc<UserProfile>(userProfileRef);
 
   const value = {
-    profile: profile,
+    profile: profile || null,
     isLoading: isUserLoading || isProfileLoading,
     error: userError || profileError,
   };
