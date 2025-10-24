@@ -77,7 +77,6 @@ export default function LoginPage() {
       router.push('/');
       router.refresh(); // Reload the page to ensure user state is updated everywhere
     } catch (e: any) {
-      console.error(e);
       setError(getFirebaseErrorMessage(e.code));
     } finally {
       setIsLoading(false);
@@ -96,7 +95,6 @@ export default function LoginPage() {
       router.push('/');
       router.refresh();
     } catch (e: any) {
-      console.error(e);
       setError(getFirebaseErrorMessage(e.code));
     } finally {
       setIsLoading(false);
