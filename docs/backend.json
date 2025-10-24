@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "UserProfile": {
@@ -6,6 +7,10 @@
       "type": "object",
       "description": "Represents a user's profile information.",
       "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The Firebase Authentication user ID."
+        },
         "email": {
           "type": "string",
           "format": "email",
@@ -16,17 +21,30 @@
           "description": "The user's display name."
         },
         "photoURL": {
-            "type": "string",
-            "format": "uri",
-            "description": "URL of the user's profile picture."
+          "type": "string",
+          "format": "uri",
+          "description": "URL of the user's profile picture."
         },
         "role": {
           "type": "string",
           "description": "The user's role in the application.",
-          "enum": ["admin", "staff"]
+          "enum": [
+            "admin",
+            "staff"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the user profile was created."
         }
       },
-      "required": ["email", "role"]
+      "required": [
+        "uid",
+        "email",
+        "role",
+        "createdAt"
+      ]
     },
     "Staff": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -199,6 +217,24 @@
         "actionType",
         "timestamp"
       ]
+    },
+    "AdminConfig": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AdminConfig",
+      "type": "object",
+      "description": "Configuration document for storing admin user UIDs.",
+      "properties": {
+        "admin_uids": {
+          "type": "array",
+          "description": "An array of Firebase Authentication UIDs for users who have admin privileges.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "admin_uids"
+      ]
     }
   },
   "auth": {
@@ -213,39 +249,43 @@
       "schema": {
         "$ref": "#/entities/UserProfile"
       },
-      "description": "Stores user profile information, including their role. A user can only read/write their own profile."
+      "description": "Stores user profile information. A user can only read/write their own profile, while admins can read all profiles."
     },
     "/staff/{staffId}": {
       "schema": {
         "$ref": "#/entities/Staff"
       },
-      "description": "Stores staff member profiles. Staff members can only read/write their own profile data. The `staffId` parameter is the Firebase Authentication UID."
+      "description": "Stores staff member profiles. Only admins can manage this data."
     },
     "/customers/{customerId}": {
       "schema": {
         "$ref": "#/entities/Customer"
       },
-      "description": "Stores customer profiles. Only admins can create, read, update, or delete customer profiles."
+      "description": "Stores customer profiles. Only admins can manage this data."
     },
     "/schedules/{scheduleId}": {
       "schema": {
         "$ref": "#/entities/Schedule"
       },
-      "description": "Stores work schedules. Only admins can create, read, update, or delete schedules. Includes `staffId` for authorization."
+      "description": "Stores work schedules. Only admins can manage this data."
     },
-    "/locations/{locationId}": {
+    "/locations/{locationId}_": {
       "schema": {
         "$ref": "#/entities/Location"
       },
-      "description": "Stores location data. Only admins can create, read, update, or delete locations."
+      "description": "Stores location data. Only admins can manage this data."
     },
     "/staff/{staffId}/employee_actions/{employeeActionId}": {
       "schema": {
         "$ref": "#/entities/EmployeeAction"
       },
-      "description": "Stores employee actions. Each staff member can only create, read, update, or delete their own actions. The `staffId` parameter is the Firebase Authentication UID."
+      "description": "Stores employee actions. Staff can manage their own actions, and admins can manage any."
+    },
+    "/config/admins": {
+      "schema": {
+        "$ref": "#/entities/AdminConfig"
+      },
+      "description": "A single document that stores a list of admin UIDs. This is used by security rules to grant admin privileges."
     }
   }
 }
-
-    
