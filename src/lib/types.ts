@@ -3,6 +3,14 @@ import type { Timestamp } from 'firebase/firestore';
 
 export type WithId<T> = T & { id: string };
 
+export type UserProfile = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  role: 'admin' | 'staff';
+};
+
 export type Staff = {
   id: string;
   name: string;
@@ -60,3 +68,5 @@ export type Order = {
   taskDetails: string;
   estimatedDuration: number; // in minutes
 };
+
+    

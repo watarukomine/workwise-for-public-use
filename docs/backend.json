@@ -1,5 +1,33 @@
 {
   "entities": {
+    "UserProfile": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserProfile",
+      "type": "object",
+      "description": "Represents a user's profile information.",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "photoURL": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the user's profile picture."
+        },
+        "role": {
+          "type": "string",
+          "description": "The user's role in the application.",
+          "enum": ["admin", "staff"]
+        }
+      },
+      "required": ["email", "role"]
+    },
     "Staff": {
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Staff",
@@ -176,128 +204,48 @@
   "auth": {
     "providers": [
       "password",
-      "anonymous"
+      "anonymous",
+      "google.com"
     ]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/staff/{staffId}",
-        "definition": {
-          "entityName": "Staff",
-          "schema": {
-            "$ref": "#/backend/entities/Staff"
-          },
-          "description": "Stores staff member profiles.  Staff members can only read/write their own profile data.  The `staffId` parameter is the Firebase Authentication UID.",
-          "params": [
-            {
-              "name": "staffId",
-              "description": "The Firebase Authentication UID of the staff member."
-            }
-          ]
-        }
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
       },
-      {
-        "path": "/customers/{customerId}",
-        "definition": {
-          "entityName": "Customer",
-          "schema": {
-            "$ref": "#/backend/entities/Customer"
-          },
-          "description": "Stores customer profiles. Only admins can create, read, update, or delete customer profiles.",
-          "params": [
-            {
-              "name": "customerId",
-              "description": "The unique identifier of the customer."
-            }
-          ]
-        }
+      "description": "Stores user profile information, including their role. A user can only read/write their own profile."
+    },
+    "/staff/{staffId}": {
+      "schema": {
+        "$ref": "#/entities/Staff"
       },
-      {
-        "path": "/schedules/{scheduleId}",
-        "definition": {
-          "entityName": "Schedule",
-          "schema": {
-            "$ref": "#/backend/entities/Schedule"
-          },
-          "description": "Stores work schedules. Only admins can create, read, update, or delete schedules. Includes `staffId` for authorization.",
-          "params": [
-            {
-              "name": "scheduleId",
-              "description": "The unique identifier of the schedule."
-            }
-          ]
-        }
+      "description": "Stores staff member profiles. Staff members can only read/write their own profile data. The `staffId` parameter is the Firebase Authentication UID."
+    },
+    "/customers/{customerId}": {
+      "schema": {
+        "$ref": "#/entities/Customer"
       },
-      {
-        "path": "/locations/{locationId}",
-        "definition": {
-          "entityName": "Location",
-          "schema": {
-            "$ref": "#/backend/entities/Location"
-          },
-          "description": "Stores location data. Only admins can create, read, update, or delete locations.",
-          "params": [
-            {
-              "name": "locationId",
-              "description": "The unique identifier of the location."
-            }
-          ]
-        }
+      "description": "Stores customer profiles. Only admins can create, read, update, or delete customer profiles."
+    },
+    "/schedules/{scheduleId}": {
+      "schema": {
+        "$ref": "#/entities/Schedule"
       },
-      {
-        "path": "/staff/{staffId}/employee_actions/{employeeActionId}",
-        "definition": {
-          "entityName": "EmployeeAction",
-          "schema": {
-            "$ref": "#/backend/entities/EmployeeAction"
-          },
-          "description": "Stores employee actions. Each staff member can only create, read, update, or delete their own actions. The `staffId` parameter is the Firebase Authentication UID.",
-          "params": [
-            {
-              "name": "staffId",
-              "description": "The Firebase Authentication UID of the staff member."
-            },
-            {
-              "name": "employeeActionId",
-              "description": "The unique identifier of the employee action."
-            }
-          ]
-        }
+      "description": "Stores work schedules. Only admins can create, read, update, or delete schedules. Includes `staffId` for authorization."
+    },
+    "/locations/{locationId}": {
+      "schema": {
+        "$ref": "#/entities/Location"
       },
-      {
-        "path": "/roles_admin/{userId}",
-        "definition": {
-          "entityName": "roles_admin",
-          "schema": {
-            "$ref": "#/backend/entities/Staff"
-          },
-          "description": "Marks a user as an administrator. Existence of the document grants admin privileges.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The Firebase Authentication UID of the administrator."
-            }
-          ]
-        }
+      "description": "Stores location data. Only admins can create, read, update, or delete locations."
+    },
+    "/staff/{staffId}/employee_actions/{employeeActionId}": {
+      "schema": {
+        "$ref": "#/entities/EmployeeAction"
       },
-      {
-        "path": "/staff_credentials/{staffId}",
-        "definition": {
-          "entityName": "Staff",
-          "schema": {
-            "$ref": "#/backend/entities/Staff"
-          },
-          "description": "Stores staff login credentials (email/password or other authentication info).  This collection is separate to isolate sensitive authentication data.  The `staffId` parameter is the Firebase Authentication UID.",
-          "params": [
-            {
-              "name": "staffId",
-              "description": "The Firebase Authentication UID of the staff member."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "This Firestore data structure is designed to support the WorkWise application, focusing on staff and customer management, scheduling, and real-time employee tracking. The design emphasizes authorization independence, structural segregation, and clear access modeling for secure and scalable operations. The inclusion of the `/staff_credentials` collection addresses the login mechanism requirement, segregating authentication data from general staff data.\n\n*   **Authorization Independence:**  Denormalization is employed to avoid `get()` calls in security rules. For instance, if access to schedules needed to be limited to the staff member assigned, the `staffId` is included directly within the schedule document. This strategy extends to other relevant relationships, ensuring that security rules can be evaluated without relying on hierarchical data access.\n\n*   **Structural Segregation:** The structure maintains clear separation of concerns. Staff credentials are kept separate from general staff information in the `staff_credentials` collection. Each top-level collection (`staff`, `customers`, `schedules`, `locations`, `employee_actions`, `roles_admin`) represents a distinct entity with its own security posture. User-specific data (e.g., employee actions related to a specific staff) will be located under a collection whose ID is the staff's UID to implement path-based ownership.\n\n*   **Access Modeling:** Path-based ownership is used where appropriate (`/staff/{staffId}/employee_actions/{employeeActionId}`). The `roles_admin` collection implements DBAC with existence-based rules, and the separate `staff_credentials` collection will be used to enable custom user authentication. A membership map approach is not used here, as authorization is handled at the path level and via the admin role collection.\n\n*   **QAPs (Rules are not Filters):** The data structure supports secure `list` operations by enforcing authorization rules at the collection level. Segregation of data with different access requirements into separate collections prevents the need for filtering based on data content within the rules themselves."
+      "description": "Stores employee actions. Each staff member can only create, read, update, or delete their own actions. The `staffId` parameter is the Firebase Authentication UID."
+    }
   }
 }
+
+    

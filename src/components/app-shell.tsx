@@ -44,6 +44,7 @@ import React from 'react';
 import { signIn, signOut } from '@/lib/auth';
 import { useUser } from '@/firebase/auth/use-user';
 import { Loader2 } from 'lucide-react';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -52,24 +53,33 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-const navItems = [
-  { href: '/', label: '本日の予定', icon: ClipboardList, mobile: true },
-  { href: '/optimizer', label: 'ルート最適化', icon: Map, mobile: true },
-  { href: '/customers', label: '販売店情報', icon: Building2, mobile: false },
-  { href: '/staff', label: 'スタッフ一覧', icon: Users, mobile: false },
-  { href: '/import', label: 'データ取込', icon: Upload, mobile: false },
-  { href: '/check-in', label: 'チェックイン', icon: MapPin, mobile: true },
+const allNavItems = [
+  { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'], mobile: true },
+  { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'], mobile: true },
+  { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'], mobile: false },
+  { href: '/staff', label: 'スタッフ一覧', icon: Users, roles: ['admin'], mobile: false },
+  { href: '/import', label: 'データ取込', icon: Upload, roles: ['admin'], mobile: false },
+  { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'], mobile: true },
 ];
 
 function NavMenu() {
   const pathname = usePathname();
   const { isMobile } = useSidebar();
-  
-  const visibleItems = isMobile ? navItems.filter(item => item.mobile) : navItems;
+  const { profile } = useUserProfile();
+
+  const userRole = profile?.role || 'staff'; // Default to 'staff' if no profile/role
+
+  const navItems = React.useMemo(() => {
+    return allNavItems.filter(item => {
+      const hasRole = item.roles.includes(userRole);
+      const isMobileVisible = isMobile ? item.mobile : true;
+      return hasRole && isMobileVisible;
+    });
+  }, [userRole, isMobile]);
 
   return (
       <SidebarMenu>
-        {visibleItems.map((item) => (
+        {navItems.map((item) => (
           <SidebarMenuItem key={item.label}>
             <SidebarMenuButton
               asChild
@@ -135,7 +145,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <NavMenu />
+          {user && <NavMenu />}
         </SidebarContent>
         <SidebarFooter className="p-2">
           {isLoading || isAuthLoading ? (
@@ -182,3 +192,5 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
+
+    

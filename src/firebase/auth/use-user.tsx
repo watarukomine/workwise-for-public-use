@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Auth, onAuthStateChanged, User } from 'firebase/auth';
-import { useAuth as useFirebaseAuth } from '@/firebase/provider'; 
+import { useFirebase } from '@/firebase/provider'; 
+import type { User } from 'firebase/auth';
 
 /**
  * Interface for the return value of the useUser hook.
@@ -20,9 +19,11 @@ export interface UseUserResult {
  * @returns {UseUserResult} Object with user, isLoading, and error.
  */
 export function useUser(): UseUserResult {
-  const { user, isUserLoading, userError } = useFirebaseAuth();
+  const { user, isUserLoading, userError } = useFirebase();
   
   // Directly return the state from the context.
   // The FirebaseProvider is now the single source of truth for auth state.
   return { user, isLoading: isUserLoading, error: userError };
 }
+
+    

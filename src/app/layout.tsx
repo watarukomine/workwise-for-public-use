@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 import React from 'react';
 import { SelectedStaffProvider } from '@/contexts/selected-staff-context';
 import { FirebaseClientProvider } from '@/firebase';
+import { UserProfileProvider } from '@/contexts/user-profile-provider';
 
 export default function RootLayout({
   children,
@@ -24,12 +25,16 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
-          <SelectedStaffProvider>
-            <AppShell>{children}</AppShell>
-          </SelectedStaffProvider>
+          <UserProfileProvider>
+            <SelectedStaffProvider>
+              <AppShell>{children}</AppShell>
+            </SelectedStaffProvider>
+          </UserProfileProvider>
         </FirebaseClientProvider>
         <Toaster />
       </body>
     </html>
   );
 }
+
+    
