@@ -1,9 +1,9 @@
 
 'use client';
 
-import React, { useMemo } from 'react';
+import React from 'react';
 import { collection, query } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection, type WithId } from '@/firebase/firestore/use-collection';
 import type { Staff, UserProfile } from '@/lib/types';
 import { StaffTable } from "@/components/staff/staff-table";
@@ -26,8 +26,8 @@ export default function StaffPage() {
   const { setAllStaff } = useSelectedStaff();
   const firestore = useFirestore();
 
-  // Memoize the query to prevent re-renders
-  const usersQuery = useMemo(() => {
+  // Memoize the query to prevent re-renders, using the required useMemoFirebase hook
+  const usersQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(collection(firestore, 'users'));
   }, [firestore]);
