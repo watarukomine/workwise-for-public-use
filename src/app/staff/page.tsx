@@ -18,7 +18,7 @@ export default function StaffPage() {
   const { setAllStaff } = useSelectedStaff();
 
   const staffCollectionRef = useMemoFirebase(
-    () => (firestore && !isUserLoading && user ? collection(firestore, 'staff') : null),
+    () => (firestore && user && !isUserLoading ? collection(firestore, 'staff') : null),
     [firestore, user, isUserLoading]
   );
   

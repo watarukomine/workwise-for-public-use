@@ -29,7 +29,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   
   const staffCollectionRef = useMemoFirebase(
-    () => (firestore && !isUserLoading && user ? collection(firestore, 'staff') : null),
+    () => (firestore && user && !isUserLoading ? collection(firestore, 'staff') : null),
     [firestore, user, isUserLoading]
   );
   const { data: staffFromHook } = useCollection<Staff>(staffCollectionRef);
@@ -63,9 +63,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
 
   const setAllStaff = useCallback((staff: Staff[]) => {
     setAllStaffState(staff);
-
-    // This part is tricky because it relies on localStorage.
-    // Let's ensure it only runs once when the staff list is first populated.
+    // Initialize selection only if it hasn't been initialized from localStorage
     const hasBeenInitialized = localStorage.getItem(LOCAL_STORAGE_KEY) !== null;
     if (staff.length > 0 && !hasBeenInitialized) {
       const allStaffIds = staff.map(s => s.id);
