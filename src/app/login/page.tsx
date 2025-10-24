@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -107,13 +106,14 @@ export default function LoginPage() {
             return '無効なメールアドレスです。';
         case 'auth/user-not-found':
         case 'auth/wrong-password':
+        case 'auth/invalid-credential':
             return 'メールアドレスまたはパスワードが正しくありません。';
         case 'auth/email-already-in-use':
             return 'このメールアドレスは既に使用されています。';
         case 'auth/weak-password':
             return 'パスワードは6文字以上で設定してください。';
         default:
-            return 'エラーが発生しました。しばらくしてからもう一度お試しください。';
+            return `エラーが発生しました: ${code}。しばらくしてからもう一度お試しください。`;
     }
   }
 
@@ -228,6 +228,14 @@ export default function LoginPage() {
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     登録する
                   </Button>
+                   <Alert variant="default" className="mt-4">
+                    <AlertTitle>サンプル管理者アカウント</AlertTitle>
+                    <AlertDescription className="text-xs">
+                        <p>テスト用に、以下の情報で管理者としてログインできます。</p>
+                        <p className="mt-2"><strong>ID:</strong> admin@example.com</p>
+                        <p><strong>PW:</strong> password</p>
+                    </AlertDescription>
+                   </Alert>
                 </CardFooter>
               </form>
             </Form>

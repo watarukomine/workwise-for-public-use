@@ -3,7 +3,32 @@
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore, doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+
+const addSampleAdminUser = async (firestore: ReturnType<typeof getFirestore>) => {
+    const adminId = 'admin-user-01';
+    const adminDocRef = doc(firestore, 'staff', adminId);
+
+    try {
+        const docSnap = await getDoc(adminDocRef);
+        if (!docSnap.exists()) {
+            console.log('Creating sample admin user...');
+            await setDoc(adminDocRef, {
+                id: adminId,
+                name: '管理者ユーザー',
+                email: 'admin@example.com',
+                photoURL: `https://picsum.photos/seed/${adminId}/100/100`,
+                role: 'admin',
+                color: 'hsl(262, 83%, 58%)',
+                createdAt: serverTimestamp(),
+            });
+            console.log('Sample admin user created.');
+        }
+    } catch (error) {
+        console.error("Error creating sample admin user:", error);
+    }
+};
+
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -24,8 +49,13 @@ export function initializeFirebase() {
       }
       firebaseApp = initializeApp(firebaseConfig);
     }
-
-    return getSdks(firebaseApp);
+    
+    const sdks = getSdks(firebaseApp);
+    // Add sample data only in non-production environments
+    if (process.env.NODE_ENV !== 'production') {
+        addSampleAdminUser(sdks.firestore);
+    }
+    return sdks;
   }
 
   // If already initialized, return the SDKs with the already initialized App
