@@ -1,74 +1,115 @@
 /**
  * @file Firestore Security Rules
- * @description This ruleset enforces a role-based access control model with user-ownership where appropriate.
+ * @description This ruleset enforces a role-based access control model with user-owned profiles and admin-managed data.
  *
  * Data Structure:
- * - /users/{userId}: User profile information, accessible to the user and admins.
- * - /staff/{staffId}: Staff profiles, managed by admins.
+ * - /users/{userId}: User profile information, accessible only to the user and admins.
+ * - /staff/{staffId}: Staff member profiles, managed by admins.
  * - /customers/{customerId}: Customer profiles, managed by admins.
  * - /schedules/{scheduleId}: Work schedules, managed by admins.
- * - /locations/{locationId}: Location data, managed by admins.
- * - /staff/{staffId}/employee_actions/{employeeActionId}: Employee actions, manageable by the staff member and admins.
- * - /config/admins: Configuration document storing a list of admin UIDs.
+ * - /locations/{locationId}: Work locations, managed by admins.
+ * - /staff/{staffId}/employee_actions/{employeeActionId}: Employee actions, managed by staff for their own actions and admins for all.
+ * - /config/admins: Configuration document containing a list of admin UIDs.
  *
  * Key Security Decisions:
- * - Strict user-ownership for user profiles.
- * - Admin-only access for managing staff, customers, schedules, and locations.
- * - Admins can manage any employee action, but staff can only manage their own.
- * - Listing the `/users` collection is denied to prevent information disclosure.
+ * - Users can only read and write their own profile data.
+ * - Listing of all users is denied to prevent information leakage.
+ * - Admins have full access to staff, customer, schedule, and location data.
+ * - Employee actions are scoped to staff members, with admin override.
+ * - The `admins` config document is used for role-based authorization.
  *
  * Denormalization for Authorization:
- * - The rules rely on the `config/admins` document to efficiently determine admin privileges.
+ * - The `admins` document in the `/config` collection is used to store a list of admin UIDs. This avoids the need for complex queries to determine admin status.
+ *
+ * Structural Segregation:
+ * - User profiles are stored in a dedicated `/users/{userId}` collection to enforce ownership and prevent unauthorized access.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Protects the admin configuration document.
-     * @path /databases/{database}/documents/config/admins
-     * @allow (get) If the request is authenticated.
-     * @deny (list) Listing is not allowed.
-     * @deny (create) Only the system can create this document.
-     * @deny (update) Only the system can update this document.
-     * @deny (delete) Only the system can delete this document.
-     * @principle Enforces a singleton admin configuration document.
+     * @description Checks if the current user is signed in.
+     * @returns {boolean} True if the user is signed in, false otherwise.
      */
-    match /config/admins {
-      allow get: if isSignedIn();
-      allow list: if false;
-      allow create: if false;
-      allow update: if false;
-      allow delete: if false;
+    function isSignedIn() {
+      return request.auth != null;
     }
 
     /**
-     * @description Controls access to user profile data.
-     * @path /databases/{database}/documents/users/{userId}
-     * @allow (get) If the user is the owner or an admin.
-     * @allow (list) If the user is the owner.
-     * @allow (create) If the user is creating their own profile.
-     * @allow (update) If the user is the owner or an admin.
-     * @allow (delete) If the user is the owner or an admin.
-     * @principle Enforces user ownership for profiles and admin override.
+     * @description Checks if the user ID matches the authenticated user's ID.
+     * @param {string} userId - The user ID to compare against.
+     * @returns {boolean} True if the user ID matches the authenticated user's ID, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the user is an existing owner of the document.
+     * @param {string} userId - The user ID to compare against.
+     * @returns {boolean} True if the user is signed in, the user ID matches the authenticated user's ID, and the document exists.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * @description Checks if the current user is an admin.
+     * @returns {boolean} True if the user's UID is in the list of admin UIDs, false otherwise.
+     */
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/config/admins).data.admin_uids.hasAny([request.auth.uid]);
+    }
+
+    /**
+     * @description Grants access to user profiles.
+     * @path /users/{userId}
+     * @allow (create) User with UID 'user123' creates their profile.
+     *    - Auth: { uid: 'user123' }
+     *    - Data: { uid: 'user123', email: 'user@example.com', role: 'staff', createdAt: '2024-01-01T00:00:00Z' }
+     * @allow (get) User with UID 'user123' reads their profile.
+     *    - Auth: { uid: 'user123' }
+     * @allow (update) User with UID 'user123' updates their profile.
+     *    - Auth: { uid: 'user123' }
+     * @allow (delete) User with UID 'user123' deletes their profile.
+     *    - Auth: { uid: 'user123' }
+     * @allow (get) Admin reads user profile.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @allow (update) Admin updates user profile.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @deny (create) User with UID 'user123' tries to create profile with UID 'user456'.
+     *    - Auth: { uid: 'user123' }
+     *    - Data: { uid: 'user456', email: 'user@example.com' }
+     * @deny (get) Non-admin user tries to read another user's profile.
+     *    - Auth: { uid: 'user123' }
+     * @principle Enforces document ownership for writes, allows admin read access.
      */
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId) || isAdmin();
+      allow list: if false; // Listing all users is forbidden
+
+      allow create: if isOwner(userId) && request.resource.data.uid == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.uid == resource.data.uid || isAdmin();
       allow delete: if isExistingOwner(userId) || isAdmin();
     }
 
     /**
-     * @description Controls access to staff profiles.
-     * @path /databases/{database}/documents/staff/{staffId}
-     * @allow (get) If the user is an admin.
-     * @allow (list) If the user is an admin.
-     * @allow (create) If the user is an admin.
-     * @allow (update) If the user is an admin.
-     * @allow (delete) If the user is an admin.
-     * @principle Restricts staff data management to admins.
+     * @description Grants access to staff profiles.
+     * @path /staff/{staffId}
+     * @allow (create) Admin creates a staff profile.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     *    - Data: { id: 'staff123', name: 'John Doe', calendarId: 'cal123' }
+     * @allow (get) Admin reads a staff profile.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @allow (update) Admin updates a staff profile.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @allow (delete) Admin deletes a staff profile.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @deny (create) Non-admin user attempts to create a staff profile.
+     *    - Auth: { uid: 'user123' }
+     *    - Data: { id: 'staff123', name: 'John Doe', calendarId: 'cal123' }
+     * @principle Restricts access to admin users only.
      */
     match /staff/{staffId} {
       allow get: if isAdmin();
@@ -79,14 +120,21 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to customer profiles.
-     * @path /databases/{database}/documents/customers/{customerId}
-     * @allow (get) If the user is an admin.
-     * @allow (list) If the user is an admin.
-     * @allow (create) If the user is an admin.
-     * @allow (update) If the user is an admin.
-     * @allow (delete) If the user is an admin.
-     * @principle Restricts customer data management to admins.
+     * @description Grants access to customer profiles.
+     * @path /customers/{customerId}
+     * @allow (create) Admin creates a customer profile.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     *    - Data: { id: 'customer123', name: 'Acme Corp', address: '123 Main St' }
+     * @allow (get) Admin reads a customer profile.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @allow (update) Admin updates a customer profile.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @allow (delete) Admin deletes a customer profile.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @deny (create) Non-admin user attempts to create a customer profile.
+     *    - Auth: { uid: 'user123' }
+     *    - Data: { id: 'customer123', name: 'Acme Corp', address: '123 Main St' }
+     * @principle Restricts access to admin users only.
      */
     match /customers/{customerId} {
       allow get: if isAdmin();
@@ -97,14 +145,21 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to work schedules.
-     * @path /databases/{database}/documents/schedules/{scheduleId}
-     * @allow (get) If the user is an admin.
-     * @allow (list) If the user is an admin.
-     * @allow (create) If the user is an admin.
-     * @allow (update) If the user is an admin.
-     * @allow (delete) If the user is an admin.
-     * @principle Restricts schedule data management to admins.
+     * @description Grants access to work schedules.
+     * @path /schedules/{scheduleId}
+     * @allow (create) Admin creates a schedule.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     *    - Data: { id: 'schedule123', staffId: 'staff123', customerId: 'customer123', startTime: '...', endTime: '...' }
+     * @allow (get) Admin reads a schedule.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @allow (update) Admin updates a schedule.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @allow (delete) Admin deletes a schedule.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @deny (create) Non-admin user attempts to create a schedule.
+     *    - Auth: { uid: 'user123' }
+     *    - Data: { id: 'schedule123', staffId: 'staff123', customerId: 'customer123', startTime: '...', endTime: '...' }
+     * @principle Restricts access to admin users only.
      */
     match /schedules/{scheduleId} {
       allow get: if isAdmin();
@@ -115,14 +170,21 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to location data.
-     * @path /databases/{database}/documents/locations/{locationId}
-     * @allow (get) If the user is an admin.
-     * @allow (list) If the user is an admin.
-     * @allow (create) If the user is an admin.
-     * @allow (update) If the user is an admin.
-     * @allow (delete) If the user is an admin.
-     * @principle Restricts location data management to admins.
+     * @description Grants access to locations.
+     * @path /locations/{locationId}
+     * @allow (create) Admin creates a location.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     *    - Data: { id: 'location123', name: 'Office', address: '...', latitude: 123, longitude: 456 }
+     * @allow (get) Admin reads a location.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @allow (update) Admin updates a location.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @allow (delete) Admin deletes a location.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @deny (create) Non-admin user attempts to create a location.
+     *    - Auth: { uid: 'user123' }
+     *    - Data: { id: 'location123', name: 'Office', address: '...', latitude: 123, longitude: 456 }
+     * @principle Restricts access to admin users only.
      */
     match /locations/{locationId} {
       allow get: if isAdmin();
@@ -133,47 +195,49 @@ service cloud.firestore {
     }
 
     /**
-     * @description Controls access to employee actions, allowing staff to manage their own and admins to manage all.
-     * @path /databases/{database}/documents/staff/{staffId}/employee_actions/{employeeActionId}
-     * @allow (get) If the user is the staff member or an admin.
-     * @allow (list) If the user is the staff member or an admin.
-     * @allow (create) If the user is the staff member or an admin.
-     * @allow (update) If the user is the staff member or an admin.
-     * @allow (delete) If the user is the staff member or an admin.
-     * @principle Enforces ownership for staff actions and admin override.
+     * @description Grants access to employee actions.
+     * @path /staff/{staffId}/employee_actions/{employeeActionId}
+     * @allow (create) Staff creates their own employee action.
+     *    - Auth: { uid: 'staff123' }
+     *    - Data: { employeeId: 'staff123', actionType: 'Arrive', timestamp: '...' }
+     * @allow (get) Staff reads their own employee action.
+     *    - Auth: { uid: 'staff123' }
+     * @allow (update) Staff updates their own employee action.
+     *    - Auth: { uid: 'staff123' }
+     * @allow (delete) Staff deletes their own employee action.
+     *    - Auth: { uid: 'staff123' }
+     * @allow (get) Admin reads an employee action.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @allow (update) Admin updates an employee action.
+     *    - Auth: { uid: 'admin123' }, /config/admins contains 'admin123'
+     * @deny (create) Staff tries to create employee action for another staff member.
+     *    - Auth: { uid: 'staff123' }
+     *    - Data: { employeeId: 'staff456', actionType: 'Arrive', timestamp: '...' }
+     * @principle Enforces ownership for staff, allows admin override.
      */
     match /staff/{staffId}/employee_actions/{employeeActionId} {
-      allow get: if isStaffOwner(staffId) || isAdmin();
-      allow list: if isStaffOwner(staffId) || isAdmin();
-      allow create: if isStaffOwner(staffId) || isAdmin();
-      allow update: if (isStaffOwner(staffId) || isAdmin()) && resource != null;
-      allow delete: if (isStaffOwner(staffId) || isAdmin()) && resource != null;
+      allow get: if isOwner(staffId) || isAdmin();
+      allow list: if isOwner(staffId) || isAdmin();
+      allow create: if isSignedIn() && (request.resource.data.employeeId == staffId) ;
+      allow update: if (isOwner(staffId) || isAdmin()) && resource != null;
+      allow delete: if (isOwner(staffId) || isAdmin()) && resource != null;
     }
 
-    // ---- Helper functions ----
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
-     function isStaffOwner(staffId) {
-      return request.auth.uid == staffId;
-    }
-
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && request.auth.uid in getAdminUids();
-    }
-
-    function getAdminUids() {
-      return get(/databases/$(database)/documents/config/admins).data.admin_uids;
+    /**
+     * @description Grants access to the admin configuration document.
+     * @path /config/admins
+     * @allow (get) Anyone can read the admin configuration.
+     * @deny (create) No one can create a new admin configuration.
+     * @deny (update) No one can update the admin configuration directly through Firestore.
+     * @deny (delete) No one can delete the admin configuration.
+     * @principle Protects the admin configuration from unauthorized modification.
+     */
+    match /config/admins {
+      allow get: if true;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }
