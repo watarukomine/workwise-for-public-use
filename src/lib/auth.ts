@@ -19,6 +19,7 @@ const getAuthAndFirestore = () => {
 
 const createUserProfileDocument = async (user: User) => {
     const { firestore } = getAuthAndFirestore();
+    if (!user.uid) return; // Add guard clause for user.uid
     const userRef = doc(firestore, 'users', user.uid);
     const snapshot = await getDoc(userRef);
 
@@ -48,9 +49,7 @@ export const signIn = async () => {
   const { auth } = getAuthAndFirestore();
   const provider = new GoogleAuthProvider();
   try {
-    console.log("Attempting to sign in with Google...");
     const result = await signInWithPopup(auth, provider);
-    console.log("Google sign-in successful:", result.user.uid);
     
     // Create a user profile document in Firestore if it doesn't exist
     await createUserProfileDocument(result.user);
@@ -68,16 +67,10 @@ export const signIn = async () => {
 };
 
 export const signOut = async () => {
-  const auth = getAuthInstance();
+  const { auth } = getAuthAndFirestore();
   try {
     await firebaseSignOut(auth);
   } catch (error) {
     console.error('Error signing out: ', error);
   }
-};
-
-// Helper function to get only auth instance, used in signOut where firestore is not needed.
-const getAuthInstance = (): Auth => {
-  const { auth } = initializeFirebase();
-  return auth;
 };

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React from 'react';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useFirestore } from '@/firebase/provider';
 import { collection } from 'firebase/firestore';
@@ -24,7 +24,7 @@ export default function StaffPage() {
   
   const { data: staff, isLoading, error } = useCollection<WithId<Staff>>(staffCollectionRef);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (staff) {
       // Map Firestore data to Staff type, ensuring role is correctly typed
       const formattedStaff = staff.map(s => ({
@@ -75,7 +75,7 @@ export default function StaffPage() {
         </Alert>
       )}
       
-      <StaffTable staff={staff} isLoading={effectiveIsLoading} />
+      <StaffTable staff={staff || []} isLoading={effectiveIsLoading} />
     </div>
   );
 }
