@@ -13,6 +13,7 @@ interface SelectedStaffContextType {
   allStaff: Staff[];
   setAllStaff: (staff: Staff[]) => void;
   togglePendingStaffSelection: (staffId: string) => void;
+  setPendingSelection: (staffIds: string[]) => void;
   applyPendingSelection: () => void;
 }
 
@@ -36,22 +37,26 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     // 1. Update pending selections to match the newly applied ones.
     setPendingSelectedStaffIds(appliedSelectedStaffIds);
     // 2. Persist the applied IDs to localStorage.
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appliedSelectedStaffIds));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appliedSelectedStaffIds));
+    }
   }, [appliedSelectedStaffIds]);
   
   const setAllStaff = (staff: Staff[]) => {
     setAllStaffState(staff);
 
     // This initialization should only happen if there's nothing in localStorage
-    const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!savedIds && staff.length > 0) {
-      const allStaffIds = staff.map(s => s.id);
-      // Set both pending and applied, which will trigger the useEffect to save to localStorage
-      setPendingSelectedStaffIds(allStaffIds);
-      setAppliedSelectedStaffIds(allStaffIds);
-    } else if (savedIds) {
-      // If there are saved IDs, ensure pending state matches on first load with staff data.
-      setPendingSelectedStaffIds(JSON.parse(savedIds));
+    if (typeof window !== 'undefined') {
+        const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (!savedIds && staff.length > 0) {
+            const allStaffIds = staff.map(s => s.id);
+            // Set both pending and applied, which will trigger the useEffect to save to localStorage
+            setPendingSelectedStaffIds(allStaffIds);
+            setAppliedSelectedStaffIds(allStaffIds);
+        } else if (savedIds) {
+            // If there are saved IDs, ensure pending state matches on first load with staff data.
+            setPendingSelectedStaffIds(JSON.parse(savedIds));
+        }
     }
   };
 
@@ -61,6 +66,10 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         ? prevIds.filter(id => id !== staffId)
         : [...prevIds, staffId]
     );
+  };
+  
+  const setPendingSelection = (staffIds: string[]) => {
+    setPendingSelectedStaffIds(staffIds);
   };
 
   const applyPendingSelection = () => {
@@ -77,6 +86,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     allStaff,
     setAllStaff,
     togglePendingStaffSelection,
+    setPendingSelection,
     applyPendingSelection,
   };
 
