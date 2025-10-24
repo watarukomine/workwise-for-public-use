@@ -20,43 +20,33 @@ interface SelectedStaffContextType {
 const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>(undefined);
 
 export function SelectedStaffProvider({ children }: { children: ReactNode }) {
-  const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
-  const [appliedSelectedStaffIds, setAppliedSelectedStaffIds] = useState<string[]>(() => {
-    // On initial client-side load, try to get the IDs from localStorage.
-    if (typeof window !== 'undefined') {
-      const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
-      return savedIds ? JSON.parse(savedIds) : [];
-    }
-    return [];
-  });
   const [allStaff, setAllStaffState] = useState<Staff[]>([]);
+  const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
+  const [appliedSelectedStaffIds, setAppliedSelectedStaffIds] = useState<string[]>([]);
+  
   const { toast } = useToast();
 
-  // This effect runs when appliedSelectedStaffIds changes.
+  // On initial mount, load applied IDs from localStorage
   useEffect(() => {
-    // 1. Update pending selections to match the newly applied ones.
-    setPendingSelectedStaffIds(appliedSelectedStaffIds);
-    // 2. Persist the applied IDs to localStorage.
     if (typeof window !== 'undefined') {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appliedSelectedStaffIds));
+      const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedIds) {
+        const parsedIds = JSON.parse(savedIds);
+        setAppliedSelectedStaffIds(parsedIds);
+        setPendingSelectedStaffIds(parsedIds); // Sync pending with applied on initial load
+      }
     }
-  }, [appliedSelectedStaffIds]);
-  
+  }, []);
+
   const setAllStaff = (staff: Staff[]) => {
     setAllStaffState(staff);
-
-    // This initialization should only happen if there's nothing in localStorage
-    if (typeof window !== 'undefined') {
-        const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (!savedIds && staff.length > 0) {
-            const allStaffIds = staff.map(s => s.id);
-            // Set both pending and applied, which will trigger the useEffect to save to localStorage
-            setPendingSelectedStaffIds(allStaffIds);
-            setAppliedSelectedStaffIds(allStaffIds);
-        } else if (savedIds) {
-            // If there are saved IDs, ensure pending state matches on first load with staff data.
-            setPendingSelectedStaffIds(JSON.parse(savedIds));
-        }
+    
+    // Initialize selection only if it hasn't been loaded from localStorage yet.
+    if (typeof window !== 'undefined' && !localStorage.getItem(LOCAL_STORAGE_KEY)) {
+      const allStaffIds = staff.map(s => s.id);
+      setAppliedSelectedStaffIds(allStaffIds);
+      setPendingSelectedStaffIds(allStaffIds);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(allStaffIds));
     }
   };
 
@@ -74,6 +64,9 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
 
   const applyPendingSelection = () => {
     setAppliedSelectedStaffIds(pendingSelectedStaffIds);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pendingSelectedStaffIds));
+    }
     toast({
       title: "スタッフ選択を更新しました",
       description: `${pendingSelectedStaffIds.length}人のスタッフが選択されました。`,
