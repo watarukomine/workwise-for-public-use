@@ -1,26 +1,64 @@
-
 'use client';
 
-import React from 'react';
+import React, { useEffect, useMemo } from 'react';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { useFirestore } from '@/firebase/provider';
+import { collection } from 'firebase/firestore';
+import { StaffTable } from '@/components/staff/staff-table';
+import type { Staff, WithId } from '@/lib/types';
+import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { useMemoFirebase } from '@/firebase/provider';
 
 export default function StaffPage() {
+  const firestore = useFirestore();
+  const { setAllStaff } = useSelectedStaff();
+
+  const staffCollectionRef = useMemoFirebase(
+    () => (firestore ? collection(firestore, 'staff') : null),
+    [firestore]
+  );
+  
+  const { data: staff, isLoading, error } = useCollection<WithId<Staff>>(staffCollectionRef);
+
+  useEffect(() => {
+    if (staff) {
+      // Map Firestore data to Staff type, ensuring role is correctly typed
+      const formattedStaff = staff.map(s => ({
+        id: s.id,
+        name: s.name,
+        email: s.email || null,
+        avatarUrl: s.avatarUrl,
+        color: s.color,
+        // Firestore might return a different type, so we ensure it matches our defined roles
+        role: s.role === 'admin' || s.role === 'staff' ? s.role : 'staff',
+      }));
+      setAllStaff(formattedStaff);
+    }
+  }, [staff, setAllStaff]);
+  
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">スタッフ・ユーザー管理</h1>
         <p className="text-muted-foreground">
-          現在この機能はメンテナンス中です。
+          表示するスタッフを選択し、「選択を適用」ボタンでダッシュボードやルート最適化に反映します。
         </p>
       </div>
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>機能利用不可</AlertTitle>
-        <AlertDescription>
-          現在、セキュリティルールの問題により、スタッフ一覧機能をご利用いただけません。ご不便をおかけして申し訳ありませんが、解決まで今しばらくお待ちください。
-        </AlertDescription>
-      </Alert>
+
+       {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>データ取得エラー</AlertTitle>
+          <AlertDescription>
+            スタッフ情報の取得中にエラーが発生しました。権限が不足している可能性があります。
+            <pre className="mt-2 text-xs bg-gray-800 p-2 rounded"><code>{error.message}</code></pre>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <StaffTable staff={staff} isLoading={isLoading} />
     </div>
   );
 }
