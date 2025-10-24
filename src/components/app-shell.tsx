@@ -56,7 +56,7 @@ const allNavItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'] },
   { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'] },
   { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
-  { href: '/staff', label: 'スタッフ一覧', icon: Users, roles: ['admin'] },
+  // { href: '/staff', label: 'スタッフ一覧', icon: Users, roles: ['admin'] }, // Temporarily disabled
   { href: '/import', label: 'データ取込', icon: Upload, roles: ['admin'] },
   { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'] },
 ];
@@ -68,6 +68,12 @@ function NavMenu() {
   const userRole = profile?.role || 'staff';
 
   const navItems = React.useMemo(() => {
+    // Return all items if user is an admin.
+    // This allows admins to see staff-only pages too.
+    if (userRole === 'admin') {
+        return allNavItems;
+    }
+    // Filter for staff role
     return allNavItems.filter(item => item.roles.includes(userRole));
   }, [userRole]);
 
