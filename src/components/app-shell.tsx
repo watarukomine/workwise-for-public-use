@@ -41,6 +41,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import React from 'react';
+import { signIn, signOut } from '@/lib/auth';
+import { useUser } from '@/firebase/auth/use-user';
+import { Loader2 } from 'lucide-react';
+
 
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -56,13 +60,6 @@ const navItems = [
   { href: '/import', label: 'データ取込', icon: Upload, mobile: false },
   { href: '/check-in', label: 'チェックイン', icon: MapPin, mobile: true },
 ];
-
-const mockUser = {
-  uid: 'mock-user-123',
-  displayName: 'デモユーザー',
-  email: 'demo@example.com',
-  photoURL: `https://picsum.photos/seed/mock-user-123/100/100`,
-}
 
 function NavMenu() {
   const pathname = usePathname();
@@ -93,27 +90,34 @@ function NavMenu() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
-  const [user, setUser] = React.useState(mockUser);
-  const [isLoading, setIsLoading] = React.useState(false);
+  const { user, isLoading } = useUser();
+  const [isAuthLoading, setIsAuthLoading] = React.useState(false);
 
 
   const handleSignIn = async () => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setUser(mockUser);
-    setIsLoading(false);
-    toast({
-      title: "ログインしました",
-      description: "デモモードへようこそ！",
-    });
+    setIsAuthLoading(true);
+    try {
+      await signIn();
+      toast({
+        title: "ログインしました",
+        description: "WorkWiseへようこそ！",
+      });
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        variant: "destructive",
+        title: "ログインに失敗しました",
+        description: error.message || "予期せぬエラーが発生しました。",
+      });
+    } finally {
+        setIsAuthLoading(false);
+    }
   };
 
   const handleSignOut = async () => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // @ts-ignore
-    setUser(null);
-    setIsLoading(false);
+    setIsAuthLoading(true);
+    await signOut();
+    setIsAuthLoading(false);
     toast({
       title: "ログアウトしました",
     });
@@ -134,13 +138,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <NavMenu />
         </SidebarContent>
         <SidebarFooter className="p-2">
-          {isLoading ? (
-             <div className="flex items-center gap-3 p-2 animate-pulse">
-                <div className="h-9 w-9 rounded-full bg-muted" />
-                <div className="flex-1 space-y-2">
-                    <div className="h-3 w-3/4 rounded bg-muted" />
-                    <div className="h-2 w-1/2 rounded bg-muted" />
-                </div>
+          {isLoading || isAuthLoading ? (
+             <div className="flex items-center justify-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : user ? (
             <DropdownMenu>

@@ -1,12 +1,12 @@
 
 'use client';
 
-import type { Metadata } from 'next';
 import './globals.css';
 import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import React from 'react';
 import { SelectedStaffProvider } from '@/contexts/selected-staff-context';
+import { FirebaseClientProvider } from '@/firebase';
 
 export default function RootLayout({
   children,
@@ -23,9 +23,11 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <SelectedStaffProvider>
-          <AppShell>{children}</AppShell>
-        </SelectedStaffProvider>
+        <FirebaseClientProvider>
+          <SelectedStaffProvider>
+            <AppShell>{children}</AppShell>
+          </SelectedStaffProvider>
+        </FirebaseClientProvider>
         <Toaster />
       </body>
     </html>
