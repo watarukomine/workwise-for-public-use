@@ -51,6 +51,7 @@ export type StaffStatus = {
   distanceFromSite?: string;
   latitude?: number;
   longitude?: number;
+  message?: string;
 };
 
 export type Order = {

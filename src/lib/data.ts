@@ -58,7 +58,7 @@ export const unassignedOrdersData: WithId<Order>[] = [
 ];
 
 export const staffStatusData: StaffStatus[] = [
-    { staffId: '1', status: 'Idle', lastAction: 'オフィスで待機中', latitude: 35.4658, longitude: 139.622 },
+    { staffId: '1', status: 'Idle', lastAction: 'オフィスで待機中', latitude: 35.4658, longitude: 139.622, message: '本日、体調不良のため大事をとって休憩を多めに取らせていただきます。' },
     { staffId: '2', status: 'En Route', lastAction: 'ABCストアへ移動中', distanceFromSite: '約15分', latitude: 35.45, longitude: 139.635 },
     { staffId: '3', status: 'Working', lastAction: 'さくら商店で新商品の陳列中', latitude: 35.48, longitude: 139.636 },
     { staffId: '4', status: 'On Site', lastAction: 'ベイサイドカフェに到着', latitude: 35.465, longitude: 139.622 },

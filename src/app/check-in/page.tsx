@@ -4,16 +4,18 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task';
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Send Message';
 
 export default function CheckInPage() {
   const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
   const [location, setLocation] = React.useState<{ latitude: number; longitude: number } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [lastAction, setLastAction] = React.useState<{ action: ActionType; time: string } | null>(null);
+  const [message, setMessage] = React.useState('');
   const { toast } = useToast();
 
   const handleAction = (action: ActionType) => {
@@ -28,8 +30,31 @@ export default function CheckInPage() {
           setLastAction({ action, time: currentTime });
           toast({
             title: 'アクションを記録しました',
-            description: `${action} at ${currentTime}`,
+            description: `${getJapaneseActionName(action)} at ${currentTime}`,
           });
+          setIsLoading(null);
+        }, 1000);
+        return;
+    }
+    
+    if (action === 'Send Message') {
+        if (!message.trim()) {
+            setError('メッセージを入力してください。');
+            setIsLoading(null);
+            return;
+        }
+        console.log(`Message to admin: ${message}`);
+        // TODO: ここでメッセージをFirestoreに保存する
+        setTimeout(() => {
+          toast({
+            title: 'メッセージを送信しました',
+            description: '管理者にメッセージが送信されました。',
+          });
+          // Also update the local state to show the message in the status
+          // This is a mock implementation. In a real app, this would be driven by Firestore.
+          const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          setLastAction({ action: 'Send Message', time: currentTime });
+          setMessage(''); // Clear textarea
           setIsLoading(null);
         }, 1000);
         return;
@@ -55,7 +80,7 @@ export default function CheckInPage() {
           setLastAction({ action, time: currentTime });
           toast({
             title: 'アクションを記録しました',
-            description: `${action} at ${currentTime}`,
+            description: `${getJapaneseActionName(action)} at ${currentTime}`,
           });
           setIsLoading(null);
         }, 1000); // Simulate network request
@@ -103,7 +128,8 @@ export default function CheckInPage() {
         'Start Travel': '移動開始',
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
-        'Finish Task': '作業終了'
+        'Finish Task': '作業終了',
+        'Send Message': 'メッセージ送信'
     };
     return map[action];
   }
@@ -151,10 +177,40 @@ export default function CheckInPage() {
               <AlertTitle>最後の記録</AlertTitle>
               <AlertDescription>
                 {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
-                {location && (lastAction.action !== 'Clock In' && lastAction.action !== 'Clock Out') && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
+                {location && (lastAction.action !== 'Clock In' && lastAction.action !== 'Clock Out' && lastAction.action !== 'Send Message') && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
               </AlertDescription>
             </Alert>
           )}
+        </CardContent>
+      </Card>
+
+       <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            管理者へ連絡
+          </CardTitle>
+          <CardDescription>緊急の連絡や報告がある場合に使用してください。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            placeholder="メッセージを入力..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            disabled={isLoading === 'Send Message'}
+          />
+          <Button
+            className="w-full"
+            onClick={() => handleAction('Send Message')}
+            disabled={!!isLoading}
+          >
+            {isLoading === 'Send Message' ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            メッセージ送信
+          </Button>
         </CardContent>
       </Card>
     </div>

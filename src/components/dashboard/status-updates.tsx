@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Separator } from '../ui/separator';
 import React from 'react';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription } from '../ui/alert';
 
 const statusColors: Record<StaffStatus['status'], string> = {
   'Idle': 'bg-gray-400',
@@ -59,7 +61,7 @@ export function StatusUpdates({ staffData, statuses }: StatusUpdatesProps) {
 
               return (
                 <div key={staff.id}>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-start gap-4">
                     <Avatar className="h-10 w-10 border">
                       <AvatarImage src={staff.avatarUrl} alt={staff.name} data-ai-hint="person" />
                       <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
@@ -77,6 +79,14 @@ export function StatusUpdates({ staffData, statuses }: StatusUpdatesProps) {
                         <p className="text-xs text-muted-foreground">
                           現場から: {status.distanceFromSite}
                         </p>
+                      )}
+                       {status.message && (
+                        <Alert variant="destructive" className="mt-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            {status.message}
+                          </AlertDescription>
+                        </Alert>
                       )}
                     </div>
                   </div>
