@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -11,39 +12,52 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { useMemoFirebase } from '@/firebase/provider';
 import { useUser } from '@/firebase/auth/use-user';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 export default function StaffPage() {
   const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
-  const { setAllStaff } = useSelectedStaff();
+  const { user, isUserLoading: isAuthLoading } = useUser();
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
+  const { allStaff: staffFromContext, setAllStaff } = useSelectedStaff();
+
+  const isAdmin = profile?.role === 'admin';
+  const isLoading = isAuthLoading || isProfileLoading;
 
   const staffCollectionRef = useMemoFirebase(
-    () => (firestore && user && !isUserLoading ? collection(firestore, 'staff') : null),
-    [firestore, user, isUserLoading]
+    () => (firestore && user && isAdmin && !isLoading ? collection(firestore, 'staff') : null),
+    [firestore, user, isAdmin, isLoading]
   );
   
-  const { data: staff, isLoading, error } = useCollection<WithId<Staff>>(staffCollectionRef);
+  const { data: staffFromHook, isLoading: isStaffLoading, error } = useCollection<WithId<Staff>>(staffCollectionRef);
 
   React.useEffect(() => {
-    if (staff) {
-      // Map Firestore data to Staff type, ensuring role is correctly typed
-      const formattedStaff = staff.map(s => ({
-        id: s.id,
-        name: s.name,
-        email: s.email || null,
-        avatarUrl: s.avatarUrl,
-        color: s.color,
-        // Firestore might return a different type, so we ensure it matches our defined roles
-        role: s.role === 'admin' || s.role === 'staff' ? s.role : 'staff',
-      }));
-      setAllStaff(formattedStaff);
-    } else if (!isLoading && !isUserLoading && !user) {
-        // If not loading and not logged in, clear staff list
+    if (isAdmin) {
+      if (staffFromHook) {
+        const formattedStaff = staffFromHook.map(s => ({
+          id: s.id,
+          name: s.name,
+          email: s.email || null,
+          avatarUrl: s.avatarUrl,
+          color: s.color,
+          role: s.role === 'admin' || s.role === 'staff' ? s.role : 'staff',
+        }));
+        setAllStaff(formattedStaff);
+      }
+    } else if (!isLoading && profile) {
+      // For non-admins, show only their own profile
+      const selfStaff: WithId<Staff> = {
+        id: profile.uid,
+        name: profile.displayName || 'Unknown',
+        email: profile.email,
+        role: profile.role,
+      };
+      setAllStaff([selfStaff]);
+    } else if (!isLoading && !user) {
         setAllStaff([]);
     }
-  }, [staff, setAllStaff, isLoading, isUserLoading, user]);
+  }, [staffFromHook, setAllStaff, isLoading, isAdmin, profile, user]);
 
-  const effectiveIsLoading = isLoading || isUserLoading;
+  const effectiveIsLoading = isLoading || (isAdmin && isStaffLoading);
   
   return (
     <div className="space-y-8">
@@ -59,7 +73,7 @@ export default function StaffPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>データ取得エラー</AlertTitle>
           <AlertDescription>
-            スタッフ情報の取得中にエラーが発生しました。権限が不足している可能性があります。
+            スタッフ情報の取得中にエラーが発生しました。管理者権限がない可能性があります。
             <pre className="mt-2 text-xs bg-gray-800 p-2 rounded"><code>{error.message}</code></pre>
           </AlertDescription>
         </Alert>
@@ -75,7 +89,7 @@ export default function StaffPage() {
         </Alert>
       )}
       
-      <StaffTable staff={staff || []} isLoading={effectiveIsLoading} />
+      <StaffTable staff={staffFromContext || []} isLoading={effectiveIsLoading} />
     </div>
   );
 }

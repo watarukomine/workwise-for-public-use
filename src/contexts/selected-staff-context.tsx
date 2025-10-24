@@ -3,19 +3,20 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import type { Staff } from '@/lib/types';
+import type { Staff, WithId } from '@/lib/types';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { collection } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase/provider';
 import { useUser } from '@/firebase/auth/use-user';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 const LOCAL_STORAGE_KEY = 'appliedStaffIds';
 
 interface SelectedStaffContextType {
   pendingSelectedStaffIds: string[];
   appliedSelectedStaffIds: string[];
-  allStaff: Staff[];
-  setAllStaff: (staff: Staff[]) => void;
+  allStaff: WithId<Staff>[];
+  setAllStaff: (staff: WithId<Staff>[]) => void;
   togglePendingStaffSelection: (staffId: string) => void;
   setPendingSelection: (staffIds: string[]) => void;
   applyPendingSelection: () => void;
@@ -25,25 +26,40 @@ const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>
 
 export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { toast } = useToast();
-  
-  const staffCollectionRef = useMemoFirebase(
-    () => (firestore && user && !isUserLoading ? collection(firestore, 'staff') : null),
-    [firestore, user, isUserLoading]
-  );
-  const { data: staffFromHook } = useCollection<Staff>(staffCollectionRef);
 
-  const [allStaff, setAllStaffState] = useState<Staff[]>([]);
+  const isAdmin = profile?.role === 'admin';
+
+  const staffCollectionRef = useMemoFirebase(
+    () => (firestore && isAdmin && !isProfileLoading ? collection(firestore, 'staff') : null),
+    [firestore, isAdmin, isProfileLoading]
+  );
+  
+  const { data: staffFromHook } = useCollection<WithId<Staff>>(staffCollectionRef);
+
+  const [allStaff, setAllStaff] = useState<WithId<Staff>[]>([]);
   const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
   const [appliedSelectedStaffIds, setAppliedSelectedStaffIds] = useState<string[]>([]);
   
-  // Effect to update allStaff state when staffFromHook changes
   useEffect(() => {
     if (staffFromHook) {
-       setAllStaffState(staffFromHook);
+       setAllStaff(staffFromHook);
+    } else if (!isProfileLoading && !isAdmin) {
+      // If the user is not an admin, 'allStaff' should just be their own profile
+      if (profile) {
+        const selfStaff: WithId<Staff> = {
+            id: profile.uid,
+            name: profile.displayName || 'Unknown',
+            email: profile.email,
+            role: profile.role
+        };
+        setAllStaff([selfStaff]);
+      } else {
+        setAllStaff([]);
+      }
     }
-  }, [staffFromHook]);
+  }, [staffFromHook, isAdmin, isProfileLoading, profile]);
 
 
   // On initial mount, load applied IDs from localStorage
@@ -53,7 +69,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
       if (savedIds) {
         const parsedIds = JSON.parse(savedIds);
         setAppliedSelectedStaffIds(parsedIds);
-        setPendingSelectedStaffIds(parsedIds); // Sync pending with applied on initial load
+        setPendingSelectedStaffIds(parsedIds);
       }
     } catch (error) {
         console.error("Failed to parse staff IDs from localStorage", error);
@@ -61,9 +77,8 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const setAllStaff = useCallback((staff: Staff[]) => {
-    setAllStaffState(staff);
-    // Initialize selection only if it hasn't been initialized from localStorage
+  const setAllStaffCb = useCallback((staff: WithId<Staff>[]) => {
+    setAllStaff(staff);
     const hasBeenInitialized = localStorage.getItem(LOCAL_STORAGE_KEY) !== null;
     if (staff.length > 0 && !hasBeenInitialized) {
       const allStaffIds = staff.map(s => s.id);
@@ -108,7 +123,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     pendingSelectedStaffIds,
     appliedSelectedStaffIds,
     allStaff,
-    setAllStaff,
+    setAllStaff: setAllStaffCb,
     togglePendingStaffSelection,
     setPendingSelection,
     applyPendingSelection,

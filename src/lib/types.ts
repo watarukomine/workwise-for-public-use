@@ -14,10 +14,10 @@ export type UserProfile = {
 export type Staff = {
   id: string;
   name: string;
+  email: string | null;
   calendarId?: string; // Made optional
   avatarUrl?: string; // Made optional
   color?: string; // Made optional
-  email?: string | null;
   role?: 'admin' | 'staff';
 };
 

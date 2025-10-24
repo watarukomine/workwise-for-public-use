@@ -60,6 +60,11 @@
           "type": "string",
           "description": "The name of the staff member."
         },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The staff member's email address, used for login."
+        },
         "calendarId": {
           "type": "string",
           "description": "Identifier of the associated Google Calendar."
@@ -75,6 +80,7 @@
       "required": [
         "id",
         "name",
+        "email",
         "calendarId"
       ]
     },
