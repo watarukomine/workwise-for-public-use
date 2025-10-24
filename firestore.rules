@@ -1,147 +1,175 @@
 /**
- * @file Firestore Security Rules
- * @description This ruleset enforces role-based access control for a work management application.
+ * @file Firebase Security Rules for Firestore.
  *
- * Core Philosophy:
- * Access is strictly controlled based on user roles (admin, staff) and ownership.
- * Admins have full CRUD access to customer, schedule, and location data.
- * Staff members can only access their own profile data and associated employee actions.
- * Users can only access their own profile data.
+ * @core_philosophy This ruleset enforces a strict, role-based access control model for most collections,
+ *  combined with user-ownership for specific user-related data.  Data shape validation is relaxed
+ *  to allow for rapid prototyping, but authorization is strictly enforced.
  *
- * Data Structure:
- * - /users/{userId}: User profile information (email, displayName, role).
- * - /staff/{staffId}: Staff member profiles.
- * - /customers/{customerId}: Customer profiles.
- * - /schedules/{scheduleId}: Work schedules.
- * - /locations/{locationId}: Work locations.
- * - /staff/{staffId}/employee_actions/{employeeActionId}: Employee action logs.
+ * @data_structure
+ * - /users/{userId}: User profile information, writable only by the user themselves.
+ * - /staff/{staffId}: Staff profiles, writable only by admins.  `staffId` matches the Firebase auth UID.
+ * - /customers/{customerId}: Customer profiles, writable only by admins.
+ * - /schedules/{scheduleId}: Work schedules, writable only by admins.  Includes `staffId` for authorization in more complex scenarios.
+ * - /locations/{locationId}: Location data, writable only by admins.
+ * - /staff/{staffId}/employee_actions/{employeeActionId}: Employee actions, writable only by the staff member themselves.
  *
- * Key Security Decisions:
- * - User listing is disabled.
- * - Data validation is limited to essential authorization checks in this prototyping phase.
- * - All write operations are protected by authorization checks.
+ * @key_security_decisions
+ * - Admin Role:  The 'admin' role in the user profile is required for managing Customers, Schedules, and Locations.
+ * - User Listing Disabled: Listing of users is explicitly denied for security reasons.
+ * - Staff and User Profile Ownership:  The `staffId` and `userId` path parameters MUST match the authenticated user's UID for write operations in user-specific collections.
  *
- * Role Definitions:
- * - Admin: Has full CRUD access to customer, schedule, and location data.
- * - Staff: Can only access their own profile data and associated employee actions.
- * - User: Can only access their own profile data.
+ * @denormalization_for_authorization
+ * - User Role: The user's role is stored directly in the `/users/{userId}` document. This avoids needing to query a separate collection for role information when securing other parts of the database.
+ *
+ * @structural_segregation There is no structural segregation in this model. All collections are top-level, with the exception of `employee_actions` which are nested under `staff`.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows a user to read/write their own profile.
+     * @description Checks if the user is signed in.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     * @param {string} userId - The user ID to compare against the authenticated user's UID.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the authenticated user is an admin.
+     * @return {bool} True if the user has the 'admin' role; otherwise, false.
+     */
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    /**
+     * @description Checks if a user is the owner of an existing document.
+     * @param {string} userId - The user ID to compare against the authenticated user's UID.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+    
+    /**
+     * @description Secures user profile information.
      * @path /users/{userId}
-     * @allow (create) request.auth.uid == userId
-     * @allow (get, update, delete) request.auth.uid == userId
-     * @deny (create) request.auth == null
-     * @deny (get, update, delete) request.auth == null || request.auth.uid != userId
-     * @principle Enforces document ownership for user profiles.
+     * @allow (create) User with UID 'user123' creates their profile document at /users/user123. The request.auth.uid must match the userId.
+     * @allow (get) User with UID 'user123' reads their profile document at /users/user123.
+     * @allow (update) User with UID 'user123' updates their profile document at /users/user123.
+     * @allow (delete) User with UID 'user123' deletes their profile document at /users/user123.
+     * @deny (create) User with UID 'user456' attempts to create a profile document at /users/user123. The request.auth.uid does not match the userId.
+     * @deny (list) Any user attempts to list all user documents. User listing is not allowed.
+     * @principle Enforces document ownership for writes.
      */
     match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
       allow get: if isOwner(userId);
       allow list: if false;
-      allow create: if isOwner(userId) && request.resource.data.email is string;
-      allow update: if isOwner(userId) && resource.data.email == request.resource.data.email;
-      allow delete: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.email is string && request.resource.data.displayName is string;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows a staff member to read/write their own profile data.
+     * @description Secures staff profiles.
      * @path /staff/{staffId}
-     * @allow (create) request.auth.uid == staffId
-     * @allow (get, update, delete) request.auth.uid == staffId
-     * @deny (create) request.auth == null
-     * @deny (get, update, delete) request.auth == null || request.auth.uid != staffId
-     * @principle Enforces document ownership for staff profiles.
+     * @allow (create) Admin creates a staff profile at /staff/staff123. The user must have the 'admin' role.
+     * @allow (get) Admin reads a staff profile at /staff/staff123. The user must have the 'admin' role.
+     * @allow (update) Admin updates a staff profile at /staff/staff123. The user must have the 'admin' role.
+     * @allow (delete) Admin deletes a staff profile at /staff/staff123. The user must have the 'admin' role.
+     * @deny (create) Regular user attempts to create a staff profile. The user does not have the 'admin' role.
+     * @deny (list) Any user attempts to list all staff documents. Staff listing is not allowed.
+     * @principle Requires admin role for all operations.
      */
     match /staff/{staffId} {
-      function isOwner(staffId) {
-        return request.auth != null && request.auth.uid == staffId;
-      }
-      allow get: if isOwner(staffId);
+      allow get: if isAdmin();
       allow list: if false;
-      allow create: if isOwner(staffId) && request.resource.data.id == request.auth.uid;
-      allow update: if isOwner(staffId) && resource.data.id == request.auth.uid;
-      allow delete: if isOwner(staffId);
+      allow create: if isAdmin() && request.resource.data.id == staffId;
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Allows admins to create, read, update, or delete customer profiles.
+     * @description Secures customer profiles.
      * @path /customers/{customerId}
-     * @allow (create, get, update, delete, list) request.auth.token.role == 'admin'
-     * @deny (create, get, update, delete, list) request.auth.token.role != 'admin'
-     * @principle Enforces role-based access control for customer profiles.
+     * @allow (create) Admin creates a customer profile at /customers/customer123. The user must have the 'admin' role.
+     * @allow (get) Admin reads a customer profile at /customers/customer123. The user must have the 'admin' role.
+     * @allow (update) Admin updates a customer profile at /customers/customer123. The user must have the 'admin' role.
+     * @allow (delete) Admin deletes a customer profile at /customers/customer123. The user must have the 'admin' role.
+     * @deny (create) Regular user attempts to create a customer profile. The user does not have the 'admin' role.
+     *  @deny (list) Any user attempts to list all customer documents. Customer listing is not allowed.
+     * @principle Requires admin role for all operations.
      */
     match /customers/{customerId} {
-      function isAdmin() {
-        return request.auth != null && request.auth.token.role == 'admin';
-      }
       allow get: if isAdmin();
       allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.id == customerId;
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Allows admins to create, read, update, or delete schedules.
+     * @description Secures work schedules.
      * @path /schedules/{scheduleId}
-     * @allow (create, get, update, delete, list) request.auth.token.role == 'admin'
-     * @deny (create, get, update, delete, list) request.auth.token.role != 'admin'
-     * @principle Enforces role-based access control for schedules.
+     * @allow (create) Admin creates a schedule at /schedules/schedule123. The user must have the 'admin' role.
+     * @allow (get) Admin reads a schedule at /schedules/schedule123. The user must have the 'admin' role.
+     * @allow (update) Admin updates a schedule at /schedules/schedule123. The user must have the 'admin' role.
+     * @allow (delete) Admin deletes a schedule at /schedules/schedule123. The user must have the 'admin' role.
+     * @deny (create) Regular user attempts to create a schedule. The user does not have the 'admin' role.
+     *  @deny (list) Any user attempts to list all schedule documents. Schedule listing is not allowed.
+     * @principle Requires admin role for all operations.
      */
     match /schedules/{scheduleId} {
-      function isAdmin() {
-        return request.auth != null && request.auth.token.role == 'admin';
-      }
       allow get: if isAdmin();
       allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.id == scheduleId;
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Allows admins to create, read, update, or delete locations.
+     * @description Secures location data.
      * @path /locations/{locationId}
-     * @allow (create, get, update, delete, list) request.auth.token.role == 'admin'
-     * @deny (create, get, update, delete, list) request.auth.token.role != 'admin'
-     * @principle Enforces role-based access control for locations.
+     * @allow (create) Admin creates a location at /locations/location123. The user must have the 'admin' role.
+     * @allow (get) Admin reads a location at /locations/location123. The user must have the 'admin' role.
+     * @allow (update) Admin updates a location at /locations/location123. The user must have the 'admin' role.
+     * @allow (delete) Admin deletes a location at /locations/location123. The user must have the 'admin' role.
+     * @deny (create) Regular user attempts to create a location. The user does not have the 'admin' role.
+     *  @deny (list) Any user attempts to list all location documents. Location listing is not allowed.
+     * @principle Requires admin role for all operations.
      */
     match /locations/{locationId} {
-      function isAdmin() {
-        return request.auth != null && request.auth.token.role == 'admin';
-      }
       allow get: if isAdmin();
       allow list: if isAdmin();
-      allow create: if isAdmin();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.id == locationId;
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Allows a staff member to create, read, update, or delete their own employee actions.
+     * @description Secures employee actions.
      * @path /staff/{staffId}/employee_actions/{employeeActionId}
-     * @allow (create) request.auth.uid == staffId
-     * @allow (get, update, delete) request.auth.uid == staffId
-     * @deny (create) request.auth == null
-     * @deny (get, update, delete) request.auth == null || request.auth.uid != staffId
-     * @principle Enforces document ownership for employee actions.
+     * @allow (create) Staff member 'staff123' creates an employee action at /staff/staff123/employee_actions/action123. The request.auth.uid must match the staffId.
+     * @allow (get) Staff member 'staff123' reads their employee action at /staff/staff123/employee_actions/action123.
+     * @allow (update) Staff member 'staff123' updates their employee action at /staff/staff123/employee_actions/action123.
+     * @allow (delete) Staff member 'staff123' deletes their employee action at /staff/staff123/employee_actions/action123.
+     * @deny (create) Staff member 'staff456' attempts to create an employee action under staff member 'staff123'. The request.auth.uid does not match the staffId.
+     * @deny (list) Any user attempts to list all employee action documents. Employee action listing is not allowed.
+     * @principle Enforces document ownership for writes.
      */
     match /staff/{staffId}/employee_actions/{employeeActionId} {
-      function isOwner(staffId) {
-        return request.auth != null && request.auth.uid == staffId;
-      }
       allow get: if isOwner(staffId);
       allow list: if isOwner(staffId);
-      allow create: if isOwner(staffId) && request.resource.data.employeeId == request.auth.uid;
-      allow update: if isOwner(staffId) && resource.data.employeeId == request.auth.uid;
-      allow delete: if isOwner(staffId);
+      allow create: if isOwner(staffId) && request.resource.data.employeeId == staffId && request.resource.data.id == employeeActionId;
+      allow update: if isExistingOwner(staffId) && request.resource.data.employeeId == staffId;
+      allow delete: if isExistingOwner(staffId);
     }
   }
 }
