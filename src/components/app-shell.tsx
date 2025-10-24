@@ -27,6 +27,7 @@ import {
   SidebarTrigger,
   SidebarContent,
   SidebarFooter,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -48,12 +49,12 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 const navItems = [
-  { href: '/', label: '本日の予定', icon: ClipboardList },
-  { href: '/customers', label: '販売店情報', icon: Building2 },
-  { href: '/staff', label: 'スタッフ一覧', icon: Users },
-  { href: '/optimizer', label: 'ルート最適化', icon: Map },
-  { href: '/import', label: 'データ取込', icon: Upload },
-  { href: '/check-in', label: 'チェックイン', icon: MapPin },
+  { href: '/', label: '本日の予定', icon: ClipboardList, mobile: true },
+  { href: '/optimizer', label: 'ルート最適化', icon: Map, mobile: true },
+  { href: '/customers', label: '販売店情報', icon: Building2, mobile: false },
+  { href: '/staff', label: 'スタッフ一覧', icon: Users, mobile: false },
+  { href: '/import', label: 'データ取込', icon: Upload, mobile: false },
+  { href: '/check-in', label: 'チェックイン', icon: MapPin, mobile: true },
 ];
 
 const mockUser = {
@@ -63,8 +64,34 @@ const mockUser = {
   photoURL: `https://picsum.photos/seed/mock-user-123/100/100`,
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+function NavMenu() {
   const pathname = usePathname();
+  const { isMobile } = useSidebar();
+  
+  const visibleItems = isMobile ? navItems.filter(item => item.mobile) : navItems;
+
+  return (
+      <SidebarMenu>
+        {visibleItems.map((item) => (
+          <SidebarMenuItem key={item.label}>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === item.href}
+              tooltip={item.label}
+              className="font-medium"
+            >
+              <Link href={item.href}>
+                <item.icon />
+                <span>{item.label}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ))}
+      </SidebarMenu>
+  )
+}
+
+export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const [user, setUser] = React.useState(mockUser);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -104,23 +131,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <SidebarMenu>
-            {navItems.map((item) => (
-              <SidebarMenuItem key={item.label}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href}
-                  tooltip={item.label}
-                  className="font-medium"
-                >
-                  <Link href={item.href}>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
+          <NavMenu />
         </SidebarContent>
         <SidebarFooter className="p-2">
           {isLoading ? (
