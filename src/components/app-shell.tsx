@@ -27,7 +27,6 @@ import {
   SidebarTrigger,
   SidebarContent,
   SidebarFooter,
-  useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -54,28 +53,23 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 const allNavItems = [
-  { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'], mobile: true },
-  { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'], mobile: true },
-  { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'], mobile: false },
-  { href: '/staff', label: 'スタッフ一覧', icon: Users, roles: ['admin'], mobile: false },
-  { href: '/import', label: 'データ取込', icon: Upload, roles: ['admin'], mobile: false },
-  { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'], mobile: true },
+  { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'] },
+  { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'] },
+  { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
+  { href: '/staff', label: 'スタッフ一覧', icon: Users, roles: ['admin'] },
+  { href: '/import', label: 'データ取込', icon: Upload, roles: ['admin'] },
+  { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'] },
 ];
 
 function NavMenu() {
   const pathname = usePathname();
-  const { isMobile } = useSidebar();
   const { profile } = useUserProfile();
 
-  const userRole = profile?.role || 'staff'; // Default to 'staff' if no profile/role
+  const userRole = profile?.role || 'staff';
 
   const navItems = React.useMemo(() => {
-    return allNavItems.filter(item => {
-      const hasRole = item.roles.includes(userRole);
-      const isMobileVisible = isMobile ? item.mobile : true;
-      return hasRole && isMobileVisible;
-    });
-  }, [userRole, isMobile]);
+    return allNavItems.filter(item => item.roles.includes(userRole));
+  }, [userRole]);
 
   return (
       <SidebarMenu>
@@ -192,5 +186,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    

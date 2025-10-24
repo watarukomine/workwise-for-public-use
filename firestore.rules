@@ -2,218 +2,142 @@
  * @fileoverview Firestore Security Rules for the application.
  *
  * Core Philosophy:
- * This ruleset enforces a strict, role-based access control model with user-ownership for profile data.
- * Admins have full access to customer, schedule, and location data, while staff members can manage their own schedules.
- * Users can only access their own profile information, with admins having broader data management capabilities.
+ * This ruleset enforces a role-based access control model for admins and staff,
+ * with strict ownership for users and staff members over their own data.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile data, accessible only by the user themselves.
- * - /staff/{staffId}: Stores staff profiles, accessible only by the staff member themselves.
- * - /customers/{customerId}: Stores customer profiles, accessible only by admins.
- * - /schedules/{scheduleId}: Stores work schedules, accessible only by admins.
- * - /locations/{locationId}: Stores location data, accessible only by admins.
- * - /staff/{staffId}/employee_actions/{employeeActionId}: Stores employee actions, accessible only by the staff member themselves.
+ * - /users/{userId}: Stores user profile information.
+ * - /staff/{staffId}: Stores staff profile information.
+ * - /customers/{customerId}: Stores customer profiles.
+ * - /schedules/{scheduleId}: Stores work schedules.
+ * - /locations/{locationId}: Stores location data.
+ * - /staff/{staffId}/employee_actions/{employeeActionId}: Stores employee actions for staff.
  *
  * Key Security Decisions:
- * - User listing is disallowed to protect privacy.
- * - Admin role is required for managing customers, schedules, and locations.
- * - Data validation is minimized for prototyping but includes ownership checks.
+ * - Only admins can manage customers, schedules, and locations.
+ * - Users (via /users/{userId}) and staff members (via /staff/{staffId}) can only manage their own profiles.
+ * - Staff members can manage their own employee actions.
+ * - Listing of documents is generally restricted except where explicitly allowed (e.g., staff listing their own employee actions).
  *
  * Denormalization for Authorization:
- * - The rules rely on the Firebase Auth UID (`request.auth.uid`) to match against document IDs in the `users` and `staff` collections, as well as the `staffId` in the `employee_actions` subcollection to enforce ownership.
- * - No denormalization is needed since the authorization checks are based on the document paths and Firebase Auth UID.
- *
- * Structural Segregation:
- * - Private user data (profiles) is stored in the `/users/{userId}` collection, ensuring it's separate from any potentially public data.
+ * The rules leverage the `request.auth.uid` for identity verification and the `role` field in the `/users/{userId}` document to determine admin/staff privileges.
+ * For example, `schedules` documents do not have the role, so we depend on the profile to authorize.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Enforces access control for user profiles. Users can only read/write their own profile.
-     * @path /databases/{database}/documents/users/{userId}
-     * @allow (get, create, update, delete) if the authenticated user's UID matches the userId.
-     *  Example: A user with UID "user123" can read their own profile at /users/user123.
-     * @deny (get, create, update, delete) if the authenticated user's UID does not match the userId.
-     *  Example: A user with UID "user123" cannot read the profile of another user at /users/user456.
-     * @principle Enforces document ownership for all operations.
+     * @description Controls access to user profile information.
+     * @path /users/{userId}
+     * @allow (create) Authenticated user can create their own profile.
+     * @allow (get, update, delete) Authenticated user can access their own profile.
+     * @deny (create) Non-authenticated user attempts to create a profile.
+     * @deny (get, update, delete) Authenticated user attempts to access another user's profile.
+     * @principle Enforces document ownership for user profiles.
      */
     match /users/{userId} {
-      // Helper function to check if the user is signed in and owns the document.
       function isOwner(userId) {
         return request.auth != null && request.auth.uid == userId;
       }
-
-      // Allow a user to read their own profile.
       allow get: if isOwner(userId);
-
-      // Only the owner can list their own "profile" which is technically only one profile, so deny list.
       allow list: if false;
-
-      // Allow a user to create their own profile if the userId matches their auth UID
-      allow create: if isOwner(userId) && request.resource.data.email is string;
-
-      // Allow a user to update their own profile.
-      allow update: if isOwner(userId);
-
-      // Allow a user to delete their own profile.
-      allow delete: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.email is string && request.resource.data.role is string;
+      allow update: if isOwner(userId) && resource != null;
+      allow delete: if isOwner(userId) && resource != null;
     }
 
     /**
-     * @description Enforces access control for staff profiles. Staff members can only read/write their own profile data.
-     * @path /databases/{database}/documents/staff/{staffId}
-     * @allow (get, create, update, delete) if the authenticated user's UID matches the staffId.
-     *  Example: A staff member with UID "staff123" can read their own profile at /staff/staff123.
-     * @deny (get, create, update, delete) if the authenticated user's UID does not match the staffId.
-     *  Example: A staff member with UID "staff123" cannot read the profile of another staff member at /staff/staff456.
-     * @principle Enforces document ownership for all operations.
+     * @description Controls access to staff profile information.
+     * @path /staff/{staffId}
+     * @allow (create) Authenticated staff member can create their own profile.
+     * @allow (get, update, delete) Authenticated staff member can access their own profile.
+     * @deny (create) Non-authenticated staff member attempts to create a profile.
+     * @deny (get, update, delete) Authenticated staff member attempts to access another staff member's profile.
+     * @principle Enforces document ownership for staff profiles.
      */
     match /staff/{staffId} {
-      // Helper function to check if the user is signed in and owns the document.
-      function isOwner(staffId) {
+      function isStaff(staffId) {
         return request.auth != null && request.auth.uid == staffId;
       }
-
-      // Allow a staff member to read their own profile.
-      allow get: if isOwner(staffId);
-
-      // Only the owner can list their own "profile" which is technically only one profile, so deny list.
+      allow get: if isStaff(staffId);
       allow list: if false;
-
-      // Allow a staff member to create their own profile if the staffId matches their auth UID
-      allow create: if isOwner(staffId) && request.resource.data.name is string;
-
-      // Allow a staff member to update their own profile.
-      allow update: if isOwner(staffId);
-
-      // Allow a staff member to delete their own profile.
-      allow delete: if isOwner(staffId);
+      allow create: if isStaff(staffId) && request.resource.data.id == staffId;
+      allow update: if isStaff(staffId) && resource != null;
+      allow delete: if isStaff(staffId) && resource != null;
     }
 
     /**
-     * @description Enforces access control for customer profiles. Only admins can create, read, update, or delete customer profiles.
-     * @path /databases/{database}/documents/customers/{customerId}
-     * @allow (get, create, update, delete) if the authenticated user has the "admin" role.
-     *  Example: An admin can read a customer profile at /customers/customer123.
-     * @deny (get, create, update, delete) if the authenticated user does not have the "admin" role.
-     *  Example: A regular user cannot read a customer profile at /customers/customer123.
-     * @principle Restricts access to customer data to admin users.
+     * @description Controls access to customer profiles. Only admins can manage customer profiles.
+     * @path /customers/{customerId}
+     * @allow (create, get, list, update, delete) Admin user can manage all customer profiles.
+     * @deny (create, get, list, update, delete) Non-admin user attempts to manage customer profiles.
+     * @principle Enforces role-based access control for customer management.
      */
     match /customers/{customerId} {
-      // Helper function to check if the user is an admin.
       function isAdmin() {
         return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
       }
-
-      // Allow admins to read customer profiles.
       allow get: if isAdmin();
-
-      // Allow admins to list customer profiles.
       allow list: if isAdmin();
-
-      // Allow admins to create customer profiles.
-      allow create: if isAdmin() && request.resource.data.name is string && request.resource.data.address is string;
-
-      // Allow admins to update customer profiles.
-      allow update: if isAdmin();
-
-      // Allow admins to delete customer profiles.
-      allow delete: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Enforces access control for work schedules. Only admins can create, read, update, or delete schedules.
-     * @path /databases/{database}/documents/schedules/{scheduleId}
-     * @allow (get, create, update, delete) if the authenticated user has the "admin" role.
-     *  Example: An admin can read a schedule at /schedules/schedule123.
-     * @deny (get, create, update, delete) if the authenticated user does not have the "admin" role.
-     *  Example: A regular user cannot read a schedule at /schedules/schedule123.
-     * @principle Restricts access to schedule data to admin users.
+     * @description Controls access to work schedules. Only admins can manage schedules.
+     * @path /schedules/{scheduleId}
+     * @allow (create, get, list, update, delete) Admin user can manage all schedules.
+     * @deny (create, get, list, update, delete) Non-admin user attempts to manage schedules.
+     * @principle Enforces role-based access control for schedule management.
      */
     match /schedules/{scheduleId} {
-      // Helper function to check if the user is an admin.
       function isAdmin() {
         return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
       }
-
-      // Allow admins to read schedules.
       allow get: if isAdmin();
-
-      // Allow admins to list schedules.
       allow list: if isAdmin();
-
-      // Allow admins to create schedules.
-      allow create: if isAdmin() && request.resource.data.staffId is string && request.resource.data.customerId is string;
-
-      // Allow admins to update schedules.
-      allow update: if isAdmin();
-
-      // Allow admins to delete schedules.
-      allow delete: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Enforces access control for location data. Only admins can create, read, update, or delete locations.
-     * @path /databases/{database}/documents/locations/{locationId}
-     * @allow (get, create, update, delete) if the authenticated user has the "admin" role.
-     *  Example: An admin can read a location at /locations/location123.
-     * @deny (get, create, update, delete) if the authenticated user does not have the "admin" role.
-     *  Example: A regular user cannot read a location at /locations/location123.
-     * @principle Restricts access to location data to admin users.
+     * @description Controls access to location data. Only admins can manage locations.
+     * @path /locations/{locationId}
+     * @allow (create, get, list, update, delete) Admin user can manage all locations.
+     * @deny (create, get, list, update, delete) Non-admin user attempts to manage locations.
+     * @principle Enforces role-based access control for location management.
      */
     match /locations/{locationId} {
-      // Helper function to check if the user is an admin.
       function isAdmin() {
         return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
       }
-
-      // Allow admins to read locations.
       allow get: if isAdmin();
-
-      // Allow admins to list locations.
       allow list: if isAdmin();
-
-      // Allow admins to create locations.
-      allow create: if isAdmin() && request.resource.data.name is string && request.resource.data.address is string;
-
-      // Allow admins to update locations.
-      allow update: if isAdmin();
-
-      // Allow admins to delete locations.
-      allow delete: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Enforces access control for employee actions. Each staff member can only create, read, update, or delete their own actions.
-     * @path /databases/{database}/documents/staff/{staffId}/employee_actions/{employeeActionId}
-     * @allow (get, create, update, delete) if the authenticated user's UID matches the staffId.
-     *  Example: A staff member with UID "staff123" can read their own action at /staff/staff123/employee_actions/action123.
-     * @deny (get, create, update, delete) if the authenticated user's UID does not match the staffId.
-     *  Example: A staff member with UID "staff123" cannot read another staff member's action at /staff/staff456/employee_actions/action123.
-     * @principle Enforces document ownership for all operations.
+     * @description Controls access to employee actions. Each staff member can only manage their own actions.
+     * @path /staff/{staffId}/employee_actions/{employeeActionId}
+     * @allow (create, get, list, update, delete) Authenticated staff member can manage their own actions.
+     * @deny (create) Non-authenticated staff member attempts to create an action.
+     * @deny (get, list, update, delete) Authenticated staff member attempts to access another staff member's actions.
+     * @principle Enforces document ownership for employee actions.
      */
     match /staff/{staffId}/employee_actions/{employeeActionId} {
-      // Helper function to check if the user is signed in and owns the document.
-      function isOwner(staffId) {
+      function isStaff(staffId) {
         return request.auth != null && request.auth.uid == staffId;
       }
-
-      // Allow a staff member to read their own actions.
-      allow get: if isOwner(staffId);
-
-      // Allow a staff member to list their own actions.
-      allow list: if isOwner(staffId);
-
-      // Allow a staff member to create their own actions.
-      allow create: if isOwner(staffId) && request.resource.data.actionType is string && request.resource.data.timestamp is string;
-
-      // Allow a staff member to update their own actions.
-      allow update: if isOwner(staffId);
-
-      // Allow a staff member to delete their own actions.
-      allow delete: if isOwner(staffId);
+      allow get: if isStaff(staffId);
+      allow list: if isStaff(staffId);
+      allow create: if isStaff(staffId) && request.resource.data.employeeId == staffId;
+      allow update: if isStaff(staffId) && resource != null && resource.data.employeeId == staffId;
+      allow delete: if isStaff(staffId) && resource != null && resource.data.employeeId == staffId;
     }
   }
 }
