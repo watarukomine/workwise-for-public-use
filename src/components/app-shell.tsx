@@ -14,6 +14,7 @@ import {
   ClipboardList,
   Upload,
   MapPin,
+  UserPlus,
 } from 'lucide-react';
 
 import {
@@ -40,23 +41,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import React from 'react';
-import { signIn, signOut } from '@/lib/auth';
+import { signOut } from '@/lib/auth';
 import { useUser } from '@/firebase/auth/use-user';
 import { Loader2 } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 
 
-const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.05 1.05-2.86 2.25-5.02 2.25-4.33 0-7.87-3.55-7.87-7.95s3.54-7.95 7.87-7.95c2.43 0 3.97 1.02 4.88 1.94l2.6-2.58C18.44 1.56 15.82 0 12.48 0 5.6 0 0 5.6 0 12.5S5.6 25 12.48 25c7.2 0 12.04-4.92 12.04-12.16 0-.8-.08-1.44-.2-2.02h-11.84z" />
-    </svg>
-);
-
 const allNavItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'] },
   { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'] },
   { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
-  // { href: '/staff', label: 'スタッフ一覧', icon: Users, roles: ['admin'] }, // Temporarily disabled
+  { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'] },
   { href: '/import', label: 'データ取込', icon: Upload, roles: ['admin'] },
   { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'] },
 ];
@@ -68,12 +63,9 @@ function NavMenu() {
   const userRole = profile?.role || 'staff';
 
   const navItems = React.useMemo(() => {
-    // Return all items if user is an admin.
-    // This allows admins to see staff-only pages too.
     if (userRole === 'admin') {
         return allNavItems;
     }
-    // Filter for staff role
     return allNavItems.filter(item => item.roles.includes(userRole));
   }, [userRole]);
 
@@ -102,27 +94,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const { user, isLoading } = useUser();
   const [isAuthLoading, setIsAuthLoading] = React.useState(false);
-
-
-  const handleSignIn = async () => {
-    setIsAuthLoading(true);
-    try {
-      await signIn();
-      toast({
-        title: "ログインしました",
-        description: "WorkWiseへようこそ！",
-      });
-    } catch (error: any) {
-      console.error(error);
-      toast({
-        variant: "destructive",
-        title: "ログインに失敗しました",
-        description: error.message || "予期せぬエラーが発生しました。",
-      });
-    } finally {
-        setIsAuthLoading(false);
-    }
-  };
 
   const handleSignOut = async () => {
     setIsAuthLoading(true);
@@ -176,9 +147,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button onClick={handleSignIn} className="w-full">
-              <GoogleIcon className="mr-2 h-4 w-4 fill-white" />
-              Sign In with Google
+            <Button asChild className="w-full">
+              <Link href="/login">
+                 <LogIn className="mr-2 h-4 w-4" />
+                 ログイン / 新規登録
+              </Link>
             </Button>
           )}
         </SidebarFooter>

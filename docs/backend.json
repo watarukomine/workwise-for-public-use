@@ -80,8 +80,7 @@
       "required": [
         "id",
         "name",
-        "email",
-        "calendarId"
+        "email"
       ]
     },
     "Customer": {
@@ -245,9 +244,7 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous",
-      "google.com"
+      "password"
     ]
   },
   "firestore": {
