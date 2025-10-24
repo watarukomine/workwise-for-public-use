@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
@@ -6,6 +7,7 @@ import type { Staff } from '@/lib/types';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { useUser } from '@/firebase/auth/use-user';
 
 const LOCAL_STORAGE_KEY = 'appliedStaffIds';
 
@@ -23,11 +25,12 @@ const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>
 
 export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   
   const staffCollectionRef = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'staff') : null),
-    [firestore]
+    () => (firestore && !isUserLoading && user ? collection(firestore, 'staff') : null),
+    [firestore, user, isUserLoading]
   );
   const { data: staffFromHook } = useCollection<Staff>(staffCollectionRef);
 
@@ -35,6 +38,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
   const [appliedSelectedStaffIds, setAppliedSelectedStaffIds] = useState<string[]>([]);
   
+  // Effect to update allStaff state when staffFromHook changes
   useEffect(() => {
     if (staffFromHook) {
        setAllStaffState(staffFromHook);
@@ -57,19 +61,18 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // When allStaff list is populated for the first time (and nothing is in localStorage)
-  useEffect(() => {
+  const setAllStaff = useCallback((staff: Staff[]) => {
+    setAllStaffState(staff);
+
+    // This part is tricky because it relies on localStorage.
+    // Let's ensure it only runs once when the staff list is first populated.
     const hasBeenInitialized = localStorage.getItem(LOCAL_STORAGE_KEY) !== null;
-    if (allStaff.length > 0 && !hasBeenInitialized) {
-      const allStaffIds = allStaff.map(s => s.id);
+    if (staff.length > 0 && !hasBeenInitialized) {
+      const allStaffIds = staff.map(s => s.id);
       setAppliedSelectedStaffIds(allStaffIds);
       setPendingSelectedStaffIds(allStaffIds);
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(allStaffIds));
     }
-  }, [allStaff]);
-  
-  const setAllStaff = useCallback((staff: Staff[]) => {
-    setAllStaffState(staff);
   }, []);
 
 

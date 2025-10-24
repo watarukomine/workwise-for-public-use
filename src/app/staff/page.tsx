@@ -10,14 +10,16 @@ import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { useMemoFirebase } from '@/firebase/provider';
+import { useUser } from '@/firebase/auth/use-user';
 
 export default function StaffPage() {
   const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
   const { setAllStaff } = useSelectedStaff();
 
   const staffCollectionRef = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'staff') : null),
-    [firestore]
+    () => (firestore && !isUserLoading && user ? collection(firestore, 'staff') : null),
+    [firestore, user, isUserLoading]
   );
   
   const { data: staff, isLoading, error } = useCollection<WithId<Staff>>(staffCollectionRef);
@@ -35,8 +37,13 @@ export default function StaffPage() {
         role: s.role === 'admin' || s.role === 'staff' ? s.role : 'staff',
       }));
       setAllStaff(formattedStaff);
+    } else if (!isLoading && !isUserLoading && !user) {
+        // If not loading and not logged in, clear staff list
+        setAllStaff([]);
     }
-  }, [staff, setAllStaff]);
+  }, [staff, setAllStaff, isLoading, isUserLoading, user]);
+
+  const effectiveIsLoading = isLoading || isUserLoading;
   
   return (
     <div className="space-y-8">
@@ -57,8 +64,18 @@ export default function StaffPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      {!effectiveIsLoading && !user && (
+         <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>ログインしてください</AlertTitle>
+          <AlertDescription>
+            スタッフ情報を表示するには、ログインが必要です。
+          </AlertDescription>
+        </Alert>
+      )}
       
-      <StaffTable staff={staff} isLoading={isLoading} />
+      <StaffTable staff={staff} isLoading={effectiveIsLoading} />
     </div>
   );
 }
