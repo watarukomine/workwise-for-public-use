@@ -1,5 +1,6 @@
+
 'use client';
-import type { Staff } from '@/lib/types';
+import type { Staff, WithId } from '@/lib/types';
 import {
   Table,
   TableBody,
@@ -19,9 +20,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface StaffTableProps {
-    staff: Staff[];
+    staff: WithId<Staff>[] | null;
     isLoading: boolean;
 }
 
@@ -33,10 +35,11 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     appliedSelectedStaffIds,
   } = useSelectedStaff();
   
-  const isAllSelected = staff.length > 0 && pendingSelectedStaffIds.length === staff.length;
+  const staffList = staff || [];
+  const isAllSelected = staffList.length > 0 && pendingSelectedStaffIds.length === staffList.length;
 
   const handleSelectAll = () => {
-    const allStaffIds = staff.map(s => s.id);
+    const allStaffIds = staffList.map(s => s.id);
     if (isAllSelected) {
       // Deselect all
       allStaffIds.forEach(id => {
@@ -78,22 +81,24 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                     checked={isAllSelected}
                     onCheckedChange={handleSelectAll}
                     aria-label="すべてのスタッフを選択"
+                    disabled={staffList.length === 0}
                   />
                 </TableHead>
                 <TableHead>スタッフ名</TableHead>
-                <TableHead>スタッフID</TableHead>
-                <TableHead>カレンダーID</TableHead>
+                <TableHead>メールアドレス</TableHead>
+                <TableHead>役割 (Role)</TableHead>
+                <TableHead>ユーザーID</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
+                    <TableCell colSpan={5} className="h-24 text-center">
                       スタッフ情報を読み込んでいます...
                     </TableCell>
                   </TableRow>
-              ) : staff && staff.length > 0 ? (
-                staff.map((member) => (
+              ) : staffList && staffList.length > 0 ? (
+                staffList.map((member) => (
                   <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) ? 'selected' : ''}>
                     <TableCell>
                        <Checkbox
@@ -111,13 +116,18 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                         <span className="font-medium">{member.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{member.id}</TableCell>
-                    <TableCell className="text-muted-foreground">{member.calendarId}</TableCell>
+                    <TableCell className="text-muted-foreground">{member.email}</TableCell>
+                    <TableCell>
+                        <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>
+                            {member.role}
+                        </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground font-mono text-xs">{member.id}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                    <TableCell colSpan={4} className="h-24 text-center">
+                    <TableCell colSpan={5} className="h-24 text-center">
                       スタッフが見つかりません。
                     </TableCell>
                 </TableRow>
