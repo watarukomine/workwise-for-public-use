@@ -27,7 +27,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { addMinutes, differenceInMinutes, format, parse, parseISO, subMinutes, isToday } from 'date-fns';
+import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,11 @@ const TRAVEL_TIME_MINUTES = 30;
 
 // --- Helper Functions ---
 const timeStringToDate = (timeStr: string) => {
+    if (!/^\d{2}:\d{2}$/.test(timeStr)) {
+        console.error("Invalid time string format:", timeStr);
+        // Return a default or invalid date
+        return new Date(NaN);
+    }
     const today = new Date();
     const [hours, minutes] = timeStr.split(':').map(Number);
     today.setHours(hours, minutes, 0, 0);
@@ -59,6 +64,9 @@ const timeStringToDate = (timeStr: string) => {
 
 const formatTime = (date: Date | string) => {
   const d = typeof date === 'string' ? parseISO(date) : date;
+   if (isNaN(d.getTime())) {
+    return "Invalid date";
+  }
   return format(d, 'HH:mm');
 };
 
@@ -146,6 +154,60 @@ interface ScheduleViewProps {
     setOrdersData: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
 }
 
+const getDraggableClassName = (task: Order) => {
+    if (task.id === 'generic-travel') return 'bg-yellow-500 text-black';
+    if (task.id === 'generic-work') return 'bg-gray-400 text-white';
+    if (task.id === 'generic-break') return 'bg-green-500 text-white';
+    return 'bg-primary text-primary-foreground';
+};
+
+const genericTasks: WithId<Order>[] = [
+      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30 },
+      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60 },
+      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60 },
+];
+
+function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], customers: WithId<Customer>[] }) {
+    const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-lg">ドラッグ可能なタスク</CardTitle>
+                <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea className="w-full whitespace-nowrap">
+                    <div className="pr-4">
+                        <div className="flex flex-wrap gap-2">
+                            {genericTasks.map((task) => (
+                                <DraggableOrder
+                                    key={task.id}
+                                    order={task}
+                                    className={getDraggableClassName(task)}
+                                />
+                            ))}
+                            {orders.map((order) => (
+                                <DraggableOrder
+                                    key={order.id}
+                                    order={order}
+                                    customer={getCustomerByCode(order.customerCode)}
+                                />
+                            ))}
+                            {orders.length === 0 && (
+                                <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
+                                    <p>未割り当てのオーダーはありません。</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </ScrollArea>
+            </CardContent>
+        </Card>
+    );
+}
+
+
 // --- Main Component ---
 export function ScheduleView({ 
     staffData, 
@@ -165,12 +227,6 @@ export function ScheduleView({
     endTime: '',
   });
 
-  const genericTasks: WithId<Order>[] = [
-      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30 },
-      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60 },
-      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60 },
-  ];
-
   React.useEffect(() => {
     setIsClient(true);
   }, []);
@@ -182,8 +238,8 @@ export function ScheduleView({
 
   const unassignedOrders = React.useMemo(() => {
     if (!ordersData || !scheduleData) return [];
-    const assignedOrderIds = new Set(scheduleData.map(e => e.orderId).filter(Boolean));
-    return ordersData.filter(order => !assignedOrderIds.has(order.id));
+    const scheduledOrderIds = new Set(scheduleData.map(e => e.orderId).filter(Boolean));
+    return ordersData.filter(order => !scheduledOrderIds.has(order.id));
   }, [ordersData, scheduleData]);
 
 
@@ -321,6 +377,14 @@ export function ScheduleView({
   
   const handleSaveEvent = () => {
     if (dialogState.mode === 'closed') return;
+    
+    const newStart = timeStringToDate(editedEventDetails.startTime);
+    const newEnd = timeStringToDate(editedEventDetails.endTime);
+
+    if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
+        console.error("Invalid time entered");
+        return;
+    }
 
     if (dialogState.mode === 'new') {
         const newEvent: WithId<ScheduleEvent> = {
@@ -328,16 +392,16 @@ export function ScheduleView({
             title: editedEventDetails.title,
             staffId: dialogState.staffId,
             locationId: '',
-            start: timeStringToDate(editedEventDetails.startTime),
-            end: timeStringToDate(editedEventDetails.endTime),
+            start: newStart,
+            end: newEnd,
         };
         setScheduleData(prev => [...prev, newEvent]);
     } else if (dialogState.mode === 'edit') {
         const updatedEvent = {
             ...dialogState.event,
             title: editedEventDetails.title,
-            start: timeStringToDate(editedEventDetails.startTime),
-            end: timeStringToDate(editedEventDetails.endTime),
+            start: newStart,
+            end: newEnd,
         };
         setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
     }
@@ -348,29 +412,35 @@ export function ScheduleView({
   const handleDeleteEvent = () => {
     if (dialogState.mode !== 'edit') return;
     const eventToDelete = dialogState.event;
+  
+    // Find the original order from the main ordersData list
+    const orderToRestore = ordersData.find(o => o.id === eventToDelete.orderId);
 
     setScheduleData(prev => {
+      // Filter out the event(s) to be deleted
       const newSchedule = prev.filter(e => {
         if (eventToDelete.tripId) {
           return e.tripId !== eventToDelete.tripId;
         }
         return e.id !== eventToDelete.id;
       });
-      
-      // If it was a task from an order, put the order back to unassigned
-      if (eventToDelete.orderId) {
-        const order = ordersData.find(o => o.id === eventToDelete.orderId) 
-                     ?? unassignedOrders.find(o => o.id === eventToDelete.orderId); // A bit redundant, but safer
-        if (order) {
-            setOrdersData(currentOrders => [...currentOrders, order]);
-        }
-      }
       return newSchedule;
     });
 
+    // If an order was associated with the deleted task, add it back to the unassigned orders list
+    if (orderToRestore) {
+        setOrdersData(currentOrders => {
+            // Avoid duplicates
+            if (currentOrders.some(o => o.id === orderToRestore.id)) {
+                return currentOrders;
+            }
+            return [...currentOrders, orderToRestore];
+        });
+    }
+
     setDialogState({ mode: 'closed' });
   };
-  
+
   const getDialogDetails = () => {
     if (dialogState.mode === 'edit') {
       const { event } = dialogState;
@@ -385,14 +455,7 @@ export function ScheduleView({
     return { event: undefined, staff: undefined, customer: undefined, start: undefined, title: '' };
   };
 
-  const { event, staff, customer, start, title } = getDialogDetails();
-
-  const getDraggableClassName = (task: Order) => {
-    if (task.id === 'generic-travel') return 'bg-yellow-500 text-black';
-    if (task.id === 'generic-work') return 'bg-gray-400 text-white';
-    if (task.id === 'generic-break') return 'bg-green-500 text-white';
-    return 'bg-primary text-primary-foreground';
-  };
+  const { event, staff, customer, title } = getDialogDetails();
 
   const dailySchedule = React.useMemo(() => {
       if (!scheduleData) return [];
@@ -402,70 +465,61 @@ export function ScheduleView({
       });
   }, [scheduleData]);
 
-  const content = (
-    <>
-      <Card className="h-full">
+  if (!isClient) {
+    return (
+      <Card>
         <CardHeader>
           <CardTitle>本日のスケジュール</CardTitle>
-          <CardDescription>タスクを下のタイムラインにドラッグして割り当てます。空白部分をダブルクリックして新規作成もできます。</CardDescription>
-          <div className="pt-4">
-               <CardTitle className="text-lg mb-2">ドラッグ可能なタスク</CardTitle>
-              <ScrollArea className="w-full whitespace-nowrap">
-                <div className="pr-4">
-                  <div className="flex flex-wrap gap-2">
-                    {genericTasks.map((task) => (
-                       <DraggableOrder
-                          key={task.id}
-                          order={task}
-                          className={getDraggableClassName(task)}
-                        />
-                    ))}
-                    {unassignedOrders.map((order) => (
-                      <DraggableOrder
-                        key={order.id}
-                        order={order}
-                        customer={getCustomerByCode(order.customerCode)}
-                      />
-                    ))}
-                    {unassignedOrders.length === 0 && (
-                      <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
-                          <p>未割り当てのオーダーはありません。</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </ScrollArea>
-          </div>
+          <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4 select-none h-[calc(100%-14rem)] overflow-y-auto pr-6">
-          <div className="grid sticky top-0 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr' }}>
-            <div />
-            <div className="relative grid border-l border-border text-xs text-muted-foreground" style={{ gridTemplateColumns: `repeat(${timelineTotalHours}, ${minutesToPixels(60)}px)` }}>
-              {Array.from({ length: timelineTotalHours }, (_, i) => timelineStartHour + i).map((hour) => (
-                <div key={hour} className="text-center border-r border-border py-1">
-                  {hour}:00
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <TooltipProvider>
-              {staffData?.map((staff) => (
-                <StaffRow
-                  key={staff.id}
-                  staff={staff}
-                  events={dailySchedule.filter(e => e.staffId === staff.id)}
-                  getCustomer={getCustomerById}
-                  isOver={currentOverStaffId === staff.id}
-                  onDoubleClickEvent={handleDoubleClickEvent}
-                  onDoubleClickTimeline={handleDoubleClickTimeline}
-                />
-              ))}
-            </TooltipProvider>
-          </div>
+        <CardContent>
+           <div className="flex items-center justify-center h-64">
+             <p>Loading schedule...</p>
+           </div>
         </CardContent>
       </Card>
+    );
+  }
+
+  return (
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
+        <div className="space-y-4">
+            <UnassignedTasks orders={unassignedOrders} customers={customerData} />
+            <Card>
+                <CardHeader>
+                    <CardTitle>タイムライン</CardTitle>
+                    <CardDescription>空白部分をダブルクリックして新規作成もできます。</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 select-none overflow-x-auto pr-6">
+                    <div className="sticky top-0 z-10 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr', display: 'grid' }}>
+                        <div />
+                        <div className="relative grid border-l border-border text-xs text-muted-foreground" style={{ gridTemplateColumns: `repeat(${timelineTotalHours}, ${minutesToPixels(60)}px)` }}>
+                        {Array.from({ length: timelineTotalHours }, (_, i) => timelineStartHour + i).map((hour) => (
+                            <div key={hour} className="text-center border-r border-border py-1">
+                            {hour}:00
+                            </div>
+                        ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <TooltipProvider>
+                        {staffData?.map((staff) => (
+                            <StaffRow
+                            key={staff.id}
+                            staff={staff}
+                            events={dailySchedule.filter(e => e.staffId === staff.id)}
+                            getCustomer={getCustomerById}
+                            isOver={currentOverStaffId === staff.id}
+                            onDoubleClickEvent={handleDoubleClickEvent}
+                            onDoubleClickTimeline={handleDoubleClickTimeline}
+                            />
+                        ))}
+                        </TooltipProvider>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
       
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={(open) => !open && setDialogState({ mode: 'closed' })}>
         <DialogContent>
@@ -535,29 +589,6 @@ export function ScheduleView({
             </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
-  );
-
-  if (!isClient) {
-    return (
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle>本日のスケジュール</CardTitle>
-          <CardDescription>各スタッフのタイムライン形式のスケジュールです。ドラッグ＆ドロップで予定を編集できます。</CardDescription>
-        </CardHeader>
-        <CardContent>
-           {/* Skeleton loader can be placed here */}
-           <div className="flex items-center justify-center h-64">
-             <p>Loading schedule...</p>
-           </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
-      {content}
     </DndContext>
   );
 }
@@ -649,7 +680,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let color = 'white';
 
   if (isTravelEvent) {
-    const hslMatch = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+    const hslMatch = staff.color?.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
     if (hslMatch) {
       const [_, h, s, l] = hslMatch;
       backgroundColor = `hsl(${h}, 20%, 50%)`;
