@@ -34,7 +34,15 @@ export default function StaffPage() {
             throw new Error(`Failed to fetch: ${response.statusText}`);
         }
         const data = await response.json();
-        const staffList: WithId<Staff>[] = data.map((item: any) => ({
+
+        // Check if data is an object with a 'data' property, or a direct array
+        const rawStaffArray = Array.isArray(data) ? data : data.data;
+
+        if (!Array.isArray(rawStaffArray)) {
+            throw new Error("GAS response did not contain a valid data array.");
+        }
+
+        const staffList: WithId<Staff>[] = rawStaffArray.map((item: any) => ({
           id: String(item['スタッフID']),
           role: item['権限（Staff /Admin）'] === 'Admin' ? 'admin' : 'staff',
           name: item['スタッフ名'],
@@ -46,7 +54,7 @@ export default function StaffPage() {
         }));
         
         if (profile.role === 'admin') {
-            // Admin sees all non-admin staff
+            // Admin sees all staff
             setAllStaff(staffList);
         } else {
             // Non-admin sees only themselves
@@ -72,7 +80,8 @@ export default function StaffPage() {
     if (profile.role === 'admin') {
         return allStaff.filter(s => s.role !== 'admin');
     }
-    return allStaff;
+    const self = allStaff.find(s => s.id === profile.id);
+    return self ? [self] : [];
   }, [profile, allStaff]);
 
   return (
