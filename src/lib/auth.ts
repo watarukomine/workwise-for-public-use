@@ -71,7 +71,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (user) {
-        console.log('Sign in successful for:', user.name);
+        console.log('Sign in successful for:', user.name, 'with role:', user.role);
         setSession(user);
         resolve(user);
       } else {
@@ -90,8 +90,15 @@ export const signUpWithEmail = async (email: string, password: string, name: str
         setTimeout(() => {
             const existingUser = staffList.find(staff => staff.email === email);
             if (existingUser) {
-                console.log('Sign up failed: Email already in use');
-                reject(new Error('このメールアドレスは既に使用されています。'));
+                console.log('User already exists, attempting login instead for:', existingUser.name);
+                 if (existingUser.password === password) {
+                    console.log('Sign in successful for existing user:', existingUser.name, 'with role:', existingUser.role);
+                    setSession(existingUser);
+                    resolve(existingUser);
+                } else {
+                    console.log('Sign in failed for existing user: Invalid password');
+                    reject(new Error('このメールアドレスは登録済みです。パスワードが正しくありません。'));
+                }
                 return;
             }
 
@@ -115,7 +122,7 @@ export const signUpWithEmail = async (email: string, password: string, name: str
             
             // staffData.push(newUser); // This won't persist
             setSession(newUser);
-            console.log('Sign up successful for:', newUser.name);
+            console.log('Sign up successful for new user:', newUser.name);
             resolve(newUser);
         }, 1000);
     });
