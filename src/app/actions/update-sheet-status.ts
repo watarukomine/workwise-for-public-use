@@ -10,6 +10,7 @@ interface UpdateSheetStatusArgs {
 interface GasResponse {
     status: 'success' | 'error';
     message: string;
+    error?: boolean; // Add error property for better compatibility
 }
 
 /**
@@ -41,26 +42,26 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         const responseText = await response.text();
         
         if (!response.ok) {
-             throw new Error(`GAS script returned an error. Status: ${response.status}. Response: ${responseText}`);
+             throw new Error(`GAS script returned a non-OK response. Status: ${response.status}. Response: ${responseText}`);
         }
 
-        if (!contentType || !contentType.includes('application/json')) {
-            // If the response is not JSON but the request was otherwise OK,
-            // it might be an HTML error page from Google.
-            throw new Error(`GAS script returned a non-JSON response. This often indicates a permission or script error. Response: ${responseText}`);
-        }
-        
-        const result: GasResponse = JSON.parse(responseText);
+        // Try to parse as JSON, but handle cases where it might not be
+        try {
+            const result: GasResponse = JSON.parse(responseText);
 
-        // Handle cases where GAS returns a JSON with an error status
-        if(result.status === 'error'){
-            throw new Error(result.message);
-        }
+            // Handle cases where GAS returns a JSON with an error status (e.g., {error: true, message: '...'})
+            if(result.error === true || result.status === 'error'){
+                throw new Error(result.message || 'GAS returned a JSON-formatted error.');
+            }
 
-        return result;
+            return result;
+        } catch (parseError) {
+             // If parsing fails, it means the response was not valid JSON.
+             throw new Error(`GAS script returned a non-JSON response. This often indicates a script error or permission issue. Response: ${responseText}`);
+        }
 
     } catch (error: any) {
-        console.error('Failed to call GAS for status update:', error);
+        console.error('Failed to call GAS for status update:', error.message);
         return {
             status: 'error',
             message: error.message || 'An unknown error occurred while updating the sheet.',
