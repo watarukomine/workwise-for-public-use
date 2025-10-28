@@ -4,18 +4,18 @@
 import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
-import { customerData, scheduleData as initialScheduleData, unassignedOrdersData, staffStatusData, staffData as allStaffData } from '@/lib/data';
+import { customerData, unassignedOrdersData, staffStatusData, staffData as allStaffData } from '@/lib/data';
 import type { Customer, Order, ScheduleEvent, StaffStatus, WithId } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 
 export default function DashboardPage() {
   const [customers] = React.useState<WithId<Customer>[]>(customerData);
-  const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>(initialScheduleData);
+  const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
   const [orders, setOrders] = React.useState<WithId<Order>[]>(unassignedOrdersData);
   const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
 
@@ -38,8 +38,8 @@ export default function DashboardPage() {
   
   const filteredSchedule = React.useMemo(() => {
     const selectedIds = new Set(filteredStaff.map(s => s.id));
-    return initialScheduleData.filter(event => selectedIds.has(event.staffId));
-  }, [filteredStaff]);
+    return scheduleData.filter(event => selectedIds.has(event.staffId));
+  }, [filteredStaff, scheduleData]);
 
   const filteredStatuses = React.useMemo(() => {
     const selectedIds = new Set(filteredStaff.map(s => s.id));
@@ -60,7 +60,11 @@ export default function DashboardPage() {
   }, [allStaff, appliedSelectedStaffIds, profile]);
 
   if (isLoading) {
-      return <div>Loading...</div>
+      return (
+        <div className="flex items-center justify-center p-10">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      );
   }
 
   if (!profile) {
