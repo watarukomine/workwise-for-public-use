@@ -57,6 +57,7 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     }));
   } catch (error) {
     console.error('Error fetching staff data from GAS:', error);
+    // If any error occurs, return the static fallback data which includes sample accounts
     return fallbackStaffData;
   }
 };
