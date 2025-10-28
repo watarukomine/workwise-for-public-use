@@ -5,16 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { LoaderCircle, AlertCircle, Download, CheckCircle, Building, Columns } from 'lucide-react';
+import { LoaderCircle, AlertCircle, Download, CheckCircle, Building } from 'lucide-react';
 import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
-
-function isFetchError(error: unknown): error is TypeError {
-  return error instanceof TypeError;
-}
 
 export function CustomerImporter() {
   const { 
@@ -23,7 +18,6 @@ export function CustomerImporter() {
     setCustomers,
     isLoading: isContextLoading,
     error: contextError,
-    customers,
   } = useCustomer();
   
   const [localUrl, setLocalUrl] = React.useState(customerGasUrl);
@@ -41,10 +35,7 @@ export function CustomerImporter() {
 
   React.useEffect(() => {
     setLocalUrl(customerGasUrl);
-    if (customerGasUrl && customers.length > 0) {
-      setImportSuccess(true);
-    }
-  }, [customerGasUrl, customers]);
+  }, [customerGasUrl]);
   
   React.useEffect(() => {
     if (contextError) setError(contextError);
@@ -63,7 +54,6 @@ export function CustomerImporter() {
     setRawResponse(null);
 
     try {
-      // Use the server action to fetch data
       const result = await fetchGasData(localUrl);
 
       setRawResponse(result);
@@ -89,7 +79,6 @@ export function CustomerImporter() {
     }
   };
   
-  const headers = customers && customers.length > 0 ? Object.keys(customers[0]) : [];
   const loading = isLoading || isContextLoading || !isClient;
 
   return (
@@ -143,27 +132,6 @@ export function CustomerImporter() {
         </Alert>
       )}
 
-      {headers.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <Columns className="h-6 w-6" />
-                取得データのカラム構成
-            </CardTitle>
-            <CardDescription>
-              GASから取得したデータヘッダー（1行目のキー）の一覧です。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-disc list-inside bg-muted rounded-md p-4 space-y-1 font-mono text-sm">
-                {headers.map((header) => (
-                    <li key={header}>{header}</li>
-                ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
       {rawResponse && (
         <Card>
           <CardHeader>
@@ -178,48 +146,6 @@ export function CustomerImporter() {
             </ScrollArea>
           </CardContent>
         </Card>
-      )}
-
-      {customers && customers.length > 0 && (
-         <Card>
-           <CardHeader>
-             <CardTitle>取得データプレビュー</CardTitle>
-              <CardDescription>
-                現在アプリケーションに読み込まれている {customers.length} 件のデータを表示しています。
-              </CardDescription>
-           </CardHeader>
-           <CardContent>
-             <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {headers.map((header) => (
-                      <TableHead key={header}>{header}</TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {customers.slice(0, 5).map((row, rowIndex) => (
-                      <TableRow key={rowIndex}>
-                        {headers.map((header) => (
-                          <TableCell key={`${rowIndex}-${header}`}>
-                            {typeof row[header] === 'object' ? JSON.stringify(row[header]) : String(row[header])}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-             </div>
-           </CardContent>
-           {customers && customers.length > 5 && (
-              <CardFooter>
-                  <p className="text-sm text-muted-foreground">
-                      {`他 ${customers.length - 5} 件のデータ...`}
-                  </p>
-              </CardFooter>
-           )}
-         </Card>
       )}
     </div>
   );

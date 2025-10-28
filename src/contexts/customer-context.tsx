@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
 const CUSTOMER_GAS_URL_KEY = 'customerGasUrl';
 
@@ -24,17 +25,13 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
-    if (savedUrl) {
-      setCustomerGasUrlState(savedUrl);
-    } else {
-      // Set the new URL as a default if nothing is saved
-      setCustomerGasUrlState('https://script.google.com/macros/s/AKfycbyZ2ggDU-l-J4yCsVu0slMc81WnJh_Mty5xtcv0bTOWy7y7avCcE9rK83qMa8vo6WVp/exec');
-    }
+    // Set state from localStorage or default if not present
+    setCustomerGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbyZ2ggDU-l-J4yCsVu0slMc81WnJh_Mty5xtcv0bTOWy7y7avCcE9rK83qMa8vo6WVp/exec');
   }, []);
   
   const setCustomerGasUrl = (url: string) => {
-    setCustomerGasUrlState(url);
     localStorage.setItem(CUSTOMER_GAS_URL_KEY, url);
+    setCustomerGasUrlState(url);
   };
 
   const setCustomers = (data: any[]) => {
@@ -51,21 +48,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setErrorState(null);
         try {
-          const response = await fetch(customerGasUrl, { cache: 'no-store' });
-
-          const responseText = await response.text();
-          if (!response.ok) {
-             try {
-                const errorJson = JSON.parse(responseText);
-                if (errorJson.message) {
-                    throw new Error(errorJson.message);
-                }
-             } catch (e) {
-                 throw new Error(`データを取得できませんでした。URLやシート名が正しいか、GASが正しくデプロイされているか確認してください。(HTTP Status: ${response.status})`);
-             }
-          }
-          
-          const result = JSON.parse(responseText);
+          const result = await fetchGasData(customerGasUrl);
 
           if (result.error && result.message) {
             throw new Error(result.message);
