@@ -119,23 +119,30 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   const [line1, line2] = order.taskDetails.split('\n');
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-    >
-      <div
-        className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
+    <Tooltip>
+      <TooltipTrigger
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
       >
-        <p className="text-xs font-semibold truncate pointer-events-none">
-          {line1}
-        </p>
-        <p className="text-xs opacity-80 truncate pointer-events-none">
-          {line2}
-        </p>
-      </div>
-    </div>
+        <div
+          className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
+        >
+          <p className="text-xs font-semibold truncate pointer-events-none">
+            {line1}
+          </p>
+          <p className="text-xs opacity-80 truncate pointer-events-none">
+            {line2}
+          </p>
+        </div>
+      </TooltipTrigger>
+       <TooltipContent>
+        <p className="font-bold">{line1}</p>
+        {line2 && <p>{line2}</p>}
+        <p className="text-xs text-muted-foreground">所要時間: {order.estimatedDuration}分</p>
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -357,17 +364,19 @@ export function ScheduleView({
             setScheduleData(prev => [...prev, travelEvent, taskEvent]);
             
             // --- Update Google Sheet ---
-            if (staff && order.raw && order.raw['No.']) {
+            const orderIdToUpdate = order.raw?.['No.'] || order.id;
+
+            if (staff && orderIdToUpdate) {
                  try {
                     const result = await updateSheetStatus({
-                        orderId: order.raw['No.'], // Use the correct ID from raw data
+                        orderId: orderIdToUpdate,
                         staffName: staff.name,
                         gasUrl: orderGasUrl,
                     });
                     if (result.status === 'success') {
                         toast({
                             title: 'スプレッドシート更新成功',
-                            description: `オーダー #${order.raw['No.']} を ${staff.name} さんに割り当てました。`,
+                            description: `オーダー #${orderIdToUpdate} を ${staff.name} さんに割り当てました。`,
                         });
                     } else {
                         throw new Error(result.message || '不明なエラー');
@@ -376,29 +385,6 @@ export function ScheduleView({
                     toast({
                         variant: 'destructive',
                         title: 'スプレッドシート更新エラー',
-                        description: `オーダーの割り当てに失敗しました: ${e.message}`,
-                    });
-                }
-            } else if (staff && order.id) {
-                // Fallback for older data or if raw['No.'] is not available
-                try {
-                    const result = await updateSheetStatus({
-                        orderId: order.id,
-                        staffName: staff.name,
-                        gasUrl: orderGasUrl,
-                    });
-                     if (result.status === 'success') {
-                        toast({
-                            title: 'スプレッドシート更新成功 (フォールバック)',
-                            description: `オーダー #${order.id} を ${staff.name} さんに割り当てました。`,
-                        });
-                    } else {
-                        throw new Error(result.message || '不明なエラー');
-                    }
-                } catch (e: any) {
-                     toast({
-                        variant: 'destructive',
-                        title: 'スプレッドシート更新エラー (フォールバック)',
                         description: `オーダーの割り当てに失敗しました: ${e.message}`,
                     });
                 }
@@ -541,6 +527,7 @@ export function ScheduleView({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
+      <TooltipProvider>
         <div className="space-y-4">
             <UnassignedTasks orders={unassignedOrders} customers={allCustomers} />
             <Card>
@@ -561,7 +548,6 @@ export function ScheduleView({
                     </div>
 
                     <div className="space-y-2">
-                        <TooltipProvider>
                         {staffData?.map((staff) => (
                             <StaffRow
                             key={staff.id}
@@ -573,12 +559,11 @@ export function ScheduleView({
                             onDoubleClickTimeline={handleDoubleClickTimeline}
                             />
                         ))}
-                        </TooltipProvider>
                     </div>
                 </CardContent>
             </Card>
         </div>
-      
+      </TooltipProvider>
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={(open) => !open && setDialogState({ mode: 'closed' })}>
         <DialogContent>
             <DialogHeader>
@@ -794,3 +779,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
