@@ -8,19 +8,14 @@ import { AlertCircle } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useCustomer } from '@/contexts/customer-context';
 
 export default function CustomersPage() {
-  // Static data is removed. Data should be fetched from an external source.
-  const [customers, setCustomers] = React.useState<any[]>([]); 
-  const [isLoading, setIsLoading] = React.useState(false);
-  
+  const { customers, isLoading: isLoadingCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
 
-  // In a real application, you would fetch the customer data here,
-  // for example, from a context or an API call that gets data 
-  // imported via the Import page.
-  // For now, it will be an empty list.
+  const isLoading = isLoadingCustomers || isProfileLoading;
 
   if (isProfileLoading) {
     return <p>Loading...</p>;

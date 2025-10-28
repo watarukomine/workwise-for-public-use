@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -6,8 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, AlertCircle, Download } from 'lucide-react';
+import { Loader2, AlertCircle, Download, CheckCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useCustomer } from '@/contexts/customer-context';
+import { useToast } from '@/hooks/use-toast';
 
 // A simple type guard to check if the error is a fetch error
 function isFetchError(error: unknown): error is TypeError {
@@ -20,6 +23,10 @@ export function GasImporter() {
   const [tableData, setTableData] = React.useState<any[] | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [importSuccess, setImportSuccess] = React.useState(false);
+  
+  const { setCustomers } = useCustomer();
+  const { toast } = useToast();
 
   const handleFetchData = async () => {
     if (!gasUrl) {
@@ -31,6 +38,7 @@ export function GasImporter() {
     setError(null);
     setTableData(null);
     setRawData(null);
+    setImportSuccess(false);
 
     try {
       const response = await fetch(gasUrl, { cache: 'no-store' });
@@ -42,20 +50,26 @@ export function GasImporter() {
       const result = await response.json();
       setRawData(result);
       
-      let dataToDisplay: any[] | null = null;
+      let dataToProcess: any[] | null = null;
 
       if (Array.isArray(result)) {
-        dataToDisplay = result;
+        dataToProcess = result;
       } else if (result && typeof result === 'object' && Array.isArray(result.data)) {
-        dataToDisplay = result.data;
+        dataToProcess = result.data;
       } else if (result && typeof result === 'object' && Object.keys(result).length > 0) {
-        // If it's an object, but not the expected format, don't try to make a table out of it
-        // but also don't throw an error. The raw view is what's important here.
-        dataToDisplay = []; 
+        dataToProcess = []; 
       }
 
-      if (dataToDisplay) {
-         setTableData(dataToDisplay);
+      if (dataToProcess) {
+         setTableData(dataToProcess);
+         if (dataToProcess.length > 0) {
+           setCustomers(dataToProcess);
+           setImportSuccess(true);
+           toast({
+             title: 'インポート成功',
+             description: `${dataToProcess.length}件の販売店情報がアプリケーションに反映されました。`,
+           });
+         }
       }
       
     } catch (e: unknown) {
@@ -84,7 +98,7 @@ export function GasImporter() {
         <CardHeader>
           <CardTitle>スプレッドシートデータ取得</CardTitle>
           <CardDescription>
-            Google Apps Scriptをウェブアプリとして公開し、そのURLを貼り付けてください。スクリプトはJSON配列形式でデータを返す必要があります。
+            販売店情報を含むGoogle Apps Scriptをウェブアプリとして公開し、そのURLを貼り付けてください。スクリプトはJSON配列形式でデータを返す必要があります。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -113,6 +127,16 @@ export function GasImporter() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>エラー</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+       {importSuccess && (
+        <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+          <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
+          <AlertTitle className="text-green-800 dark:text-green-400">インポート完了</AlertTitle>
+          <AlertDescription className="text-green-700 dark:text-green-300">
+            データが正常に読み込まれました。「販売店情報」ページで確認できます。
+          </AlertDescription>
         </Alert>
       )}
 

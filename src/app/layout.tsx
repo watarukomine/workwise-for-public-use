@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 import React from 'react';
 import { SelectedStaffProvider } from '@/contexts/selected-staff-context';
 import { UserProfileProvider } from '@/contexts/user-profile-provider';
+import { CustomerProvider } from '@/contexts/customer-context';
 
 export default function RootLayout({
   children,
@@ -25,7 +26,9 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <UserProfileProvider>
           <SelectedStaffProvider>
-            <AppShell>{children}</AppShell>
+            <CustomerProvider>
+              <AppShell>{children}</AppShell>
+            </CustomerProvider>
           </SelectedStaffProvider>
         </UserProfileProvider>
         <Toaster />
