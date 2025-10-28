@@ -44,7 +44,7 @@ export default function StaffPage() {
 
         const staffList: WithId<Staff>[] = rawStaffArray.map((item: any) => ({
           id: String(item['スタッフID']),
-          role: item['権限（Staff /Admin）'] === 'Admin' ? 'admin' : 'staff',
+          role: String(item['権限（Staff /Admin）'] || 'staff').toLowerCase() === 'admin' ? 'admin' : 'staff',
           name: item['スタッフ名'],
           email: item['メールアドレス'],
           password: item['パスワード'],
@@ -78,7 +78,7 @@ export default function StaffPage() {
   const staffToDisplay = React.useMemo(() => {
     if (!profile || !allStaff) return [];
     if (profile.role === 'admin') {
-        return allStaff.filter(s => s.role !== 'admin');
+        return allStaff.filter(s => String(s.role).toLowerCase() !== 'admin');
     }
     const self = allStaff.find(s => s.id === profile.id);
     return self ? [self] : [];

@@ -47,7 +47,7 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     // Assuming the GAS returns an array of objects with specific keys
     return rawStaffArray.map((item: any) => ({
       id: String(item['スタッフID']),
-      role: item['権限（Staff /Admin）'] === 'Admin' ? 'admin' : 'staff',
+      role: String(item['権限（Staff /Admin）'] || 'staff').toLowerCase() === 'admin' ? 'admin' : 'staff',
       name: item['スタッフ名'],
       email: item['メールアドレス'],
       password: item['パスワード'],
