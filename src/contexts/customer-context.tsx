@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
@@ -25,12 +24,10 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
-    // 初期URLを設定する。保存されたものがなければデフォルト値を使う
-    const initialUrl = savedUrl || 'https://script.google.com/macros/s/AKfycb1q1B0pLIOJ_GFs7aQ2nQL1X7NxUKO7OrB35zLm7JwI-oc_FtPfkwIO0WJl7atfcOKJA/exec?sheet=販売店情報';
-    setCustomerGasUrlState(initialUrl);
-    // 保存されたURLがなかった場合、デフォルト値をlocalStorageに保存する
-    if (!savedUrl) {
-      localStorage.setItem(CUSTOMER_GAS_URL_KEY, initialUrl);
+    if (savedUrl) {
+      setCustomerGasUrlState(savedUrl);
+    } else {
+      setIsLoading(false); // No URL, stop loading
     }
   }, []);
   
@@ -53,23 +50,24 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setErrorState(null);
         try {
+          // CRITICAL FIX: Add cache: 'no-store' to ensure parameters are not lost on redirect
           const response = await fetch(customerGasUrl, { cache: 'no-store' });
+
+          const responseText = await response.text();
           if (!response.ok) {
-            const errorText = await response.text();
              try {
-                // Check if the error response is JSON from our GAS script
-                const errorJson = JSON.parse(errorText);
+                const errorJson = JSON.parse(responseText);
                 if (errorJson.message) {
                     throw new Error(errorJson.message);
                 }
              } catch (e) {
-                 // If not JSON, it might be a standard HTTP error or GAS HTML error page
-                 throw new Error(`データを取得できませんでした。URLが正しいか、GASが正しくデプロイされているか確認してください。(HTTP Status: ${response.status})`);
+                 throw new Error(`データを取得できませんでした。URLやシート名が正しいか、GASが正しくデプロイされているか確認してください。(HTTP Status: ${response.status})`);
              }
           }
-          const result = await response.json();
+          
+          const result = JSON.parse(responseText);
 
-          if (result.error) {
+          if (result.error && result.message) {
             throw new Error(result.message);
           }
 
@@ -90,8 +88,6 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     };
 
     fetchCustomers();
-    // *** CRITICAL FIX: Add customerGasUrl to the dependency array ***
-    // This ensures that the fetch operation is re-run whenever the URL changes.
   }, [customerGasUrl]);
 
 
