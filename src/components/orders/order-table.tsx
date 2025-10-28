@@ -17,11 +17,46 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
   isLoading: boolean;
 }
+
+const formatDate = (dateString: string) => {
+  if (!dateString || isNaN(new Date(dateString).getTime())) {
+    return dateString; // Return original string if invalid
+  }
+  try {
+    return format(new Date(dateString), 'MM/dd');
+  } catch {
+    return dateString;
+  }
+};
+
+const formatTime = (timeString: string) => {
+    // Handles ISO-8601 DateTime strings or just time strings
+    if (!timeString) return timeString;
+    const date = new Date(timeString);
+    if (isNaN(date.getTime())) {
+        // Handle cases like "10:00" which might be parsed as invalid date alone
+        const today = new Date();
+        const [hours, minutes] = timeString.split(':');
+        if (hours && minutes) {
+            today.setHours(parseInt(hours, 10), parseInt(minutes, 10));
+            if (!isNaN(today.getTime())) {
+                return format(today, 'HH:mm');
+            }
+        }
+        return timeString; // Return original if still invalid
+    }
+    try {
+        return format(date, 'HH:mm');
+    } catch {
+        return timeString;
+    }
+};
 
 export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -60,6 +95,11 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     }
   };
 
+  const headersToFormat: Record<string, (value: string) => string> = {
+    '作業予定日': formatDate,
+    '予定時間': formatTime,
+  };
+
   return (
     <Card>
       <CardContent className="pt-6">
@@ -95,11 +135,13 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     <TableRow 
                       key={index}
                       onClick={() => handleRowClick(order)}
-                      className={cn(hasUrl && "cursor-pointer")}
+                      className={cn(hasUrl && "cursor-pointer hover:bg-muted/50")}
                     >
                       {headers.map(header => (
                         <TableCell key={header}>
-                          {order[header] !== undefined && order[header] !== null ? String(order[header]) : ''}
+                          {headersToFormat[header] 
+                            ? headersToFormat[header](order[header])
+                            : (order[header] !== undefined && order[header] !== null ? String(order[header]) : '')}
                         </TableCell>
                       ))}
                     </TableRow>
