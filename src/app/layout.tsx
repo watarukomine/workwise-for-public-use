@@ -8,6 +8,7 @@ import React from 'react';
 import { SelectedStaffProvider } from '@/contexts/selected-staff-context';
 import { UserProfileProvider } from '@/contexts/user-profile-provider';
 import { CustomerProvider } from '@/contexts/customer-context';
+import { OrderProvider } from '@/contexts/order-context';
 
 export default function RootLayout({
   children,
@@ -27,7 +28,9 @@ export default function RootLayout({
         <UserProfileProvider>
           <SelectedStaffProvider>
             <CustomerProvider>
-              <AppShell>{children}</AppShell>
+              <OrderProvider>
+                <AppShell>{children}</AppShell>
+              </OrderProvider>
             </CustomerProvider>
           </SelectedStaffProvider>
         </UserProfileProvider>

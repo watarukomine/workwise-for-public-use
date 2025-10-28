@@ -11,6 +11,7 @@ import {
   Briefcase,
   LogIn,
   LogOut,
+  ShoppingBag,
 } from 'lucide-react';
 
 import {
@@ -45,6 +46,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const allNavItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'] },
   { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'] },
+  { href: '/orders', label: '受注管理', icon: ShoppingBag, roles: ['admin'] },
   { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
   { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'] },
   { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'], mobileOnly: true },
