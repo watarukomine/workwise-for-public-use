@@ -19,14 +19,17 @@ const CustomerContext = createContext<CustomerContextType | undefined>(undefined
 
 export function CustomerProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomersState] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [customerGasUrl, setCustomerGasUrlState] = useState('https://script.google.com/macros/s/AKfycbznaVC5Zhz4SHG4E_XVbQTi-EV19XZSyqGnz5qOd5WftXtchzPA3buvusWDDu3npSkWbQ/exec');
+  const [isLoading, setIsLoading] = useState(true); // Start with loading true
+  const [customerGasUrl, setCustomerGasUrlState] = useState('');
   const [error, setErrorState] = useState<string | null>(null);
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
-    if (savedUrl) {
-      setCustomerGasUrlState(savedUrl);
+    // Use the new URL from the user as the initial value if no URL is saved yet.
+    const initialUrl = savedUrl || 'https://script.google.com/macros/s/AKfycbznaVC5Zhz4SHG4E_XVbQTi-EV19XZSyqGnz5qOd5WftXtchzPA3buvusWDDu3npSkWbQ/exec?sheet=顧客マスタ';
+    setCustomerGasUrlState(initialUrl);
+    if (!savedUrl) {
+      localStorage.setItem(CUSTOMER_GAS_URL_KEY, initialUrl);
     }
   }, []);
   

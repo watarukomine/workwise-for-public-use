@@ -13,24 +13,14 @@ import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { useRouter } from 'next/navigation';
+import { fetchStaffDataFromGAS } from '@/lib/auth';
 
 // A simple type guard to check if the error is a fetch error
 function isFetchError(error: unknown): error is TypeError {
   return error instanceof TypeError;
 }
 
-const findRoleValue = (item: any): 'admin' | 'staff' => {
-    if (!item || typeof item !== 'object') return 'staff';
-
-    const roleValue = item['権限'];
-
-    if (roleValue && typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
-        return 'admin';
-    }
-    
-    return 'staff'; // Default to staff
-}
-
+const STAFF_GAS_URL_KEY = 'staffImporterUrl';
 
 export function StaffImporter() {
   const [gasUrl, setGasUrl] = React.useState('');
@@ -45,6 +35,12 @@ export function StaffImporter() {
   const { toast } = useToast();
   const router = useRouter();
 
+  React.useEffect(() => {
+    const savedUrl = localStorage.getItem(STAFF_GAS_URL_KEY);
+    if (savedUrl) {
+      setGasUrl(savedUrl);
+    }
+  }, []);
 
   const handleFetchData = async () => {
     if (!gasUrl) {
@@ -58,52 +54,38 @@ export function StaffImporter() {
     setRawData(null);
     setImportSuccess(false);
     setColumnHeaders(null);
-    localStorage.setItem('staffImporterUrl', gasUrl); // Save URL for auth.ts
+    localStorage.setItem(STAFF_GAS_URL_KEY, gasUrl); 
 
     try {
+      // Use the function from auth.ts which now reads from localStorage
+      const staffList = await fetchStaffDataFromGAS(); 
+      setAllStaff(staffList);
+      
+      // For preview purposes, we still need to fetch and display raw data here
       const response = await fetch(gasUrl, { cache: 'no-store' });
-
-      if (!response.ok) {
+       if (!response.ok) {
         throw new Error(`HTTPエラー: ${response.status} ${response.statusText}`);
       }
-
       const result = await response.json();
       setRawData(result);
       
-      let dataToProcess: any[] | null = null;
-
-      if (Array.isArray(result)) {
-        dataToProcess = result;
-      } else if (result && typeof result === 'object' && Array.isArray(result.data)) {
-        dataToProcess = result.data;
-      }
+      let dataToProcess = result.data || (Array.isArray(result) ? result : []);
 
       if (dataToProcess) {
          setTableData(dataToProcess);
          if (dataToProcess.length > 0) {
-           setColumnHeaders(Object.keys(dataToProcess[0])); // Extract headers
-           const staffList: WithId<Staff>[] = dataToProcess.map((item: any) => {
-              return {
-                id: String(item['スタッフID']),
-                role: findRoleValue(item),
-                name: item['スタッフ名'],
-                email: item['メールアドレス'],
-                password: item['パスワード'],
-                calendarId: item['カレンダーID'],
-                color: item['カラー'],
-                avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
-              }
-           });
-
-           setAllStaff(staffList);
-           setImportSuccess(true);
-           toast({
-             title: 'インポート成功',
-             description: `${staffList.length}件のスタッフ情報がアプリケーションに反映されました。`,
-           });
+           setColumnHeaders(Object.keys(dataToProcess[0]));
          }
       }
-      
+
+      setImportSuccess(true);
+      toast({
+        title: 'インポート成功',
+        description: `${staffList.length}件のスタッフ情報がアプリケーションに反映されました。`,
+      });
+      // Force reload to make sure all contexts get the new data
+      window.location.reload();
+
     } catch (e: unknown) {
       console.error('GAS Fetch Error:', e);
        if (isFetchError(e)) {
@@ -151,7 +133,7 @@ export function StaffImporter() {
               ) : (
                 <Download className="mr-2 h-4 w-4" />
               )}
-              データ取得
+              データ取得・更新
             </Button>
           </div>
         </CardContent>

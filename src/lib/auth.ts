@@ -8,8 +8,7 @@ import type { Staff, WithId } from './types';
 import { staffData as fallbackStaffData } from './data';
 
 const MOCK_USER_SESSION_KEY = 'mockUserSession';
-const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxT6Qz8vLTVi94Yk5EQpACijVWVOWg-kDwOcADoq2gF63wsSzIIP9FDMP5rR31NR6_I_w/exec';
-
+const STAFF_GAS_URL_KEY = 'staffImporterUrl'; // Key to get URL from localStorage
 
 // Helper to get user session from localStorage
 const getSession = (): WithId<Staff> | null => {
@@ -41,28 +40,32 @@ const findRoleValue = (item: any): 'admin' | 'staff' => {
 };
 
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
-    if (!STAFF_GAS_URL) {
-        console.warn("No GAS URL for staff is defined.");
+    if (typeof window === 'undefined') return [];
+    const staffGasUrl = localStorage.getItem(STAFF_GAS_URL_KEY);
+    
+    if (!staffGasUrl) {
+        console.warn("No GAS URL for staff is defined in localStorage.");
         return [];
     }
 
     try {
-        const response = await fetch(STAFF_GAS_URL, { cache: 'no-store' });
+        const response = await fetch(staffGasUrl, { cache: 'no-store' });
         if (response.ok) {
-            const data = await response.json();
-            const rawStaffArray = Array.isArray(data) ? data : data.data;
+            const result = await response.json();
+            const rawStaffArray = result.data || (Array.isArray(result) ? result : []);
 
             if (Array.isArray(rawStaffArray)) {
                 return rawStaffArray.map((item: any) => {
+                    const id = String(item['スタッフID'] || item.id);
                     return {
-                        id: String(item['スタッフID']),
+                        id: id,
                         role: findRoleValue(item),
-                        name: item['スタッフ名'],
-                        email: item['メールアドレス'],
-                        password: item['パスワード'],
-                        calendarId: item['カレンダーID'],
-                        color: item['カラー'],
-                        avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
+                        name: item['スタッフ名'] || item.name,
+                        email: item['メールアドレス'] || item.email,
+                        password: item['パスワード'] || item.password,
+                        calendarId: item['カレンダーID'] || item.calendarId,
+                        color: item['カラー'] || item.color,
+                        avatarUrl: `https://picsum.photos/seed/${id}/100/100`,
                     };
                 });
             }
