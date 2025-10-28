@@ -14,46 +14,46 @@ import { fetchStaffDataFromGAS } from '@/lib/auth';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
-  const { setAllStaff } = useSelectedStaff();
-  const [staffData, setStaffData] = useState<WithId<Staff>[]>([]);
+  const { allStaff, setAllStaff } = useSelectedStaff();
   const [isFetchingStaff, setIsFetchingStaff] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadStaff = useCallback(async () => {
-    setIsFetchingStaff(true);
-    setError(null);
-    try {
-      const fetchedStaff = await fetchStaffDataFromGAS();
-      setStaffData(fetchedStaff);
-      setAllStaff(fetchedStaff); // Update context for selection logic
-    } catch (e: any) {
-      setError("スタッフ情報の取得に失敗しました。");
-      console.error(e);
-    } finally {
-      setIsFetchingStaff(false);
-    }
-  }, [setAllStaff]);
-
   useEffect(() => {
+    // This function is now defined inside useEffect to capture dependencies correctly.
+    const loadStaff = async () => {
+      setIsFetchingStaff(true);
+      setError(null);
+      try {
+        const fetchedStaff = await fetchStaffDataFromGAS();
+        setAllStaff(fetchedStaff);
+      } catch (e: any) {
+        setError("スタッフ情報の取得に失敗しました。");
+        console.error(e);
+      } finally {
+        setIsFetchingStaff(false);
+      }
+    };
+
     if (profile) {
       loadStaff();
     } else if (!isProfileLoading) {
+      // If not loading and still no profile, stop fetching state.
       setIsFetchingStaff(false);
     }
-  }, [profile, isProfileLoading, loadStaff]);
+  }, [profile, isProfileLoading, setAllStaff]);
   
   const isLoading = isProfileLoading || isFetchingStaff;
 
   const staffToDisplay = React.useMemo(() => {
-    if (!profile || !staffData) return [];
+    if (!profile || !allStaff) return [];
     if (profile.role === 'admin') {
         // For admin, filter out other admins from the main list view.
-        return staffData.filter(s => s.role !== 'admin');
+        return allStaff.filter(s => s.role !== 'admin');
     }
     // For staff, show only themselves.
-    const self = staffData.find(s => s.id === profile.id);
+    const self = allStaff.find(s => s.id === profile.id);
     return self ? [self] : [];
-  }, [profile, staffData]);
+  }, [profile, allStaff]);
 
   return (
     <div className="space-y-8">
@@ -98,7 +98,7 @@ export default function StaffPage() {
          profile && <StaffTable staff={staffToDisplay} isLoading={isLoading} />
       )}
       
-      {!isLoading && profile && staffData.length === 0 && !error && (
+      {!isLoading && profile && allStaff.length === 0 && !error && (
          <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>スタッフ情報がありません</AlertTitle>
