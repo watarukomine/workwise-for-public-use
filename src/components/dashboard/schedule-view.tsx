@@ -118,6 +118,14 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   
   const [line1, line2] = order.taskDetails.split('\n');
 
+  const tooltipContent = (
+    <>
+      <p className="font-bold">{line1}</p>
+      {line2 && <p>{line2}</p>}
+      <p className="text-xs text-muted-foreground">所要時間: {order.estimatedDuration}分</p>
+    </>
+  );
+
   return (
     <Tooltip>
       <TooltipTrigger
@@ -138,9 +146,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
         </div>
       </TooltipTrigger>
        <TooltipContent>
-        <p className="font-bold">{line1}</p>
-        {line2 && <p>{line2}</p>}
-        <p className="text-xs text-muted-foreground">所要時間: {order.estimatedDuration}分</p>
+        {tooltipContent}
       </TooltipContent>
     </Tooltip>
   );
@@ -364,7 +370,7 @@ export function ScheduleView({
             setScheduleData(prev => [...prev, travelEvent, taskEvent]);
             
             // --- Update Google Sheet ---
-            const orderIdToUpdate = order.raw?.['No.'] || order.id;
+            const orderIdToUpdate = order.raw?.['受注ID'] || order.id;
 
             if (staff && orderIdToUpdate) {
                  try {
