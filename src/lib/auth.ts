@@ -36,7 +36,6 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     }
     const data = await response.json();
     
-    // Check if data is an object with a 'data' property, or a direct array
     const rawStaffArray = Array.isArray(data) ? data : data.data;
 
     if (!Array.isArray(rawStaffArray)) {
@@ -44,7 +43,6 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
         return fallbackStaffData;
     }
 
-    // Assuming the GAS returns an array of objects with specific keys
     return rawStaffArray.map((item: any) => ({
       id: String(item['スタッフID']),
       role: String(item['権限（Staff /Admin）'] || 'staff').toLowerCase() === 'admin' ? 'admin' : 'staff',
@@ -53,11 +51,11 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
       password: item['パスワード'],
       calendarId: item['カレンダーID'],
       color: item['カラー'],
-      avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`, // Generate a consistent avatar
+      avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
     }));
   } catch (error) {
     console.error('Error fetching staff data from GAS:', error);
-    return fallbackStaffData; // Return fallback data in case of any error
+    return fallbackStaffData;
   }
 };
 
@@ -93,6 +91,7 @@ export const signUpWithEmail = async (email: string, password: string, name: str
                 console.log('User already exists, attempting login instead for:', existingUser.name);
                  if (existingUser.password === password) {
                     console.log('Sign in successful for existing user:', existingUser.name, 'with role:', existingUser.role);
+                    // Use the correct user object from the spreadsheet data
                     setSession(existingUser);
                     resolve(existingUser);
                 } else {
@@ -120,7 +119,6 @@ export const signUpWithEmail = async (email: string, password: string, name: str
                 avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
             };
             
-            // staffData.push(newUser); // This won't persist
             setSession(newUser);
             console.log('Sign up successful for new user:', newUser.name);
             resolve(newUser);
