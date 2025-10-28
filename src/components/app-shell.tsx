@@ -62,6 +62,11 @@ function NavMenu() {
     if (isLoading || !profile) {
       return [];
     }
+    
+    if (profile.role === 'admin') {
+      return allNavItems.filter(item => !item.mobileOnly || isMobile);
+    }
+
     return allNavItems.filter(item => {
         const roleMatch = item.roles.includes(profile.role);
         const deviceMatch = !item.mobileOnly || isMobile;
