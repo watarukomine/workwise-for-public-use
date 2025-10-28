@@ -7,7 +7,6 @@ import {
   Building2,
   Map,
   ClipboardList,
-  Upload,
   MapPin,
   Briefcase,
   LogIn,
@@ -48,7 +47,6 @@ const allNavItems = [
   { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'] },
   { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
   { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'] },
-  { href: '/import', label: 'データ取込', icon: Upload, roles: ['admin'] },
   { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'], mobileOnly: true },
 ];
 
