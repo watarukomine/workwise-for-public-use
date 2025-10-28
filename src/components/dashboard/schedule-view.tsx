@@ -357,17 +357,17 @@ export function ScheduleView({
             setScheduleData(prev => [...prev, travelEvent, taskEvent]);
             
             // --- Update Google Sheet ---
-            if (staff && order.id) {
+            if (staff && order.raw && order.raw['No.']) {
                  try {
                     const result = await updateSheetStatus({
-                        orderId: order.id,
+                        orderId: order.raw['No.'], // Use the correct ID from raw data
                         staffName: staff.name,
                         gasUrl: orderGasUrl,
                     });
                     if (result.status === 'success') {
                         toast({
                             title: 'スプレッドシート更新成功',
-                            description: `オーダー #${order.id} を ${staff.name} さんに割り当てました。`,
+                            description: `オーダー #${order.raw['No.']} を ${staff.name} さんに割り当てました。`,
                         });
                     } else {
                         throw new Error(result.message || '不明なエラー');
@@ -376,6 +376,29 @@ export function ScheduleView({
                     toast({
                         variant: 'destructive',
                         title: 'スプレッドシート更新エラー',
+                        description: `オーダーの割り当てに失敗しました: ${e.message}`,
+                    });
+                }
+            } else if (staff && order.id) {
+                // Fallback for older data or if raw['No.'] is not available
+                try {
+                    const result = await updateSheetStatus({
+                        orderId: order.id,
+                        staffName: staff.name,
+                        gasUrl: orderGasUrl,
+                    });
+                     if (result.status === 'success') {
+                        toast({
+                            title: 'スプレッドシート更新成功 (フォールバック)',
+                            description: `オーダー #${order.id} を ${staff.name} さんに割り当てました。`,
+                        });
+                    } else {
+                        throw new Error(result.message || '不明なエラー');
+                    }
+                } catch (e: any) {
+                     toast({
+                        variant: 'destructive',
+                        title: 'スプレッドシート更新エラー (フォールバック)',
                         description: `オーダーの割り当てに失敗しました: ${e.message}`,
                     });
                 }
