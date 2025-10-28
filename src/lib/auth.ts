@@ -8,6 +8,8 @@ import type { Staff, WithId } from './types';
 import { staffData as fallbackStaffData } from './data';
 
 const MOCK_USER_SESSION_KEY = 'mockUserSession';
+const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxT6Qz8vLTVi94Yk5EQpACijVWVOWg-kDwOcADoq2gF63wsSzIIP9FDMP5rR31NR6_I_w/exec';
+
 
 // Helper to get user session from localStorage
 const getSession = (): WithId<Staff> | null => {
@@ -27,28 +29,25 @@ const setSession = (user: WithId<Staff> | null) => {
 };
 
 const findRoleValue = (item: any): 'admin' | 'staff' => {
-    if (!item || typeof item !== 'object') return 'staff';
+  if (!item || typeof item !== 'object') return 'staff';
 
-    // Check for a '権限' or 'role' key, case-insensitive
-    const roleValue = item['権限'];
+  const roleValue = item['権限'];
 
-    if (roleValue && typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
-        return 'admin';
-    }
-    
-    return 'staff'; // Default to staff
-}
+  if (roleValue && typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
+    return 'admin';
+  }
+  
+  return 'staff';
+};
 
-
-const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
-    const staffImporterUrl = localStorage.getItem('staffImporterUrl');
-    if (!staffImporterUrl) {
-        console.log("No GAS URL for staff found in localStorage. Using only fallback data.");
+export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
+    if (!STAFF_GAS_URL) {
+        console.warn("No GAS URL for staff is defined.");
         return [];
     }
 
     try {
-        const response = await fetch(staffImporterUrl, { cache: 'no-store' });
+        const response = await fetch(STAFF_GAS_URL, { cache: 'no-store' });
         if (response.ok) {
             const data = await response.json();
             const rawStaffArray = Array.isArray(data) ? data : data.data;
@@ -70,8 +69,10 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
         }
     } catch (error) {
         console.error('Error fetching staff data from GAS:', error);
+        // In case of fetch error, we can decide if we want to throw or return empty/fallback
+        throw new Error('Failed to fetch staff data from spreadsheet.');
     }
-    return [];
+    return []; // Return empty if response not ok or data malformed
 };
 
 

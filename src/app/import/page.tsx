@@ -1,6 +1,5 @@
 
 import { CustomerImporter } from '@/components/import/customer-importer';
-import { StaffImporter } from '@/components/import/staff-importer';
 import { ShiftImporter } from '@/components/import/shift-importer';
 import { Separator } from '@/components/ui/separator';
 
@@ -15,10 +14,6 @@ export default function ImportPage() {
       </div>
 
       <ShiftImporter />
-
-      <Separator />
-
-      <StaffImporter />
 
       <Separator />
 
