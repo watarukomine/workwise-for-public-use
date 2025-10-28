@@ -15,7 +15,6 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import { staffData as allStaffData } from '@/lib/data'; // Import static data
 
 type State = {
   data: OptimizeRouteOutput | null;
