@@ -40,18 +40,22 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         const contentType = response.headers.get('content-type');
         if (!response.ok || !contentType || !contentType.includes('application/json')) {
             const errorText = await response.text();
+            // Try to parse as JSON to get a structured error message if possible
             try {
                 const errorJson = JSON.parse(errorText);
                  if (errorJson && errorJson.message) {
+                    // Re-throw with the specific message from GAS
                     throw new Error(errorJson.message);
                 }
             } catch (e) {
+                // If it's not JSON, throw the raw text response
                 throw new Error(`GAS script returned a non-JSON or error response. Status: ${response.status}. Response: ${errorText}`);
             }
         }
 
         const result: GasResponse = await response.json();
 
+        // Handle cases where GAS returns a JSON with an error status
         if(result.status === 'error'){
             throw new Error(result.message);
         }
