@@ -71,7 +71,7 @@ export default function StaffPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">スタッフ・ユーザー管理</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">スタッフ管理</h1>
         <p className="text-muted-foreground">
           {profile?.role === 'admin'
             ? "スプレッドシートから取得したスタッフの一覧です。表示するスタッフを選択し、「選択を適用」ボタンで他ページに反映します。" 
