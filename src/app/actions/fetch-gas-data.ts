@@ -14,23 +14,24 @@ export async function fetchGasData(url: string): Promise<any> {
 
   try {
     const response = await fetch(url, {
+      method: 'GET',
       cache: 'no-store', // Ensures fresh data is fetched every time
       redirect: 'follow', // Follow redirects from GAS
     });
 
+    // Check if the final URL is a Google Accounts sign-in page, indicating a permission issue.
+    if (response.url.includes('accounts.google.com')) {
+        throw new Error('Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings.');
+    }
+    
     // Check the content-type before parsing as JSON
     const contentType = response.headers.get('content-type');
     if (!response.ok || !contentType || !contentType.includes('application/json')) {
       const errorText = await response.text();
       let errorMessage = `GAS request failed or did not return JSON. Status: ${response.status}.`;
       
-      // If we get a Google login page, it's a permission issue with the GAS deployment.
-      if (errorText.includes('signin') && errorText.includes('accounts.google.com')) {
-         errorMessage = 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings.';
-      } else {
-        // Fallback for other non-JSON responses
-        errorMessage += ` Response: ${errorText.substring(0, 300)}...`;
-      }
+      // Fallback for other non-JSON responses
+      errorMessage += ` Response: ${errorText.substring(0, 300)}...`;
       
       throw new Error(errorMessage);
     }
