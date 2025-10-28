@@ -35,7 +35,10 @@ export function CustomerImporter() {
 
   React.useEffect(() => {
     setLocalUrl(customerGasUrl);
-  }, [customerGasUrl]);
+    if (customerGasUrl && customers.length > 0) {
+      setImportSuccess(true);
+    }
+  }, [customerGasUrl, customers]);
   
   React.useEffect(() => {
     if (contextError) setError(contextError);
@@ -134,7 +137,7 @@ export function CustomerImporter() {
         </Alert>
       )}
 
-       {importSuccess && (
+       {importSuccess && !isLoading && (
         <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
           <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
           <AlertTitle className="text-green-800 dark:text-green-400">インポート完了</AlertTitle>

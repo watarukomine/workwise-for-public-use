@@ -21,7 +21,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const { profile } = useUserProfile();
   const [customers, setCustomersState] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [customerGasUrl, setCustomerGasUrlState] = useState('https://script.google.com/macros/s/AKfycbyv1B6CRkN0Hld3tJuKmUgEyTSnMPDQesLk8ZuFhLQz5nhDvKiM8aU21mU4L_qrb2LgOw/exec');
+  const [customerGasUrl, setCustomerGasUrlState] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         } finally {
           setIsLoading(false);
         }
-      } else if (!customerGasUrl) {
+      } else if (profile && !customerGasUrl) {
         setError("販売店データのURLが設定されていません。「データ取込」ページで設定してください。")
         setIsLoading(false);
       }
