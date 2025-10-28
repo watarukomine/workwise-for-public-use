@@ -60,7 +60,8 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
       return mappedCustomers;
     }
     return mappedCustomers.filter(customer =>
-      customer.userCode && String(customer.userCode).toLowerCase().includes(searchTerm.toLowerCase())
+      (customer.storeName && String(customer.storeName).toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (customer.userCode && String(customer.userCode).toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [mappedCustomers, searchTerm]);
 
@@ -74,17 +75,11 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
 
   const headers = [
-    { key: 'No', label: 'No' },
     { key: 'userCode', label: 'ユーザーコード' },
-    { key: '旧 チャネル SEQ', label: '旧 チャネル SEQ' },
-    { key: 'storeName', label: '店舗' },
-    { key: '管理C', label: '管理C' },
-    { key: '機材有無', label: '機材有無' },
+    { key: 'storeName', label: '店舗名' },
     { key: 'address', label: '住所' },
-    { key: 'latitude', label: '緯度' },
-    { key: 'longitude', label: '経度' },
     { key: '電話番号', label: '電話番号' },
-    { key: '営業時間', label: '営業時間' }
+    { key: '機材有無', label: '機材有無' },
   ];
 
   return (
@@ -94,7 +89,7 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
           <div className="relative w-full max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="ユーザーコードで検索..."
+              placeholder="店舗名、コードで検索..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
