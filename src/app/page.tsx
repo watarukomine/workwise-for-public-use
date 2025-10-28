@@ -37,6 +37,16 @@ export default function DashboardPage() {
     return allStaffData.filter(staff => staff.id === profile.id);
   }, [appliedSelectedStaffIds, profile, isLoading]);
 
+  const selectedStaffNames = React.useMemo(() => {
+    if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
+      return null;
+    }
+    if (appliedSelectedStaffIds.length === allStaffData.length) {
+      return "全スタッフ";
+    }
+    return filteredStaff.map(s => s.name).join('、');
+  }, [filteredStaff, appliedSelectedStaffIds, allStaffData, profile]);
+
   if (isLoading) {
       return <div>Loading...</div>
   }
@@ -57,16 +67,6 @@ export default function DashboardPage() {
         </Alert>
       )
   }
-
-  const selectedStaffNames = React.useMemo(() => {
-    if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
-      return null;
-    }
-    if (appliedSelectedStaffIds.length === allStaffData.length) {
-      return "全スタッフ";
-    }
-    return filteredStaff.map(s => s.name).join('、');
-  }, [filteredStaff, appliedSelectedStaffIds, allStaffData, profile]);
 
   return (
     <div className="space-y-8">
