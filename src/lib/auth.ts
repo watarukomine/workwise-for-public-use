@@ -36,6 +36,7 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     }
     const data = await response.json();
     
+    // Handle both direct array and object with 'data' property
     const rawStaffArray = Array.isArray(data) ? data : data.data;
 
     if (!Array.isArray(rawStaffArray)) {
@@ -45,6 +46,7 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
     return rawStaffArray.map((item: any) => ({
       id: String(item['スタッフID']),
+      // Ensure role is always lowercase
       role: String(item['権限（Staff /Admin）'] || 'staff').toLowerCase() === 'admin' ? 'admin' : 'staff',
       name: item['スタッフ名'],
       email: item['メールアドレス'],
@@ -64,11 +66,13 @@ export const signInWithEmail = async (email: string, password: string): Promise<
   console.log(`Attempting to sign in with email: ${email}`);
   
   const staffList = await fetchStaffDataFromGAS();
-  const user = staffList.find(staff => staff.email === email && staff.password === password);
+  // Find user by email and password, case-insensitive email matching can be useful
+  const user = staffList.find(staff => staff.email.toLowerCase() === email.toLowerCase() && staff.password === password);
 
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (user) {
+        // The `role` is already correctly set to lowercase 'admin' or 'staff' by fetchStaffDataFromGAS
         console.log('Sign in successful for:', user.name, 'with role:', user.role);
         setSession(user);
         resolve(user);
@@ -83,15 +87,16 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 export const signUpWithEmail = async (email: string, password: string, name: string): Promise<WithId<Staff>> => {
     console.log(`Attempting to sign up with email: ${email}`);
     const staffList = await fetchStaffDataFromGAS();
+    
+    const existingUser = staffList.find(staff => staff.email.toLowerCase() === email.toLowerCase());
 
     return new Promise((resolve, reject) => {
         setTimeout(() => {
-            const existingUser = staffList.find(staff => staff.email === email);
             if (existingUser) {
                 console.log('User already exists, attempting login instead for:', existingUser.name);
                  if (existingUser.password === password) {
+                    // The `role` is already correctly set by fetchStaffDataFromGAS
                     console.log('Sign in successful for existing user:', existingUser.name, 'with role:', existingUser.role);
-                    // Use the correct user object from the spreadsheet data
                     setSession(existingUser);
                     resolve(existingUser);
                 } else {
@@ -114,7 +119,7 @@ export const signUpWithEmail = async (email: string, password: string, name: str
                 name,
                 email,
                 password,
-                role: 'staff',
+                role: 'staff', // New signups are always 'staff' by default
                 color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`,
                 avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
             };
