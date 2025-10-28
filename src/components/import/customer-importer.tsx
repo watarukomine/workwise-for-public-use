@@ -10,6 +10,7 @@ import { LoaderCircle, AlertCircle, Download, CheckCircle, Building, Columns } f
 import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
 function isFetchError(error: unknown): error is TypeError {
   return error instanceof TypeError;
@@ -62,13 +63,9 @@ export function CustomerImporter() {
     setRawResponse(null);
 
     try {
-      const response = await fetch(localUrl, { cache: 'no-store' });
+      // Use the server action to fetch data
+      const result = await fetchGasData(localUrl);
 
-      if (!response.ok) {
-        throw new Error(`HTTPエラー: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
       setRawResponse(result);
       const dataToProcess = result.data || (Array.isArray(result) ? result : []);
       
@@ -82,17 +79,11 @@ export function CustomerImporter() {
       
     } catch (e: unknown) {
       console.error('GAS Fetch Error:', e);
-       if (isFetchError(e)) {
-         if (e.message.includes('Failed to fetch')) {
-             setError('データの取得に失敗しました。CORSポリシーまたはネットワークの問題が考えられます。GAS側で正しくCORSヘッダーが設定されているか確認してください。');
-         } else {
-            setError(`予期せぬネットワークエラー: ${e.message}`);
-         }
-       } else if (e instanceof Error) {
-        setError(`エラーが発生しました: ${e.message}`);
-       } else {
+      if (e instanceof Error) {
+        setError(`データの取得に失敗しました: ${e.message}`);
+      } else {
         setError('不明なエラーが発生しました。');
-       }
+      }
     } finally {
       setIsLoading(false);
     }
