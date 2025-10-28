@@ -64,4 +64,5 @@ export type Order = {
   customerCode: string;
   taskDetails: string;
   estimatedDuration: number; // in minutes
+  raw?: any; // To hold the original data from GAS if needed
 };

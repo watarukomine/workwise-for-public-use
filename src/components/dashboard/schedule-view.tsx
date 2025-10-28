@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useCustomer } from '@/contexts/customer-context';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 8;
@@ -147,9 +148,9 @@ type EditedEventDetails = {
 
 interface ScheduleViewProps {
     staffData: WithId<Staff>[];
-    customerData: WithId<Customer>[];
+    customerData: WithId<Customer>[]; // This is static, from lib/data, might be empty
     scheduleData: WithId<ScheduleEvent>[];
-    ordersData: WithId<Order>[];
+    ordersData: WithId<Order>[]; // These are the dynamic, unassigned orders
     setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
     setOrdersData: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
 }
@@ -211,9 +212,9 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
 // --- Main Component ---
 export function ScheduleView({ 
     staffData, 
-    customerData, 
+    customerData,
     scheduleData, 
-    ordersData, 
+    ordersData, // These are the unassigned orders from page.tsx
     setScheduleData,
     setOrdersData
 }: ScheduleViewProps) {
@@ -227,17 +228,19 @@ export function ScheduleView({
     endTime: '',
   });
 
+  // Use the full customer list from context for lookups
+  const { customers: allCustomers } = useCustomer();
+
   React.useEffect(() => {
     setIsClient(true);
   }, []);
   
-  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customerData?.find(c => c.userCode === code);
-  const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => customerData?.find(c => c.id === id);
+  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
+  const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.id === id);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
 
   const unassignedOrders = React.useMemo(() => {
-    if (!ordersData || !scheduleData) return [];
     const scheduledOrderIds = new Set(scheduleData.map(e => e.orderId).filter(Boolean));
     return ordersData.filter(order => !scheduledOrderIds.has(order.id));
   }, [ordersData, scheduleData]);
@@ -413,7 +416,7 @@ export function ScheduleView({
     if (dialogState.mode !== 'edit') return;
     const eventToDelete = dialogState.event;
   
-    // Find the original order from the main ordersData list
+    // This finds the original order from the *full list* of orders, not just unassigned.
     const orderToRestore = ordersData.find(o => o.id === eventToDelete.orderId);
 
     setScheduleData(prev => {
@@ -484,7 +487,7 @@ export function ScheduleView({
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
         <div className="space-y-4">
-            <UnassignedTasks orders={unassignedOrders} customers={customerData} />
+            <UnassignedTasks orders={unassignedOrders} customers={allCustomers} />
             <Card>
                 <CardHeader>
                     <CardTitle>タイムライン</CardTitle>

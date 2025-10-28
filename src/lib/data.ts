@@ -33,12 +33,8 @@ export const staffData: WithId<Staff>[] = [
 
 export const customerData: WithId<Customer>[] = [];
 
-export const unassignedOrdersData: WithId<Order>[] = [
-    { id: 'ORD001', customerCode: 'CUST001', taskDetails: '商品棚の整理', estimatedDuration: 60 },
-    { id: 'ORD002', customerCode: 'CUST003', taskDetails: '新商品の陳列', estimatedDuration: 90 },
-    { id: 'ORD003', customerCode: 'CUST005', taskDetails: '在庫確認と発注', estimatedDuration: 75 },
-    { id: 'ORD004', customerCode: 'CUST008', taskDetails: '販促物の設置', estimatedDuration: 45 },
-];
+// This is now populated from the OrderContext in page.tsx
+export const unassignedOrdersData: WithId<Order>[] = [];
 
 export const staffStatusData: StaffStatus[] = [
     { staffId: '1', status: 'Idle', lastAction: 'オフィスで待機中', latitude: 35.4658, longitude: 139.622, message: '本日、体調不良のため大事をとって休憩を多めに取らせていただきます。' },
@@ -54,51 +50,4 @@ function getTodayAt(hour: number, minute: number = 0): Date {
     return today;
 }
 
-export const scheduleData: WithId<ScheduleEvent>[] = [
-  {
-    id: 'event-1',
-    staffId: '2',
-    locationId: 'C001',
-    title: '移動: ABCストア',
-    start: getTodayAt(9, 0),
-    end: getTodayAt(9, 30),
-    tripId: 'trip-1'
-  },
-  {
-    id: 'event-2',
-    staffId: '2',
-    locationId: 'C001',
-    orderId: 'ORD001',
-    title: '商品棚の整理',
-    start: getTodayAt(9, 30),
-    end: getTodayAt(10, 30),
-    tripId: 'trip-1'
-  },
-  {
-    id: 'event-3',
-    staffId: '3',
-    locationId: 'C003',
-    title: '移動: さくら商店',
-    start: getTodayAt(10, 0),
-    end: getTodayAt(10, 30),
-    tripId: 'trip-2'
-  },
-    {
-    id: 'event-4',
-    staffId: '3',
-    locationId: 'C003',
-    orderId: 'ORD002',
-    title: '新商品の陳列',
-    start: getTodayAt(10, 30),
-    end: getTodayAt(12, 0),
-    tripId: 'trip-2'
-  },
-   {
-    id: 'event-5',
-    staffId: '1',
-    title: '休憩',
-    locationId: '',
-    start: getTodayAt(12, 0),
-    end: getTodayAt(13, 0),
-  },
-];
+export const scheduleData: WithId<ScheduleEvent>[] = [];

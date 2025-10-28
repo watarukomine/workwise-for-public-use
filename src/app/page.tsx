@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
-import { customerData, unassignedOrdersData, staffStatusData, staffData as allStaffData } from '@/lib/data';
+import { customerData, staffStatusData, staffData as allStaffData } from '@/lib/data';
 import type { Customer, Order, ScheduleEvent, StaffStatus, WithId } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -12,18 +12,59 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useOrder } from '@/contexts/order-context';
+import { isToday, parseISO, isValid } from 'date-fns';
+
+const parseDate = (dateString: any): Date | null => {
+  if (!dateString || typeof dateString !== 'string') return null;
+  const date = parseISO(dateString);
+  return isValid(date) ? date : null;
+};
+
+// Map raw order data from GAS to a structured Order object
+const mapRawToOrder = (rawOrder: any): WithId<Order> => {
+  const duration = parseInt(rawOrder['作業時間（分）'], 10);
+  return {
+    id: String(rawOrder['No.'] || rawOrder.id || `ord-${Math.random()}`),
+    customerCode: String(rawOrder['ユーザーコード'] || ''),
+    taskDetails: `${rawOrder['お取引先']}: ${rawOrder['作業内容'] || '未定義のタスク'}`,
+    estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
+    raw: rawOrder,
+  };
+};
 
 export default function DashboardPage() {
   const [customers] = React.useState<WithId<Customer>[]>(customerData);
   const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
-  const [orders, setOrders] = React.useState<WithId<Order>[]>(unassignedOrdersData);
+  
+  const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
+  
+  const [orders, setOrders] = React.useState<WithId<Order>[]>([]);
   const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
 
-  const { profile, isLoading } = useUserProfile();
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds } = useSelectedStaff();
 
+  // Filter orders for today and map them to the Order type
+  React.useEffect(() => {
+    if (rawOrders && rawOrders.length > 0) {
+      const filteredAndMapped = rawOrders
+        .filter(order => {
+          const scheduledDate = parseDate(order['作業予定日']);
+          const receptionDate = parseDate(order['受付日']);
+          const isScheduledForToday = scheduledDate ? isToday(scheduledDate) : false;
+          const isReceivedToday = receptionDate ? isToday(receptionDate) : false;
+          return isScheduledForToday || isReceivedToday;
+        })
+        .map(mapRawToOrder);
+      setOrders(filteredAndMapped);
+    } else {
+      setOrders([]);
+    }
+  }, [rawOrders]);
+
   const filteredStaff = React.useMemo(() => {
-    if (isLoading || !profile) return [];
+    if (isProfileLoading || !profile) return [];
 
     const staffToUse = allStaff.length > 0 ? allStaff : allStaffData;
 
@@ -34,7 +75,7 @@ export default function DashboardPage() {
         return staffToUse.filter(staff => appliedSelectedStaffIds.includes(staff.id));
     }
     return staffToUse.filter(staff => staff.id === profile.id);
-  }, [appliedSelectedStaffIds, profile, isLoading, allStaff]);
+  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff]);
   
   const filteredSchedule = React.useMemo(() => {
     const selectedIds = new Set(filteredStaff.map(s => s.id));
@@ -58,6 +99,8 @@ export default function DashboardPage() {
     const selectedStaff = staffToUse.filter(s => appliedSelectedStaffIds.includes(s.id));
     return selectedStaff.map(s => s.name).join('、');
   }, [allStaff, appliedSelectedStaffIds, profile]);
+
+  const isLoading = isProfileLoading || isLoadingOrders;
 
   if (isLoading) {
       return (
