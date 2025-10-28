@@ -18,6 +18,7 @@ const findRoleValue = (item: any): 'admin' | 'staff' => {
   return 'staff';
 };
 
+// This function now lives here, where it belongs.
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     if (typeof window === 'undefined') return [];
     const staffGasUrl = localStorage.getItem(STAFF_GAS_URL_KEY);
@@ -47,6 +48,15 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                         avatarUrl: `https://picsum.photos/seed/${id}/100/100`,
                     };
                 });
+            }
+        } else {
+             // Handle non-ok responses
+            const errorText = await response.text();
+            try {
+                const errorJson = JSON.parse(errorText);
+                throw new Error(errorJson.message || `GAS request failed with status: ${response.status}`);
+            } catch (e) {
+                throw new Error(errorText || `GAS request failed with status: ${response.status}`);
             }
         }
     } catch (error) {
@@ -80,7 +90,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // This effect loads staff data from GAS when the component mounts or profile changes.
+  // This effect loads staff data from GAS when the component mounts.
   useEffect(() => {
     const loadStaff = async () => {
         setIsLoading(true);
@@ -88,6 +98,20 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         try {
           const fetchedStaff = await fetchStaffDataFromGAS();
           setAllStaffState(fetchedStaff);
+
+          // Initialize selections after staff has been fetched
+          const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
+          if (savedIds) {
+            const parsedIds = JSON.parse(savedIds);
+            setAppliedSelectedStaffIds(parsedIds);
+            setPendingSelectedStaffIds(parsedIds);
+          } else {
+             // If no selection is saved, default to all staff
+            const allStaffIds = fetchedStaff.map(s => s.id);
+            setAppliedSelectedStaffIds(allStaffIds);
+            setPendingSelectedStaffIds(allStaffIds);
+          }
+
         } catch (e: any) {
           setError("スタッフ情報の取得に失敗しました。データ取込ページでURLが正しく設定されているか確認してください。");
           console.error(e);
@@ -96,32 +120,19 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         }
     };
     loadStaff();
-  }, []); // Run only once on mount
+  }, []); 
 
 
   useEffect(() => {
-    try {
-      const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (savedIds) {
-        const parsedIds = JSON.parse(savedIds);
-        setAppliedSelectedStaffIds(parsedIds);
-        setPendingSelectedStaffIds(parsedIds);
-      } else if (profile && profile.role !== 'admin' && allStaff.length > 0) {
-          // For non-admins, default to only their own ID if not set
-          setAppliedSelectedStaffIds([profile.id]);
-          setPendingSelectedStaffIds([profile.id]);
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([profile.id]));
-      } else if (profile && profile.role === 'admin' && allStaff.length > 0) {
-        // For admins, if nothing is set, default to all staff
-        const allStaffIds = allStaff.map(s => s.id);
-        setAppliedSelectedStaffIds(allStaffIds);
-        setPendingSelectedStaffIds(allStaffIds);
-      }
-    } catch (error) {
-        console.error("Failed to process staff IDs from localStorage", error);
-        localStorage.removeItem(LOCAL_STORAGE_KEY);
+    if (!profile || isProfileLoading || isLoading) return;
+
+    if (profile.role !== 'admin') {
+        // For non-admins, force selection to only their own ID
+        setAppliedSelectedStaffIds([profile.id]);
+        setPendingSelectedStaffIds([profile.id]);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([profile.id]));
     }
-  }, [profile, allStaff]);
+  }, [profile, isProfileLoading, isLoading]);
 
   const setAllStaff = (staff: WithId<Staff>[]) => {
     setAllStaffState(staff);

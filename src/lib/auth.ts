@@ -6,7 +6,7 @@
 
 import type { Staff, WithId } from './types';
 import { staffData as fallbackStaffData } from './data';
-import { fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
+// The function to fetch from GAS has been moved to selected-staff-context.tsx
 
 const MOCK_USER_SESSION_KEY = 'mockUserSession';
 
@@ -27,9 +27,19 @@ const setSession = (user: WithId<Staff> | null) => {
   }
 };
 
-const fetchAndCombineStaffData = async (): Promise<WithId<Staff>[]> => {
-  const gasStaff = await fetchStaffDataFromGAS().catch(() => []); // Catch errors and return empty array
-  
+const findRoleValue = (item: any): 'admin' | 'staff' => {
+  if (!item || typeof item !== 'object') return 'staff';
+  const roleValue = item['権限'];
+  if (roleValue && typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
+    return 'admin';
+  }
+  return 'staff';
+};
+
+
+// This function now only combines data, it does not fetch from GAS itself.
+// It relies on the staff data passed to it.
+const combineStaffData = (gasStaff: WithId<Staff>[]): WithId<Staff>[] => {
   const combinedStaffMap = new Map<string, WithId<Staff>>();
 
   // Add GAS data first
@@ -53,8 +63,38 @@ const fetchAndCombineStaffData = async (): Promise<WithId<Staff>[]> => {
 export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
   console.log(`Attempting to sign in with email: ${email}`);
   
-  const staffList = await fetchAndCombineStaffData();
-  const user = staffList.find(staff => staff.email && staff.email.toLowerCase() === email.toLowerCase() && staff.password === password);
+  // To sign in, we must fetch the latest staff data.
+  // We'll use a temporary direct fetch here, but the main app state uses the context.
+  const tempStaffList = await (async () => {
+      if (typeof window === 'undefined') return fallbackStaffData;
+      const staffGasUrl = localStorage.getItem('staffImporterUrl');
+      if (!staffGasUrl) return fallbackStaffData;
+      
+      try {
+        const response = await fetch(staffGasUrl, { cache: 'no-store' });
+        if (!response.ok) return fallbackStaffData;
+        const result = await response.json();
+        const rawStaffArray = result.data || (Array.isArray(result) ? result : []);
+         if (Array.isArray(rawStaffArray)) {
+            return rawStaffArray.map((item: any) => ({
+                id: String(item['スタッフID'] || item.id),
+                role: findRoleValue(item),
+                name: item['スタッフ名'] || item.name,
+                email: item['メールアドレス'] || item.email,
+                password: item['パスワード'] || item.password,
+                calendarId: item['カレンダーID'] || item.calendarId,
+                color: item['カラー'] || item.color,
+                avatarUrl: `https://picsum.photos/seed/${String(item['スタッフID'] || item.id)}/100/100`,
+            }));
+        }
+      } catch {
+        return fallbackStaffData;
+      }
+      return fallbackStaffData;
+  })();
+  
+  const combinedStaff = combineStaffData(tempStaffList);
+  const user = combinedStaff.find(staff => staff.email && staff.email.toLowerCase() === email.toLowerCase() && staff.password === password);
 
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -66,30 +106,15 @@ export const signInWithEmail = async (email: string, password: string): Promise<
         console.log('Sign in failed: Invalid credentials');
         reject(new Error('メールアドレスまたはパスワードが正しくありません。'));
       }
-    }, 1000); // Simulate network delay
+    }, 500); // Simulate network delay
   });
 };
 
 export const signUpWithEmail = async (email: string, password: string, name: string): Promise<WithId<Staff>> => {
     console.log(`Attempting to process sign up for email: ${email}`);
-    const staffList = await fetchAndCombineStaffData();
-    
-    const existingUser = staffList.find(staff => staff.email && staff.email.toLowerCase() === email.toLowerCase());
 
     return new Promise((resolve, reject) => {
         setTimeout(() => {
-            if (existingUser) {
-                 if (existingUser.password === password) {
-                    console.log('Login via signup form successful for:', existingUser.name, 'with role:', existingUser.role);
-                    setSession(existingUser);
-                    resolve(existingUser);
-                } else {
-                    console.log('Sign up failed for existing user: Invalid password');
-                    reject(new Error('このメールアドレスは登録済みですが、パスワードが異なります。'));
-                }
-                return;
-            }
-            
             if (password.length < 6) {
                 console.log('Sign up failed: Password too weak');
                 reject(new Error('パスワードは6文字以上で設定してください。'));
@@ -109,7 +134,7 @@ export const signUpWithEmail = async (email: string, password: string, name: str
             setSession(newUser);
             console.log('Sign up successful for new user:', newUser.name);
             resolve(newUser);
-        }, 1000);
+        }, 500);
     });
 };
 
