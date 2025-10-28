@@ -19,13 +19,12 @@ const CustomerContext = createContext<CustomerContextType | undefined>(undefined
 
 export function CustomerProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomersState] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true); // Start with loading true
+  const [isLoading, setIsLoading] = useState(true);
   const [customerGasUrl, setCustomerGasUrlState] = useState('');
   const [error, setErrorState] = useState<string | null>(null);
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
-    // Use the new URL from the user as the initial value if no URL is saved yet.
     const initialUrl = savedUrl || 'https://script.google.com/macros/s/AKfycby1q1B0pLIOJ_GFs7aQ2nQL1X7NxUKO7OrB35zLm7JwI-oc_FtPfkwIO0WJl7atfcOKJA/exec?sheet=販売店情報';
     setCustomerGasUrlState(initialUrl);
     if (!savedUrl) {
