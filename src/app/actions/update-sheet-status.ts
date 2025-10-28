@@ -43,10 +43,23 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         const contentType = response.headers.get('content-type');
         if (!response.ok || !contentType || !contentType.includes('application/json')) {
             const errorText = await response.text();
-            throw new Error(`GAS script returned a non-JSON or error response. Status: ${response.status}. Response: ${errorText}`);
+            // Try to parse for a specific error message from our GAS script format
+            try {
+                const errorJson = JSON.parse(errorText);
+                 if (errorJson && errorJson.message) {
+                    throw new Error(errorJson.message);
+                }
+            } catch (e) {
+                // Fallback for non-JSON or differently structured errors
+                throw new Error(`GAS script returned a non-JSON or error response. Status: ${response.status}. Response: ${errorText}`);
+            }
         }
 
         const result: GasResponse = await response.json();
+
+        if(result.status === 'error'){
+            throw new Error(result.message);
+        }
 
         return result;
 
