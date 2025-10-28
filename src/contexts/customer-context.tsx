@@ -21,7 +21,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const { profile } = useUserProfile();
   const [customers, setCustomersState] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [customerGasUrl, setCustomerGasUrlState] = useState('');
+  const [customerGasUrl, setCustomerGasUrlState] = useState('https://script.google.com/macros/s/AKfycbziEeP4R_ViB-rbKvf2h9C4dzGdTqD4xFBq1FgLTx3Qwsg2qklPAxGOQoKKXS4O9WxNKw/exec');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
