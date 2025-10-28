@@ -676,22 +676,29 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isTravelEvent = event.title?.startsWith('移動');
   const isBreakEvent = event.title === '休憩';
 
-  let backgroundColor = staff.color;
+  let backgroundColor = staff.color || 'hsl(var(--primary))';
   let color = 'white';
 
+  const hslMatch = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+
   if (isTravelEvent) {
-    const hslMatch = staff.color?.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
     if (hslMatch) {
-      const [_, h, s, l] = hslMatch;
-      backgroundColor = `hsl(${h}, 20%, 50%)`;
+      const [_, h, s] = hslMatch;
+      backgroundColor = `hsl(${h}, ${Number(s) * 0.5}%, 50%)`;
       color = 'white';
     } else {
       backgroundColor = 'hsl(210, 14%, 88%)'; // Muted color fallback
       color = 'hsl(var(--foreground))';
     }
   } else if (isBreakEvent) {
-    backgroundColor = `hsl(120, 40%, 85%)`;
-    color = 'hsl(var(--foreground))';
+     if (hslMatch) {
+      const [_, h, s] = hslMatch;
+      backgroundColor = `hsl(${h}, ${s}%, 90%)`;
+      color = 'hsl(var(--foreground))';
+    } else {
+      backgroundColor = `hsl(120, 40%, 85%)`;
+      color = 'hsl(var(--foreground))';
+    }
   }
 
 

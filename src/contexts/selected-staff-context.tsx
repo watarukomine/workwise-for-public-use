@@ -35,8 +35,10 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
             const rawStaffArray = result.data || (Array.isArray(result) ? result : []);
 
             if (Array.isArray(rawStaffArray)) {
-                return rawStaffArray.map((item: any) => {
+                return rawStaffArray.map((item: any, index: number) => {
                     const id = String(item['スタッフID'] || item.id);
+                    // Assign a unique, visually distinct color if not provided
+                    const color = item['カラー'] || item.color || `hsl(${(index * 137.5) % 360}, 70%, 50%)`;
                     return {
                         id: id,
                         role: findRoleValue(item),
@@ -44,7 +46,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                         email: item['メールアドレス'] || item.email,
                         password: item['パスワード'] || item.password,
                         calendarId: item['カレンダーID'] || item.calendarId,
-                        color: item['カラー'] || item.color,
+                        color: color,
                         avatarUrl: `https://picsum.photos/seed/${id}/100/100`,
                     };
                 });
