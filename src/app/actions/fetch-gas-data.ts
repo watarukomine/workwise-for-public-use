@@ -14,19 +14,23 @@ export async function fetchGasData(url: string): Promise<any> {
   try {
     const response = await fetch(url, {
       cache: 'no-store', // Ensures fresh data is fetched every time
+      redirect: 'follow', // Follow redirects from GAS
     });
 
-    if (!response.ok) {
-      // Try to parse the error message from GAS if available
+    // It's crucial to check the content-type before parsing as JSON
+    const contentType = response.headers.get('content-type');
+    if (!response.ok || !contentType || !contentType.includes('application/json')) {
       const errorText = await response.text();
+      // Try to parse the error message from GAS if available
       try {
         const errorJson = JSON.parse(errorText);
         if (errorJson && errorJson.message) {
           throw new Error(errorJson.message);
         }
       } catch (e) {
-        // Fallback to HTTP status if the error is not JSON
-        throw new Error(`HTTP error: ${response.status} ${response.statusText} - ${errorText}`);
+        // Fallback to HTTP status if the error is not JSON or doesn't have a message
+        const detailedError = `GAS request failed. Status: ${response.status}. Response: ${errorText.substring(0, 200)}...`;
+        throw new Error(detailedError);
       }
     }
 
