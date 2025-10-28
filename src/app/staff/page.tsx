@@ -42,16 +42,19 @@ export default function StaffPage() {
             throw new Error("GAS response did not contain a valid data array.");
         }
 
-        const staffList: WithId<Staff>[] = rawStaffArray.map((item: any) => ({
-          id: String(item['スタッフID']),
-          role: (item['権限（Staff /Admin）'] || 'staff').toString().toLowerCase() === 'admin' ? 'admin' : 'staff',
-          name: item['スタッフ名'],
-          email: item['メールアドレス'],
-          password: item['パスワード'],
-          calendarId: item['カレンダーID'],
-          color: item['カラー'],
-          avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
-        }));
+        const staffList: WithId<Staff>[] = rawStaffArray.map((item: any) => {
+          const roleValue = item['権限（Staff /Admin）'] || 'staff';
+          return {
+            id: String(item['スタッフID']),
+            role: String(roleValue).toLowerCase() === 'admin' ? 'admin' : 'staff',
+            name: item['スタッフ名'],
+            email: item['メールアドレス'],
+            password: item['パスワード'],
+            calendarId: item['カレンダーID'],
+            color: item['カラー'],
+            avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
+          }
+        });
         
         if (profile.role === 'admin') {
             // Admin sees all staff

@@ -65,16 +65,19 @@ export function StaffImporter() {
       if (dataToProcess) {
          setTableData(dataToProcess);
          if (dataToProcess.length > 0) {
-           const staffList: WithId<Staff>[] = dataToProcess.map((item: any) => ({
-              id: String(item['スタッフID']),
-              role: (String(item['権限（Staff /Admin）']) || 'staff').toLowerCase() === 'admin' ? 'admin' : 'staff',
-              name: item['スタッフ名'],
-              email: item['メールアドレス'],
-              password: item['パスワード'],
-              calendarId: item['カレンダーID'],
-              color: item['カラー'],
-              avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
-            }));
+           const staffList: WithId<Staff>[] = dataToProcess.map((item: any) => {
+              const roleValue = item['権限（Staff /Admin）'] || 'staff';
+              return {
+                id: String(item['スタッフID']),
+                role: String(roleValue).toLowerCase() === 'admin' ? 'admin' : 'staff',
+                name: item['スタッフ名'],
+                email: item['メールアドレス'],
+                password: item['パスワード'],
+                calendarId: item['カレンダーID'],
+                color: item['カラー'],
+                avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
+              }
+           });
 
            setAllStaff(staffList);
            setImportSuccess(true);
@@ -224,3 +227,4 @@ export function StaffImporter() {
     </div>
   );
 }
+

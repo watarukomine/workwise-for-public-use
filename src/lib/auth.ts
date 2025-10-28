@@ -36,16 +36,19 @@ const fetchAndCombineStaffData = async (): Promise<WithId<Staff>[]> => {
         const rawStaffArray = Array.isArray(data) ? data : data.data;
 
         if (Array.isArray(rawStaffArray)) {
-            gasStaff = rawStaffArray.map((item: any) => ({
-              id: String(item['スタッフID']),
-              role: (item['権限（Staff /Admin）'] || 'staff').toString().toLowerCase() === 'admin' ? 'admin' : 'staff',
-              name: item['スタッフ名'],
-              email: item['メールアドレス'],
-              password: item['パスワード'],
-              calendarId: item['カレンダーID'],
-              color: item['カラー'],
-              avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
-            }));
+            gasStaff = rawStaffArray.map((item: any) => {
+              const roleValue = item['権限（Staff /Admin）'] || 'staff';
+              return {
+                id: String(item['スタッフID']),
+                role: String(roleValue).toLowerCase() === 'admin' ? 'admin' : 'staff',
+                name: item['スタッフ名'],
+                email: item['メールアドレス'],
+                password: item['パスワード'],
+                calendarId: item['カレンダーID'],
+                color: item['カラー'],
+                avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
+              }
+            });
         } else {
             console.error("GAS response did not contain a valid data array.");
         }
@@ -100,6 +103,7 @@ export const signUpWithEmail = async (email: string, password: string, name: str
         setTimeout(() => {
             if (existingUser) {
                  if (existingUser.password === password) {
+                    // This is a login via signup form. Use the correct data.
                     console.log('Login via signup form successful for:', existingUser.name, 'with role:', existingUser.role);
                     setSession(existingUser);
                     resolve(existingUser);
@@ -116,6 +120,7 @@ export const signUpWithEmail = async (email: string, password: string, name: str
                 return;
             }
             
+            // This is a new user, not present in any data source. Default role to 'staff'.
             const newUser: WithId<Staff> = {
                 id: `new-${Date.now()}`,
                 name,
