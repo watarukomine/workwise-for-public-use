@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
@@ -19,7 +20,7 @@ const CustomerContext = createContext<CustomerContextType | undefined>(undefined
 export function CustomerProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomersState] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [customerGasUrl, setCustomerGasUrlState] = useState('https://script.google.com/macros/s/AKfycbxxoqcfTsyLWkNC99FXjPZwlan5eYMYlncluhY8brsYktengkr5lU9fqkBI4IzvSDnXKQ/exec');
+  const [customerGasUrl, setCustomerGasUrlState] = useState('https://script.google.com/macros/s/AKfycbznaVC5Zhz4SHG4E_XVbQTi-EV19XZSyqGnz5qOd5WftXtchzPA3buvusWDDu3npSkWbQ/exec');
   const [error, setErrorState] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,14 +51,27 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         try {
           const response = await fetch(customerGasUrl, { cache: 'no-store' });
           if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const errorText = await response.text();
+             try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.message) {
+                    throw new Error(errorJson.message);
+                }
+            } catch (e) {
+                 throw new Error(`HTTPエラー: ${response.status} ${response.statusText}`);
+            }
           }
           const result = await response.json();
+
+          if (result.error) {
+            throw new Error(result.message);
+          }
+
           const customerData = result.data || (Array.isArray(result) ? result : []);
           setCustomers(customerData);
         } catch (e: any) {
           console.error("Failed to fetch customers from GAS:", e);
-          setErrorState("販売店情報の取得に失敗しました。URLまたはGASの実装を確認してください。");
+          setErrorState(`販売店情報の取得に失敗しました: ${e.message}`);
         } finally {
           setIsLoading(false);
         }
