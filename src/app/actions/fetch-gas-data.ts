@@ -22,7 +22,7 @@ export async function fetchGasData(url: string): Promise<any> {
 
     // Handle redirects manually to provide a clearer error message
     if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
-       throw new Error(`GAS request was redirected. This usually indicates a permission issue. Please ensure your script is deployed with 'Who has access' set to 'Anyone' and that the doGet() function is correctly returning ContentService output, not an HTML page.`);
+       throw new Error(`GAS request was redirected. This usually indicates a permission issue. Please ensure your script is deployed with 'Who has access' set to 'Anyone' and that you have deployed a new version after any changes to the script. The doGet() function must also correctly return ContentService output, not an HTML page.`);
     }
 
     // Check if the final URL is a Google Accounts sign-in page, indicating a permission issue.
