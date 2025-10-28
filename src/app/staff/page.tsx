@@ -13,76 +13,19 @@ import { Button } from '@/components/ui/button';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
-  const { allStaff, setAllStaff } = useSelectedStaff();
-  const [isFetchingStaff, setIsFetchingStaff] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  // Data is now sourced exclusively from the context, which is updated by the importer.
+  const { allStaff } = useSelectedStaff();
 
-  React.useEffect(() => {
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbyOUN7eqN2f3u9aYaU-5rP8UGrcawlan3FAHzHKjm7RuXifKBCjs2kbfTTB09ygvfRd-Q/exec';
-
-    const fetchStaffData = async () => {
-      if (!profile) {
-        setIsFetchingStaff(false);
-        setAllStaff([]);
-        return;
-      }
-      setIsFetchingStaff(true);
-      setError(null);
-      try {
-        const response = await fetch(GAS_URL, { cache: 'no-store' });
-        if (!response.ok) {
-            throw new Error(`Failed to fetch: ${response.statusText}`);
-        }
-        const data = await response.json();
-
-        // Check if data is an object with a 'data' property, or a direct array
-        const rawStaffArray = Array.isArray(data) ? data : data.data;
-
-        if (!Array.isArray(rawStaffArray)) {
-            throw new Error("GAS response did not contain a valid data array.");
-        }
-
-        const staffList: WithId<Staff>[] = rawStaffArray.map((item: any) => {
-          const roleValue = item['権限（Staff /Admin）'] || 'staff';
-          return {
-            id: String(item['スタッフID']),
-            role: String(roleValue).toLowerCase() === 'admin' ? 'admin' : 'staff',
-            name: item['スタッフ名'],
-            email: item['メールアドレス'],
-            password: item['パスワード'],
-            calendarId: item['カレンダーID'],
-            color: item['カラー'],
-            avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
-          }
-        });
-        
-        if (profile.role === 'admin') {
-            // Admin sees all staff
-            setAllStaff(staffList);
-        } else {
-            // Non-admin sees only themselves
-            const self = staffList.find(s => s.id === profile.id);
-            setAllStaff(self ? [self] : []);
-        }
-      } catch (error) {
-        console.error("Failed to fetch staff data", error);
-        setError("スタッフ情報の取得に失敗しました。ネットワーク接続を確認するか、後でもう一度お試しください。");
-        setAllStaff([]);
-      } finally {
-        setIsFetchingStaff(false);
-      }
-    };
-
-    fetchStaffData();
-  }, [profile, setAllStaff]);
-  
-  const isLoading = isProfileLoading || isFetchingStaff;
+  // The isLoading state now only depends on the profile loading.
+  const isLoading = isProfileLoading;
 
   const staffToDisplay = React.useMemo(() => {
     if (!profile || !allStaff) return [];
     if (profile.role === 'admin') {
+        // For admin, filter out other admins from the main list view.
         return allStaff.filter(s => String(s.role).toLowerCase() !== 'admin');
     }
+    // For staff, show only themselves.
     const self = allStaff.find(s => s.id === profile.id);
     return self ? [self] : [];
   }, [profile, allStaff]);
@@ -93,7 +36,7 @@ export default function StaffPage() {
         <h1 className="text-2xl font-semibold tracking-tight">スタッフ・ユーザー管理</h1>
         <p className="text-muted-foreground">
           {profile?.role === 'admin'
-            ? "表示するスタッフを選択し、「選択を適用」ボタンでダッシュボードやルート最適化に反映します。" 
+            ? "「データ取込」ページでインポートしたスタッフの一覧です。表示するスタッフを選択し、「選択を適用」ボタンで他ページに反映します。" 
             : "ご自身の情報を確認できます。"}
         </p>
       </div>
@@ -113,23 +56,28 @@ export default function StaffPage() {
         </Alert>
       )}
 
-      {error && (
-         <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>エラー</AlertTitle>
-          <AlertDescription>
-            {error}
-          </AlertDescription>
-        </Alert>
-      )}
-      
       {isLoading ? (
         <div className="flex items-center justify-center p-10">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="ml-4">スタッフ情報を読み込んでいます...</p>
+          <p className="ml-4">ユーザー情報を読み込んでいます...</p>
         </div>
       ) : (
-         !error && profile && <StaffTable staff={staffToDisplay} isLoading={isLoading} />
+         profile && <StaffTable staff={staffToDisplay} isLoading={isLoading} />
+      )}
+      
+      {!isLoading && profile && allStaff.length === 0 && (
+         <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>スタッフ情報がありません</AlertTitle>
+            <AlertDescription>
+                <p>表示するスタッフ情報がありません。「データ取込」ページからスタッフデータをインポートしてください。</p>
+                <Button asChild className="mt-4">
+                    <Link href="/import">
+                        データ取込ページへ
+                    </Link>
+                </Button>
+            </AlertDescription>
+         </Alert>
       )}
     </div>
   );
