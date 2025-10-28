@@ -6,7 +6,7 @@ const getAvatarUrl = (avatarId: string) => {
   return PlaceHolderImages.find(img => img.id === avatarId)?.imageUrl || '';
 };
 
-// Mock staff data including roles and passwords for local auth simulation
+// This static data is now a fallback, authentication will be handled via GAS.
 export const staffData: WithId<Staff>[] = [
   {
     id: '1',
@@ -27,26 +27,6 @@ export const staffData: WithId<Staff>[] = [
     calendarId: 'staff@example.com',
     color: 'hsl(12, 76%, 61%)',
     avatarUrl: getAvatarUrl('avatar1'),
-  },
-  {
-    id: '3',
-    name: '高橋 一郎',
-    email: 'ichiro.takahashi@example.com',
-    password: 'password',
-    role: 'staff',
-    calendarId: 'ichiro.takahashi@example.com',
-    color: 'hsl(173, 58%, 39%)',
-    avatarUrl: getAvatarUrl('avatar4'),
-  },
-  {
-    id: '4',
-    name: '田中 美咲',
-    email: 'misaki.tanaka@example.com',
-    password: 'password',
-    role: 'staff',
-    calendarId: 'misaki.tanaka@example.com',
-    color: 'hsl(43, 74%, 66%)',
-    avatarUrl: getAvatarUrl('avatar3'),
   },
 ];
 

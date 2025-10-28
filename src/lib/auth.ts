@@ -4,10 +4,11 @@
 // This is a mock authentication service.
 // In a real application, this would be replaced with a robust authentication provider like Firebase Auth.
 
-import { staffData } from './data';
 import type { Staff, WithId } from './types';
+import { staffData as fallbackStaffData } from './data';
 
 const MOCK_USER_SESSION_KEY = 'mockUserSession';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbyOUN7eqN2f3u9aYaU-5rP8UGrcawlan3FAHzHKjm7RuXifKBCjs2kbfTTB09ygvfRd-Q/exec';
 
 // Helper to get user session from localStorage
 const getSession = (): WithId<Staff> | null => {
@@ -26,10 +27,38 @@ const setSession = (user: WithId<Staff> | null) => {
   }
 };
 
+const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
+  try {
+    const response = await fetch(GAS_URL, { cache: 'no-store' });
+    if (!response.ok) {
+      console.error('Failed to fetch from GAS, using fallback data.');
+      return fallbackStaffData;
+    }
+    const data = await response.json();
+    
+    // Assuming the GAS returns an array of objects with specific keys
+    return data.map((item: any) => ({
+      id: String(item['スタッフID']),
+      role: item['権限（Staff /Admin）'] === 'Admin' ? 'admin' : 'staff',
+      name: item['スタッフ名'],
+      email: item['メールアドレス'],
+      password: item['パスワード'],
+      calendarId: item['カレンダーID'],
+      color: item['カラー'],
+      avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`, // Generate a consistent avatar
+    }));
+  } catch (error) {
+    console.error('Error fetching staff data from GAS:', error);
+    return fallbackStaffData; // Return fallback data in case of any error
+  }
+};
+
+
 export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
   console.log(`Attempting to sign in with email: ${email}`);
   
-  const user = staffData.find(staff => staff.email === email && staff.password === password);
+  const staffList = await fetchStaffDataFromGAS();
+  const user = staffList.find(staff => staff.email === email && staff.password === password);
 
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -47,10 +76,11 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 
 export const signUpWithEmail = async (email: string, password: string, name: string): Promise<WithId<Staff>> => {
     console.log(`Attempting to sign up with email: ${email}`);
+    const staffList = await fetchStaffDataFromGAS();
 
     return new Promise((resolve, reject) => {
         setTimeout(() => {
-            const existingUser = staffData.find(staff => staff.email === email);
+            const existingUser = staffList.find(staff => staff.email === email);
             if (existingUser) {
                 console.log('Sign up failed: Email already in use');
                 reject(new Error('このメールアドレスは既に使用されています。'));
@@ -63,8 +93,8 @@ export const signUpWithEmail = async (email: string, password: string, name: str
                 return;
             }
             
-            // NOTE: This only adds to the in-memory array for the current session.
-            // It does not persist the new user.
+            // NOTE: This only creates a user for the current session.
+            // It does not persist the new user to the spreadsheet.
             const newUser: WithId<Staff> = {
                 id: `new-${Date.now()}`,
                 name,
@@ -75,7 +105,7 @@ export const signUpWithEmail = async (email: string, password: string, name: str
                 avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
             };
             
-            staffData.push(newUser);
+            // staffData.push(newUser); // This won't persist
             setSession(newUser);
             console.log('Sign up successful for:', newUser.name);
             resolve(newUser);

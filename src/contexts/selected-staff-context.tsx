@@ -4,7 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
-import { staffData } from '@/lib/data'; // Import static data
+// Removed direct import of staffData, as it will be fetched dynamically.
 import { useUserProfile } from '@/hooks/use-user-profile';
 
 const LOCAL_STORAGE_KEY = 'appliedStaffIds';
@@ -25,12 +25,12 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const { profile } = useUserProfile();
   const { toast } = useToast();
 
-  // Use the static staffData as the source of truth
-  const [allStaff, setAllStaff] = useState<WithId<Staff>[]>(staffData);
+  const [allStaff, setAllStaff] = useState<WithId<Staff>[]>([]);
   const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
   const [appliedSelectedStaffIds, setAppliedSelectedStaffIds] = useState<string[]>([]);
   
-  // On initial mount, load applied IDs from localStorage or set defaults based on role
+  // This effect now primarily loads saved selections from localStorage.
+  // The initial setting of staff data will happen in pages that fetch it.
   useEffect(() => {
     try {
       const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -38,14 +38,11 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         const parsedIds = JSON.parse(savedIds);
         setAppliedSelectedStaffIds(parsedIds);
         setPendingSelectedStaffIds(parsedIds);
-      } else if (profile) {
-        // If no saved IDs, set initial state based on user role
-        const initialIds = profile.role === 'admin' 
-          ? staffData.map(s => s.id) // Admin sees all
-          : [profile.id];           // Staff sees only themselves
-        setAppliedSelectedStaffIds(initialIds);
-        setPendingSelectedStaffIds(initialIds);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialIds));
+      } else if (profile && profile.role !== 'admin') {
+          // For non-admins, default to only their own ID
+          setAppliedSelectedStaffIds([profile.id]);
+          setPendingSelectedStaffIds([profile.id]);
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([profile.id]));
       }
     } catch (error) {
         console.error("Failed to process staff IDs from localStorage", error);
@@ -93,7 +90,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     pendingSelectedStaffIds,
     appliedSelectedStaffIds,
     allStaff,
-    setAllStaff: setAllStaff, // This may not be needed anymore but kept for compatibility
+    setAllStaff,
     togglePendingStaffSelection,
     setPendingSelection,
     applyPendingSelection,
