@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, AlertCircle, Download, CheckCircle, Building } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 
@@ -135,7 +134,7 @@ export function CustomerImporter() {
        {importSuccess && (
         <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
           <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
-          <AlertTitle className="インポート完了">URLを保存しました</AlertTitle>
+          <AlertTitle className="text-green-800 dark:text-green-400">インポート完了</AlertTitle>
           <AlertDescription className="text-green-700 dark:text-green-300">
             販売店データが正常に読み込まれ、URLが保存されました。「販売店情報」ページで確認できます。
           </AlertDescription>
