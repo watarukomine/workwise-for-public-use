@@ -20,32 +20,44 @@ export default function DashboardPage() {
   const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
 
   const { profile, isLoading } = useUserProfile();
-  const { appliedSelectedStaffIds } = useSelectedStaff();
+  const { allStaff, appliedSelectedStaffIds } = useSelectedStaff();
 
   const filteredStaff = React.useMemo(() => {
     if (isLoading || !profile) return [];
 
+    const staffToUse = allStaff.length > 0 ? allStaff : allStaffData;
+
     if (profile.role === 'admin') {
-        // If no staff are selected via the filter, show all
         if (appliedSelectedStaffIds.length === 0) {
-            return allStaffData;
+            return staffToUse;
         }
-        // Filter based on admin's selection
-        return allStaffData.filter(staff => appliedSelectedStaffIds.includes(staff.id));
+        return staffToUse.filter(staff => appliedSelectedStaffIds.includes(staff.id));
     }
-    // For staff, only show their own data
-    return allStaffData.filter(staff => staff.id === profile.id);
-  }, [appliedSelectedStaffIds, profile, isLoading]);
+    return staffToUse.filter(staff => staff.id === profile.id);
+  }, [appliedSelectedStaffIds, profile, isLoading, allStaff]);
+  
+  const filteredSchedule = React.useMemo(() => {
+    const selectedIds = new Set(filteredStaff.map(s => s.id));
+    return initialScheduleData.filter(event => selectedIds.has(event.staffId));
+  }, [filteredStaff]);
+
+  const filteredStatuses = React.useMemo(() => {
+    const selectedIds = new Set(filteredStaff.map(s => s.id));
+    return staffStatusData.filter(status => selectedIds.has(status.staffId));
+  }, [filteredStaff]);
+
 
   const selectedStaffNames = React.useMemo(() => {
     if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
       return null;
     }
-    if (appliedSelectedStaffIds.length === allStaffData.length) {
+    const staffToUse = allStaff.length > 0 ? allStaff : allStaffData;
+    if (appliedSelectedStaffIds.length === staffToUse.length) {
       return "全スタッフ";
     }
-    return filteredStaff.map(s => s.name).join('、');
-  }, [filteredStaff, appliedSelectedStaffIds, allStaffData, profile]);
+    const selectedStaff = staffToUse.filter(s => appliedSelectedStaffIds.includes(s.id));
+    return selectedStaff.map(s => s.name).join('、');
+  }, [allStaff, appliedSelectedStaffIds, profile]);
 
   if (isLoading) {
       return <div>Loading...</div>
@@ -71,7 +83,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">管理者ダッシュボード</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">ダッシュボード</h1>
         <p className="text-muted-foreground">
           スタッフのスケジュールと現在の状況を一覧で確認できます。
         </p>
@@ -87,12 +99,12 @@ export default function DashboardPage() {
         <ScheduleView 
             staffData={filteredStaff} 
             customerData={customers} 
-            scheduleData={scheduleData}
+            scheduleData={filteredSchedule}
             ordersData={orders}
             setScheduleData={setScheduleData}
             setOrdersData={setOrders}
         />
-        <StatusUpdates staffData={filteredStaff} statuses={statuses} />
+        <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />
       </div>
     </div>
   );
