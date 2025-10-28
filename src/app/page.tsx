@@ -48,7 +48,7 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
   const duration = parseInt(rawOrder['作業時間（分）'], 10);
   
   // Construct the detailed task description
-  const line1 = `${rawOrder['お取引先'] || ''}${rawOrder['予定時間'] ? `：${formatTime(rawOrder['予定時間'])}` : ''}`;
+  const line1 = `${rawOrder['お取引先名'] || ''}${rawOrder['予定時間'] ? `：${formatTime(rawOrder['予定時間'])}` : ''}`;
   const line2 = `${rawOrder['タイヤサイズ'] || ''}${rawOrder['本数'] ? `：${rawOrder['本数']}本` : ''}`;
 
   let taskDetails = line1;
