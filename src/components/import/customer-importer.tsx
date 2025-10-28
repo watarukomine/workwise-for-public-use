@@ -6,11 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, AlertCircle, Download, CheckCircle, Building } from 'lucide-react';
+import { Loader2, AlertCircle, Download, CheckCircle, Building, Columns } from 'lucide-react';
 import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-// A simple type guard to check if the error is a fetch error
 function isFetchError(error: unknown): error is TypeError {
   return error instanceof TypeError;
 }
@@ -29,6 +29,7 @@ export function CustomerImporter() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [importSuccess, setImportSuccess] = React.useState(false);
+  const [rawResponse, setRawResponse] = React.useState<any | null>(null);
   
   const { toast } = useToast();
 
@@ -50,6 +51,7 @@ export function CustomerImporter() {
     setIsLoading(true);
     setError(null);
     setImportSuccess(false);
+    setRawResponse(null);
 
     try {
       const response = await fetch(localUrl, { cache: 'no-store' });
@@ -59,10 +61,11 @@ export function CustomerImporter() {
       }
 
       const result = await response.json();
+      setRawResponse(result);
       const dataToProcess = result.data || (Array.isArray(result) ? result : []);
       
       setCustomers(dataToProcess);
-      setCustomerGasUrl(localUrl); // Save URL to context and localStorage
+      setCustomerGasUrl(localUrl); 
       setImportSuccess(true);
       toast({
          title: 'インポート成功',
@@ -139,6 +142,43 @@ export function CustomerImporter() {
             販売店データが正常に読み込まれ、URLが保存されました。「販売店情報」ページで確認できます。
           </AlertDescription>
         </Alert>
+      )}
+
+      {headers.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+                <Columns className="h-6 w-6" />
+                取得データのカラム構成
+            </CardTitle>
+            <CardDescription>
+              GASから取得したデータヘッダー（1行目のキー）の一覧です。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc list-inside bg-muted rounded-md p-4 space-y-1 font-mono text-sm">
+                {headers.map((header) => (
+                    <li key={header}>{header}</li>
+                ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {rawResponse && (
+        <Card>
+          <CardHeader>
+            <CardTitle>生のデータ（Raw Response）</CardTitle>
+            <CardDescription>GASから返された生のJSONデータです。この内容が空や意図しない形式の場合、GAS側に問題がある可能性があります。</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-48 w-full rounded-md border bg-muted p-4">
+              <pre className="text-sm">
+                <code>{JSON.stringify(rawResponse, null, 2)}</code>
+              </pre>
+            </ScrollArea>
+          </CardContent>
+        </Card>
       )}
 
       {customers && customers.length > 0 && (

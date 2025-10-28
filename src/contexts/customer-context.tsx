@@ -19,7 +19,7 @@ const CustomerContext = createContext<CustomerContextType | undefined>(undefined
 
 export function CustomerProvider({ children }: { children: ReactNode }) {
   const { profile } = useUserProfile();
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomersState] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [customerGasUrl, setCustomerGasUrlState] = useState('https://script.google.com/macros/s/AKfycbyv1B6CRkN0Hld3tJuKmUgEyTSnMPDQesLk8ZuFhLQz5nhDvKiM8aU21mU4L_qrb2LgOw/exec');
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +35,10 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     setCustomerGasUrlState(url);
     localStorage.setItem(CUSTOMER_GAS_URL_KEY, url);
   };
+
+  const setCustomers = (data: any[]) => {
+    setCustomersState(data);
+  }
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -61,7 +65,6 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Fetch customers only when profile is loaded
     if (profile) {
       fetchCustomers();
     }
