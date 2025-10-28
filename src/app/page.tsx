@@ -58,6 +58,16 @@ export default function DashboardPage() {
       )
   }
 
+  const selectedStaffNames = React.useMemo(() => {
+    if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
+      return null;
+    }
+    if (appliedSelectedStaffIds.length === allStaffData.length) {
+      return "全スタッフ";
+    }
+    return filteredStaff.map(s => s.name).join('、');
+  }, [filteredStaff, appliedSelectedStaffIds, allStaffData, profile]);
+
   return (
     <div className="space-y-8">
       <div>
@@ -65,6 +75,13 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">
           スタッフのスケジュールと現在の状況を一覧で確認できます。
         </p>
+         {selectedStaffNames && (
+          <div className="mt-4 rounded-lg bg-muted p-3">
+              <p className="text-sm font-medium text-muted-foreground">
+                <span className="font-semibold text-foreground">表示中のスタッフ:</span> {selectedStaffNames}
+              </p>
+          </div>
+        )}
       </div>
       <div className="flex flex-col gap-8">
         <ScheduleView 
