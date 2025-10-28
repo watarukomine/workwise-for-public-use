@@ -16,8 +16,14 @@ export async function fetchGasData(url: string): Promise<any> {
     const response = await fetch(url, {
       method: 'GET',
       cache: 'no-store',
-      redirect: 'follow', 
+      // Manual redirect handling to better diagnose auth issues
+      redirect: 'manual', 
     });
+
+    // Handle redirects manually to provide a clearer error message
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+       throw new Error(`GAS request was redirected. This usually indicates a permission issue. Please ensure your script is deployed with 'Who has access' set to 'Anyone' and that the doGet() function is correctly returning ContentService output, not an HTML page.`);
+    }
 
     // Check if the final URL is a Google Accounts sign-in page, indicating a permission issue.
     if (response.url.includes('accounts.google.com')) {
@@ -33,7 +39,6 @@ export async function fetchGasData(url: string): Promise<any> {
       
       let errorMessage = `GAS request failed or did not return JSON. Status: ${response.status}.`;
       
-      // Provide a more specific message if it looks like a permission issue
       if (errorText.toLowerCase().includes('<title>google') || errorText.toLowerCase().includes('signin')) {
           errorMessage = 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings and that you have deployed a new version after any changes.';
       } else {
