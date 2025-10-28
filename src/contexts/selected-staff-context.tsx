@@ -1,11 +1,10 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
-// Removed direct import of staffData, as it will be fetched dynamically.
 import { useUserProfile } from '@/hooks/use-user-profile';
+import { fetchStaffDataFromGAS } from '@/lib/auth'; // Import the fetch function
 
 const LOCAL_STORAGE_KEY = 'appliedStaffIds';
 
@@ -17,20 +16,46 @@ interface SelectedStaffContextType {
   togglePendingStaffSelection: (staffId: string) => void;
   setPendingSelection: (staffIds: string[]) => void;
   applyPendingSelection: () => void;
+  isLoading: boolean; // Add loading state
+  error: string | null; // Add error state
 }
 
 const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>(undefined);
 
 export function SelectedStaffProvider({ children }: { children: ReactNode }) {
-  const { profile } = useUserProfile();
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { toast } = useToast();
 
   const [allStaff, setAllStaffState] = useState<WithId<Staff>[]>([]);
   const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
   const [appliedSelectedStaffIds, setAppliedSelectedStaffIds] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  // This effect now primarily loads saved selections from localStorage.
-  // The initial setting of staff data will happen in pages that fetch it.
+  // This effect loads staff data from GAS when the user profile is available
+  useEffect(() => {
+    const loadStaff = async () => {
+      if (profile && !isProfileLoading) {
+        setIsLoading(true);
+        setError(null);
+        try {
+          const fetchedStaff = await fetchStaffDataFromGAS();
+          setAllStaffState(fetchedStaff);
+        } catch (e: any) {
+          setError("スタッフ情報の取得に失敗しました。");
+          console.error(e);
+        } finally {
+          setIsLoading(false);
+        }
+      } else if (!isProfileLoading) {
+        // If there's no profile and we are not loading, stop loading state.
+        setIsLoading(false);
+      }
+    };
+    loadStaff();
+  }, [profile, isProfileLoading]);
+
+
   useEffect(() => {
     try {
       const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -38,20 +63,24 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         const parsedIds = JSON.parse(savedIds);
         setAppliedSelectedStaffIds(parsedIds);
         setPendingSelectedStaffIds(parsedIds);
-      } else if (profile && profile.role !== 'admin') {
-          // For non-admins, default to only their own ID
+      } else if (profile && profile.role !== 'admin' && allStaff.length > 0) {
+          // For non-admins, default to only their own ID if not set
           setAppliedSelectedStaffIds([profile.id]);
           setPendingSelectedStaffIds([profile.id]);
           localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([profile.id]));
+      } else if (profile && profile.role === 'admin' && allStaff.length > 0) {
+        // For admins, if nothing is set, default to all staff
+        const allStaffIds = allStaff.map(s => s.id);
+        setAppliedSelectedStaffIds(allStaffIds);
+        setPendingSelectedStaffIds(allStaffIds);
       }
     } catch (error) {
         console.error("Failed to process staff IDs from localStorage", error);
         localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
-  }, [profile]);
+  }, [profile, allStaff]);
 
   const setAllStaff = (staff: WithId<Staff>[]) => {
-    // This is the fix: Always update the state with the new staff list.
     setAllStaffState(staff);
   };
 
@@ -99,6 +128,8 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     togglePendingStaffSelection,
     setPendingSelection,
     applyPendingSelection,
+    isLoading: isLoading || isProfileLoading,
+    error,
   };
 
   return (
