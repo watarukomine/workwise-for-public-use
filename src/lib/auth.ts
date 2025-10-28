@@ -27,53 +27,58 @@ const setSession = (user: WithId<Staff> | null) => {
   }
 };
 
-const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
+const fetchAndCombineStaffData = async (): Promise<WithId<Staff>[]> => {
+  let gasStaff: WithId<Staff>[] = [];
   try {
     const response = await fetch(GAS_URL, { cache: 'no-store' });
-    if (!response.ok) {
-      console.error('Failed to fetch from GAS, using fallback data.');
-      return fallbackStaffData;
-    }
-    const data = await response.json();
-    
-    // Handle both direct array and object with 'data' property
-    const rawStaffArray = Array.isArray(data) ? data : data.data;
+    if (response.ok) {
+        const data = await response.json();
+        const rawStaffArray = Array.isArray(data) ? data : data.data;
 
-    if (!Array.isArray(rawStaffArray)) {
-        console.error("GAS response did not contain a valid data array, using fallback.");
-        return fallbackStaffData;
+        if (Array.isArray(rawStaffArray)) {
+            gasStaff = rawStaffArray.map((item: any) => ({
+              id: String(item['スタッフID']),
+              role: (item['権限（Staff /Admin）'] || 'staff').toString().toLowerCase() === 'admin' ? 'admin' : 'staff',
+              name: item['スタッフ名'],
+              email: item['メールアドレス'],
+              password: item['パスワード'],
+              calendarId: item['カレンダーID'],
+              color: item['カラー'],
+              avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
+            }));
+        } else {
+            console.error("GAS response did not contain a valid data array.");
+        }
+    } else {
+      console.error('Failed to fetch from GAS, using only fallback data.');
     }
-
-    return rawStaffArray.map((item: any) => ({
-      id: String(item['スタッフID']),
-      // Ensure role is always lowercase after converting to string
-      role: (item['権限（Staff /Admin）'] || 'staff').toString().toLowerCase() === 'admin' ? 'admin' : 'staff',
-      name: item['スタッフ名'],
-      email: item['メールアドレス'],
-      password: item['パスワード'],
-      calendarId: item['カレンダーID'],
-      color: item['カラー'],
-      avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
-    }));
   } catch (error) {
     console.error('Error fetching staff data from GAS:', error);
-    // If any error occurs, return the static fallback data which includes sample accounts
-    return fallbackStaffData;
   }
+
+  // Combine GAS data with fallback data, ensuring no duplicates by email
+  const combinedStaff = [...fallbackStaffData];
+  const fallbackEmails = new Set(fallbackStaffData.map(s => s.email.toLowerCase()));
+
+  gasStaff.forEach(staff => {
+      if (staff.email && !fallbackEmails.has(staff.email.toLowerCase())) {
+          combinedStaff.push(staff);
+      }
+  });
+
+  return combinedStaff;
 };
 
 
 export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
   console.log(`Attempting to sign in with email: ${email}`);
   
-  const staffList = await fetchStaffDataFromGAS();
-  // Find user by email and password, case-insensitive email matching can be useful
+  const staffList = await fetchAndCombineStaffData();
   const user = staffList.find(staff => staff.email.toLowerCase() === email.toLowerCase() && staff.password === password);
 
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (user) {
-        // The `role` is now correctly set to lowercase 'admin' or 'staff' by fetchStaffDataFromGAS
         console.log('Sign in successful for:', user.name, 'with role:', user.role);
         setSession(user);
         resolve(user);
@@ -87,7 +92,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 
 export const signUpWithEmail = async (email: string, password: string, name: string): Promise<WithId<Staff>> => {
     console.log(`Attempting to sign up with email: ${email}`);
-    const staffList = await fetchStaffDataFromGAS();
+    const staffList = await fetchAndCombineStaffData();
     
     const existingUser = staffList.find(staff => staff.email.toLowerCase() === email.toLowerCase());
 
@@ -95,13 +100,10 @@ export const signUpWithEmail = async (email: string, password: string, name: str
         setTimeout(() => {
             if (existingUser) {
                  if (existingUser.password === password) {
-                    // This is a login scenario from the sign-up form.
-                    // The `role` is already correctly set by fetchStaffDataFromGAS.
                     console.log('Login via signup form successful for:', existingUser.name, 'with role:', existingUser.role);
                     setSession(existingUser);
                     resolve(existingUser);
                 } else {
-                    // User exists, but password doesn't match.
                     console.log('Sign up failed for existing user: Invalid password');
                     reject(new Error('このメールアドレスは登録済みですが、パスワードが異なります。'));
                 }
@@ -114,14 +116,12 @@ export const signUpWithEmail = async (email: string, password: string, name: str
                 return;
             }
             
-            // NOTE: This only creates a user for the current session.
-            // It does not persist the new user to the spreadsheet.
             const newUser: WithId<Staff> = {
                 id: `new-${Date.now()}`,
                 name,
                 email,
                 password,
-                role: 'staff', // New signups are always 'staff' by default
+                role: 'staff',
                 color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`,
                 avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
             };
