@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -62,7 +63,7 @@ export default function StaffPage() {
   const staffToDisplay = React.useMemo(() => {
     if (isLoading || !profile || !allStaff) return [];
     if (profile.role === 'admin') {
-      return allStaff.filter(s => s.role !== 'admin');
+      return allStaff;
     }
     const self = allStaff.find(s => s.id === profile.id);
     return self ? [self] : [];
