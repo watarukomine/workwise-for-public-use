@@ -38,13 +38,12 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         });
 
         const contentType = response.headers.get('content-type');
+        const errorText = await response.text();
+        
         if (!response.ok || !contentType || !contentType.includes('application/json')) {
-            const errorText = await response.text();
-            // Try to parse as JSON to get a structured error message if possible
             try {
                 const errorJson = JSON.parse(errorText);
                  if (errorJson && errorJson.message) {
-                    // Re-throw with the specific message from GAS
                     throw new Error(errorJson.message);
                 }
             } catch (e) {
@@ -53,7 +52,7 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
             }
         }
 
-        const result: GasResponse = await response.json();
+        const result: GasResponse = JSON.parse(errorText);
 
         // Handle cases where GAS returns a JSON with an error status
         if(result.status === 'error'){
