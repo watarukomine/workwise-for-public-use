@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, AlertCircle, Download, CheckCircle, Users } from 'lucide-react';
+import { Loader2, AlertCircle, Download, CheckCircle, Users, Columns } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +26,7 @@ export function StaffImporter() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [importSuccess, setImportSuccess] = React.useState(false);
+  const [columnHeaders, setColumnHeaders] = React.useState<string[] | null>(null);
   
   const { setAllStaff } = useSelectedStaff();
   const { toast } = useToast();
@@ -43,6 +44,7 @@ export function StaffImporter() {
     setTableData(null);
     setRawData(null);
     setImportSuccess(false);
+    setColumnHeaders(null);
 
     try {
       const response = await fetch(gasUrl, { cache: 'no-store' });
@@ -65,11 +67,12 @@ export function StaffImporter() {
       if (dataToProcess) {
          setTableData(dataToProcess);
          if (dataToProcess.length > 0) {
+           setColumnHeaders(Object.keys(dataToProcess[0])); // Extract headers
            const staffList: WithId<Staff>[] = dataToProcess.map((item: any) => {
-              const roleValue = item['権限（Staff /Admin）'] || 'staff';
+              const roleValue = item['権限（Staff /Admin）'];
               return {
                 id: String(item['スタッフID']),
-                role: String(roleValue).toLowerCase() === 'admin' ? 'admin' : 'staff',
+                role: typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin' ? 'admin' : 'staff',
                 name: item['スタッフ名'],
                 email: item['メールアドレス'],
                 password: item['パスワード'],
@@ -159,6 +162,27 @@ export function StaffImporter() {
         </Alert>
       )}
 
+      {columnHeaders && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+                <Columns className="h-6 w-6" />
+                取得データのカラム構成
+            </CardTitle>
+            <CardDescription>
+              GASから取得したデータヘッダー（1行目のキー）の一覧です。この中に権限に関するカラムが存在するかご確認ください。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc list-inside bg-muted rounded-md p-4 space-y-1 font-mono text-sm">
+                {columnHeaders.map((header) => (
+                    <li key={header}>{header}</li>
+                ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {rawData && (
         <Card>
           <CardHeader>
@@ -227,4 +251,3 @@ export function StaffImporter() {
     </div>
   );
 }
-
