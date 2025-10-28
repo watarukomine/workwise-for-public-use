@@ -31,18 +31,7 @@ export const staffData: WithId<Staff>[] = [
 ];
 
 
-export const customerData: WithId<Customer>[] = [
-    { id: 'C001', No: '1', userCode: 'CUST001', storeName: 'ABCストア', address: '神奈川県横浜市中区元町1-1', '電話番号': '045-111-1111', '営業時間': '10:00-19:00', latitude: 35.442, longitude: 139.648, name: 'ABCストア' },
-    { id: 'C002', No: '2', userCode: 'CUST002', storeName: 'XYZマート', address: '神奈川県横浜市西区みなとみらい2-2', '電話番号': '045-222-2222', '営業時間': '09:00-21:00', latitude: 35.456, longitude: 139.63, name: 'XYZマート' },
-    { id: 'C003', No: '3', userCode: 'CUST003', storeName: 'さくら商店', address: '神奈川県横浜市神奈川区東神奈川1-12', '電話番号': '045-333-3333', '営業時間': '09:30-18:30', latitude: 35.48, longitude: 139.636, name: 'さくら商店' },
-    { id: 'C004', No: '4', userCode: 'CUST004', storeName: 'みなと薬局', address: '神奈川県横浜市中区山下町200', '電話番号': '045-444-4444', '営業時間': '09:00-18:00', latitude: 35.443, longitude: 139.643, name: 'みなと薬局' },
-    { id: 'C005', No: '5', userCode: 'CUST005', storeName: 'ベイサイドカフェ', address: '神奈川県横浜市西区高島1-1', '電話番号': '045-555-5555', '営業時間': '08:00-20:00', latitude: 35.465, longitude: 139.622, name: 'ベイサイドカフェ' },
-    { id: 'C006', No: '6', userCode: 'CUST006', storeName: 'グリーンフラワー', address: '神奈川県横浜市青葉区美しが丘1-1-2', '電話番号': '045-666-6666', '営業時間': '10:00-19:00', latitude: 35.548, longitude: 139.55, name: 'グリーンフラワー' },
-    { id: 'C007', No: '7', userCode: 'CUST007', storeName: 'かもめベーカリー', address: '神奈川県横浜市港北区新横浜2-5', '電話番号': '045-777-7777', '営業時間': '07:30-18:00', latitude: 35.508, longitude: 139.617, name: 'かもめベーカリー' },
-    { id: 'C008', No: '8', userCode: 'CUST008', storeName: 'ブックポート横浜', address: '神奈川県横浜市西区南幸1-5-1', '電話番号': '045-888-8888', '営業時間': '10:00-22:00', latitude: 35.466, longitude: 139.622, name: 'ブックポート横浜' },
-    { id: 'C009', No: '9', userCode: 'CUST009', storeName: 'オーシャンビューホテル', address: '神奈川県横浜市中区海岸通1-1', '電話番号': '045-999-9999', '営業時間': '24時間', latitude: 35.45, longitude: 139.64, name: 'オーシャンビューホテル' },
-    { id: 'C010', No: '10', userCode: 'CUST010', storeName: 'サンセットダイナー', address: '神奈川県横浜市金沢区海の公園10', '電話番号': '045-000-0000', '営業時間': '11:00-22:00', latitude: 35.33, longitude: 139.645, name: 'サンセットダイナー' },
-];
+export const customerData: WithId<Customer>[] = [];
 
 export const unassignedOrdersData: WithId<Order>[] = [
     { id: 'ORD001', customerCode: 'CUST001', taskDetails: '商品棚の整理', estimatedDuration: 60 },

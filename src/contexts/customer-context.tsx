@@ -27,7 +27,8 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     if (savedUrl) {
       setCustomerGasUrlState(savedUrl);
     } else {
-      setIsLoading(false); // No URL, stop loading
+      // Set the new URL as a default if nothing is saved
+      setCustomerGasUrlState('https://script.google.com/macros/s/AKfycbyZ2ggDU-l-J4yCsVu0slMc81WnJh_Mty5xtcv0bTOWy7y7avCcE9rK83qMa8vo6WVp/exec');
     }
   }, []);
   
@@ -50,7 +51,6 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setErrorState(null);
         try {
-          // CRITICAL FIX: Add cache: 'no-store' to ensure parameters are not lost on redirect
           const response = await fetch(customerGasUrl, { cache: 'no-store' });
 
           const responseText = await response.text();
@@ -76,7 +76,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         } catch (e: any) {
           console.error("Failed to fetch customers from GAS:", e);
           setErrorState(`販売店情報の取得に失敗しました: ${e.message}`);
-          setCustomers([]); // Clear data on error
+          setCustomers([]);
         } finally {
           setIsLoading(false);
         }
