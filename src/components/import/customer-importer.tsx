@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, AlertCircle, Download, CheckCircle, Building, Columns } from 'lucide-react';
+import { LoaderCircle, AlertCircle, Download, CheckCircle, Building, Columns } from 'lucide-react';
 import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -30,8 +30,13 @@ export function CustomerImporter() {
   const [error, setError] = React.useState<string | null>(null);
   const [importSuccess, setImportSuccess] = React.useState(false);
   const [rawResponse, setRawResponse] = React.useState<any | null>(null);
+  const [isClient, setIsClient] = React.useState(false);
   
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   React.useEffect(() => {
     setLocalUrl(customerGasUrl);
@@ -94,7 +99,7 @@ export function CustomerImporter() {
   };
   
   const headers = customers && customers.length > 0 ? Object.keys(customers[0]) : [];
-  const loading = isLoading || isContextLoading;
+  const loading = isLoading || isContextLoading || !isClient;
 
   return (
     <div className="space-y-4">
@@ -119,7 +124,7 @@ export function CustomerImporter() {
             />
             <Button onClick={handleFetchData} disabled={loading}>
               {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Download className="mr-2 h-4 w-4" />
               )}
