@@ -57,6 +57,8 @@ export function GasImporter() {
       } else if (result && typeof result === 'object' && Array.isArray(result.data)) {
         dataToProcess = result.data;
       } else if (result && typeof result === 'object' && Object.keys(result).length > 0) {
+        // Handle cases where result is a non-array object but without a 'data' key, maybe it's a single record object
+        // For now, we'll treat this as "no tabular data found" to avoid crashes.
         dataToProcess = []; 
       }
 
@@ -176,7 +178,7 @@ export function GasImporter() {
                 </TableHeader>
                 <TableBody>
                   {tableData.length > 0 ? (
-                    tableData.map((row, rowIndex) => (
+                    tableData.slice(0, 5).map((row, rowIndex) => (
                       <TableRow key={rowIndex}>
                         {headers.map((header) => (
                           <TableCell key={`${rowIndex}-${header}`}>
@@ -196,8 +198,17 @@ export function GasImporter() {
               </Table>
              </div>
            </CardContent>
+           {tableData && tableData.length > 5 && (
+              <CardFooter>
+                  <p className="text-sm text-muted-foreground">
+                      {`他 ${tableData.length - 5} 件のデータがインポートされました...`}
+                  </p>
+              </CardFooter>
+           )}
          </Card>
       )}
     </div>
   );
 }
+
+    
