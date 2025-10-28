@@ -26,7 +26,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
     // Use the new URL from the user as the initial value if no URL is saved yet.
-    const initialUrl = savedUrl || 'https://script.google.com/macros/s/AKfycbznaVC5Zhz4SHG4E_XVbQTi-EV19XZSyqGnz5qOd5WftXtchzPA3buvusWDDu3npSkWbQ/exec?sheet=顧客マスタ';
+    const initialUrl = savedUrl || 'https://script.google.com/macros/s/AKfycby1q1B0pLIOJ_GFs7aQ2nQL1X7NxUKO7OrB35zLm7JwI-oc_FtPfkwIO0WJl7atfcOKJA/exec?sheet=販売店情報';
     setCustomerGasUrlState(initialUrl);
     if (!savedUrl) {
       localStorage.setItem(CUSTOMER_GAS_URL_KEY, initialUrl);
