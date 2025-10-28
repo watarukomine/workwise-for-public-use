@@ -13,7 +13,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { isToday, parseISO, isValid } from 'date-fns';
+import { isToday, parseISO, isValid, format } from 'date-fns';
 
 const parseDate = (dateString: any): Date | null => {
   if (!dateString || typeof dateString !== 'string') return null;
@@ -21,13 +21,46 @@ const parseDate = (dateString: any): Date | null => {
   return isValid(date) ? date : null;
 };
 
+const formatTime = (timeString: string): string => {
+    if (!timeString) return '';
+    const date = new Date(timeString);
+    if (!isValid(date)) {
+        const today = new Date();
+        const [hours, minutes] = timeString.split(':');
+        if (hours && minutes) {
+            today.setHours(parseInt(hours, 10), parseInt(minutes, 10));
+            if (isValid(today)) {
+                return format(today, 'HH:mm');
+            }
+        }
+        return timeString;
+    }
+    try {
+        return format(date, 'HH:mm');
+    } catch {
+        return timeString;
+    }
+};
+
+
 // Map raw order data from GAS to a structured Order object
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
   const duration = parseInt(rawOrder['作業時間（分）'], 10);
+  
+  // Construct the detailed task description
+  const line1 = `${rawOrder['お取引先'] || ''}${rawOrder['予定時間'] ? `：${formatTime(rawOrder['予定時間'])}` : ''}`;
+  const line2 = `${rawOrder['タイヤサイズ'] || ''}${rawOrder['本数'] ? `：${rawOrder['本数']}本` : ''}`;
+
+  let taskDetails = line1;
+  if (line2.trim()) {
+      taskDetails += `\n${line2}`;
+  }
+
+
   return {
     id: String(rawOrder['No.'] || rawOrder.id || `ord-${Math.random()}`),
     customerCode: String(rawOrder['ユーザーコード'] || ''),
-    taskDetails: `${rawOrder['お取引先']}: ${rawOrder['作業内容'] || '未定義のタスク'}`,
+    taskDetails: taskDetails.trim(),
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     raw: rawOrder,
   };
@@ -146,7 +179,7 @@ export default function DashboardPage() {
         <ScheduleView 
             staffData={filteredStaff} 
             customerData={customers} 
-            scheduleData={filteredSchedule}
+            scheduleData={scheduleData}
             ordersData={orders}
             setScheduleData={setScheduleData}
             setOrdersData={setOrders}

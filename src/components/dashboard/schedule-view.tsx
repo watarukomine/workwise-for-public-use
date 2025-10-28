@@ -112,6 +112,8 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
     opacity: isDragging ? 0.8 : 1,
     width: `${(order.estimatedDuration || 60) * PIXELS_PER_MINUTE}px`,
   };
+  
+  const [line1, line2] = order.taskDetails.split('\n');
 
   return (
     <div
@@ -124,10 +126,10 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
         className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
       >
         <p className="text-xs font-semibold truncate pointer-events-none">
-          {order.taskDetails}
+          {line1}
         </p>
         <p className="text-xs opacity-80 truncate pointer-events-none">
-          @{customer?.storeName || order.customerCode}
+          {line2}
         </p>
       </div>
     </div>
@@ -703,6 +705,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       color = 'hsl(var(--foreground))';
     }
   }
+  
+  const [line1, line2] = (event.title || '').split('\n');
 
 
   return (
@@ -713,7 +717,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           {...listeners}
           {...attributes}
           onDoubleClick={handleDoubleClick}
-          className="absolute h-12 rounded-md px-2 flex items-center cursor-move"
+          className="absolute h-12 rounded-md px-2 flex flex-col justify-center cursor-move"
           style={{
             ...style,
             backgroundColor,
@@ -721,12 +725,15 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           }}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
-            {event.title || '未定のタスク'} {customer ? `@ ${customer.storeName}` : ''}
+            {line1}
+          </p>
+          <p className="text-xs opacity-80 truncate pointer-events-none">
+            {line2}
           </p>
         </div>
       </TooltipTrigger>
       <TooltipContent>
-        <p className="font-bold">{event.title || '未定のタスク'}</p>
+        <p className="font-bold">{event.title?.replace('\n', ' - ') || '未定のタスク'}</p>
         <p>顧客: {customer?.storeName || '未定'}</p>
         <p>時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
         <p>担当: {staff.name}</p>
