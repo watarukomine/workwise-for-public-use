@@ -1,8 +1,6 @@
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
-import type { Customer, WithId } from '@/lib/types';
-import { useUserProfile } from '@/hooks/use-user-profile';
 
 const CUSTOMER_GAS_URL_KEY = 'customerGasUrl';
 
@@ -13,16 +11,16 @@ interface CustomerContextType {
   customerGasUrl: string;
   setCustomerGasUrl: (url: string) => void;
   error: string | null;
+  setError: (error: string | null) => void;
 }
 
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
 
 export function CustomerProvider({ children }: { children: ReactNode }) {
-  const { profile } = useUserProfile();
   const [customers, setCustomersState] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [customerGasUrl, setCustomerGasUrlState] = useState('https://script.google.com/macros/s/AKfycbwzxlKPM46QdC2LdYV-VudRGgxSq4NVqbsbP7ZhUHgR8W4VjetIO8JoUgMMLgtc0k7D/exec?sheet=顧客マスタ');
-  const [error, setError] = useState<string | null>(null);
+  const [customerGasUrl, setCustomerGasUrlState] = useState('https://script.google.com/macros/s/AKfycbxxoqcfTsyLWkNC99FXjPZwlan5eYMYlncluhY8brsYktengkr5lU9fqkBI4IzvSDnXKQ/exec');
+  const [error, setErrorState] = useState<string | null>(null);
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
@@ -38,13 +36,17 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
 
   const setCustomers = (data: any[]) => {
     setCustomersState(data);
-  }
+  };
+
+  const setError = (error: string | null) => {
+    setErrorState(error);
+  };
 
   useEffect(() => {
     const fetchCustomers = async () => {
-      if (profile && customerGasUrl) {
+      if (customerGasUrl) {
         setIsLoading(true);
-        setError(null);
+        setErrorState(null);
         try {
           const response = await fetch(customerGasUrl, { cache: 'no-store' });
           if (!response.ok) {
@@ -55,20 +57,19 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
           setCustomers(customerData);
         } catch (e: any) {
           console.error("Failed to fetch customers from GAS:", e);
-          setError("販売店情報の取得に失敗しました。URLまたはGASの実装を確認してください。");
+          setErrorState("販売店情報の取得に失敗しました。URLまたはGASの実装を確認してください。");
         } finally {
           setIsLoading(false);
         }
-      } else if (profile && !customerGasUrl) {
-        setError("販売店データのURLが設定されていません。「データ取込」ページで設定してください。")
+      } else {
+        setErrorState("販売店データのURLが設定されていません。「データ取込」ページで設定してください。")
+        setCustomers([]);
         setIsLoading(false);
       }
     };
 
-    if (profile) {
-      fetchCustomers();
-    }
-  }, [profile, customerGasUrl]);
+    fetchCustomers();
+  }, [customerGasUrl]);
 
 
   const value = {
@@ -78,6 +79,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     customerGasUrl,
     setCustomerGasUrl,
     error,
+    setError,
   };
 
   return (
