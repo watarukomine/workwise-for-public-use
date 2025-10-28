@@ -30,27 +30,22 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
             headers: {
                 'Content-Type': 'application/json',
             },
-            // The body needs to be a stringified JSON object
             body: JSON.stringify({
                 orderId: orderId,
                 staffName: staffName,
             }),
-            // Since GAS POST requests might redirect, we follow them
             redirect: 'follow', 
         });
 
-        // Check if the response is OK, and if the content type is JSON
         const contentType = response.headers.get('content-type');
         if (!response.ok || !contentType || !contentType.includes('application/json')) {
             const errorText = await response.text();
-            // Try to parse for a specific error message from our GAS script format
             try {
                 const errorJson = JSON.parse(errorText);
                  if (errorJson && errorJson.message) {
                     throw new Error(errorJson.message);
                 }
             } catch (e) {
-                // Fallback for non-JSON or differently structured errors
                 throw new Error(`GAS script returned a non-JSON or error response. Status: ${response.status}. Response: ${errorText}`);
             }
         }
