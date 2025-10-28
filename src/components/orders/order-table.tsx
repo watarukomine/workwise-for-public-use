@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, isToday, parseISO, isValid } from 'date-fns';
 
 interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
@@ -25,7 +25,7 @@ interface OrderTableProps {
 }
 
 const formatDate = (dateString: string) => {
-  if (!dateString || isNaN(new Date(dateString).getTime())) {
+  if (!dateString || !isValid(parseISO(dateString))) {
     return dateString; // Return original string if invalid
   }
   try {
@@ -39,13 +39,13 @@ const formatTime = (timeString: string) => {
     // Handles ISO-8601 DateTime strings or just time strings
     if (!timeString) return timeString;
     const date = new Date(timeString);
-    if (isNaN(date.getTime())) {
+    if (!isValid(date)) {
         // Handle cases like "10:00" which might be parsed as invalid date alone
         const today = new Date();
         const [hours, minutes] = timeString.split(':');
         if (hours && minutes) {
             today.setHours(parseInt(hours, 10), parseInt(minutes, 10));
-            if (!isNaN(today.getTime())) {
+            if (isValid(today)) {
                 return format(today, 'HH:mm');
             }
         }
@@ -58,6 +58,17 @@ const formatTime = (timeString: string) => {
     }
 };
 
+// Helper to parse dates which might be in various formats
+const parseDate = (dateString: any): Date | null => {
+  if (!dateString || typeof dateString !== 'string') return null;
+  const date = parseISO(dateString); // Handles 'YYYY-MM-DDTHH:mm:ss.sssZ'
+  if (isValid(date)) {
+    return date;
+  }
+  // Add other parsing logic if necessary for other formats
+  return null;
+}
+
 export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -65,11 +76,23 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
   const filteredOrders = React.useMemo(() => {
     if (!rawOrders) return [];
+
+    const todayFilteredOrders = rawOrders.filter(order => {
+        const scheduledDate = parseDate(order['作業予定日']);
+        const receptionDate = parseDate(order['受付日']); // Assuming '受付日' is the column for reception date
+
+        const isScheduledForToday = scheduledDate ? isToday(scheduledDate) : false;
+        const isReceivedToday = receptionDate ? isToday(receptionDate) : false;
+        
+        return isScheduledForToday || isReceivedToday;
+    });
+
     if (searchTerm.trim() === '') {
-      return rawOrders;
+      return todayFilteredOrders;
     }
+    
     // A simple search across all values of an order object
-    return rawOrders.filter(order =>
+    return todayFilteredOrders.filter(order =>
         Object.values(order).some(value => 
             String(value).toLowerCase().includes(searchTerm.toLowerCase())
         )
@@ -97,6 +120,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
   const headersToFormat: Record<string, (value: string) => string> = {
     '作業予定日': formatDate,
+    '受付日': formatDate, // Format reception date as well
     '予定時間': formatTime,
   };
 
@@ -150,7 +174,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
               ) : (
                 <TableRow>
                   <TableCell colSpan={headers.length || 1} className="h-24 text-center">
-                    {rawOrders.length === 0 && !searchTerm ? "受注情報が見つかりません。" : "検索条件に合う受注が見つかりません。"}
+                    {rawOrders.length === 0 && !searchTerm ? "表示対象の受注情報が見つかりません。" : "検索条件に合う受注が見つかりません。"}
                   </TableCell>
                 </TableRow>
               )}
