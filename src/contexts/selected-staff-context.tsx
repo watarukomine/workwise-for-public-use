@@ -1,12 +1,60 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import { fetchStaffDataFromGAS } from '@/lib/auth'; // Import the fetch function
 
 const LOCAL_STORAGE_KEY = 'appliedStaffIds';
+const STAFF_GAS_URL_KEY = 'staffImporterUrl'; // Key to get URL from localStorage
+
+const findRoleValue = (item: any): 'admin' | 'staff' => {
+  if (!item || typeof item !== 'object') return 'staff';
+  const roleValue = item['権限'];
+  if (roleValue && typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
+    return 'admin';
+  }
+  return 'staff';
+};
+
+export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
+    if (typeof window === 'undefined') return [];
+    const staffGasUrl = localStorage.getItem(STAFF_GAS_URL_KEY);
+    
+    if (!staffGasUrl) {
+        console.warn("No GAS URL for staff is defined in localStorage.");
+        return [];
+    }
+
+    try {
+        const response = await fetch(staffGasUrl, { cache: 'no-store' });
+        if (response.ok) {
+            const result = await response.json();
+            const rawStaffArray = result.data || (Array.isArray(result) ? result : []);
+
+            if (Array.isArray(rawStaffArray)) {
+                return rawStaffArray.map((item: any) => {
+                    const id = String(item['スタッフID'] || item.id);
+                    return {
+                        id: id,
+                        role: findRoleValue(item),
+                        name: item['スタッフ名'] || item.name,
+                        email: item['メールアドレス'] || item.email,
+                        password: item['パスワード'] || item.password,
+                        calendarId: item['カレンダーID'] || item.calendarId,
+                        color: item['カラー'] || item.color,
+                        avatarUrl: `https://picsum.photos/seed/${id}/100/100`,
+                    };
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching staff data from GAS:', error);
+        throw new Error('Failed to fetch staff data from spreadsheet.');
+    }
+    return []; // Return empty if response not ok or data malformed
+};
 
 interface SelectedStaffContextType {
   pendingSelectedStaffIds: string[];
@@ -32,28 +80,23 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // This effect loads staff data from GAS when the user profile is available
+  // This effect loads staff data from GAS when the component mounts or profile changes.
   useEffect(() => {
     const loadStaff = async () => {
-      if (profile && !isProfileLoading) {
         setIsLoading(true);
         setError(null);
         try {
           const fetchedStaff = await fetchStaffDataFromGAS();
           setAllStaffState(fetchedStaff);
         } catch (e: any) {
-          setError("スタッフ情報の取得に失敗しました。");
+          setError("スタッフ情報の取得に失敗しました。データ取込ページでURLが正しく設定されているか確認してください。");
           console.error(e);
         } finally {
           setIsLoading(false);
         }
-      } else if (!isProfileLoading) {
-        // If there's no profile and we are not loading, stop loading state.
-        setIsLoading(false);
-      }
     };
     loadStaff();
-  }, [profile, isProfileLoading]);
+  }, []); // Run only once on mount
 
 
   useEffect(() => {
