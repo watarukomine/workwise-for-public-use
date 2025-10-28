@@ -43,6 +43,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCustomer } from '@/contexts/customer-context';
+import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { useToast } from '@/hooks/use-toast';
+import { useOrder } from '@/contexts/order-context';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 8;
@@ -230,8 +233,9 @@ export function ScheduleView({
     endTime: '',
   });
 
-  // Use the full customer list from context for lookups
   const { customers: allCustomers } = useCustomer();
+  const { orderGasUrl } = useOrder();
+  const { toast } = useToast();
 
   React.useEffect(() => {
     setIsClient(true);
@@ -304,6 +308,7 @@ export function ScheduleView({
         startOfDay.setHours(timelineStartHour, 0, 0, 0);
         
         const isGeneric = order.id.startsWith('generic-');
+        const staff = getStaffById(newStaffId);
 
         if (isGeneric) {
              const newStart = addMinutes(startOfDay, dropMinutes);
@@ -318,7 +323,7 @@ export function ScheduleView({
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
-            // This is a customer order, so add travel time
+            // This is a customer order, so add travel time and update sheet
             const taskStart = addMinutes(startOfDay, dropMinutes);
             const taskEnd = addMinutes(taskStart, order.estimatedDuration);
             const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
@@ -350,6 +355,31 @@ export function ScheduleView({
             
             setOrdersData(prev => prev.filter(o => o.id !== order.id));
             setScheduleData(prev => [...prev, travelEvent, taskEvent]);
+            
+            // --- Update Google Sheet ---
+            if (staff && order.id) {
+                 try {
+                    const result = await updateSheetStatus({
+                        orderId: order.id,
+                        staffName: staff.name,
+                        gasUrl: orderGasUrl,
+                    });
+                    if (result.status === 'success') {
+                        toast({
+                            title: 'スプレッドシート更新成功',
+                            description: `オーダー #${order.id} を ${staff.name} さんに割り当てました。`,
+                        });
+                    } else {
+                        throw new Error(result.message || '不明なエラー');
+                    }
+                } catch (e: any) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'スプレッドシート更新エラー',
+                        description: `オーダーの割り当てに失敗しました: ${e.message}`,
+                    });
+                }
+            }
         }
     }
 
