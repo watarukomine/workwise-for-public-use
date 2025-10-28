@@ -38,7 +38,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import React from 'react';
-import { signOut } from '@/lib/auth';
 import { Loader2 } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -108,17 +107,17 @@ function NavMenu() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const router = useRouter();
-  const { profile, isLoading } = useUserProfile();
+  const { profile, isLoading, clearProfile } = useUserProfile();
   const [isAuthLoading, setIsAuthLoading] = React.useState(false);
 
   const handleSignOut = async () => {
     setIsAuthLoading(true);
-    await signOut();
+    clearProfile();
     toast({
       title: "ログアウトしました",
     });
-    // Use window.location to force a full page reload to clear all state
-    window.location.href = '/login';
+    router.push('/login');
+    setIsAuthLoading(false);
   };
   
   const displayName = profile?.name || 'Anonymous';

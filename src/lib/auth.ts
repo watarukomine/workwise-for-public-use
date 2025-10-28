@@ -8,7 +8,6 @@ import type { Staff, WithId } from './types';
 import { staffData as fallbackStaffData } from './data';
 
 const MOCK_USER_SESSION_KEY = 'mockUserSession';
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbyOUN7eqN2f3u9aYaU-5rP8UGrcawlan3FAHzHKjm7RuXifKBCjs2kbfTTB09ygvfRd-Q/exec';
 
 // Helper to get user session from localStorage
 const getSession = (): WithId<Staff> | null => {
@@ -27,49 +26,58 @@ const setSession = (user: WithId<Staff> | null) => {
   }
 };
 
-const fetchAndCombineStaffData = async (): Promise<WithId<Staff>[]> => {
-  let gasStaff: WithId<Staff>[] = [];
-  try {
-    const response = await fetch(GAS_URL, { cache: 'no-store' });
-    if (response.ok) {
-        const data = await response.json();
-        const rawStaffArray = Array.isArray(data) ? data : data.data;
-
-        if (Array.isArray(rawStaffArray)) {
-            gasStaff = rawStaffArray.map((item: any) => {
-              const roleValue = item['権限（Staff /Admin）'] || 'staff';
-              return {
-                id: String(item['スタッフID']),
-                role: String(roleValue).toLowerCase() === 'admin' ? 'admin' : 'staff',
-                name: item['スタッフ名'],
-                email: item['メールアドレス'],
-                password: item['パスワード'],
-                calendarId: item['カレンダーID'],
-                color: item['カラー'],
-                avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
-              }
-            });
-        } else {
-            console.error("GAS response did not contain a valid data array.");
-        }
-    } else {
-      console.error('Failed to fetch from GAS, using only fallback data.');
+const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
+    const staffImporterUrl = localStorage.getItem('staffImporterUrl');
+    if (!staffImporterUrl) {
+        console.log("No GAS URL for staff found in localStorage. Using only fallback data.");
+        return [];
     }
-  } catch (error) {
-    console.error('Error fetching staff data from GAS:', error);
-  }
 
-  // Combine GAS data with fallback data, ensuring no duplicates by email
-  const combinedStaff = [...fallbackStaffData];
-  const fallbackEmails = new Set(fallbackStaffData.map(s => s.email.toLowerCase()));
+    try {
+        const response = await fetch(staffImporterUrl, { cache: 'no-store' });
+        if (response.ok) {
+            const data = await response.json();
+            const rawStaffArray = Array.isArray(data) ? data : data.data;
 
+            if (Array.isArray(rawStaffArray)) {
+                return rawStaffArray.map((item: any) => {
+                    const roleValue = item['権限（Staff /Admin）'];
+                    return {
+                        id: String(item['スタッフID']),
+                        role: typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin' ? 'admin' : 'staff',
+                        name: item['スタッフ名'],
+                        email: item['メールアドレス'],
+                        password: item['パスワード'],
+                        calendarId: item['カレンダーID'],
+                        color: item['カラー'],
+                        avatarUrl: `https://picsum.photos/seed/${item['スタッフID']}/100/100`,
+                    };
+                });
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching staff data from GAS:', error);
+    }
+    return [];
+};
+
+
+const fetchAndCombineStaffData = async (): Promise<WithId<Staff>[]> => {
+  const gasStaff = await fetchStaffDataFromGAS();
+  
+  const combinedStaffMap = new Map<string, WithId<Staff>>();
+
+  // Add fallback data first
+  fallbackStaffData.forEach(staff => combinedStaffMap.set(staff.email.toLowerCase(), staff));
+
+  // Overwrite with or add GAS data
   gasStaff.forEach(staff => {
-      if (staff.email && !fallbackEmails.has(staff.email.toLowerCase())) {
-          combinedStaff.push(staff);
+      if (staff.email) {
+        combinedStaffMap.set(staff.email.toLowerCase(), staff)
       }
   });
 
-  return combinedStaff;
+  return Array.from(combinedStaffMap.values());
 };
 
 
@@ -77,7 +85,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
   console.log(`Attempting to sign in with email: ${email}`);
   
   const staffList = await fetchAndCombineStaffData();
-  const user = staffList.find(staff => staff.email.toLowerCase() === email.toLowerCase() && staff.password === password);
+  const user = staffList.find(staff => staff.email && staff.email.toLowerCase() === email.toLowerCase() && staff.password === password);
 
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -94,10 +102,10 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 };
 
 export const signUpWithEmail = async (email: string, password: string, name: string): Promise<WithId<Staff>> => {
-    console.log(`Attempting to sign up with email: ${email}`);
+    console.log(`Attempting to process sign up for email: ${email}`);
     const staffList = await fetchAndCombineStaffData();
     
-    const existingUser = staffList.find(staff => staff.email.toLowerCase() === email.toLowerCase());
+    const existingUser = staffList.find(staff => staff.email && staff.email.toLowerCase() === email.toLowerCase());
 
     return new Promise((resolve, reject) => {
         setTimeout(() => {
@@ -113,20 +121,20 @@ export const signUpWithEmail = async (email: string, password: string, name: str
                 }
                 return;
             }
-
+            
+            // This case handles a completely new user not in any data source.
             if (password.length < 6) {
                 console.log('Sign up failed: Password too weak');
                 reject(new Error('パスワードは6文字以上で設定してください。'));
                 return;
             }
             
-            // This is a new user, not present in any data source. Default role to 'staff'.
             const newUser: WithId<Staff> = {
                 id: `new-${Date.now()}`,
                 name,
                 email,
                 password,
-                role: 'staff',
+                role: 'staff', // New sign-ups are always 'staff'
                 color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`,
                 avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
             };

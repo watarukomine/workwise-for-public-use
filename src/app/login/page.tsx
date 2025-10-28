@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 const loginSchema = z.object({
   email: z.string().email({ message: '有効なメールアドレスを入力してください。' }),
@@ -47,6 +48,7 @@ export default function LoginPage() {
   const [error, setError] = React.useState<string | null>(null);
   const { toast } = useToast();
   const router = useRouter();
+  const { setProfile } = useUserProfile();
 
   const loginForm = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -69,13 +71,13 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     try {
-      await signInWithEmail(data.email, data.password);
+      const user = await signInWithEmail(data.email, data.password);
+      setProfile(user); // Update the global profile
       toast({
         title: 'ログインしました',
         description: 'WorkWiseへようこそ！',
       });
-      // Use window.location to force a full page reload to update context correctly
-      window.location.href = '/'; 
+      router.push('/'); 
     } catch (e: any) {
       setError(e.message || 'ログイン中にエラーが発生しました。');
     } finally {
@@ -87,13 +89,13 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
      try {
-      await signUpWithEmail(data.email, data.password, data.name);
+      const user = await signUpWithEmail(data.email, data.password, data.name);
+      setProfile(user); // Update the global profile
       toast({
-        title: 'アカウントを作成しました',
+        title: 'アカウントを処理しました',
         description: 'WorkWiseへようこそ！',
       });
-      // Use window.location to force a full page reload to update context correctly
-      window.location.href = '/';
+       router.push('/');
     } catch (e: any) {
       setError(e.message || '新規登録中にエラーが発生しました。');
     } finally {

@@ -45,6 +45,7 @@ export function StaffImporter() {
     setRawData(null);
     setImportSuccess(false);
     setColumnHeaders(null);
+    localStorage.setItem('staffImporterUrl', gasUrl); // Save URL for auth.ts
 
     try {
       const response = await fetch(gasUrl, { cache: 'no-store' });
