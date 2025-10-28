@@ -26,20 +26,17 @@ const setSession = (user: WithId<Staff> | null) => {
   }
 };
 
-const findRoleValue = (item: any): string => {
+const findRoleValue = (item: any): 'admin' | 'staff' => {
     if (!item || typeof item !== 'object') return 'staff';
-    
-    // Find a key that likely represents the role, ignoring case and spaces
-    const roleKey = Object.keys(item).find(key => 
-        key.toLowerCase().replace(/\s/g, '').includes('権限') || 
-        key.toLowerCase().replace(/\s/g, '').includes('role')
-    );
 
-    if (roleKey && item[roleKey] && typeof item[roleKey] === 'string') {
-        return item[roleKey].toLowerCase() === 'admin' ? 'admin' : 'staff';
+    // Directly check for the '権限' key as specified by the user.
+    const roleValue = item['権限'];
+
+    if (roleValue && typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
+        return 'admin';
     }
     
-    return 'staff'; // Default to staff if no role-like key is found or value is not 'admin'
+    return 'staff'; // Default to staff
 }
 
 
@@ -83,18 +80,18 @@ const fetchAndCombineStaffData = async (): Promise<WithId<Staff>[]> => {
   
   const combinedStaffMap = new Map<string, WithId<Staff>>();
 
-  // Add fallback data first
-  fallbackStaffData.forEach(staff => {
-    if (staff.email) {
-      combinedStaffMap.set(staff.email.toLowerCase(), staff);
-    }
-  });
-
-  // Overwrite with or add GAS data
+  // Add GAS data first
   gasStaff.forEach(staff => {
       if (staff.email) {
         combinedStaffMap.set(staff.email.toLowerCase(), staff)
       }
+  });
+
+  // Add fallback data only if it doesn't already exist from GAS
+  fallbackStaffData.forEach(staff => {
+    if (staff.email && !combinedStaffMap.has(staff.email.toLowerCase())) {
+      combinedStaffMap.set(staff.email.toLowerCase(), staff);
+    }
   });
 
   return Array.from(combinedStaffMap.values());
@@ -131,7 +128,6 @@ export const signUpWithEmail = async (email: string, password: string, name: str
         setTimeout(() => {
             if (existingUser) {
                  if (existingUser.password === password) {
-                    // This is a login via signup form. Use the correct data.
                     console.log('Login via signup form successful for:', existingUser.name, 'with role:', existingUser.role);
                     setSession(existingUser);
                     resolve(existingUser);
@@ -142,7 +138,6 @@ export const signUpWithEmail = async (email: string, password: string, name: str
                 return;
             }
             
-            // This case handles a completely new user not in any data source.
             if (password.length < 6) {
                 console.log('Sign up failed: Password too weak');
                 reject(new Error('パスワードは6文字以上で設定してください。'));
@@ -154,7 +149,7 @@ export const signUpWithEmail = async (email: string, password: string, name: str
                 name,
                 email,
                 password,
-                role: 'staff', // New sign-ups are always 'staff'
+                role: 'staff',
                 color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`,
                 avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
             };
@@ -167,17 +162,11 @@ export const signUpWithEmail = async (email: string, password: string, name: str
 };
 
 
-export const signOut = async (): Promise<void> => {
+export const signOut = () => {
     console.log('Signing out user');
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            setSession(null);
-            resolve();
-        }, 500);
-    });
+    setSession(null);
 };
 
 export const getCurrentUser = (): WithId<Staff> | null => {
     return getSession();
 };
-

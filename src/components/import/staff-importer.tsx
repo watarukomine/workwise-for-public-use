@@ -19,20 +19,17 @@ function isFetchError(error: unknown): error is TypeError {
   return error instanceof TypeError;
 }
 
-const findRoleValue = (item: any): string => {
+const findRoleValue = (item: any): 'admin' | 'staff' => {
     if (!item || typeof item !== 'object') return 'staff';
-    
-    // Find a key that likely represents the role, ignoring case and spaces
-    const roleKey = Object.keys(item).find(key => 
-        key.toLowerCase().replace(/\s/g, '').includes('権限') || 
-        key.toLowerCase().replace(/\s/g, '').includes('role')
-    );
 
-    if (roleKey && item[roleKey] && typeof item[roleKey] === 'string') {
-        return item[roleKey].toLowerCase() === 'admin' ? 'admin' : 'staff';
+    // Directly check for the '権限' key as specified by the user.
+    const roleValue = item['権限'];
+
+    if (roleValue && typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
+        return 'admin';
     }
     
-    return 'staff'; // Default to staff if no role-like key is found or value is not 'admin'
+    return 'staff'; // Default to staff
 }
 
 

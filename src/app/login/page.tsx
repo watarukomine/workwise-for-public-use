@@ -46,6 +46,7 @@ type SignUpSchema = z.infer<typeof signUpSchema>;
 export default function LoginPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [activeTab, setActiveTab] = React.useState('login');
   const { toast } = useToast();
   const router = useRouter();
   const { setProfile } = useUserProfile();
@@ -66,6 +67,10 @@ export default function LoginPage() {
       password: '',
     },
   });
+  
+  React.useEffect(() => {
+    setError(null);
+  }, [activeTab]);
 
   const handleLogin = async (data: LoginSchema) => {
     setIsLoading(true);
@@ -92,7 +97,7 @@ export default function LoginPage() {
       const user = await signUpWithEmail(data.email, data.password, data.name);
       setProfile(user); // Update the global profile
       toast({
-        title: 'アカウントを処理しました',
+        title: user.id.startsWith('new-') ? 'アカウントを作成しました' : 'ログインしました',
         description: 'WorkWiseへようこそ！',
       });
        router.push('/');
@@ -105,7 +110,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
-      <Tabs defaultValue="login" className="w-full max-w-md">
+      <Tabs defaultValue="login" className="w-full max-w-md" onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="login">ログイン</TabsTrigger>
           <TabsTrigger value="signup">新規登録</TabsTrigger>
@@ -148,7 +153,7 @@ export default function LoginPage() {
                   />
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4">
-                   {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+                   {error && activeTab === 'login' && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
                    <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     ログイン
@@ -218,7 +223,7 @@ export default function LoginPage() {
                     />
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4">
-                  {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+                  {error && activeTab === 'signup' && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     登録する
