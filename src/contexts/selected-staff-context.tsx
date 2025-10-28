@@ -25,7 +25,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const { profile } = useUserProfile();
   const { toast } = useToast();
 
-  const [allStaff, setAllStaff] = useState<WithId<Staff>[]>([]);
+  const [allStaff, setAllStaffState] = useState<WithId<Staff>[]>([]);
   const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
   const [appliedSelectedStaffIds, setAppliedSelectedStaffIds] = useState<string[]>([]);
   
@@ -49,6 +49,11 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
   }, [profile]);
+
+  const setAllStaff = (staff: WithId<Staff>[]) => {
+    // This is the fix: Always update the state with the new staff list.
+    setAllStaffState(staff);
+  };
 
   const togglePendingStaffSelection = (staffId: string) => {
     if (profile?.role !== 'admin') {
