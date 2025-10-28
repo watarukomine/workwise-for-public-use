@@ -1,7 +1,7 @@
 
 'use client';
 import * as React from 'react';
-import { useActionState } from 'react';
+import { useFormState } from 'react-dom';
 
 import type { Customer, Staff, StaffStatus } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
+import { staffData as allStaffData } from '@/lib/data'; // Import static data
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -78,46 +79,36 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
 }
 
 function SubmitButton() {
-  const [pending, setPending] = React.useState(false);
-  
-  React.useEffect(() => {
-    let form: HTMLFormElement | null = null;
-    const findForm = (el: HTMLElement | null): HTMLFormElement | null => {
-        if (!el) return null;
-        if (el.tagName === 'FORM') return el as HTMLFormElement;
-        return findForm(el.parentElement);
-    }
-    
-    const handleFormSubmit = () => setPending(true);
-    const observer = new MutationObserver(() => {
-        setPending(false);
-    });
+    const [pending, setPending] = React.useState(false);
 
-    const button = document.getElementById('optimizer-submit-button');
-    if (button) {
-      form = findForm(button);
-      if (form) {
-        form.addEventListener('submit', handleFormSubmit);
-        const resultsContainer = document.getElementById('optimizer-results');
-        if(resultsContainer) {
-            observer.observe(resultsContainer, { childList: true, subtree: true });
+    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+        const form = event.currentTarget.form;
+        if (form && form.checkValidity()) {
+            setPending(true);
         }
-      }
-    }
-    return () => {
-      if (form) {
-        form.removeEventListener('submit', handleFormSubmit);
-      }
-      observer.disconnect();
     };
-  }, []);
 
-  return (
-    <Button id="optimizer-submit-button" type="submit" disabled={pending} className="w-full sm:w-auto">
-      {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RouteIcon className="mr-2 h-4 w-4" />}
-      ルートを最適化
-    </Button>
-  );
+    React.useEffect(() => {
+        // This effect is to reset the pending state after the action completes.
+        // It observes changes in a results container.
+        const resultsContainer = document.getElementById('optimizer-results');
+        if (!resultsContainer) return;
+
+        const observer = new MutationObserver(() => {
+            setPending(false);
+        });
+
+        observer.observe(resultsContainer, { childList: true, subtree: true });
+
+        return () => observer.disconnect();
+    }, []);
+
+    return (
+        <Button id="optimizer-submit-button" type="submit" disabled={pending} onClick={handleClick} className="w-full sm:w-auto">
+            {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RouteIcon className="mr-2 h-4 w-4" />}
+            ルートを最適化
+        </Button>
+    );
 }
 
 const LocationSelector: React.FC<{
@@ -177,7 +168,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
   const [waypoints, setWaypoints] = React.useState<string[]>([]);
-  const [state, formActionWithState] = useActionState(formAction, { data: null, error: null, options: { avoidHighways: false } });
+  const [state, formActionWithState] = useFormState(formAction, { data: null, error: null, options: { avoidHighways: false } });
 
   React.useEffect(() => {
     onRouteOptimized(state.data, state.options);
@@ -187,9 +178,11 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
     if (!customers || !staff || !statuses) return [];
 
     const staffWithStatus = statuses.map(status => {
+        // Use the passed-in `staff` prop which is already filtered by the parent page
         const staffDetails = staff.find(s => s.id === status.staffId);
-        return { ...staffDetails, ...status };
-    }).filter(s => s.id);
+        return staffDetails ? { ...staffDetails, ...status } : null;
+    }).filter((s): s is (Staff & StaffStatus) => !!s && !!s.id);
+
 
     const customerLocations: Location[] = customers
       .filter(c => c.latitude && c.longitude && (c.storeName || c.name))
@@ -392,5 +385,3 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
     </div>
   );
 }
-
-    

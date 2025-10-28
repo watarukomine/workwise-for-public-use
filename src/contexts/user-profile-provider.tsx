@@ -1,41 +1,33 @@
 
 'use client';
 
-import React, { createContext, ReactNode } from 'react';
-import { useUser } from '@/firebase/auth/use-user';
-import { useDoc } from '@/firebase/firestore/use-doc';
-import type { Staff } from '@/lib/types'; // Changed from UserProfile to Staff
-import { useFirestore, useMemoFirebase } from '@/firebase/provider';
-import { doc, DocumentReference } from 'firebase/firestore';
+import React, { createContext, ReactNode, useState, useEffect } from 'react';
+import { getCurrentUser } from '@/lib/auth';
+import type { Staff, WithId } from '@/lib/types';
 
 interface UserProfileContextType {
-  profile: Staff | null; // Changed from UserProfile to Staff
+  profile: WithId<Staff> | null;
   isLoading: boolean;
-  error: Error | null;
+  error: Error | null; // Errors are not expected in this mock setup but kept for type consistency.
 }
 
 export const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
 
 export function UserProfileProvider({ children }: { children: ReactNode }) {
-  const { user, isLoading: isUserLoading, error: userError } = useUser();
-  const firestore = useFirestore();
+  const [profile, setProfile] = useState<WithId<Staff> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Create a document reference to the 'staff' collection instead of 'users'
-  const staffProfileRef = useMemoFirebase(() => {
-    if (firestore && user?.uid) {
-      // Point to the 'staff' collection with the user's UID
-      return doc(firestore, 'staff', user.uid) as DocumentReference<Staff>;
-    }
-    return null;
-  }, [firestore, user?.uid]);
-
-  // Use the useDoc hook to fetch the profile data from the 'staff' collection
-  const { data: profile, isLoading: isProfileLoading, error: profileError } = useDoc<Staff>(staffProfileRef);
+  useEffect(() => {
+    // On mount, check if there is a user session in localStorage.
+    const user = getCurrentUser();
+    setProfile(user);
+    setIsLoading(false);
+  }, []);
 
   const value = {
-    profile: profile || null,
-    isLoading: isUserLoading || isProfileLoading,
-    error: userError || profileError,
+    profile: profile,
+    isLoading: isLoading,
+    error: null, // No real error handling in this mock implementation
   };
 
   return (
@@ -44,5 +36,3 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
     </UserProfileContext.Provider>
   );
 }
-
-    

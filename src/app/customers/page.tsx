@@ -1,3 +1,4 @@
+
 'use client';
 
 import { CustomerTable } from '@/components/customers/customer-table';
@@ -5,80 +6,59 @@ import type { Customer } from '@/lib/types';
 import React from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbywC5IoTryeIFRyo7rU4hBaTb7u9p4aK1p0UBvYeuzJiyVDaHqfjYeyA61seoH9LpeQYw/exec';
+import { customerData } from '@/lib/data'; // Import static data
+import { useUserProfile } from '@/hooks/use-user-profile';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = React.useState<any[]>([]);
-  const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+  const [customers] = React.useState<any[]>(customerData); // Use static data
+  const [isLoading, setIsLoading] = React.useState(false); // No real loading needed
+  
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
+  const isAdmin = profile?.role === 'admin';
 
-  React.useEffect(() => {
-    const fetchCustomers = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(GAS_URL, { cache: 'no-store' });
-        if (!response.ok) {
-          throw new Error(`HTTPエラー: ${response.status}`);
-        }
-        const result = await response.json();
-        
-        let customerData: any[] | null = null;
+  if (isProfileLoading) {
+    return <p>Loading...</p>;
+  }
 
-        if (Array.isArray(result)) {
-            customerData = result;
-        } else if (result && typeof result === 'object' && Array.isArray(result.data)) {
-            customerData = result.data;
-        }
+  if (!profile) {
+     return (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>ログインしてください</AlertTitle>
+          <AlertDescription>
+            <p>このページを表示するにはログインが必要です。</p>
+             <Button asChild className="mt-4">
+              <Link href="/login">
+                 ログインページへ
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )
+  }
 
-        if (customerData !== null) {
-          setCustomers(customerData);
-        } else {
-          // Handle unexpected formats without crashing, e.g., {}
-          // This prevents errors if GAS returns an empty object for an empty sheet.
-          if (result && typeof result === 'object' && Object.keys(result).length === 0) {
-            setCustomers([]);
-          } else {
-             setError('GASから受信したデータの形式が予期せぬものです。');
-             setCustomers([]);
-          }
-        }
-
-      } catch (e: unknown) {
-        console.error('Failed to fetch customer data:', e);
-        if (e instanceof Error) {
-            if (e.message.includes('Failed to fetch')) {
-                 setError('データの取得に失敗しました。CORSポリシーまたはネットワークの問題が考えられます。GAS側で正しくCORSヘッダーが設定されているか確認してください。');
-            } else {
-                setError(`エラーが発生しました: ${e.message}`);
-            }
-        } else {
-            setError('不明なエラーが発生しました。');
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCustomers();
-  }, []);
+  if (!isAdmin) {
+      return (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>権限がありません</AlertTitle>
+          <AlertDescription>
+            このページは管理者のみがアクセスできます。
+          </AlertDescription>
+        </Alert>
+      )
+  }
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">販売店情報</h1>
         <p className="text-muted-foreground">
-          スプレッドシートから取得した販売店の一覧です。
+          登録されている販売店の一覧です。
         </p>
       </div>
-       {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>データ取得エラー</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
       <CustomerTable customers={customers} isLoading={isLoading} />
     </div>
   );

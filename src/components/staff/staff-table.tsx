@@ -21,6 +21,7 @@ import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 interface StaffTableProps {
     staff: WithId<Staff>[] | null;
@@ -28,6 +29,7 @@ interface StaffTableProps {
 }
 
 export function StaffTable({ staff, isLoading }: StaffTableProps) {
+  const { profile } = useUserProfile();
   const { 
     pendingSelectedStaffIds, 
     togglePendingStaffSelection,
@@ -36,6 +38,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   } = useSelectedStaff();
   
   const staffList = staff || [];
+  const isAdmin = profile?.role === 'admin';
   const isAllSelected = staffList.length > 0 && pendingSelectedStaffIds.length === staffList.length;
 
   const handleSelectAll = () => {
@@ -63,31 +66,35 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>スタッフ一覧</CardTitle>
-          <Button 
-            onClick={applyPendingSelection}
-            disabled={!isSelectionChanged}
-          >
-            <Check className="mr-2 h-4 w-4" />
-            選択を適用
-          </Button>
+          {isAdmin && (
+            <Button 
+                onClick={applyPendingSelection}
+                disabled={!isSelectionChanged}
+            >
+                <Check className="mr-2 h-4 w-4" />
+                選択を適用
+            </Button>
+          )}
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[50px]">
-                  <Checkbox
-                    checked={isAllSelected}
-                    onCheckedChange={handleSelectAll}
-                    aria-label="すべてのスタッフを選択"
-                    disabled={staffList.length === 0}
-                  />
-                </TableHead>
+                {isAdmin && (
+                    <TableHead className="w-[50px]">
+                        <Checkbox
+                            checked={isAllSelected}
+                            onCheckedChange={handleSelectAll}
+                            aria-label="すべてのスタッフを選択"
+                            disabled={staffList.length === 0}
+                        />
+                    </TableHead>
+                )}
                 <TableHead>スタッフ名</TableHead>
                 <TableHead>メールアドレス</TableHead>
                 <TableHead>役割 (Role)</TableHead>
-                <TableHead>ユーザーID</TableHead>
+                <TableHead>スタッフID</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -99,14 +106,16 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   </TableRow>
               ) : staffList && staffList.length > 0 ? (
                 staffList.map((member) => (
-                  <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) ? 'selected' : ''}>
-                    <TableCell>
-                       <Checkbox
-                          checked={pendingSelectedStaffIds.includes(member.id)}
-                          onCheckedChange={() => togglePendingStaffSelection(member.id)}
-                          aria-label={`${member.name}を選択`}
-                        />
-                    </TableCell>
+                  <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''}>
+                    {isAdmin && (
+                        <TableCell>
+                            <Checkbox
+                                checked={pendingSelectedStaffIds.includes(member.id)}
+                                onCheckedChange={() => togglePendingStaffSelection(member.id)}
+                                aria-label={`${member.name}を選択`}
+                            />
+                        </TableCell>
+                    )}
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div 
@@ -128,7 +137,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
               ) : (
                 <TableRow>
                     <TableCell colSpan={5} className="h-24 text-center">
-                      スタッフが見つかりません。
+                      表示するスタッフ情報がありません。
                     </TableCell>
                 </TableRow>
               )}

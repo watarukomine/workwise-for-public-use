@@ -1,20 +1,17 @@
 
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
-  CalendarDays,
   Users,
   Building2,
-  Route,
-  Briefcase,
-  LogIn,
-  Home,
   Map,
   ClipboardList,
   Upload,
   MapPin,
-  UserPlus,
+  Briefcase,
+  LogIn,
+  LogOut,
 } from 'lucide-react';
 
 import {
@@ -42,9 +39,9 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import React from 'react';
 import { signOut } from '@/lib/auth';
-import { useUser } from '@/firebase/auth/use-user';
 import { Loader2 } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 const allNavItems = [
@@ -53,23 +50,34 @@ const allNavItems = [
   { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
   { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'] },
   { href: '/import', label: 'データ取込', icon: Upload, roles: ['admin'] },
-  { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'] },
+  { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'], mobileOnly: true },
 ];
 
 function NavMenu() {
   const pathname = usePathname();
   const { profile, isLoading } = useUserProfile();
+  const isMobile = useIsMobile();
 
   const navItems = React.useMemo(() => {
     if (isLoading || !profile) {
-      // Return a limited set or nothing while loading or if no profile
-      return allNavItems.filter(item => item.roles.includes('staff') && item.href !== '/check-in');
+      return [];
     }
-    if (profile.role === 'admin') {
-        return allNavItems;
-    }
-    return allNavItems.filter(item => item.roles.includes(profile.role));
-  }, [profile, isLoading]);
+    return allNavItems.filter(item => {
+        const roleMatch = item.roles.includes(profile.role);
+        const deviceMatch = !item.mobileOnly || isMobile;
+        return roleMatch && deviceMatch;
+    });
+  }, [profile, isLoading, isMobile]);
+
+  if (isLoading) {
+      return (
+        <div className="p-4 space-y-2">
+            <div className="h-8 bg-gray-200 rounded-md animate-pulse"></div>
+            <div className="h-8 bg-gray-200 rounded-md animate-pulse"></div>
+            <div className="h-8 bg-gray-200 rounded-md animate-pulse"></div>
+        </div>
+      )
+  }
 
   return (
       <SidebarMenu>
@@ -94,21 +102,22 @@ function NavMenu() {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
-  const { user, isLoading } = useUser();
-  const { profile } = useUserProfile();
+  const router = useRouter();
+  const { profile, isLoading } = useUserProfile();
   const [isAuthLoading, setIsAuthLoading] = React.useState(false);
 
   const handleSignOut = async () => {
     setIsAuthLoading(true);
     await signOut();
-    setIsAuthLoading(false);
     toast({
       title: "ログアウトしました",
     });
+    // Use window.location to force a full page reload to clear all state
+    window.location.href = '/login';
   };
   
-  const displayName = profile?.name || user?.displayName || 'Anonymous';
-  const displayEmail = profile?.email || user?.email || `UID: ${user?.uid.slice(0,6)}...`;
+  const displayName = profile?.name || 'Anonymous';
+  const displayEmail = profile?.email || '...';
 
   return (
     <SidebarProvider>
@@ -122,19 +131,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          {user && <NavMenu />}
+          {profile && <NavMenu />}
         </SidebarContent>
         <SidebarFooter className="p-2">
           {isLoading || isAuthLoading ? (
              <div className="flex items-center justify-center p-4">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : user ? (
+          ) : profile ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-start items-center gap-3 p-2 h-auto text-left">
                    <Avatar className="h-9 w-9">
-                    <AvatarImage src={profile?.photoURL || user.photoURL || `https://picsum.photos/seed/${user.uid}/100/100`} data-ai-hint="person" />
+                    <AvatarImage src={profile?.avatarUrl} data-ai-hint="person" />
                     <AvatarFallback>{displayName.charAt(0) ?? 'A'}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 -space-y-1">
@@ -146,7 +155,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <DropdownMenuContent side="right" align="start" className="w-56">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push('/staff')}>Profile</DropdownMenuItem>
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
@@ -171,5 +180,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </SidebarProvider>
   );
 }
-
-    

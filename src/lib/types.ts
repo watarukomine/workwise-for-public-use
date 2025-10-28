@@ -3,15 +3,6 @@ import type { Timestamp } from 'firebase/firestore';
 
 export type WithId<T> = T & { id: string };
 
-// This type is no longer needed as we merged UserProfile into Staff
-// export type UserProfile = {
-//   uid: string;
-//   email: string | null;
-//   displayName: string | null;
-//   photoURL: string | null;
-//   role: 'admin' | 'staff';
-// };
-
 export type Staff = {
   id: string; // Corresponds to Firebase Auth UID
   name: string;
@@ -21,6 +12,8 @@ export type Staff = {
   avatarUrl?: string; 
   color?: string; 
   role: 'admin' | 'staff';
+  // Add password for mock authentication, but it should not be stored in a real DB like this.
+  password?: string; 
 };
 
 export type Customer = {
@@ -72,5 +65,3 @@ export type Order = {
   taskDetails: string;
   estimatedDuration: number; // in minutes
 };
-
-    

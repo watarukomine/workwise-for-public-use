@@ -4,10 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
-import { useCollection } from '@/firebase/firestore/use-collection';
-import { collection, query, where } from 'firebase/firestore';
-import { useFirestore, useMemoFirebase } from '@/firebase/provider';
-import { useUser } from '@/firebase/auth/use-user';
+import { staffData } from '@/lib/data'; // Import static data
 import { useUserProfile } from '@/hooks/use-user-profile';
 
 const LOCAL_STORAGE_KEY = 'appliedStaffIds';
@@ -25,42 +22,15 @@ interface SelectedStaffContextType {
 const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>(undefined);
 
 export function SelectedStaffProvider({ children }: { children: ReactNode }) {
-  const firestore = useFirestore();
-  const { user, isLoading: isAuthLoading } = useUser();
-  const { profile, isLoading: isProfileLoading } = useUserProfile();
+  const { profile } = useUserProfile();
   const { toast } = useToast();
 
-  const isAdmin = profile?.role === 'admin';
-  const isStaff = profile?.role === 'staff';
-  const isLoading = isAuthLoading || isProfileLoading;
-  
-  const staffQuery = useMemoFirebase(() => {
-    if (!firestore || !user || isLoading) return null;
-    if (isAdmin) {
-      return collection(firestore, 'staff');
-    }
-    if (isStaff && user.email) {
-      return query(collection(firestore, 'staff'), where('email', '==', user.email));
-    }
-    return null;
-  }, [firestore, user, isAdmin, isStaff, isLoading]);
-  
-  const { data: staffFromHook } = useCollection<WithId<Staff>>(staffQuery);
-
-  const [allStaff, setAllStaff] = useState<WithId<Staff>[]>([]);
+  // Use the static staffData as the source of truth
+  const [allStaff, setAllStaff] = useState<WithId<Staff>[]>(staffData);
   const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
   const [appliedSelectedStaffIds, setAppliedSelectedStaffIds] = useState<string[]>([]);
   
-  useEffect(() => {
-    if (staffFromHook) {
-       setAllStaff(staffFromHook);
-    } else if (!isLoading && !user) {
-       setAllStaff([]);
-    }
-  }, [staffFromHook, isLoading, user]);
-
-
-  // On initial mount, load applied IDs from localStorage
+  // On initial mount, load applied IDs from localStorage or set defaults based on role
   useEffect(() => {
     try {
       const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -68,26 +38,26 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         const parsedIds = JSON.parse(savedIds);
         setAppliedSelectedStaffIds(parsedIds);
         setPendingSelectedStaffIds(parsedIds);
+      } else if (profile) {
+        // If no saved IDs, set initial state based on user role
+        const initialIds = profile.role === 'admin' 
+          ? staffData.map(s => s.id) // Admin sees all
+          : [profile.id];           // Staff sees only themselves
+        setAppliedSelectedStaffIds(initialIds);
+        setPendingSelectedStaffIds(initialIds);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(initialIds));
       }
     } catch (error) {
-        console.error("Failed to parse staff IDs from localStorage", error);
+        console.error("Failed to process staff IDs from localStorage", error);
         localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
-  }, []);
-
-  const setAllStaffCb = useCallback((staff: WithId<Staff>[]) => {
-    setAllStaff(staff);
-    const hasBeenInitialized = localStorage.getItem(LOCAL_STORAGE_KEY) !== null;
-    if (staff.length > 0 && !hasBeenInitialized) {
-      const allStaffIds = staff.map(s => s.id);
-      setAppliedSelectedStaffIds(allStaffIds);
-      setPendingSelectedStaffIds(allStaffIds);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(allStaffIds));
-    }
-  }, []);
-
+  }, [profile]);
 
   const togglePendingStaffSelection = (staffId: string) => {
+    if (profile?.role !== 'admin') {
+        toast({ title: "権限エラー", description: "スタッフの選択は管理者のみ可能です。", variant: "destructive" });
+        return;
+    }
     setPendingSelectedStaffIds(prevIds =>
       prevIds.includes(staffId)
         ? prevIds.filter(id => id !== staffId)
@@ -96,10 +66,12 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   };
   
   const setPendingSelection = (staffIds: string[]) => {
+    if (profile?.role !== 'admin') return;
     setPendingSelectedStaffIds(staffIds);
   };
 
   const applyPendingSelection = () => {
+    if (profile?.role !== 'admin') return;
     setAppliedSelectedStaffIds(pendingSelectedStaffIds);
     try {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pendingSelectedStaffIds));
@@ -121,7 +93,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     pendingSelectedStaffIds,
     appliedSelectedStaffIds,
     allStaff,
-    setAllStaff: setAllStaffCb,
+    setAllStaff: setAllStaff, // This may not be needed anymore but kept for compatibility
     togglePendingStaffSelection,
     setPendingSelection,
     applyPendingSelection,

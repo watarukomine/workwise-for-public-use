@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -31,7 +32,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const loginSchema = z.object({
   email: z.string().email({ message: '有効なメールアドレスを入力してください。' }),
-  password: z.string().min(6, { message: 'パスワードは6文字以上で入力してください。' }),
+  password: z.string().min(1, { message: 'パスワードを入力してください。' }),
 });
 
 const signUpSchema = loginSchema.extend({
@@ -73,10 +74,10 @@ export default function LoginPage() {
         title: 'ログインしました',
         description: 'WorkWiseへようこそ！',
       });
-      router.push('/');
-      router.refresh(); // Reload the page to ensure user state is updated everywhere
+      // Use window.location to force a full page reload to update context correctly
+      window.location.href = '/'; 
     } catch (e: any) {
-      setError(getFirebaseErrorMessage(e.code));
+      setError(e.message || 'ログイン中にエラーが発生しました。');
     } finally {
       setIsLoading(false);
     }
@@ -91,31 +92,14 @@ export default function LoginPage() {
         title: 'アカウントを作成しました',
         description: 'WorkWiseへようこそ！',
       });
-      router.push('/');
-      router.refresh();
+      // Use window.location to force a full page reload to update context correctly
+      window.location.href = '/';
     } catch (e: any) {
-      setError(getFirebaseErrorMessage(e.code));
+      setError(e.message || '新規登録中にエラーが発生しました。');
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const getFirebaseErrorMessage = (code: string) => {
-    switch (code) {
-        case 'auth/invalid-email':
-            return '無効なメールアドレスです。';
-        case 'auth/user-not-found':
-        case 'auth/wrong-password':
-        case 'auth/invalid-credential':
-            return 'メールアドレスまたはパスワードが正しくありません。';
-        case 'auth/email-already-in-use':
-            return 'このメールアドレスは既に使用されています。';
-        case 'auth/weak-password':
-            return 'パスワードは6文字以上で設定してください。';
-        default:
-            return `エラーが発生しました: ${code}。しばらくしてからもう一度お試しください。`;
-    }
-  }
 
   return (
     <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
@@ -141,7 +125,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>メールアドレス</FormLabel>
                         <FormControl>
-                          <Input placeholder="email@example.com" {...field} />
+                          <Input placeholder="admin@example.com" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -154,7 +138,7 @@ export default function LoginPage() {
                       <FormItem>
                         <FormLabel>パスワード</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="******" {...field} />
+                          <Input type="password" placeholder="password" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -167,6 +151,15 @@ export default function LoginPage() {
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     ログイン
                   </Button>
+                   <Alert variant="default" className="mt-4">
+                    <AlertTitle>サンプルアカウント</AlertTitle>
+                    <AlertDescription className="text-xs">
+                        <p>テスト用に、以下のアカウントでログインできます。</p>
+                        <p className="mt-2"><strong>管理者ID:</strong> admin@example.com</p>
+                        <p><strong>一般ID:</strong> staff@example.com</p>
+                        <p><strong>PW (共通):</strong> password</p>
+                    </AlertDescription>
+                   </Alert>
                 </CardFooter>
               </form>
             </Form>
@@ -177,7 +170,7 @@ export default function LoginPage() {
           <Card>
             <CardHeader>
               <CardTitle>新規登録</CardTitle>
-              <CardDescription>新しいアカウントを作成します。</CardDescription>
+              <CardDescription>新しいアカウントを作成します。（このセッションでのみ有効です）</CardDescription>
             </CardHeader>
              <Form {...signUpForm}>
               <form onSubmit={signUpForm.handleSubmit(handleSignUp)}>
@@ -228,14 +221,6 @@ export default function LoginPage() {
                     {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     登録する
                   </Button>
-                   <Alert variant="default" className="mt-4">
-                    <AlertTitle>サンプル管理者アカウント</AlertTitle>
-                    <AlertDescription className="text-xs">
-                        <p>テスト用に、以下の情報で管理者としてログインできます。</p>
-                        <p className="mt-2"><strong>ID:</strong> admin@example.com</p>
-                        <p><strong>PW:</strong> password</p>
-                    </AlertDescription>
-                   </Alert>
                 </CardFooter>
               </form>
             </Form>

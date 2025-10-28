@@ -6,24 +6,34 @@ const getAvatarUrl = (avatarId: string) => {
   return PlaceHolderImages.find(img => img.id === avatarId)?.imageUrl || '';
 };
 
+// Mock staff data including roles and passwords for local auth simulation
 export const staffData: WithId<Staff>[] = [
   {
     id: '1',
-    name: '佐藤 太郎',
-    calendarId: 'taro.sato@example.com',
-    color: 'hsl(217, 91%, 60%)',
+    name: '管理者ユーザー',
+    email: 'admin@example.com',
+    password: 'password', // Plain text for demo purposes only
+    role: 'admin',
+    calendarId: 'admin@example.com',
+    color: 'hsl(262, 83%, 58%)',
     avatarUrl: getAvatarUrl('avatar2'),
   },
   {
     id: '2',
-    name: '鈴木 花子',
-    calendarId: 'hanako.suzuki@example.com',
+    name: '一般スタッフ',
+    email: 'staff@example.com',
+    password: 'password', // Plain text for demo purposes only
+    role: 'staff',
+    calendarId: 'staff@example.com',
     color: 'hsl(12, 76%, 61%)',
     avatarUrl: getAvatarUrl('avatar1'),
   },
   {
     id: '3',
     name: '高橋 一郎',
+    email: 'ichiro.takahashi@example.com',
+    password: 'password',
+    role: 'staff',
     calendarId: 'ichiro.takahashi@example.com',
     color: 'hsl(173, 58%, 39%)',
     avatarUrl: getAvatarUrl('avatar4'),
@@ -31,11 +41,15 @@ export const staffData: WithId<Staff>[] = [
   {
     id: '4',
     name: '田中 美咲',
+    email: 'misaki.tanaka@example.com',
+    password: 'password',
+    role: 'staff',
     calendarId: 'misaki.tanaka@example.com',
     color: 'hsl(43, 74%, 66%)',
     avatarUrl: getAvatarUrl('avatar3'),
   },
 ];
+
 
 export const customerData: WithId<Customer>[] = [
     { id: 'C001', No: '1', userCode: 'CUST001', storeName: 'ABCストア', address: '神奈川県横浜市中区元町1-1', '電話番号': '045-111-1111', '営業時間': '10:00-19:00', latitude: 35.442, longitude: 139.648, name: 'ABCストア' },

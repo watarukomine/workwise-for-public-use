@@ -2,81 +2,45 @@
 'use client';
 
 import React from 'react';
-import { useCollection } from '@/firebase/firestore/use-collection';
-import { useFirestore } from '@/firebase/provider';
-import { collection, query, where } from 'firebase/firestore';
 import { StaffTable } from '@/components/staff/staff-table';
-import type { Staff, WithId } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
-import { useMemoFirebase } from '@/firebase/provider';
-import { useUser } from '@/firebase/auth/use-user';
 import { useUserProfile } from '@/hooks/use-user-profile';
+import { staffData } from '@/lib/data'; // Import static data
 
 export default function StaffPage() {
-  const firestore = useFirestore();
-  const { user, isUserLoading: isAuthLoading } = useUser();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff: staffFromContext, setAllStaff } = useSelectedStaff();
 
-  const isAdmin = profile?.role === 'admin';
-  const isStaff = profile?.role === 'staff';
-  const isLoading = isAuthLoading || isProfileLoading;
-
-  const staffQuery = useMemoFirebase(() => {
-    if (!firestore || !user || isLoading) return null;
-    
-    // Admin gets all staff
-    if (isAdmin) {
-      return collection(firestore, 'staff');
-    }
-    
-    // A regular staff member can only see their own document
-    if (isStaff && user.email) {
-      return query(collection(firestore, 'staff'), where('email', '==', user.email));
-    }
-
-    return null; // Return null if no valid query can be constructed
-  }, [firestore, user, isAdmin, isStaff, isLoading]);
-  
-  const { data: staffFromHook, isLoading: isStaffLoading, error } = useCollection<WithId<Staff>>(staffQuery);
-
   React.useEffect(() => {
-    if (staffFromHook) {
-      // The data from the hook is already the correct, filtered list.
-      setAllStaff(staffFromHook);
-    } else if (!isLoading && !user) {
-        // If the user logs out, clear the staff list
+    // If a user is logged in, filter the static data based on their role
+    if (profile) {
+      if (profile.role === 'admin') {
+        setAllStaff(staffData); // Admin sees all staff
+      } else {
+        // Staff sees only their own data
+        const self = staffData.find(s => s.id === profile.id);
+        setAllStaff(self ? [self] : []);
+      }
+    } else if (!isProfileLoading) {
+        // If no user is logged in (and we're not loading), show an empty list
         setAllStaff([]);
     }
-  }, [staffFromHook, setAllStaff, isLoading, user]);
+  }, [profile, isProfileLoading, setAllStaff]);
 
-  const effectiveIsLoading = isLoading || isStaffLoading;
-  
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">スタッフ・ユーザー管理</h1>
         <p className="text-muted-foreground">
-          {isAdmin 
+          {profile?.role === 'admin'
             ? "表示するスタッフを選択し、「選択を適用」ボタンでダッシュボードやルート最適化に反映します。" 
             : "ご自身の情報を確認できます。"}
         </p>
       </div>
 
-       {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>データ取得エラー</AlertTitle>
-          <AlertDescription>
-            スタッフ情報の取得中にエラーが発生しました。権限を確認してください。
-            <pre className="mt-2 text-xs bg-gray-800 p-2 rounded"><code>{error.message}</code></pre>
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {!effectiveIsLoading && !user && (
+      {!isProfileLoading && !profile && (
          <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>ログインしてください</AlertTitle>
@@ -86,9 +50,7 @@ export default function StaffPage() {
         </Alert>
       )}
       
-      <StaffTable staff={staffFromContext || []} isLoading={effectiveIsLoading} />
+      <StaffTable staff={staffFromContext || []} isLoading={isProfileLoading} />
     </div>
   );
 }
-
-    

@@ -1,29 +1,19 @@
+
 'use client';
+// This hook is disabled in the simplified mock auth flow.
+// User state is now managed by useUserProfile via UserProfileProvider.
+// This function is kept to prevent import errors but will not be executed.
 
-import { useFirebase } from '@/firebase/provider'; 
-import type { User } from 'firebase/auth';
+import { useState } from 'react';
+import type { User } from 'firebase/auth'; // Keep type for compatibility
 
-/**
- * Interface for the return value of the useUser hook.
- */
 export interface UseUserResult {
-  user: User | null;
+  user: any | null; // Use `any` as we are mocking
   isLoading: boolean;
   error: Error | null;
 }
 
-/**
- * React hook to get the current authenticated user from Firebase Auth.
- * It leverages the user state managed by the FirebaseProvider.
- *
- * @returns {UseUserResult} Object with user, isLoading, and error.
- */
 export function useUser(): UseUserResult {
-  const { user, isUserLoading, userError } = useFirebase();
-  
-  // Directly return the state from the context.
-  // The FirebaseProvider is now the single source of truth for auth state.
-  return { user, isLoading: isUserLoading, error: userError };
+  // Returns a mock state. The real user profile is in `useUserProfile`.
+  return { user: null, isLoading: false, error: null };
 }
-
-    

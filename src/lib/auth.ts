@@ -1,87 +1,99 @@
 
 'use client';
 
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  type User,
-  updateProfile,
-} from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
-import { setDocWithContext } from '@/lib/mutations';
+// This is a mock authentication service.
+// In a real application, this would be replaced with a robust authentication provider like Firebase Auth.
 
-const getAuthAndFirestore = () => {
-  const { auth, firestore } = initializeFirebase();
-  return { auth, firestore };
+import { staffData } from './data';
+import type { Staff, WithId } from './types';
+
+const MOCK_USER_SESSION_KEY = 'mockUserSession';
+
+// Helper to get user session from localStorage
+const getSession = (): WithId<Staff> | null => {
+  if (typeof window === 'undefined') return null;
+  const session = localStorage.getItem(MOCK_USER_SESSION_KEY);
+  return session ? JSON.parse(session) : null;
 };
 
-const createStaffDocument = async (user: User, name: string) => {
-  const { auth, firestore } = getAuthAndFirestore();
-  if (!user.uid) return;
+// Helper to set user session in localStorage
+const setSession = (user: WithId<Staff> | null) => {
+  if (typeof window === 'undefined') return;
+  if (user) {
+    localStorage.setItem(MOCK_USER_SESSION_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(MOCK_USER_SESSION_KEY);
+  }
+};
 
-  const staffRef = doc(firestore, 'staff', user.uid);
+export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
+  console.log(`Attempting to sign in with email: ${email}`);
   
-  try {
-    const staffSnapshot = await getDoc(staffRef);
+  const user = staffData.find(staff => staff.email === email && staff.password === password);
 
-    if (!staffSnapshot.exists()) {
-      const { email, photoURL } = user;
-      
-      const staffData = {
-        id: user.uid,
-        name: name,
-        email: email,
-        photoURL: photoURL,
-        role: 'staff',
-        color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`,
-        // createdAt is handled by setDocWithContext
-      };
-
-      // Use the new mutation function which handles contextual errors
-      await setDocWithContext(staffRef, staffData, { merge: false });
-      
-      if (auth.currentUser) {
-        await updateProfile(auth.currentUser, { displayName: name });
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (user) {
+        console.log('Sign in successful for:', user.name);
+        setSession(user);
+        resolve(user);
+      } else {
+        console.log('Sign in failed: Invalid credentials');
+        reject(new Error('メールアドレスまたはパスワードが正しくありません。'));
       }
-    }
-  } catch (error) {
-    // This will now catch a wider range of issues, but the permission
-    // error during setDoc is handled inside setDocWithContext.
-    // We can re-throw or handle other types of errors here if needed.
-    console.error("Error in createStaffDocument:", error);
-    // Re-throwing the original error might be useful for debugging other issues.
-    throw error;
-  }
+    }, 1000); // Simulate network delay
+  });
+};
+
+export const signUpWithEmail = async (email: string, password: string, name: string): Promise<WithId<Staff>> => {
+    console.log(`Attempting to sign up with email: ${email}`);
+
+    return new Promise((resolve, reject) => {
+        setTimeout(() => {
+            const existingUser = staffData.find(staff => staff.email === email);
+            if (existingUser) {
+                console.log('Sign up failed: Email already in use');
+                reject(new Error('このメールアドレスは既に使用されています。'));
+                return;
+            }
+
+            if (password.length < 6) {
+                console.log('Sign up failed: Password too weak');
+                reject(new Error('パスワードは6文字以上で設定してください。'));
+                return;
+            }
+            
+            // NOTE: This only adds to the in-memory array for the current session.
+            // It does not persist the new user.
+            const newUser: WithId<Staff> = {
+                id: `new-${Date.now()}`,
+                name,
+                email,
+                password,
+                role: 'staff',
+                color: `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`,
+                avatarUrl: `https://picsum.photos/seed/${Date.now()}/100/100`,
+            };
+            
+            staffData.push(newUser);
+            setSession(newUser);
+            console.log('Sign up successful for:', newUser.name);
+            resolve(newUser);
+        }, 1000);
+    });
 };
 
 
-export const signUpWithEmail = async (email: string, password: string, name: string) => {
-    const { auth } = getAuthAndFirestore();
-    try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await createStaffDocument(userCredential.user, name);
-        return userCredential;
-    } catch(e: any) {
-        // The error from createUserWithEmailAndPassword is an auth error, not a Firestore error.
-        // It's okay to let it propagate as is for now, as it's already descriptive.
-        // e.g., auth/email-already-in-use
-        console.error("Sign up failed:", e.code);
-        throw e;
-    }
-}
+export const signOut = async (): Promise<void> => {
+    console.log('Signing out user');
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            setSession(null);
+            resolve();
+        }, 500);
+    });
+};
 
-export const signInWithEmail = async (email: string, password: string) => {
-    const { auth } = getAuthAndFirestore();
-    return await signInWithEmailAndPassword(auth, email, password);
-}
-
-export const signOut = async () => {
-  const { auth } = getAuthAndFirestore();
-  try {
-    await firebaseSignOut(auth);
-  } catch (error) {
-    console.error('Error signing out: ', error);
-  }
+export const getCurrentUser = (): WithId<Staff> | null => {
+    return getSession();
 };

@@ -6,7 +6,6 @@ import { AppShell } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import React from 'react';
 import { SelectedStaffProvider } from '@/contexts/selected-staff-context';
-import { FirebaseClientProvider } from '@/firebase';
 import { UserProfileProvider } from '@/contexts/user-profile-provider';
 
 export default function RootLayout({
@@ -24,17 +23,13 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
-          <UserProfileProvider>
-            <SelectedStaffProvider>
-              <AppShell>{children}</AppShell>
-            </SelectedStaffProvider>
-          </UserProfileProvider>
-        </FirebaseClientProvider>
+        <UserProfileProvider>
+          <SelectedStaffProvider>
+            <AppShell>{children}</AppShell>
+          </SelectedStaffProvider>
+        </UserProfileProvider>
         <Toaster />
       </body>
     </html>
   );
 }
-
-    
