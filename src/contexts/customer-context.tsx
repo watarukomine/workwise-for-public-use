@@ -21,7 +21,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const { profile } = useUserProfile();
   const [customers, setCustomersState] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [customerGasUrl, setCustomerGasUrlState] = useState('https://script.google.com/macros/s/AKfycbziEeP4R_ViB-rbKvf2h9C4dzGdTqD4xFBq1FgLTx3Qwsg2qklPAxGOQoKKXS4O9WxNKw/exec');
+  const [customerGasUrl, setCustomerGasUrlState] = useState('https://script.google.com/macros/s/AKfycbwzxlKPM46QdC2LdYV-VudRGgxSq4NVqbsbP7ZhUHgR8W4VjetIO8JoUgMMLgtc0k7D/exec?sheet=顧客マスタ');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
