@@ -8,11 +8,14 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import type { Staff, WithId } from '@/lib/types';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, setAllStaff } = useSelectedStaff();
   const [isFetchingStaff, setIsFetchingStaff] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbyOUN7eqN2f3u9aYaU-5rP8UGrcawlan3FAHzHKjm7RuXifKBCjs2kbfTTB09ygvfRd-Q/exec';
@@ -24,8 +27,12 @@ export default function StaffPage() {
         return;
       }
       setIsFetchingStaff(true);
+      setError(null);
       try {
         const response = await fetch(GAS_URL, { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error(`Failed to fetch: ${response.statusText}`);
+        }
         const data = await response.json();
         const staffList: WithId<Staff>[] = data.map((item: any) => ({
           id: String(item['スタッフID']),
@@ -39,13 +46,16 @@ export default function StaffPage() {
         }));
         
         if (profile.role === 'admin') {
+            // Admin sees all non-admin staff
             setAllStaff(staffList);
         } else {
+            // Non-admin sees only themselves
             const self = staffList.find(s => s.id === profile.id);
             setAllStaff(self ? [self] : []);
         }
       } catch (error) {
         console.error("Failed to fetch staff data", error);
+        setError("スタッフ情報の取得に失敗しました。ネットワーク接続を確認するか、後でもう一度お試しください。");
         setAllStaff([]);
       } finally {
         setIsFetchingStaff(false);
@@ -56,6 +66,14 @@ export default function StaffPage() {
   }, [profile, setAllStaff]);
   
   const isLoading = isProfileLoading || isFetchingStaff;
+
+  const staffToDisplay = React.useMemo(() => {
+    if (!profile || !allStaff) return [];
+    if (profile.role === 'admin') {
+        return allStaff.filter(s => s.role !== 'admin');
+    }
+    return allStaff;
+  }, [profile, allStaff]);
 
   return (
     <div className="space-y-8">
@@ -73,7 +91,22 @@ export default function StaffPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>ログインしてください</AlertTitle>
           <AlertDescription>
-            スタッフ情報を表示するには、ログインが必要です。
+            <p>このページを表示するにはログインが必要です。</p>
+             <Button asChild className="mt-4">
+              <Link href="/login">
+                 ログインページへ
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {error && (
+         <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>エラー</AlertTitle>
+          <AlertDescription>
+            {error}
           </AlertDescription>
         </Alert>
       )}
@@ -84,7 +117,7 @@ export default function StaffPage() {
           <p className="ml-4">スタッフ情報を読み込んでいます...</p>
         </div>
       ) : (
-        <StaffTable staff={allStaff || []} isLoading={isLoading} />
+         !error && profile && <StaffTable staff={staffToDisplay} isLoading={isLoading} />
       )}
     </div>
   );
