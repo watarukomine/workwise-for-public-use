@@ -36,8 +36,16 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     }
     const data = await response.json();
     
+    // Check if data is an object with a 'data' property, or a direct array
+    const rawStaffArray = Array.isArray(data) ? data : data.data;
+
+    if (!Array.isArray(rawStaffArray)) {
+        console.error("GAS response did not contain a valid data array, using fallback.");
+        return fallbackStaffData;
+    }
+
     // Assuming the GAS returns an array of objects with specific keys
-    return data.map((item: any) => ({
+    return rawStaffArray.map((item: any) => ({
       id: String(item['スタッフID']),
       role: item['権限（Staff /Admin）'] === 'Admin' ? 'admin' : 'staff',
       name: item['スタッフ名'],
