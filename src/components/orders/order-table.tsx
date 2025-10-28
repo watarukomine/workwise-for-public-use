@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
@@ -49,7 +50,15 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
   const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
 
-  const headers = rawOrders && rawOrders.length > 0 ? Object.keys(rawOrders[0]) : [];
+  const headers = rawOrders && rawOrders.length > 0 
+    ? Object.keys(rawOrders[0]).filter(key => key !== 'Order_URL') // Hide Order_URL column
+    : [];
+    
+  const handleRowClick = (order: any) => {
+    if (order && order.Order_URL) {
+      window.open(order.Order_URL, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   return (
     <Card>
@@ -80,15 +89,22 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                   </TableCell>
                 </TableRow>
               ) : paginatedOrders.length > 0 ? (
-                paginatedOrders.map((order, index) => (
-                  <TableRow key={index}>
-                    {headers.map(header => (
-                      <TableCell key={header}>
-                        {order[header] !== undefined && order[header] !== null ? String(order[header]) : ''}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
+                paginatedOrders.map((order, index) => {
+                  const hasUrl = !!order.Order_URL;
+                  return (
+                    <TableRow 
+                      key={index}
+                      onClick={() => handleRowClick(order)}
+                      className={cn(hasUrl && "cursor-pointer")}
+                    >
+                      {headers.map(header => (
+                        <TableCell key={header}>
+                          {order[header] !== undefined && order[header] !== null ? String(order[header]) : ''}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  )
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={headers.length || 1} className="h-24 text-center">
