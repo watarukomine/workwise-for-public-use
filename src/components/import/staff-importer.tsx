@@ -22,7 +22,6 @@ function isFetchError(error: unknown): error is TypeError {
 const findRoleValue = (item: any): 'admin' | 'staff' => {
     if (!item || typeof item !== 'object') return 'staff';
 
-    // Directly check for the '権限' key as specified by the user.
     const roleValue = item['権限'];
 
     if (roleValue && typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {

@@ -29,7 +29,7 @@ const setSession = (user: WithId<Staff> | null) => {
 const findRoleValue = (item: any): 'admin' | 'staff' => {
     if (!item || typeof item !== 'object') return 'staff';
 
-    // Directly check for the '権限' key as specified by the user.
+    // Check for a '権限' or 'role' key, case-insensitive
     const roleValue = item['権限'];
 
     if (roleValue && typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
