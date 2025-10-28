@@ -44,7 +44,7 @@ export default function StaffPage() {
 
         const staffList: WithId<Staff>[] = rawStaffArray.map((item: any) => ({
           id: String(item['スタッフID']),
-          role: String(item['権限（Staff /Admin）'] || 'staff').toLowerCase() === 'admin' ? 'admin' : 'staff',
+          role: (item['権限（Staff /Admin）'] || 'staff').toString().toLowerCase() === 'admin' ? 'admin' : 'staff',
           name: item['スタッフ名'],
           email: item['メールアドレス'],
           password: item['パスワード'],

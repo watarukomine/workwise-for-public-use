@@ -47,7 +47,7 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     return rawStaffArray.map((item: any) => ({
       id: String(item['スタッフID']),
       // Ensure role is always lowercase
-      role: String(item['権限（Staff /Admin）'] || 'staff').toLowerCase() === 'admin' ? 'admin' : 'staff',
+      role: (item['権限（Staff /Admin）'] || 'staff').toString().toLowerCase() === 'admin' ? 'admin' : 'staff',
       name: item['スタッフ名'],
       email: item['メールアドレス'],
       password: item['パスワード'],
@@ -73,7 +73,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (user) {
-        // The `role` is already correctly set to lowercase 'admin' or 'staff' by fetchStaffDataFromGAS
+        // The `role` is now correctly set to lowercase 'admin' or 'staff' by fetchStaffDataFromGAS
         console.log('Sign in successful for:', user.name, 'with role:', user.role);
         setSession(user);
         resolve(user);
@@ -94,7 +94,6 @@ export const signUpWithEmail = async (email: string, password: string, name: str
     return new Promise((resolve, reject) => {
         setTimeout(() => {
             if (existingUser) {
-                console.log('User already exists, attempting login instead for:', existingUser.name);
                  if (existingUser.password === password) {
                     // The `role` is already correctly set by fetchStaffDataFromGAS
                     console.log('Sign in successful for existing user:', existingUser.name, 'with role:', existingUser.role);
