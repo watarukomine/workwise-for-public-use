@@ -16,11 +16,9 @@ export async function fetchGasData(url: string): Promise<any> {
     const response = await fetch(url, {
       method: 'GET',
       cache: 'no-store',
-      // Manual redirect handling to better diagnose auth issues
       redirect: 'manual', 
     });
 
-    // Handle redirects manually to provide a clearer error message
     if (response.status >= 300 && response.status < 400) {
        const locationHeader = response.headers.get('location');
        console.error(`[GAS DEBUG] Redirect detected. Status: ${response.status}. Location: ${locationHeader}`);
@@ -31,17 +29,14 @@ export async function fetchGasData(url: string): Promise<any> {
        throw new Error(redirectError);
     }
     
-    // Check if the final URL is a Google Accounts sign-in page, indicating a permission issue.
     if (response.url.includes('accounts.google.com')) {
         throw new Error('Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings.');
     }
     
-    // Check the content-type before parsing as JSON
     const contentType = response.headers.get('content-type');
     const responseText = await response.text();
 
     if (!response.ok || !contentType || !contentType.includes('application/json')) {
-      // For debugging, log the entire response
       console.error(`[GAS DEBUG] Status: ${response.status}, Content-Type: ${contentType}, Response Body: ${responseText}`);
       
       let errorMessage = `GAS request failed or did not return JSON. Status: ${response.status}.`;
@@ -55,12 +50,16 @@ export async function fetchGasData(url: string): Promise<any> {
       throw new Error(errorMessage);
     }
 
-    const result = JSON.parse(responseText);
-    // Handle cases where GAS returns a JSON with an error status
-    if (result.error && result.message) {
-      throw new Error(`GAS script returned an error: ${result.message}`);
+    try {
+        const result = JSON.parse(responseText);
+        if (result.error && result.message) {
+          throw new Error(`GAS script returned an error: ${result.message}`);
+        }
+        return result;
+    } catch (parseError) {
+        console.error("[GAS DEBUG] JSON Parse Error. Response was not valid JSON.", responseText);
+        throw new Error(`Failed to parse response from GAS as JSON. Response text: ${responseText.substring(0, 500)}...`);
     }
-    return result;
     
   } catch (error: any) {
     console.error('Server-side fetch to GAS failed:', error.message);

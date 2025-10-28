@@ -10,7 +10,7 @@ interface UpdateSheetStatusArgs {
 interface GasResponse {
     status: 'success' | 'error';
     message: string;
-    error?: boolean; // Add error property for better compatibility
+    error?: boolean;
 }
 
 /**
@@ -45,12 +45,11 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
              throw new Error(`GAS script returned a non-OK response. Status: ${response.status}. Response: ${responseText}`);
         }
 
-        // Try to parse as JSON, but handle cases where it might not be
         try {
             const result: GasResponse = JSON.parse(responseText);
 
-            // Handle cases where GAS returns a JSON with an error status (e.g., {error: true, message: '...'})
             if(result.error === true || result.status === 'error'){
+                // Prefer the JSON error message if it exists
                 throw new Error(result.message || 'GAS returned a JSON-formatted error.');
             }
 
