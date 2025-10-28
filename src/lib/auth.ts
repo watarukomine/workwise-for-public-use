@@ -46,7 +46,7 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
     return rawStaffArray.map((item: any) => ({
       id: String(item['スタッフID']),
-      // Ensure role is always lowercase
+      // Ensure role is always lowercase after converting to string
       role: (item['権限（Staff /Admin）'] || 'staff').toString().toLowerCase() === 'admin' ? 'admin' : 'staff',
       name: item['スタッフ名'],
       email: item['メールアドレス'],
@@ -95,13 +95,15 @@ export const signUpWithEmail = async (email: string, password: string, name: str
         setTimeout(() => {
             if (existingUser) {
                  if (existingUser.password === password) {
-                    // The `role` is already correctly set by fetchStaffDataFromGAS
-                    console.log('Sign in successful for existing user:', existingUser.name, 'with role:', existingUser.role);
+                    // This is a login scenario from the sign-up form.
+                    // The `role` is already correctly set by fetchStaffDataFromGAS.
+                    console.log('Login via signup form successful for:', existingUser.name, 'with role:', existingUser.role);
                     setSession(existingUser);
                     resolve(existingUser);
                 } else {
-                    console.log('Sign in failed for existing user: Invalid password');
-                    reject(new Error('このメールアドレスは登録済みです。パスワードが正しくありません。'));
+                    // User exists, but password doesn't match.
+                    console.log('Sign up failed for existing user: Invalid password');
+                    reject(new Error('このメールアドレスは登録済みですが、パスワードが異なります。'));
                 }
                 return;
             }
