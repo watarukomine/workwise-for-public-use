@@ -25,8 +25,10 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
-    const initialUrl = savedUrl || 'https://script.google.com/macros/s/AKfycby1q1B0pLIOJ_GFs7aQ2nQL1X7NxUKO7OrB35zLm7JwI-oc_FtPfkwIO0WJl7atfcOKJA/exec?sheet=販売店情報';
+    // 初期URLを設定する。保存されたものがなければデフォルト値を使う
+    const initialUrl = savedUrl || 'https://script.google.com/macros/s/AKfycb1q1B0pLIOJ_GFs7aQ2nQL1X7NxUKO7OrB35zLm7JwI-oc_FtPfkwIO0WJl7atfcOKJA/exec?sheet=販売店情報';
     setCustomerGasUrlState(initialUrl);
+    // 保存されたURLがなかった場合、デフォルト値をlocalStorageに保存する
     if (!savedUrl) {
       localStorage.setItem(CUSTOMER_GAS_URL_KEY, initialUrl);
     }
@@ -55,13 +57,15 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
           if (!response.ok) {
             const errorText = await response.text();
              try {
+                // Check if the error response is JSON from our GAS script
                 const errorJson = JSON.parse(errorText);
                 if (errorJson.message) {
                     throw new Error(errorJson.message);
                 }
-            } catch (e) {
-                 throw new Error(`HTTPエラー: ${response.status} ${response.statusText}`);
-            }
+             } catch (e) {
+                 // If not JSON, it might be a standard HTTP error or GAS HTML error page
+                 throw new Error(`データを取得できませんでした。URLが正しいか、GASが正しくデプロイされているか確認してください。(HTTP Status: ${response.status})`);
+             }
           }
           const result = await response.json();
 
@@ -74,6 +78,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         } catch (e: any) {
           console.error("Failed to fetch customers from GAS:", e);
           setErrorState(`販売店情報の取得に失敗しました: ${e.message}`);
+          setCustomers([]); // Clear data on error
         } finally {
           setIsLoading(false);
         }
@@ -85,6 +90,8 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     };
 
     fetchCustomers();
+    // *** CRITICAL FIX: Add customerGasUrl to the dependency array ***
+    // This ensures that the fetch operation is re-run whenever the URL changes.
   }, [customerGasUrl]);
 
 
