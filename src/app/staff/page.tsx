@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { StaffTable } from '@/components/staff/staff-table';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -14,34 +14,33 @@ import { fetchStaffDataFromGAS } from '@/lib/auth';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
-  // The 'allStaff' from context is now used for selection state, not for displaying data.
   const { setAllStaff } = useSelectedStaff();
   const [staffData, setStaffData] = useState<WithId<Staff>[]>([]);
   const [isFetchingStaff, setIsFetchingStaff] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadStaff() {
-      if (!profile) {
-        setIsFetchingStaff(false);
-        return;
-      };
-      
-      setIsFetchingStaff(true);
-      setError(null);
-      try {
-        const fetchedStaff = await fetchStaffDataFromGAS();
-        setStaffData(fetchedStaff);
-        setAllStaff(fetchedStaff); // Update context for selection logic
-      } catch (e: any) {
-        setError("スタッフ情報の取得に失敗しました。");
-        console.error(e);
-      } finally {
-        setIsFetchingStaff(false);
-      }
+  const loadStaff = useCallback(async () => {
+    setIsFetchingStaff(true);
+    setError(null);
+    try {
+      const fetchedStaff = await fetchStaffDataFromGAS();
+      setStaffData(fetchedStaff);
+      setAllStaff(fetchedStaff); // Update context for selection logic
+    } catch (e: any) {
+      setError("スタッフ情報の取得に失敗しました。");
+      console.error(e);
+    } finally {
+      setIsFetchingStaff(false);
     }
-    loadStaff();
-  }, [profile, setAllStaff]);
+  }, [setAllStaff]);
+
+  useEffect(() => {
+    if (profile) {
+      loadStaff();
+    } else if (!isProfileLoading) {
+      setIsFetchingStaff(false);
+    }
+  }, [profile, isProfileLoading, loadStaff]);
   
   const isLoading = isProfileLoading || isFetchingStaff;
 
