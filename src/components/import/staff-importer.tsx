@@ -19,6 +19,23 @@ function isFetchError(error: unknown): error is TypeError {
   return error instanceof TypeError;
 }
 
+const findRoleValue = (item: any): string => {
+    if (!item || typeof item !== 'object') return 'staff';
+    
+    // Find a key that likely represents the role, ignoring case and spaces
+    const roleKey = Object.keys(item).find(key => 
+        key.toLowerCase().replace(/\s/g, '').includes('権限') || 
+        key.toLowerCase().replace(/\s/g, '').includes('role')
+    );
+
+    if (roleKey && item[roleKey] && typeof item[roleKey] === 'string') {
+        return item[roleKey].toLowerCase() === 'admin' ? 'admin' : 'staff';
+    }
+    
+    return 'staff'; // Default to staff if no role-like key is found or value is not 'admin'
+}
+
+
 export function StaffImporter() {
   const [gasUrl, setGasUrl] = React.useState('');
   const [rawData, setRawData] = React.useState<any>(null);
@@ -70,10 +87,9 @@ export function StaffImporter() {
          if (dataToProcess.length > 0) {
            setColumnHeaders(Object.keys(dataToProcess[0])); // Extract headers
            const staffList: WithId<Staff>[] = dataToProcess.map((item: any) => {
-              const roleValue = item['権限（Staff /Admin）'];
               return {
                 id: String(item['スタッフID']),
-                role: typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin' ? 'admin' : 'staff',
+                role: findRoleValue(item),
                 name: item['スタッフ名'],
                 email: item['メールアドレス'],
                 password: item['パスワード'],

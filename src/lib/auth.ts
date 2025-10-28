@@ -26,6 +26,23 @@ const setSession = (user: WithId<Staff> | null) => {
   }
 };
 
+const findRoleValue = (item: any): string => {
+    if (!item || typeof item !== 'object') return 'staff';
+    
+    // Find a key that likely represents the role, ignoring case and spaces
+    const roleKey = Object.keys(item).find(key => 
+        key.toLowerCase().replace(/\s/g, '').includes('権限') || 
+        key.toLowerCase().replace(/\s/g, '').includes('role')
+    );
+
+    if (roleKey && item[roleKey] && typeof item[roleKey] === 'string') {
+        return item[roleKey].toLowerCase() === 'admin' ? 'admin' : 'staff';
+    }
+    
+    return 'staff'; // Default to staff if no role-like key is found or value is not 'admin'
+}
+
+
 const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     const staffImporterUrl = localStorage.getItem('staffImporterUrl');
     if (!staffImporterUrl) {
@@ -41,10 +58,9 @@ const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
             if (Array.isArray(rawStaffArray)) {
                 return rawStaffArray.map((item: any) => {
-                    const roleValue = item['権限（Staff /Admin）'];
                     return {
                         id: String(item['スタッフID']),
-                        role: typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin' ? 'admin' : 'staff',
+                        role: findRoleValue(item),
                         name: item['スタッフ名'],
                         email: item['メールアドレス'],
                         password: item['パスワード'],
@@ -68,7 +84,11 @@ const fetchAndCombineStaffData = async (): Promise<WithId<Staff>[]> => {
   const combinedStaffMap = new Map<string, WithId<Staff>>();
 
   // Add fallback data first
-  fallbackStaffData.forEach(staff => combinedStaffMap.set(staff.email.toLowerCase(), staff));
+  fallbackStaffData.forEach(staff => {
+    if (staff.email) {
+      combinedStaffMap.set(staff.email.toLowerCase(), staff);
+    }
+  });
 
   // Overwrite with or add GAS data
   gasStaff.forEach(staff => {
@@ -160,3 +180,4 @@ export const signOut = async (): Promise<void> => {
 export const getCurrentUser = (): WithId<Staff> | null => {
     return getSession();
 };
+
