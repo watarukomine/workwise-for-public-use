@@ -1,8 +1,6 @@
 
 'use server';
 
-import { useOrder } from "@/contexts/order-context";
-
 interface UpdateSheetStatusArgs {
     orderId: string;
     staffName: string | null;
@@ -23,19 +21,23 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
     }
 
     try {
-        const formData = new URLSearchParams();
-        formData.append('orderId', orderId);
-        if (staffName !== null) {
-            formData.append('staffName', staffName);
-        }
+        const args = { orderId, staffName };
+
+        // This is a workaround to match the GAS expectation of a JSON-stringified payload
+        // within a specific object structure.
+        const bodyPayload = JSON.stringify({
+            postData: {
+                contents: JSON.stringify(args)
+            }
+        });
 
         const response = await fetch(gasUrl, {
             method: 'POST',
             cache: 'no-store',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'text/plain;charset=utf-8',
             },
-            body: formData.toString(),
+            body: bodyPayload,
             redirect: 'follow', 
         });
         
