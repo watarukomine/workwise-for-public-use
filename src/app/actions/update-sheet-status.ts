@@ -20,21 +20,20 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
-    const formData = new URLSearchParams();
-    formData.append('orderId', orderId);
-    if (staffName !== null) {
-        formData.append('staffName', staffName);
-    } else {
-        formData.append('staffName', ''); // Unassigning
-    }
+    const payload = {
+      orderId,
+      staffName: staffName, // Send null if unassigning
+    };
 
     try {
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
             },
-            body: formData.toString(),
+            // GASがJSON.parse(e.postData.contents)を期待しているため、
+            // bodyをJSON文字列として送信します。
+            body: JSON.stringify(payload),
             cache: 'no-store',
             redirect: 'follow'
         });
@@ -43,7 +42,9 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
              throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
         
-        const result = await response.json();
+        const resultText = await response.text();
+        const result = JSON.parse(resultText);
+
 
         if (result.status === 'error') {
             throw new Error(result.message || 'GASスクリプトでエラーが発生しました。');
@@ -53,6 +54,7 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
 
     } catch (error: any) {
         console.error('Failed to call GAS for sheet update:', error);
+        // エラーメッセージにGASからの応答を含めることでデバッグしやすくする
         return {
             status: 'error',
             message: `GASの呼び出しに失敗しました: ${error.message}`,

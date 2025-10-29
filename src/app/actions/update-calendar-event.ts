@@ -26,20 +26,13 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
-    const formData = new URLSearchParams();
-    for (const [key, value] of Object.entries(payload)) {
-        if (value !== undefined && value !== null) {
-            formData.append(key, String(value));
-        }
-    }
-
     try {
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Type': 'application/json',
             },
-            body: formData.toString(),
+            body: JSON.stringify(payload),
             cache: 'no-store',
             redirect: 'follow',
         });
@@ -47,8 +40,9 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
         if (response.redirected && response.url.includes('accounts.google.com')) {
              throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
-
-        const result = await response.json();
+        
+        const resultText = await response.text();
+        const result = JSON.parse(resultText);
 
         if (result.status === 'error') {
             throw new Error(result.message || 'GASスクリプトでカレンダー操作エラーが発生しました。');
