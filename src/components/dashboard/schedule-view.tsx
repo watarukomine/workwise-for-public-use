@@ -83,7 +83,7 @@ const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
 const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
 
 const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
-  const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventEnd;
+  const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventStart;
   const end = typeof eventEnd === 'string' ? parseISO(eventEnd) : eventEnd;
   
   const startOfDay = new Date(start);
