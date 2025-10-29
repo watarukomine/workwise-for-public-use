@@ -1,4 +1,3 @@
-
 /**
  * @OnlyCurrentDoc
  *
@@ -8,15 +7,9 @@
 
 function doPost(e) {
   try {
-    // デバッグ用：受信したリクエスト全体をログに出力
-    Logger.log("Received POST request: " + JSON.stringify(e));
-
-    if (!e.postData || !e.postData.contents) {
-      throw new Error("POSTデータが見つかりません。");
-    }
-    const args = JSON.parse(e.postData.contents);
-    Logger.log("Parsed arguments: " + JSON.stringify(args));
-
+    // Use e.parameter to get arguments when content-type is x-www-form-urlencoded
+    const args = e.parameter;
+    Logger.log("Received parameters: " + JSON.stringify(args));
 
     const { operation, calendarId, eventId, title, description, startTime, endTime } = args;
 
@@ -30,19 +23,22 @@ function doPost(e) {
     }
 
     let event;
-    let result = { status: "success", message: "", eventId: "" };
+    let result = { status: "success", message: "" };
 
     switch (operation) {
       case "create":
+        if (!title || !startTime || !endTime) {
+          throw new Error("作成に必要な情報（タイトル、開始時刻、終了時刻）が不足しています。");
+        }
         event = calendar.createEvent(
           title,
           new Date(startTime),
           new Date(endTime),
-          { description: description }
+          { description: description || '' }
         );
         result.message = "イベントが正常に作成されました。";
         result.eventId = event.getId();
-        Logger.log("Event created: " + event.getId());
+        Logger.log("Event created: " + event.getId() + " in calendar " + calendarId);
         break;
 
       case "update":
@@ -50,9 +46,9 @@ function doPost(e) {
         event = calendar.getEventById(eventId);
         if (!event) throw new Error(`指定されたイベントIDが見つかりません: ${eventId}`);
         
-        event.setTitle(title);
-        event.setTime(new Date(startTime), new Date(endTime));
-        event.setDescription(description);
+        if (title) event.setTitle(title);
+        if (startTime && endTime) event.setTime(new Date(startTime), new Date(endTime));
+        if (description) event.setDescription(description);
         
         result.message = "イベントが正常に更新されました。";
         result.eventId = eventId;
@@ -67,7 +63,6 @@ function doPost(e) {
           result.message = "イベントが正常に削除されました。";
           Logger.log("Event deleted: " + eventId);
         } else {
-          // イベントが存在しなくてもエラーとしない
           result.message = "指定されたイベントは既に存在しないか、見つかりませんでした。";
           Logger.log("Event not found for deletion: " + eventId);
         }

@@ -18,6 +18,7 @@ interface GasResponse {
     error?: boolean;
 }
 
+// This URL will be updated by the user's input.
 const DEFAULT_CALENDAR_GAS_URL = 'https://script.google.com/macros/s/AKfycbzoWDxQQlLCDBZ8tsXPCVavazZ14gkH--Q8AQ81rT7Ok1lxl_3lLNtgBdZ9ok6Run_X/exec';
 
 
@@ -31,15 +32,22 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
     }
 
     try {
+        // GASで e.parameter を使用するための形式に変換
+        const formData = new URLSearchParams();
+        Object.entries(args).forEach(([key, value]) => {
+            if (value !== undefined) {
+                formData.append(key, String(value));
+            }
+        });
+
         const response = await fetch(gasUrl, {
             method: 'POST',
             cache: 'no-store',
             headers: {
-                // To be correctly parsed by e.postData.contents in GAS,
-                // the Content-Type should be text/plain.
-                'Content-Type': 'text/plain;charset=utf-8',
+                // application/x-www-form-urlencoded is the default for URLSearchParams
+                // so we don't need to explicitly set it.
             },
-            body: JSON.stringify(args), // Simply stringify the arguments
+            body: formData.toString(),
             redirect: 'follow',
         });
 
