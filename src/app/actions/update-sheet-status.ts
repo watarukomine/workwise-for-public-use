@@ -28,10 +28,8 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                // 明示的にJSON形式で送信することを宣言
                 'Content-Type': 'application/json',
             },
-            // JavaScriptオブジェクトをJSON文字列に変換してbodyに設定
             body: JSON.stringify(payload),
             cache: 'no-store',
             redirect: 'follow'
