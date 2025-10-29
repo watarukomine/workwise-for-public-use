@@ -26,7 +26,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(ORDER_GAS_URL_KEY);
-    setOrderGasUrlState(savedUrl || '');
+    setOrderGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbzcWHnpH1MlNURYTIMoaBSmCUPGYcJZEIWtB-P66GRldQ_vU8jMHvbWqJEvpDXKGt27/exec');
   }, []);
   
   const setOrderGasUrl = (url: string) => {
@@ -64,7 +64,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         }
       } else {
-        setErrorState(null); // URLが空の場合はエラーメッセージを表示しない
+        setErrorState('受注情報を取得するためのGoogle Apps Script URLが設定されていません。');
         setOrders([]);
         setIsLoading(false);
       }

@@ -22,10 +22,10 @@ const findRoleValue = (item: any): 'admin' | 'staff' => {
 
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     if (typeof window === 'undefined') return [];
-    const staffGasUrl = localStorage.getItem(STAFF_GAS_URL_KEY);
+    const staffGasUrl = localStorage.getItem(STAFF_GAS_URL_KEY) || 'https://script.google.com/macros/s/AKfycbzLj_Y_rDFec0KKhJ9ZFJbLCskQ3joHzPuTKv4KeyXBOWoAlqo97qlBB_41-K7hdvsp/exec';
     
     if (!staffGasUrl) {
-        console.warn("No GAS URL for staff is defined in localStorage.");
+        console.warn("No GAS URL for staff is defined.");
         return [];
     }
 

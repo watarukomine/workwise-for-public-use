@@ -26,7 +26,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
-    setCustomerGasUrlState(savedUrl || '');
+    setCustomerGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbygUg4b1tD4Y489xg0Fz09e84DtDAy_35KhJ_VD4RyJ3J1DavI0B_aZP5ck8hssWPCi/exec');
   }, []);
   
   const setCustomerGasUrl = (url: string) => {
@@ -64,7 +64,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         }
       } else {
-        setErrorState(null); // URLが空の場合はエラーメッセージを表示しない
+        setErrorState('販売店情報を取得するためのGoogle Apps Script URLが設定されていません。');
         setCustomers([]);
         setIsLoading(false);
       }
