@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
@@ -12,17 +13,18 @@ const STAFF_GAS_URL_KEY = 'staffGasUrl';
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     const url = localStorage.getItem(STAFF_GAS_URL_KEY);
     if (!url) {
-        console.log("Staff GAS URL not found, returning fallback data.");
-        return fallbackStaffData;
+        throw new Error("スタッフ情報を取得するためのGoogle Apps Script URLが設定されていません。");
     }
 
     try {
         const result = await fetchGasData(url);
+        
         const dataToProcess = result.data || (Array.isArray(result) ? result : []);
         
         if (dataToProcess.length === 0) {
-            console.warn("GAS returned no staff data, using fallback.");
-            return fallbackStaffData;
+            console.warn("GAS returned no staff data. Raw response:", result);
+            // This is now an error condition, as we expect data if the URL is set.
+             throw new Error("GASからスタッフデータを取得できませんでした。GASのURLが正しいか、シートにデータが存在するか確認してください。");
         }
 
         // Map GAS data to Staff type
@@ -37,9 +39,9 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
         }));
 
     } catch (error: any) {
-        console.error('Error fetching staff data from GAS, returning fallback:', error);
-        // Do not re-throw, just return fallback so the app remains usable.
-        return fallbackStaffData;
+        console.error('Error fetching staff data from GAS:', error);
+        // Re-throw the specific error from fetchGasData or a generic one
+        throw new Error(error.message || 'スプレッドシートからスタッフデータを取得できませんでした。');
     }
 };
 
@@ -91,6 +93,8 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         } catch (e: any) {
           setError(`スタッフ情報の取得に失敗しました: ${e.message}`);
           console.error(e);
+          // If fetching fails, use fallback data so the app doesn't crash, but show error.
+          setAllStaffState(fallbackStaffData);
         } finally {
           setIsLoading(false);
         }

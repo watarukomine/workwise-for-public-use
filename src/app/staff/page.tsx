@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { StaffTable } from '@/components/staff/staff-table';
-import { useSelectedStaff } from '@/contexts/selected-staff-context';
+import { useSelectedStaff, fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2, Save } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -12,9 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
 
-const STAFF_GAS_URL_KEY = 'staffImporterUrl';
+const STAFF_GAS_URL_KEY = 'staffGasUrl';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -35,24 +34,19 @@ export default function StaffPage() {
     setIsUpdating(true);
     try {
       localStorage.setItem(STAFF_GAS_URL_KEY, localUrl);
-      const newStaff = await fetchStaffDataFromGAS();
-      setAllStaff(newStaff);
-      setInitialUrl(localUrl);
-
+      // Force a reload of the page. The context's useEffect will handle fetching.
       toast({
         title: "URLを更新しました",
-        description: "新しいURLからスタッフデータを再取得しました。",
+        description: "ページを再読み込みして、新しいURLからスタッフデータを取得します。",
       });
-      // A full reload might be better to ensure all contexts are fresh.
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 1000);
     } catch (e: any) {
       console.error(e);
       toast({
         variant: "destructive",
         title: "エラー",
-        description: `URLの更新に失敗しました: ${e.message}`,
+        description: `URLの保存に失敗しました: ${e.message}`,
       });
-    } finally {
       setIsUpdating(false);
     }
   };
@@ -98,8 +92,11 @@ export default function StaffPage() {
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>エラー</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <AlertTitle>データ取得エラー</AlertTitle>
+          <AlertDescription>
+            {error}
+             <p className="mt-2">下のフォームでURLが正しいか確認・更新してください。</p>
+          </AlertDescription>
         </Alert>
       )}
 
