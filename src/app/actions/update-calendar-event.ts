@@ -26,13 +26,25 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
     
+    // Use URLSearchParams for form-encoded data
+    const body = new URLSearchParams();
+    // Append all keys from payload to the body
+    for (const key in payload) {
+        if (Object.prototype.hasOwnProperty.call(payload, key)) {
+            const value = payload[key as keyof typeof payload];
+            if (value !== undefined && value !== null) {
+                body.append(key, String(value));
+            }
+        }
+    }
+
     try {
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: JSON.stringify(payload),
+            body: body.toString(),
             cache: 'no-store',
             redirect: 'follow',
         });

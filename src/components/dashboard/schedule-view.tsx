@@ -297,12 +297,10 @@ export function ScheduleView({
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
-    // A trip consists of multiple events (travel, task). Delete them all.
     const eventsToDelete = eventToUnassign.tripId 
         ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId)
         : [eventToUnassign];
     
-    // --- Google Calendar Deletion ---
     for (const eventToDelete of eventsToDelete) {
         if (staff.calendarId && eventToDelete.calendarEventId && orderGasUrl) {
             try {
@@ -310,7 +308,7 @@ export function ScheduleView({
                     operation: 'delete',
                     calendarId: staff.calendarId,
                     eventId: eventToDelete.calendarEventId,
-                    gasUrl: orderGasUrl, // Use the unified URL
+                    gasUrl: orderGasUrl,
                 });
                 if (result.status === 'error') throw new Error(result.message);
                 toast({ title: "カレンダーから予定を削除しました" });
@@ -320,40 +318,34 @@ export function ScheduleView({
         }
     }
     
-    const orderIdToUpdate = eventToUnassign.rawOrderId;
-    const originalOrder = ordersData.find(o => o.raw?.['受注ID'] === orderIdToUpdate);
-    
-    // --- Restore Order to Unassigned List ---
-    if (originalOrder) {
-        setOrdersData(currentOrders => {
-            if (currentOrders.some(o => o.id === originalOrder.id)) {
-                return currentOrders; // Already exists, do nothing
-            }
-            return [...currentOrders, originalOrder];
-        });
+    const orderIdToRestore = eventToUnassign.orderId;
+    if (orderIdToRestore) {
+        const originalOrder = ordersData.find(o => o.id === orderIdToRestore);
+        if (originalOrder) {
+           setOrdersData(currentOrders => [...currentOrders, originalOrder]);
+        }
     }
-
-    // --- Update Google Sheet ---
-    if (orderIdToUpdate && orderGasUrl) {
+    
+    const orderIdForSheet = eventToUnassign.rawOrderId;
+    if (orderIdForSheet && orderGasUrl) {
         try {
             const result = await updateSheetStatus({
-                orderId: orderIdToUpdate,
-                staffName: null, // Clear staff name
+                orderId: orderIdForSheet,
+                staffName: null,
                 gasUrl: orderGasUrl,
             });
             if (result.status === 'success') {
-                toast({ title: 'スプレッドシート更新', description: `オーダー #${orderIdToUpdate} を未割当に戻しました。` });
+                toast({ title: 'スプレッドシート更新', description: `オーダー #${orderIdForSheet} を未割当に戻しました。` });
             } else {
                 throw new Error(result.message || '不明なエラー');
             }
         } catch (e: any) {
             toast({ variant: 'destructive', title: 'スプレッドシート更新エラー', description: `オーダーの割り当て解除に失敗しました: ${e.message}` });
         }
-    } else if (!orderGasUrl) {
+    } else if (eventToUnassign.orderId && !orderGasUrl) {
          toast({ variant: 'destructive', title: 'URL未設定', description: '担当者更新用のGAS URLが設定されていません。「受注管理」ページで設定してください。' });
     }
 
-    // --- Update Local Schedule State ---
     setScheduleData(prev => prev.filter(e => !eventsToDelete.some(del => del.id === e.id)));
   };
 
@@ -363,7 +355,6 @@ export function ScheduleView({
     
     if (!item) return;
 
-    // --- Logic for Unassigning (Dragging back to task list) ---
     if (over?.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         handleUnassignEvent(item);
         setActiveItem(null);
@@ -373,7 +364,6 @@ export function ScheduleView({
     
     const newStaffId = over?.id as string | undefined;
 
-    // --- Logic for moving existing events ---
     if ('staffId' in item && 'start' in item && newStaffId && newStaffId !== UNASSIGNED_TASKS_DROPPABLE_ID) {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
@@ -395,7 +385,6 @@ export function ScheduleView({
 
       setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
       
-      // Update Google Calendar
       const staffMember = allStaff.find(s => s.id === finalStaffId);
       if (staffMember?.calendarId && updatedEvent.calendarEventId && orderGasUrl) {
         try {
@@ -407,7 +396,7 @@ export function ScheduleView({
             description: updatedEvent.description,
             startTime: newStart.toISOString(),
             endTime: newEnd.toISOString(),
-            gasUrl: orderGasUrl, // Pass the unified URL
+            gasUrl: orderGasUrl,
           });
           if (result.status === 'error') throw new Error(result.message);
           toast({ title: "カレンダー更新成功" });
@@ -417,7 +406,6 @@ export function ScheduleView({
       }
 
     }
-    // --- Logic for adding new orders as events ---
     else if ('estimatedDuration' in item && newStaffId && over?.rect) {
         const order = item;
         const timelineRect = over.rect;
@@ -446,7 +434,7 @@ export function ScheduleView({
                     description: event.description,
                     startTime: (event.start as Date).toISOString(),
                     endTime: (event.end as Date).toISOString(),
-                    gasUrl: orderGasUrl, // Pass the unified URL
+                    gasUrl: orderGasUrl,
                 });
                 if (result.status === 'success' && result.eventId) {
                     toast({ title: 'カレンダー登録成功', description: 'Googleカレンダーに予定を登録しました。' });
@@ -476,7 +464,6 @@ export function ScheduleView({
 
              setScheduleData(prev => [...prev, newEvent]);
         } else {
-            // This is a customer order, so add travel time and update sheet
             const taskStart = addMinutes(startOfDay, dropMinutes);
             const taskEnd = addMinutes(taskStart, order.estimatedDuration);
             const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
@@ -519,7 +506,6 @@ export function ScheduleView({
             setOrdersData(prev => prev.filter(o => o.id !== order.id));
             setScheduleData(prev => [...prev, travelEvent, taskEvent]);
             
-            // --- Update Google Sheet ---
             if (staff && rawOrderId && orderGasUrl) {
                  try {
                     const result = await updateSheetStatus({
