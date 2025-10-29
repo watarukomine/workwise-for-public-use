@@ -16,9 +16,10 @@ export async function fetchGasData(url: string): Promise<any> {
     const response = await fetch(url, {
       method: 'GET',
       cache: 'no-store',
-      redirect: 'manual', 
+      redirect: 'manual', // Manually handle redirects to get more info
     });
 
+    // Check for redirects (status 300-399)
     if (response.status >= 300 && response.status < 400) {
        const locationHeader = response.headers.get('location');
        console.error(`[GAS DEBUG] Redirect detected. Status: ${response.status}. Location: ${locationHeader}`);
@@ -29,6 +30,7 @@ export async function fetchGasData(url: string): Promise<any> {
        throw new Error(redirectError);
     }
     
+    // As a fallback, check if the final URL is a Google sign-in page
     if (response.url.includes('accounts.google.com')) {
         throw new Error('Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings.');
     }
@@ -41,6 +43,7 @@ export async function fetchGasData(url: string): Promise<any> {
       
       let errorMessage = `GAS request failed or did not return JSON. Status: ${response.status}.`;
       
+      // Check if the response looks like a Google login page HTML
       if (responseText.toLowerCase().includes('<title>google') || responseText.toLowerCase().includes('signin')) {
           errorMessage = 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings and that you have deployed a new version after any changes.';
       } else {
@@ -52,6 +55,7 @@ export async function fetchGasData(url: string): Promise<any> {
 
     try {
         const result = JSON.parse(responseText);
+        // Check for error field within the JSON response from GAS itself
         if (result.error && result.message) {
           throw new Error(`GAS script returned an error: ${result.message}`);
         }
