@@ -62,7 +62,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   };
 
   const handleRowDoubleClick = (member: WithId<Staff> & { Order_URL?: string }) => {
-    if (member && member.Order_URL) {
+    if (isAdmin && member && member.Order_URL) {
       window.open(member.Order_URL, '_blank', 'noopener,noreferrer');
     }
   };
@@ -117,7 +117,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                     key={member.id} 
                     data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''}
                     onDoubleClick={() => handleRowDoubleClick(member)}
-                    className={cn(member.Order_URL && "cursor-pointer")}
+                    className={cn(isAdmin && member.Order_URL && "cursor-pointer")}
                   >
                     {isAdmin && (
                         <TableCell>

@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import type { Customer } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 type CustomerWithUrl = Customer & { Order_URL?: string };
 interface CustomerTableProps {
@@ -53,6 +54,8 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
+  const { profile } = useUserProfile();
+  const isAdmin = profile?.role === 'admin';
 
   // Map the raw data to structured Customer data
   const mappedCustomers = React.useMemo(() => mapRawDataToCustomers(rawCustomers), [rawCustomers]);
@@ -77,7 +80,7 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
   
   const handleRowDoubleClick = (customer: CustomerWithUrl) => {
-    if (customer && customer.Order_URL) {
+    if (isAdmin && customer && customer.Order_URL) {
       window.open(customer.Order_URL, '_blank', 'noopener,noreferrer');
     }
   };
@@ -124,7 +127,7 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
                   <TableRow 
                     key={customer.id || index}
                     onDoubleClick={() => handleRowDoubleClick(customer)}
-                    className={cn(customer.Order_URL && "cursor-pointer")}
+                    className={cn(isAdmin && customer.Order_URL && "cursor-pointer")}
                   >
                     {headers.map(header => (
                       <TableCell key={header.key}>
