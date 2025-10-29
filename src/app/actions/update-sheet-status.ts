@@ -3,7 +3,7 @@
 
 interface UpdateSheetStatusArgs {
     orderId: string;
-    staffName: string;
+    staffName: string | null; // Allow null to clear the name
     gasUrl: string;
 }
 

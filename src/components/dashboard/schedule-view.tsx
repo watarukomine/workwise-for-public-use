@@ -55,6 +55,7 @@ const timelineStartHour = 8;
 const timelineEndHour = 18;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
+const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
 
 // --- Helper Functions ---
 const timeStringToDate = (timeStr: string) => {
@@ -82,7 +83,7 @@ const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
 const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
 
 const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
-  const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventStart;
+  const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventEnd;
   const end = typeof eventEnd === 'string' ? parseISO(eventEnd) : eventEnd;
   
   const startOfDay = new Date(start);
@@ -192,16 +193,20 @@ const genericTasks: WithId<Order>[] = [
 
 function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], customers: WithId<Customer>[] }) {
     const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
+    const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
 
     return (
-        <Card>
+        <Card 
+            ref={setNodeRef}
+            className={cn("transition-colors", isOver && "bg-primary/10 border-primary/50")}
+        >
             <CardHeader>
                 <CardTitle className="text-lg">ドラッグ可能なタスク</CardTitle>
-                <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。</CardDescription>
+                <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。タイムラインからここに戻すと未割り当てになります。</CardDescription>
             </CardHeader>
             <CardContent>
                 <ScrollArea className="w-full whitespace-nowrap">
-                    <div className="pr-4">
+                    <div className="pr-4 min-h-[6rem]">
                         <div className="flex flex-wrap gap-2">
                             {genericTasks.map((task) => (
                                 <DraggableOrder
@@ -284,16 +289,81 @@ export function ScheduleView({
      setCurrentOverStaffId(over ? over.id : null);
   };
 
+  const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
+    const staff = getStaffById(eventToUnassign.staffId);
+    if (!staff) return;
+
+    const eventsToDelete = eventToUnassign.tripId 
+        ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId)
+        : [eventToUnassign];
+    
+    // --- Google Calendar Deletion ---
+    for (const eventToDelete of eventsToDelete) {
+        if (staff.calendarId && eventToDelete.calendarEventId) {
+            try {
+                const result = await updateCalendarEvent({
+                    operation: 'delete',
+                    calendarId: staff.calendarId,
+                    eventId: eventToDelete.calendarEventId,
+                });
+                if (result.status === 'error') throw new Error(result.message);
+                toast({ title: "カレンダーから予定を削除しました" });
+            } catch (e: any) {
+                toast({ variant: 'destructive', title: 'カレンダー削除エラー', description: e.message });
+            }
+        }
+    }
+
+    // --- Restore Order to Unassigned List ---
+    const orderToRestore = ordersData.find(o => o.id === eventToUnassign.orderId);
+    if (orderToRestore) {
+        setOrdersData(currentOrders => {
+            if (currentOrders.some(o => o.id === orderToRestore.id)) return currentOrders;
+            return [...currentOrders, orderToRestore];
+        });
+
+        // --- Update Google Sheet ---
+        const orderIdToUpdate = orderToRestore.raw?.['受注ID'] || orderToRestore.id;
+        if (orderIdToUpdate) {
+            try {
+                const result = await updateSheetStatus({
+                    orderId: orderIdToUpdate,
+                    staffName: "", // Clear staff name
+                    gasUrl: orderGasUrl,
+                });
+                if (result.status === 'success') {
+                    toast({ title: 'スプレッドシート更新', description: `オーダー #${orderIdToUpdate} を未割当に戻しました。` });
+                } else {
+                    throw new Error(result.message || '不明なエラー');
+                }
+            } catch (e: any) {
+                toast({ variant: 'destructive', title: 'スプレッドシート更新エラー', description: e.message });
+            }
+        }
+    }
+
+    // --- Update Local Schedule State ---
+    setScheduleData(prev => prev.filter(e => !eventsToDelete.some(del => del.id === e.id)));
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, delta, over } = event;
     const item = active.data.current as WithId<ScheduleEvent> | WithId<Order>;
     
     if (!item) return;
+
+    // --- Logic for Unassigning (Dragging back to task list) ---
+    if (over?.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
+        handleUnassignEvent(item);
+        setActiveItem(null);
+        setCurrentOverStaffId(null);
+        return;
+    }
     
     const newStaffId = over?.id as string | undefined;
 
     // --- Logic for moving existing events ---
-    if ('staffId' in item && 'start' in item) {
+    if ('staffId' in item && 'start' in item && newStaffId && newStaffId !== UNASSIGNED_TASKS_DROPPABLE_ID) {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
       
@@ -577,50 +647,7 @@ export function ScheduleView({
 
   const handleDeleteEvent = async () => {
     if (dialogState.mode !== 'edit') return;
-    const eventToDelete = dialogState.event;
-    
-    // --- Google Calendar Deletion ---
-    const staff = getStaffById(eventToDelete.staffId);
-    if (staff?.calendarId && eventToDelete.calendarEventId) {
-         try {
-            const result = await updateCalendarEvent({
-                operation: 'delete',
-                calendarId: staff.calendarId,
-                eventId: eventToDelete.calendarEventId,
-            });
-            if (result.status === 'error') throw new Error(result.message);
-            toast({ title: "カレンダー削除成功" });
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: 'カレンダー削除エラー', description: e.message });
-            // Optionally, ask user if they want to proceed with app-only deletion
-        }
-    }
-  
-    // This finds the original order from the *full list* of orders, not just unassigned.
-    const orderToRestore = ordersData.find(o => o.id === eventToDelete.orderId);
-
-    setScheduleData(prev => {
-      // Filter out the event(s) to be deleted
-      const newSchedule = prev.filter(e => {
-        if (eventToDelete.tripId) {
-          return e.tripId !== eventToDelete.tripId;
-        }
-        return e.id !== eventToDelete.id;
-      });
-      return newSchedule;
-    });
-
-    // If an order was associated with the deleted task, add it back to the unassigned orders list
-    if (orderToRestore) {
-        setOrdersData(currentOrders => {
-            // Avoid duplicates
-            if (currentOrders.some(o => o.id === orderToRestore.id)) {
-                return currentOrders;
-            }
-            return [...currentOrders, orderToRestore];
-        });
-    }
-
+    handleUnassignEvent(dialogState.event);
     setDialogState({ mode: 'closed' });
   };
 
