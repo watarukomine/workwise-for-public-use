@@ -1,0 +1,72 @@
+
+'use server';
+
+interface UpdateCalendarEventArgs {
+    operation: 'create' | 'update' | 'delete';
+    calendarId: string;
+    eventId?: string;
+    title?: string;
+    description?: string;
+    startTime?: string;
+    endTime?: string;
+}
+
+interface GasResponse {
+    status: 'success' | 'error';
+    message: string;
+    eventId?: string;
+    error?: boolean;
+}
+
+// 【重要】このURLは、ユーザーが作成するGoogleカレンダー連携用の新しいGASのURLに置き換える必要があります。
+const DEFAULT_CALENDAR_GAS_URL = 'https://script.google.com/macros/s/AKfycbx-kQMoE5s_8pXkhk5o0A4L3a4_3x-I3JqW7L5vR8yNqP7sD6uC1B2aX/exec';
+
+
+export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<GasResponse> {
+    
+    // TODO: このURLをユーザーが設定できるように、将来的にはContextや設定ページから取得するように変更するのが望ましい。
+    const gasUrl = process.env.CALENDAR_GAS_URL || DEFAULT_CALENDAR_GAS_URL;
+
+    if (!gasUrl) {
+        console.error('GAS URL for Calendar is not provided.');
+        return { status: 'error', message: 'カレンダー連携用のGAS URLが設定されていません。' };
+    }
+
+    try {
+        const response = await fetch(gasUrl, {
+            method: 'POST',
+            cache: 'no-store',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(args),
+            redirect: 'follow',
+        });
+
+        const contentType = response.headers.get('content-type');
+        const responseText = await response.text();
+        
+        if (!response.ok) {
+             throw new Error(`GAS script returned a non-OK response. Status: ${response.status}. Response: ${responseText}`);
+        }
+
+        try {
+            const result: GasResponse = JSON.parse(responseText);
+
+            if(result.error === true || result.status === 'error'){
+                throw new Error(result.message || 'GAS returned a JSON-formatted error.');
+            }
+
+            return result;
+        } catch (parseError) {
+             throw new Error(`GAS script returned a non-JSON response. Response: ${responseText}`);
+        }
+
+    } catch (error: any) {
+        console.error('Failed to call GAS for calendar update:', error.message);
+        return {
+            status: 'error',
+            message: error.message || 'カレンダーの更新中に不明なエラーが発生しました。',
+        };
+    }
+}

@@ -14,6 +14,7 @@ export type Staff = {
   role: 'admin' | 'staff';
   // Add password for mock authentication, but it should not be stored in a real DB like this.
   password?: string; 
+  'ロール'?: 'admin' | 'staff';
 };
 
 export type Customer = {
@@ -43,10 +44,12 @@ export type ScheduleEvent = {
   tripId?: string; // To group travel and task events
   orderId?: string; // To link back to the original order
   title?: string;
+  description?: string;
   locationId: string;
   staffId: string;
   start: Date | string | Timestamp;
   end: Date | string | Timestamp;
+  calendarEventId?: string; // To store the Google Calendar event ID
 };
 
 export type StaffStatus = {

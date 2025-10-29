@@ -46,6 +46,9 @@ import { useCustomer } from '@/contexts/customer-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { useToast } from '@/hooks/use-toast';
 import { useOrder } from '@/contexts/order-context';
+import { updateCalendarEvent } from '@/app/actions/update-calendar-event';
+import { useSelectedStaff } from '@/contexts/selected-staff-context';
+import { Textarea } from '../ui/textarea';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 8;
@@ -159,6 +162,7 @@ type DialogState =
 
 type EditedEventDetails = {
     title: string;
+    description: string;
     startTime: string;
     endTime: string;
 };
@@ -242,11 +246,13 @@ export function ScheduleView({
   
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({
     title: '',
+    description: '',
     startTime: '',
     endTime: '',
   });
 
   const { customers: allCustomers } = useCustomer();
+  const { allStaff } = useSelectedStaff();
   const { orderGasUrl } = useOrder();
   const { toast } = useToast();
 
@@ -307,6 +313,27 @@ export function ScheduleView({
       };
 
       setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+      
+      // Update Google Calendar
+      const staffMember = allStaff.find(s => s.id === finalStaffId);
+      if (staffMember?.calendarId && updatedEvent.calendarEventId) {
+        try {
+          const result = await updateCalendarEvent({
+            operation: 'update',
+            calendarId: staffMember.calendarId,
+            eventId: updatedEvent.calendarEventId,
+            title: updatedEvent.title,
+            description: updatedEvent.description,
+            startTime: newStart.toISOString(),
+            endTime: newEnd.toISOString(),
+          });
+          if (result.status === 'error') throw new Error(result.message);
+          toast({ title: "カレンダー更新成功" });
+        } catch (e: any) {
+          toast({ variant: 'destructive', title: 'カレンダー更新エラー', description: e.message });
+        }
+      }
+
     }
     // --- Logic for adding new orders as events ---
     else if ('estimatedDuration' in item && newStaffId && over?.rect) {
@@ -322,18 +349,45 @@ export function ScheduleView({
         
         const isGeneric = order.id.startsWith('generic-');
         const staff = getStaffById(newStaffId);
+        if (!staff) return;
 
+        const handleCalendarCreate = async (event: Omit<WithId<ScheduleEvent>, 'calendarEventId'>): Promise<string | undefined> => {
+            if (!staff.calendarId) return;
+            try {
+                const result = await updateCalendarEvent({
+                    operation: 'create',
+                    calendarId: staff.calendarId,
+                    title: event.title,
+                    description: event.description,
+                    startTime: (event.start as Date).toISOString(),
+                    endTime: (event.end as Date).toISOString(),
+                });
+                if (result.status === 'success' && result.eventId) {
+                    toast({ title: 'カレンダー登録成功', description: 'Googleカレンダーに予定を登録しました。' });
+                    return result.eventId;
+                }
+                throw new Error(result.message || 'カレンダーに登録できませんでした。');
+            } catch (e: any) {
+                toast({ variant: 'destructive', title: 'カレンダー登録エラー', description: e.message });
+                return undefined;
+            }
+        };
+        
         if (isGeneric) {
              const newStart = addMinutes(startOfDay, dropMinutes);
              const newEnd = addMinutes(newStart, order.estimatedDuration);
-             const newEvent: WithId<ScheduleEvent> = {
+             const newEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
                 id: `event-${Date.now()}`,
                 title: order.taskDetails,
+                description: '',
                 staffId: newStaffId,
                 locationId: '',
                 start: newStart,
                 end: newEnd,
              };
+             const calendarEventId = await handleCalendarCreate(newEventData);
+             const newEvent: WithId<ScheduleEvent> = { ...newEventData, calendarEventId };
+
              setScheduleData(prev => [...prev, newEvent]);
         } else {
             // This is a customer order, so add travel time and update sheet
@@ -344,28 +398,36 @@ export function ScheduleView({
             const tripId = `trip-${Date.now()}`;
             const travelEventId = `event-${Date.now()}-travel`;
             const taskEventId = `event-${Date.now()}-task`;
-
-            const travelEvent: WithId<ScheduleEvent> = {
+            
+            const travelEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
                 id: travelEventId,
                 tripId: tripId,
                 title: `移動: ${customer?.storeName || order.customerCode}`,
+                description: `目的地: ${customer?.address || 'N/A'}`,
                 staffId: newStaffId,
                 locationId: customer?.id || '',
                 start: travelStart,
                 end: taskStart,
             };
 
-            const taskEvent: WithId<ScheduleEvent> = {
+            const taskEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
                 id: taskEventId,
                 tripId: tripId,
                 orderId: order.id,
                 title: order.taskDetails,
+                description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`,
                 staffId: newStaffId,
                 locationId: customer?.id || '',
                 start: taskStart,
                 end: taskEnd,
             };
-            
+
+            const travelCalendarId = await handleCalendarCreate(travelEventData);
+            const taskCalendarId = await handleCalendarCreate(taskEventData);
+
+            const travelEvent: WithId<ScheduleEvent> = { ...travelEventData, calendarEventId: travelCalendarId };
+            const taskEvent: WithId<ScheduleEvent> = { ...taskEventData, calendarEventId: taskCalendarId };
+
             setOrdersData(prev => prev.filter(o => o.id !== order.id));
             setScheduleData(prev => [...prev, travelEvent, taskEvent]);
             
@@ -405,6 +467,7 @@ export function ScheduleView({
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
     setEditedEventDetails({
         title: event.title || '',
+        description: event.description || '',
         startTime: formatTime(event.start),
         endTime: formatTime(event.end),
     });
@@ -421,11 +484,11 @@ export function ScheduleView({
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
     const newStart = addMinutes(startOfDay, clickMinutes);
 
-    setEditedEventDetails({ title: '', startTime: formatTime(newStart), endTime: formatTime(addMinutes(newStart, 60)) });
+    setEditedEventDetails({ title: '', description: '', startTime: formatTime(newStart), endTime: formatTime(addMinutes(newStart, 60)) });
     setDialogState({ mode: 'new', staffId, start: newStart });
   };
   
-  const handleSaveEvent = () => {
+  const handleSaveEvent = async () => {
     if (dialogState.mode === 'closed') return;
     
     const newStart = timeStringToDate(editedEventDetails.startTime);
@@ -435,33 +498,103 @@ export function ScheduleView({
         console.error("Invalid time entered");
         return;
     }
+    
+    const { title, description } = editedEventDetails;
 
     if (dialogState.mode === 'new') {
+        const staff = getStaffById(dialogState.staffId);
+        if (!staff) return;
+
+        let calendarEventId: string | undefined;
+        if (staff.calendarId) {
+            try {
+                const result = await updateCalendarEvent({
+                    operation: 'create',
+                    calendarId: staff.calendarId,
+                    title,
+                    description,
+                    startTime: newStart.toISOString(),
+                    endTime: newEnd.toISOString(),
+                });
+                if (result.status === 'success' && result.eventId) {
+                    calendarEventId = result.eventId;
+                    toast({ title: 'カレンダー登録成功' });
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (e: any) {
+                toast({ variant: 'destructive', title: 'カレンダー登録エラー', description: e.message });
+            }
+        }
+
         const newEvent: WithId<ScheduleEvent> = {
             id: `event-${Date.now()}`,
-            title: editedEventDetails.title,
+            title,
+            description,
             staffId: dialogState.staffId,
             locationId: '',
             start: newStart,
             end: newEnd,
+            calendarEventId,
         };
         setScheduleData(prev => [...prev, newEvent]);
+
     } else if (dialogState.mode === 'edit') {
+        const staff = getStaffById(dialogState.event.staffId);
+        if (!staff) return;
+
         const updatedEvent = {
             ...dialogState.event,
-            title: editedEventDetails.title,
+            title,
+            description,
             start: newStart,
             end: newEnd,
         };
+
+        if (staff.calendarId && updatedEvent.calendarEventId) {
+             try {
+                const result = await updateCalendarEvent({
+                    operation: 'update',
+                    calendarId: staff.calendarId,
+                    eventId: updatedEvent.calendarEventId,
+                    title,
+                    description,
+                    startTime: newStart.toISOString(),
+                    endTime: newEnd.toISOString(),
+                });
+                if (result.status === 'error') throw new Error(result.message);
+                toast({ title: "カレンダー更新成功" });
+            } catch (e: any) {
+                toast({ variant: 'destructive', title: 'カレンダー更新エラー', description: e.message });
+            }
+        }
+
         setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
     }
     setDialogState({ mode: 'closed' });
   };
 
 
-  const handleDeleteEvent = () => {
+  const handleDeleteEvent = async () => {
     if (dialogState.mode !== 'edit') return;
     const eventToDelete = dialogState.event;
+    
+    // --- Google Calendar Deletion ---
+    const staff = getStaffById(eventToDelete.staffId);
+    if (staff?.calendarId && eventToDelete.calendarEventId) {
+         try {
+            const result = await updateCalendarEvent({
+                operation: 'delete',
+                calendarId: staff.calendarId,
+                eventId: eventToDelete.calendarEventId,
+            });
+            if (result.status === 'error') throw new Error(result.message);
+            toast({ title: "カレンダー削除成功" });
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'カレンダー削除エラー', description: e.message });
+            // Optionally, ask user if they want to proceed with app-only deletion
+        }
+    }
   
     // This finds the original order from the *full list* of orders, not just unassigned.
     const orderToRestore = ordersData.find(o => o.id === eventToDelete.orderId);
@@ -599,6 +732,15 @@ export function ScheduleView({
                         onChange={(e) => setEditedEventDetails(prev => ({ ...prev, title: e.target.value }))}
                         placeholder="例：定期メンテナンス"
                         disabled={!!(dialogState.mode === 'edit' && event?.orderId)}
+                    />
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="event-description">詳細</Label>
+                    <Textarea
+                        id="event-description"
+                        value={editedEventDetails.description}
+                        onChange={(e) => setEditedEventDetails(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="予定の詳細やメモ"
                     />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -781,9 +923,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         <p>顧客: {customer?.storeName || '未定'}</p>
         <p>時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
         <p>担当: {staff.name}</p>
+        {event.description && <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{event.description}</p>}
       </TooltipContent>
     </Tooltip>
   );
 };
-
-    
