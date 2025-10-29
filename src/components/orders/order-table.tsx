@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -18,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, parseISO, isValid } from 'date-fns';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
@@ -73,6 +73,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
+  const { profile } = useUserProfile();
+  const isAdmin = profile?.role === 'admin';
 
   const filteredOrders = React.useMemo(() => {
     if (!rawOrders) return [];
@@ -113,7 +115,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     : [];
     
   const handleRowClick = (order: any) => {
-    if (order && order.Order_URL) {
+    if (isAdmin && order && order.Order_URL) {
       window.open(order.Order_URL, '_blank', 'noopener,noreferrer');
     }
   };
@@ -142,7 +144,9 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                {headers.map(header => <TableHead key={header}>{header}</TableHead>)}
+                {headers.map(header => <TableHead key={header} className="[writing-mode:vertical-rl] text-center h-40">
+                  {header}
+                </TableHead>)}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -159,7 +163,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     <TableRow 
                       key={index}
                       onClick={() => handleRowClick(order)}
-                      className={cn(hasUrl && "cursor-pointer hover:bg-muted/50")}
+                      className={cn(isAdmin && hasUrl && "cursor-pointer hover:bg-muted/50")}
                     >
                       {headers.map(header => (
                         <TableCell key={header}>
