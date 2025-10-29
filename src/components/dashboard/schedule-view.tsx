@@ -297,20 +297,21 @@ export function ScheduleView({
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
-    // --- Sheet Update Logic ---
-    try {
-        const sheetResult = await updateSheetStatus({
-            gasUrl: orderGasUrl,
-            eventTitle: eventToUnassign.title,
-            staffName: null, // Set staff name to null/empty
-        });
-        if (sheetResult.status === 'error') throw new Error(sheetResult.message);
-        toast({ title: "担当者をシートから削除しました", description: sheetResult.message });
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: 'シート更新エラー', description: e.message });
-        // Optionally, prevent un-assignment if sheet update fails
-        // return; 
+    // --- Sheet Update Logic (using rawOrderId) ---
+    if (eventToUnassign.rawOrderId) { // Only update sheet if it's a real order
+      try {
+          const sheetResult = await updateSheetStatus({
+              gasUrl: orderGasUrl,
+              orderId: eventToUnassign.rawOrderId,
+              staffName: null, // Set staff name to null/empty
+          });
+          if (sheetResult.status === 'error') throw new Error(sheetResult.message);
+          toast({ title: "担当者をシートから削除しました", description: sheetResult.message });
+      } catch (e: any) {
+          toast({ variant: 'destructive', title: 'シート更新エラー', description: e.message });
+      }
     }
+
 
     // --- Calendar Deletion Logic ---
     const eventsToDelete = eventToUnassign.tripId 
@@ -337,18 +338,15 @@ export function ScheduleView({
     // --- App State Update Logic ---
     if (eventToUnassign.orderId) {
         const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
-        // If it's not in ordersData, it might be an already-scheduled one
         if (!originalOrder) {
-            const scheduledOrderData = {
+             const scheduledOrderData: WithId<Order> = {
                 id: eventToUnassign.orderId,
                 customerCode: getCustomerById(eventToUnassign.locationId)?.userCode || '',
-                taskDetails: eventToUnassign.title.replace(/\(ID:\s*\w+\)\s*/, ''), // Clean up title
+                taskDetails: eventToUnassign.title,
                 estimatedDuration: differenceInMinutes(parseISO(eventToUnassign.end as string), parseISO(eventToUnassign.start as string)),
-                raw: { '受注ID': eventToUnassign.title.match(/\(ID:\s*(\w+)\)/)?.[1] }
+                raw: { '受注ID': eventToUnassign.rawOrderId }
             };
             setOrdersData(currentOrders => [...currentOrders, scheduledOrderData]);
-        } else {
-            setOrdersData(currentOrders => [...currentOrders, originalOrder]);
         }
         toast({ title: 'タスクを未割り当てに戻しました' });
     }
@@ -395,11 +393,11 @@ export function ScheduleView({
       setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
       
       // Update sheet if staff member changed
-      if (staffMember && eventToUpdate.staffId !== finalStaffId) {
+      if (staffMember && eventToUpdate.staffId !== finalStaffId && updatedEvent.rawOrderId) {
           try {
               const sheetResult = await updateSheetStatus({
                   gasUrl: orderGasUrl,
-                  eventTitle: updatedEvent.title,
+                  orderId: updatedEvent.rawOrderId,
                   staffName: staffMember.name,
               });
               if (sheetResult.status === 'error') throw new Error(sheetResult.message);
@@ -500,15 +498,13 @@ export function ScheduleView({
             const travelEventId = `event-${Date.now()}-travel`;
             const taskEventId = `event-${Date.now()}-task`;
             
-            // The crucial change: embed the raw order ID into the title
             const rawOrderId = order.raw?.['受注ID'] || order.id;
-            const taskTitleWithId = `(ID: ${rawOrderId}) ${order.taskDetails.split('\n')[0]}`;
             
             // --- Sheet Update Logic ---
             try {
               const sheetResult = await updateSheetStatus({
                 gasUrl: orderGasUrl,
-                eventTitle: taskTitleWithId,
+                orderId: rawOrderId,
                 staffName: staff.name,
               });
               if (sheetResult.status === 'error') throw new Error(sheetResult.message);
@@ -532,11 +528,12 @@ export function ScheduleView({
                 end: taskStart,
             };
             
-            const taskEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
+            const taskEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId' | 'rawOrderId'> & { rawOrderId?: string } = {
                 id: taskEventId,
                 tripId: tripId,
                 orderId: order.id,
-                title: taskTitleWithId,
+                rawOrderId: rawOrderId,
+                title: order.taskDetails,
                 description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                 staffId: newStaffId,
                 locationId: customer?.id || '',
@@ -552,7 +549,7 @@ export function ScheduleView({
             
             setOrdersData(prev => prev.filter(o => o.id !== order.id));
             setScheduleData(prev => [...prev, travelEvent, taskEvent]);
-            toast({ title: 'タスクを割り当てました', description: `${staff.name}さんに「${taskTitleWithId}」を割り当てました。`});
+            toast({ title: 'タスクを割り当てました', description: `${staff.name}さんに「${order.taskDetails.split('\n')[0]}」を割り当てました。`});
         }
     }
 

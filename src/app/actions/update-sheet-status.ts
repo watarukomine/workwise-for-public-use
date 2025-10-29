@@ -1,10 +1,8 @@
 
 'use server';
 
-import { useOrder } from "@/contexts/order-context";
-
 interface UpdateSheetStatusArgs {
-    eventTitle?: string;
+    orderId: string;
     staffName?: string | null;
     gasUrl: string;
 }
@@ -15,18 +13,18 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName } = args;
+    const { gasUrl, orderId, staffName } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
-     if (!eventTitle) {
-        return { status: 'error', message: '更新対象のイベントタイトルが必要です。' };
+     if (!orderId) {
+        return { status: 'error', message: '更新対象の受注IDが必要です。' };
     }
 
     const payload = {
-      eventTitle: eventTitle,
-      staffName: staffName || "" // Ensure staffName is at least an empty string
+      orderId: orderId,
+      staffName: staffName || "" // Ensure staffName is at least an empty string to signify un-assignment
     };
 
     try {

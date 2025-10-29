@@ -43,6 +43,7 @@ export type ScheduleEvent = {
   id: string;
   tripId?: string; // To group travel and task events
   orderId?: string; // To link back to the original order
+  rawOrderId?: string; // To persist the original Sheet Order ID
   title: string;
   description?: string;
   locationId: string;
