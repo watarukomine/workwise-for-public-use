@@ -19,9 +19,10 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
+    // staffNameがnullの場合は、GAS側で正しく処理できるよう空文字を渡す
     const payload = {
         orderId: orderId,
-        staffName: staffName,
+        staffName: staffName ?? "",
     };
 
     try {
@@ -39,7 +40,6 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
              throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
         
-        // GASからのレスポンスは常にJSONとしてパースする
         const result = await response.json();
 
         if (result.status === 'error' || result.error) {

@@ -30,10 +30,8 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                // 明示的にJSON形式で送信することを宣言
                 'Content-Type': 'application/json',
             },
-            // ペイロード全体をJSON文字列に変換してbodyに設定
             body: JSON.stringify(payload),
             cache: 'no-store',
             redirect: 'follow',
@@ -43,7 +41,6 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
              throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
         
-        // GASからのレスポンスは常にJSONとしてパースする
         const result = await response.json();
 
         if (result.status === 'error' || result.error) {
