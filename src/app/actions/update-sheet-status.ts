@@ -22,7 +22,8 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
 
     const payload = {
       orderId,
-      staffName: staffName, // Send null if unassigning
+      // staffName が null の場合でも、キー自体は送信するようにする
+      staffName: staffName,
     };
 
     try {
@@ -31,8 +32,6 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
             headers: {
                 'Content-Type': 'application/json',
             },
-            // GASがJSON.parse(e.postData.contents)を期待しているため、
-            // bodyをJSON文字列として送信します。
             body: JSON.stringify(payload),
             cache: 'no-store',
             redirect: 'follow'
