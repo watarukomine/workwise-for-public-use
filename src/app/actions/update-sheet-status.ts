@@ -3,33 +3,26 @@
 
 interface UpdateSheetStatusArgs {
     orderId: string;
-    staffName: string | null; // Allow null to clear the name
+    staffName: string | null;
     gasUrl: string;
 }
 
 interface GasResponse {
     status: 'success' | 'error';
     message: string;
-    error?: boolean; // Some GAS implementations might return 'error: true'
+    error?: boolean; 
 }
 
-/**
- * Calls a Google Apps Script to update the status of an order in a spreadsheet.
- * @param {UpdateSheetStatusArgs} args - The arguments for updating the sheet.
- * @returns {Promise<GasResponse>} The response from the Google Apps Script.
- */
+
 export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSheetStatusArgs): Promise<GasResponse> {
     if (!gasUrl) {
-        console.error('GAS URL is not provided.');
-        return { status: 'error', message: 'GAS URL is not configured.' };
+        console.error('担当者更新用のGAS URLが提供されていません。');
+        return { status: 'error', message: '担当者更新用のGAS URLが設定されていません。「受注管理」ページで設定してください。' };
     }
 
     try {
-        // Use URLSearchParams to send data as form data, which is robust for GAS.
         const formData = new URLSearchParams();
         formData.append('orderId', orderId);
-        // Append staffName only if it's not null. GAS will see it as an empty string if it's ""
-        // and won't see the parameter at all if it's null, which is fine.
         if (staffName !== null) {
             formData.append('staffName', staffName);
         }
@@ -38,36 +31,38 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
             method: 'POST',
             cache: 'no-store',
             headers: {
-                // This header is automatically set by fetch when body is URLSearchParams,
-                // but we set it explicitly for clarity.
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: formData.toString(),
             redirect: 'follow', 
         });
+        
+        // Check if the final URL after redirects is a Google sign-in page, indicating a permissions error.
+        if (response.url.includes('accounts.google.com')) {
+            throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
+        }
 
-        const contentType = response.headers.get('content-type');
         const responseText = await response.text();
         
+        // First, check for a non-OK HTTP status
         if (!response.ok) {
              throw new Error(`GAS script returned a non-OK response. Status: ${response.status}. Response: ${responseText}`);
         }
 
-        // GAS should always return JSON now.
+        // If the response is not JSON, it's an error (e.g. HTML from a login page)
+        let result: GasResponse;
         try {
-            const result: GasResponse = JSON.parse(responseText);
-
-            if(result.error === true || result.status === 'error'){
-                // The message from GAS is now the primary source of truth.
-                throw new Error(result.message || 'GAS returned a JSON-formatted error.');
-            }
-
-            return result;
+            result = JSON.parse(responseText);
         } catch (parseError) {
-             // This error happens if GAS returns something that isn't valid JSON,
-             // which points to an error happening *before* the `catch` block in the GAS code itself.
              throw new Error(`GAS script returned a non-JSON response. This often indicates a script error or permission issue. Response: ${responseText}`);
         }
+
+        // Check for an application-level error within the JSON response
+        if (result.error === true || result.status === 'error') {
+            throw new Error(result.message || 'GAS script returned a JSON-formatted error.');
+        }
+
+        return result;
 
     } catch (error: any) {
         console.error('Failed to call GAS for status update:', error.message);
