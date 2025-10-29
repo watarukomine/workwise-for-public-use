@@ -2,7 +2,7 @@
 'use server';
 
 interface UpdateSheetStatusArgs {
-    orderId: string;
+    eventTitle: string; // 受注IDを含むイベントのタイトル
     staffName: string | null;
     gasUrl: string;
 }
@@ -13,25 +13,27 @@ interface GasResponse {
     error?: boolean; 
 }
 
-export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSheetStatusArgs): Promise<GasResponse> {
+export async function updateSheetStatus({ eventTitle, staffName, gasUrl }: UpdateSheetStatusArgs): Promise<GasResponse> {
     
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
-
-    // Use URLSearchParams to ensure 'application/x-www-form-urlencoded' format
-    const body = new URLSearchParams();
-    body.append('orderId', orderId);
-    // Ensure staffName is always present, even if empty, to satisfy GAS.
-    body.append('staffName', staffName || '');
+    
+    // 送信するデータをシンプルなJSONオブジェクトとして定義
+    const payload = {
+        eventTitle: eventTitle,
+        staffName: staffName, // nullの場合もそのまま送信
+    };
 
     try {
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                // 明示的にJSON形式であることを指定
+                'Content-Type': 'application/json',
             },
-            body: body.toString(),
+            // オブジェクトをJSON文字列に変換してbodyに設定
+            body: JSON.stringify(payload),
             cache: 'no-store',
             redirect: 'follow'
         });

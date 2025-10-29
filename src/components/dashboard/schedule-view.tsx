@@ -297,6 +297,9 @@ export function ScheduleView({
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
+    // This is the event title that contains the ID, e.g., "(ID: 5) ABC Store"
+    const eventTitle = eventToUnassign.title;
+
     const eventsToDelete = eventToUnassign.tripId 
         ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId)
         : [eventToUnassign];
@@ -318,24 +321,24 @@ export function ScheduleView({
         }
     }
     
-    const orderIdToRestore = eventToUnassign.orderId;
-    if (orderIdToRestore) {
-        const originalOrder = ordersData.find(o => o.id === orderIdToRestore);
+    // Restore the original order to the unassigned list
+    if (eventToUnassign.orderId) {
+        const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
         if (originalOrder) {
            setOrdersData(currentOrders => [...currentOrders, originalOrder]);
         }
     }
     
-    const orderIdForSheet = eventToUnassign.rawOrderId;
-    if (orderIdForSheet && orderGasUrl) {
+    // Update the spreadsheet by sending the event title
+    if (eventTitle && orderGasUrl) {
         try {
             const result = await updateSheetStatus({
-                orderId: orderIdForSheet,
-                staffName: null,
+                eventTitle: eventTitle, // Use the title which contains the ID
+                staffName: null, // Set staff to null
                 gasUrl: orderGasUrl,
             });
             if (result.status === 'success') {
-                toast({ title: 'スプレッドシート更新', description: `オーダー #${orderIdForSheet} を未割当に戻しました。` });
+                toast({ title: 'スプレッドシート更新', description: `タスク「${eventTitle}」を未割当に戻しました。` });
             } else {
                 throw new Error(result.message || '不明なエラー');
             }
@@ -364,6 +367,7 @@ export function ScheduleView({
     
     const newStaffId = over?.id as string | undefined;
 
+    // This block handles MOVING an existing event on the timeline
     if ('staffId' in item && 'start' in item && newStaffId && newStaffId !== UNASSIGNED_TASKS_DROPPABLE_ID) {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
@@ -406,6 +410,7 @@ export function ScheduleView({
       }
 
     }
+    // This block handles ADDING a NEW event from the unassigned list
     else if ('estimatedDuration' in item && newStaffId && over?.rect) {
         const order = item;
         const timelineRect = over.rect;
@@ -471,8 +476,12 @@ export function ScheduleView({
             const tripId = `trip-${Date.now()}`;
             const travelEventId = `event-${Date.now()}-travel`;
             const taskEventId = `event-${Date.now()}-task`;
+
+            // ★★★ Your Suggestion Here: Embed the Raw Order ID into the title ★★★
+            const rawOrderId = order.raw?.['受注ID'] || order.id;
+            const taskTitleWithId = `(ID: ${rawOrderId}) ${order.taskDetails}`;
             
-            const travelEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
+            const travelEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId' | 'title'> & { title: string } = {
                 id: travelEventId,
                 tripId: tripId,
                 title: `移動: ${customer?.storeName || order.customerCode}`,
@@ -483,13 +492,12 @@ export function ScheduleView({
                 end: taskStart,
             };
             
-            const rawOrderId = order.raw?.['受注ID'] || order.id;
-            const taskEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
+            const taskEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId' | 'title'> & { title: string } = {
                 id: taskEventId,
                 tripId: tripId,
                 orderId: order.id,
                 rawOrderId: rawOrderId,
-                title: order.taskDetails,
+                title: taskTitleWithId, // Use the title with the embedded ID
                 description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`,
                 staffId: newStaffId,
                 locationId: customer?.id || '',
@@ -506,17 +514,17 @@ export function ScheduleView({
             setOrdersData(prev => prev.filter(o => o.id !== order.id));
             setScheduleData(prev => [...prev, travelEvent, taskEvent]);
             
-            if (staff && rawOrderId && orderGasUrl) {
+            if (staff && orderGasUrl) {
                  try {
                     const result = await updateSheetStatus({
-                        orderId: rawOrderId,
+                        eventTitle: taskTitleWithId, // Send the title with the ID
                         staffName: staff.name,
                         gasUrl: orderGasUrl,
                     });
                     if (result.status === 'success') {
                         toast({
                             title: 'スプレッドシート更新成功',
-                            description: `オーダー #${rawOrderId} を ${staff.name} さんに割り当てました。`,
+                            description: `オーダー ${taskTitleWithId} を ${staff.name} さんに割り当てました。`,
                         });
                     } else {
                         throw new Error(result.message || '不明なエラー');
@@ -934,7 +942,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     }
   }
   
-  const [line1, line2] = (event.title || '').split('\n');
+  const [line1, ...rest] = (event.title || '').split('\n');
+  const line2 = rest.join('\n');
 
 
   return (
@@ -955,9 +964,11 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
           </p>
-          <p className="text-xs opacity-80 truncate pointer-events-none">
-            {line2}
-          </p>
+          {line2 && (
+            <p className="text-xs opacity-80 truncate pointer-events-none">
+                {line2}
+            </p>
+          )}
         </div>
       </TooltipTrigger>
       <TooltipContent>
