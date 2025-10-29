@@ -13,7 +13,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { isToday, parseISO, isValid, format } from 'date-fns';
+import { isToday, parseISO, isValid, format, startOfToday } from 'date-fns';
 
 const parseDate = (dateString: any): Date | null => {
   if (!dateString || typeof dateString !== 'string') return null;
@@ -66,10 +66,32 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
   };
 };
 
+const getTodayStorageKey = () => {
+    const today = format(startOfToday(), 'yyyy-MM-dd');
+    return `scheduleData-${today}`;
+};
+
 export default function DashboardPage() {
   const [customers] = React.useState<WithId<Customer>[]>(customerData);
-  const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
   
+  // Initialize scheduleData from localStorage
+  const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>(() => {
+      if (typeof window === 'undefined') return [];
+      try {
+          // Clear old storage keys
+          Object.keys(localStorage).forEach(key => {
+              if (key.startsWith('scheduleData-') && key !== getTodayStorageKey()) {
+                  localStorage.removeItem(key);
+              }
+          });
+          const savedData = localStorage.getItem(getTodayStorageKey());
+          return savedData ? JSON.parse(savedData) : [];
+      } catch (error) {
+          console.error("Failed to parse schedule data from localStorage", error);
+          return [];
+      }
+  });
+
   const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
   
   const [orders, setOrders] = React.useState<WithId<Order>[]>([]);
@@ -95,6 +117,18 @@ export default function DashboardPage() {
       setOrders([]);
     }
   }, [rawOrders]);
+
+  // Persist scheduleData to localStorage whenever it changes
+  React.useEffect(() => {
+      try {
+          if (typeof window !== 'undefined') {
+              localStorage.setItem(getTodayStorageKey(), JSON.stringify(scheduleData));
+          }
+      } catch (error) {
+          console.error("Failed to save schedule data to localStorage", error);
+      }
+  }, [scheduleData]);
+
 
   const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || !profile) return [];
