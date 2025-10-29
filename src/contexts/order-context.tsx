@@ -5,7 +5,6 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
 const ORDER_GAS_URL_KEY = 'orderGasUrl';
-const ORDER_SHEET_NAME = '受注管理'; // Define the sheet name
 
 interface OrderContextType {
   orders: any[];
@@ -49,11 +48,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setErrorState(null);
         try {
-          // Append sheet name as a query parameter
-          const url = new URL(orderGasUrl);
-          url.searchParams.set('sheet', ORDER_SHEET_NAME);
-          
-          const result = await fetchGasData(url.toString());
+          // This script is expected to fetch only order data. No parameters needed.
+          const result = await fetchGasData(orderGasUrl);
 
           if (result.error && result.message) {
             throw new Error(result.message);

@@ -1,10 +1,10 @@
+
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
 const CUSTOMER_GAS_URL_KEY = 'customerGasUrl';
-const CUSTOMER_SHEET_NAME = '販売店'; // Define the sheet name
 
 interface CustomerContextType {
   customers: any[];
@@ -48,11 +48,8 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setErrorState(null);
         try {
-          // Append sheet name as a query parameter
-          const url = new URL(customerGasUrl);
-          url.searchParams.set('sheet', CUSTOMER_SHEET_NAME);
-
-          const result = await fetchGasData(url.toString());
+          // This script is expected to fetch only customer data. No parameters needed.
+          const result = await fetchGasData(customerGasUrl);
 
           if (result.error && result.message) {
             throw new Error(result.message);
@@ -68,7 +65,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         }
       } else {
-        setErrorState("販売店データのURLが設定されていません。「データ取込」ページで設定してください。")
+        setErrorState("販売店データのURLが設定されていません。")
         setCustomers([]);
         setIsLoading(false);
       }

@@ -10,7 +10,6 @@ import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
 const LOCAL_STORAGE_KEY = 'appliedStaffIds';
 const STAFF_GAS_URL_KEY = 'staffImporterUrl';
-const STAFF_SHEET_NAME = 'スタッフ'; // Define the sheet name
 
 const findRoleValue = (item: any): 'admin' | 'staff' => {
   if (!item || typeof item !== 'object') return 'staff';
@@ -31,11 +30,8 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     }
 
     try {
-        const url = new URL(staffGasUrl);
-        url.searchParams.set('sheet', STAFF_SHEET_NAME);
-        
-        // Use the centralized fetchGasData action
-        const result = await fetchGasData(url.toString());
+        // This script is expected to fetch only staff data. No parameters needed.
+        const result = await fetchGasData(staffGasUrl);
         
         if (result.error && result.message) {
           throw new Error(result.message);
