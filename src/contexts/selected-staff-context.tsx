@@ -9,10 +9,11 @@ import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
 const STAFF_GAS_URL_KEY = 'staffGasUrl';
 
+
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     const url = localStorage.getItem(STAFF_GAS_URL_KEY);
     if (!url) {
-        throw new Error("スタッフ情報を取得するためのGoogle Apps Script URLが設定されていません。");
+        throw new Error("スタッフ情報を取得するためのGoogle Apps Script URLがスタッフ管理ページで設定されていません。");
     }
 
     try {
@@ -21,8 +22,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
         const dataToProcess = result.data || (Array.isArray(result) ? result : []);
         
         if (dataToProcess.length === 0) {
-            console.warn("GAS returned no staff data. Raw response:", result);
-             throw new Error("GASからスタッフデータを取得できませんでした。GASのURLが正しいか、シートにデータが存在するか確認してください。");
+            throw new Error("GASからスタッフデータを取得できませんでした。GASのURLが正しいか、シートにデータが存在するか確認してください。");
         }
 
         // Map GAS data to Staff type
@@ -30,7 +30,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
             id: String(item['id'] || item['ID'] || item['スタッフID'] || `gas-staff-${Math.random()}`),
             name: item['スタッフ名'] || 'No Name',
             email: item['メールアドレス'] || '',
-            role: (item['権限'] === 'admin' || item['Role'] === 'admin') ? 'admin' : 'staff',
+            role: (item['権限'] === 'admin' || item['Role'] === 'admin' || item['ロール'] === 'admin') ? 'admin' : 'staff',
             password: item['パスワード'] || 'password',
             color: item['color'] || `hsl(${Math.floor(Math.random() * 360)}, 70%, 60%)`,
             avatarUrl: item['avatarUrl'] || '',
