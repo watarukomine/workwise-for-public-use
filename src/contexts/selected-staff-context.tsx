@@ -56,8 +56,8 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 email: item['メールアドレス'] || '',
                 role: getRole(),
                 password: item['パスワード'] || 'password',
-                // Use color from sheet if available, otherwise use the consistent generated color
-                color: item['color'] || consistentColor,
+                // Use color from sheet if available (checking for 'color' or 'カラー'), otherwise use the consistent generated color
+                color: item['color'] || item['カラー'] || consistentColor,
                 avatarUrl: item['avatarUrl'] || '',
                 ...item
             };
