@@ -5,6 +5,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
 const ORDER_GAS_URL_KEY = 'orderGasUrl';
+const ORDER_SHEET_NAME = '受注管理'; // Define the sheet name
 
 interface OrderContextType {
   orders: any[];
@@ -26,7 +27,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(ORDER_GAS_URL_KEY);
-    // Set state from localStorage or default if not present
     setOrderGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbwKHEiMgF1sj5etEdC5nngl1Trbshj299lsAaMLLvJdWz1d48WmPgMgcA86K_hbZQes6w/exec');
   }, []);
   
@@ -49,7 +49,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setErrorState(null);
         try {
-          const result = await fetchGasData(orderGasUrl);
+          // Append sheet name as a query parameter
+          const url = new URL(orderGasUrl);
+          url.searchParams.set('sheet', ORDER_SHEET_NAME);
+          
+          const result = await fetchGasData(url.toString());
 
           if (result.error && result.message) {
             throw new Error(result.message);

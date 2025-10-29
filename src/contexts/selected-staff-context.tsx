@@ -5,9 +5,12 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useCa
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
+import { fetchGasData } from '@/app/actions/fetch-gas-data';
+
 
 const LOCAL_STORAGE_KEY = 'appliedStaffIds';
-const STAFF_GAS_URL_KEY = 'staffImporterUrl'; // Key to get URL from localStorage
+const STAFF_GAS_URL_KEY = 'staffImporterUrl';
+const STAFF_SHEET_NAME = 'スタッフ'; // Define the sheet name
 
 const findRoleValue = (item: any): 'admin' | 'staff' => {
   if (!item || typeof item !== 'object') return 'staff';
@@ -18,7 +21,6 @@ const findRoleValue = (item: any): 'admin' | 'staff' => {
   return 'staff';
 };
 
-// This function now lives here, where it belongs.
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     if (typeof window === 'undefined') return [];
     const staffGasUrl = localStorage.getItem(STAFF_GAS_URL_KEY);
@@ -29,43 +31,40 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     }
 
     try {
-        const response = await fetch(staffGasUrl, { cache: 'no-store' });
-        if (response.ok) {
-            const result = await response.json();
-            const rawStaffArray = result.data || (Array.isArray(result) ? result : []);
-
-            if (Array.isArray(rawStaffArray)) {
-                return rawStaffArray.map((item: any, index: number) => {
-                    const id = String(item['スタッフID'] || item.id);
-                    // Assign a unique, visually distinct color if not provided
-                    const color = item['カラー'] || item.color || `hsl(${(index * 137.5) % 360}, 70%, 50%)`;
-                    return {
-                        id: id,
-                        role: findRoleValue(item),
-                        name: item['スタッフ名'] || item.name,
-                        email: item['メールアドレス'] || item.email,
-                        password: item['パスワード'] || item.password,
-                        calendarId: item['カレンダーID'] || item.calendarId,
-                        color: color,
-                        avatarUrl: `https://picsum.photos/seed/${id}/100/100`,
-                    };
-                });
-            }
-        } else {
-             // Handle non-ok responses
-            const errorText = await response.text();
-            try {
-                const errorJson = JSON.parse(errorText);
-                throw new Error(errorJson.message || `GAS request failed with status: ${response.status}`);
-            } catch (e) {
-                throw new Error(errorText || `GAS request failed with status: ${response.status}`);
-            }
+        const url = new URL(staffGasUrl);
+        url.searchParams.set('sheet', STAFF_SHEET_NAME);
+        
+        // Use the centralized fetchGasData action
+        const result = await fetchGasData(url.toString());
+        
+        if (result.error && result.message) {
+          throw new Error(result.message);
         }
-    } catch (error) {
+
+        const rawStaffArray = result.data || (Array.isArray(result) ? result : []);
+
+        if (Array.isArray(rawStaffArray)) {
+            return rawStaffArray.map((item: any, index: number) => {
+                const id = String(item['スタッフID'] || item.id);
+                const color = item['カラー'] || item.color || `hsl(${(index * 137.5) % 360}, 70%, 50%)`;
+                return {
+                    id: id,
+                    role: findRoleValue(item),
+                    name: item['スタッフ名'] || item.name,
+                    email: item['メールアドレス'] || item.email,
+                    password: item['パスワード'] || item.password,
+                    calendarId: item['カレンダーID'] || item.calendarId,
+                    color: color,
+                    avatarUrl: `https://picsum.photos/seed/${id}/100/100`,
+                };
+            });
+        }
+    } catch (error: any) {
         console.error('Error fetching staff data from GAS:', error);
-        throw new Error('Failed to fetch staff data from spreadsheet.');
+        // Re-throw the specific error message from fetchGasData
+        throw new Error(error.message || 'Failed to fetch staff data from spreadsheet.');
     }
-    return []; // Return empty if response not ok or data malformed
+    return [];
 };
 
 interface SelectedStaffContextType {
@@ -76,8 +75,8 @@ interface SelectedStaffContextType {
   togglePendingStaffSelection: (staffId: string) => void;
   setPendingSelection: (staffIds: string[]) => void;
   applyPendingSelection: () => void;
-  isLoading: boolean; // Add loading state
-  error: string | null; // Add error state
+  isLoading: boolean;
+  error: string | null;
 }
 
 const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>(undefined);
@@ -92,7 +91,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // This effect loads staff data from GAS when the component mounts.
   useEffect(() => {
     const loadStaff = async () => {
         setIsLoading(true);
@@ -101,21 +99,19 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
           const fetchedStaff = await fetchStaffDataFromGAS();
           setAllStaffState(fetchedStaff);
 
-          // Initialize selections after staff has been fetched
           const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
           if (savedIds) {
             const parsedIds = JSON.parse(savedIds);
             setAppliedSelectedStaffIds(parsedIds);
             setPendingSelectedStaffIds(parsedIds);
           } else {
-             // If no selection is saved, default to all staff
             const allStaffIds = fetchedStaff.map(s => s.id);
             setAppliedSelectedStaffIds(allStaffIds);
             setPendingSelectedStaffIds(allStaffIds);
           }
 
         } catch (e: any) {
-          setError("スタッフ情報の取得に失敗しました。データ取込ページでURLが正しく設定されているか確認してください。");
+          setError(`スタッフ情報の取得に失敗しました: ${e.message}`);
           console.error(e);
         } finally {
           setIsLoading(false);
@@ -129,7 +125,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     if (!profile || isProfileLoading || isLoading) return;
 
     if (profile.role !== 'admin') {
-        // For non-admins, force selection to only their own ID
         setAppliedSelectedStaffIds([profile.id]);
         setPendingSelectedStaffIds([profile.id]);
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([profile.id]));

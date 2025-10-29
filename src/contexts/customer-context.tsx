@@ -4,6 +4,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
 const CUSTOMER_GAS_URL_KEY = 'customerGasUrl';
+const CUSTOMER_SHEET_NAME = '販売店'; // Define the sheet name
 
 interface CustomerContextType {
   customers: any[];
@@ -25,7 +26,6 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
-    // Set state from localStorage or default if not present
     setCustomerGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbyZ2ggDU-l-J4yCsVu0slMc81WnJh_Mty5xtcv0bTOWy7y7avCcE9rK83qMa8vo6WVp/exec');
   }, []);
   
@@ -48,7 +48,11 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setErrorState(null);
         try {
-          const result = await fetchGasData(customerGasUrl);
+          // Append sheet name as a query parameter
+          const url = new URL(customerGasUrl);
+          url.searchParams.set('sheet', CUSTOMER_SHEET_NAME);
+
+          const result = await fetchGasData(url.toString());
 
           if (result.error && result.message) {
             throw new Error(result.message);
