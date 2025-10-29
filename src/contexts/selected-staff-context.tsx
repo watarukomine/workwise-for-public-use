@@ -13,7 +13,10 @@ const STAFF_GAS_URL_KEY = 'staffGasUrl';
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     const url = localStorage.getItem(STAFF_GAS_URL_KEY);
     if (!url) {
-        throw new Error("スタッフ情報を取得するためのGoogle Apps Script URLがスタッフ管理ページで設定されていません。");
+        // Return empty array instead of throwing error if URL is not set.
+        // The UI will handle prompting the user.
+        console.log("スタッフ情報を取得するためのGoogle Apps Script URLが設定されていません。");
+        return [];
     }
 
     try {
@@ -26,16 +29,27 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
         }
 
         // Map GAS data to Staff type
-        return dataToProcess.map((item: any) => ({
-            id: String(item['id'] || item['ID'] || item['スタッフID'] || `gas-staff-${Math.random()}`),
-            name: item['スタッフ名'] || 'No Name',
-            email: item['メールアドレス'] || '',
-            role: (item['権限'] === 'admin' || item['Role'] === 'admin' || item['ロール'] === 'admin') ? 'admin' : 'staff',
-            password: item['パスワード'] || 'password',
-            color: item['color'] || `hsl(${Math.floor(Math.random() * 360)}, 70%, 60%)`,
-            avatarUrl: item['avatarUrl'] || '',
-            ...item
-        }));
+        return dataToProcess.map((item: any) => {
+            
+            const getRole = (): 'admin' | 'staff' => {
+                const roleValue = item['権限'] || item['Role'] || item['ロール'];
+                if (typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
+                    return 'admin';
+                }
+                return 'staff';
+            };
+
+            return {
+                id: String(item['id'] || item['ID'] || item['スタッフID'] || `gas-staff-${Math.random()}`),
+                name: item['スタッフ名'] || 'No Name',
+                email: item['メールアドレス'] || '',
+                role: getRole(),
+                password: item['パスワード'] || 'password',
+                color: item['color'] || `hsl(${Math.floor(Math.random() * 360)}, 70%, 60%)`,
+                avatarUrl: item['avatarUrl'] || '',
+                ...item
+            };
+        });
 
     } catch (error: any) {
         console.error('Error fetching staff data from GAS:', error);
