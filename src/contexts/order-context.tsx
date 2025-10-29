@@ -26,7 +26,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(ORDER_GAS_URL_KEY);
-    setOrderGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbwKHEiMgF1sj5etEdC5nngl1Trbshj299lsAaMLLvJdWz1d48WmPgMgcA86K_hbZQes6w/exec');
+    setOrderGasUrlState(savedUrl || '');
   }, []);
   
   const setOrderGasUrl = (url: string) => {
@@ -48,7 +48,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setErrorState(null);
         try {
-          // This script is expected to fetch only order data. No parameters needed.
           const result = await fetchGasData(orderGasUrl);
 
           if (result.error && result.message) {
@@ -65,7 +64,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         }
       } else {
-        setErrorState("受注データのURLが設定されていません。")
+        setErrorState(null); // URLが空の場合はエラーメッセージを表示しない
         setOrders([]);
         setIsLoading(false);
       }

@@ -26,7 +26,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
-    setCustomerGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbyZ2ggDU-l-J4yCsVu0slMc81WnJh_Mty5xtcv0bTOWy7y7avCcE9rK83qMa8vo6WVp/exec');
+    setCustomerGasUrlState(savedUrl || '');
   }, []);
   
   const setCustomerGasUrl = (url: string) => {
@@ -48,7 +48,6 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setErrorState(null);
         try {
-          // This script is expected to fetch only customer data. No parameters needed.
           const result = await fetchGasData(customerGasUrl);
 
           if (result.error && result.message) {
@@ -65,7 +64,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         }
       } else {
-        setErrorState("販売店データのURLが設定されていません。")
+        setErrorState(null); // URLが空の場合はエラーメッセージを表示しない
         setCustomers([]);
         setIsLoading(false);
       }

@@ -30,7 +30,6 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     }
 
     try {
-        // This script is expected to fetch only staff data. No parameters needed.
         const result = await fetchGasData(staffGasUrl);
         
         if (result.error && result.message) {
@@ -41,7 +40,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
         if (Array.isArray(rawStaffArray)) {
             return rawStaffArray.map((item: any, index: number) => {
-                const id = String(item['スタッフID'] || item.id);
+                const id = String(item['スタッフID'] || item.id || `staff-${index}`);
                 const color = item['カラー'] || item.color || `hsl(${(index * 137.5) % 360}, 70%, 50%)`;
                 return {
                     id: id,
@@ -55,12 +54,11 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 };
             });
         }
+         return [];
     } catch (error: any) {
         console.error('Error fetching staff data from GAS:', error);
-        // Re-throw the specific error message from fetchGasData
         throw new Error(error.message || 'Failed to fetch staff data from spreadsheet.');
     }
-    return [];
 };
 
 interface SelectedStaffContextType {
