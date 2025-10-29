@@ -20,19 +20,19 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
-    const payload = {
-      orderId,
-      // staffName が null の場合でも、キー自体は送信するようにする
-      staffName: staffName,
-    };
+    const formData = new URLSearchParams();
+    formData.append('orderId', orderId);
+    // staffName が null の場合でも、キー自体は送信するようにする
+    formData.append('staffName', staffName || '');
+
 
     try {
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: JSON.stringify(payload),
+            body: formData.toString(),
             cache: 'no-store',
             redirect: 'follow'
         });
@@ -60,3 +60,4 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         };
     }
 }
+
