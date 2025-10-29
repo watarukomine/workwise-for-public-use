@@ -12,6 +12,7 @@ export type Staff = {
   avatarUrl?: string; 
   color?: string; 
   role: 'admin' | 'staff';
+  ロール?: 'admin' | 'staff';
   // Add password for mock authentication, but it should not be stored in a real DB like this.
   password?: string; 
 };

@@ -22,7 +22,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
         const dataToProcess = result.data || (Array.isArray(result) ? result : []);
         
         if (dataToProcess.length === 0) {
-            throw new Error("GASからスタッフデータを取得できませんでした。GASのURLが正しいか、シートにデータが存在するか確認してください。");
+            return [];
         }
 
         // Map GAS data to Staff type
@@ -34,6 +34,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
             password: item['パスワード'] || 'password',
             color: item['color'] || `hsl(${Math.floor(Math.random() * 360)}, 70%, 60%)`,
             avatarUrl: item['avatarUrl'] || '',
+            ...item
         }));
 
     } catch (error: any) {
@@ -77,15 +78,17 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
           const fetchedStaff = await fetchStaffDataFromGAS();
           setAllStaffState(fetchedStaff);
 
-          const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
-          if (savedIds) {
-            const parsedIds = JSON.parse(savedIds);
-            setAppliedSelectedStaffIds(parsedIds);
-            setPendingSelectedStaffIds(parsedIds);
-          } else {
-            const allStaffIds = fetchedStaff.map(s => s.id);
-            setAppliedSelectedStaffIds(allStaffIds);
-            setPendingSelectedStaffIds(allStaffIds);
+          if (fetchedStaff.length > 0) {
+            const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (savedIds) {
+              const parsedIds = JSON.parse(savedIds);
+              setAppliedSelectedStaffIds(parsedIds);
+              setPendingSelectedStaffIds(parsedIds);
+            } else {
+              const allStaffIds = fetchedStaff.map(s => s.id);
+              setAppliedSelectedStaffIds(allStaffIds);
+              setPendingSelectedStaffIds(allStaffIds);
+            }
           }
 
         } catch (e: any) {

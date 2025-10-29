@@ -100,7 +100,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                 )}
                 <TableHead>スタッフ名</TableHead>
                 <TableHead>メールアドレス</TableHead>
-                <TableHead>権限</TableHead>
+                <TableHead>ロール</TableHead>
                 <TableHead>スタッフID</TableHead>
               </TableRow>
             </TableHeader>
