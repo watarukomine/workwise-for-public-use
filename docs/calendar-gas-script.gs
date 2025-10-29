@@ -2,113 +2,95 @@
 /**
  * @OnlyCurrentDoc
  *
- * The above comment directs App Script to limit the scope of file
- * access for this script to only the current document containing the script.
- * This is a security best practice.
+ * The above comment directs App Scripts to limit the scope of OAuth token
+ * to only the current document.
  */
 
-// This function handles all incoming POST requests from the web app.
 function doPost(e) {
-  let response;
   try {
-    // It's crucial to wrap this in a try-catch block to handle any errors.
-    // The `e` object contains information about the request.
-    // For a POST request with a JSON payload, the data is in `e.postData.string`.
-    if (!e || !e.postData || !e.postData.string) {
-      throw new Error("Invalid POST data received.");
+    // デバッグ用：受信したリクエスト全体をログに出力
+    Logger.log("Received POST request: " + JSON.stringify(e));
+
+    if (!e.postData || !e.postData.contents) {
+      throw new Error("POSTデータが見つかりません。");
     }
-    
-    // Parse the JSON string from the request body into a JavaScript object.
-    const args = JSON.parse(e.postData.string);
+    const args = JSON.parse(e.postData.contents);
+    Logger.log("Parsed arguments: " + JSON.stringify(args));
 
-    // Call the main handler function with the parsed arguments.
-    response = handleCalendarUpdate(args);
 
-  } catch (error) {
-    // If an error occurs, create an error response object.
-    response = {
-      status: 'error',
-      message: 'GAS Script Error: ' + error.toString(),
+    const { operation, calendarId, eventId, title, description, startTime, endTime } = args;
+
+    if (!calendarId) {
+      throw new Error("カレンダーIDが指定されていません。");
+    }
+
+    const calendar = CalendarApp.getCalendarById(calendarId);
+    if (!calendar) {
+      throw new Error(`指定されたカレンダーIDが見つかりません: ${calendarId}`);
+    }
+
+    let event;
+    let result = { status: "success", message: "", eventId: "" };
+
+    switch (operation) {
+      case "create":
+        event = calendar.createEvent(
+          title,
+          new Date(startTime),
+          new Date(endTime),
+          { description: description }
+        );
+        result.message = "イベントが正常に作成されました。";
+        result.eventId = event.getId();
+        Logger.log("Event created: " + event.getId());
+        break;
+
+      case "update":
+        if (!eventId) throw new Error("イベントIDが指定されていません。");
+        event = calendar.getEventById(eventId);
+        if (!event) throw new Error(`指定されたイベントIDが見つかりません: ${eventId}`);
+        
+        event.setTitle(title);
+        event.setTime(new Date(startTime), new Date(endTime));
+        event.setDescription(description);
+        
+        result.message = "イベントが正常に更新されました。";
+        result.eventId = eventId;
+        Logger.log("Event updated: " + eventId);
+        break;
+
+      case "delete":
+        if (!eventId) throw new Error("イベントIDが指定されていません。");
+        event = calendar.getEventById(eventId);
+        if (event) {
+          event.deleteEvent();
+          result.message = "イベントが正常に削除されました。";
+          Logger.log("Event deleted: " + eventId);
+        } else {
+          // イベントが存在しなくてもエラーとしない
+          result.message = "指定されたイベントは既に存在しないか、見つかりませんでした。";
+          Logger.log("Event not found for deletion: " + eventId);
+        }
+        result.eventId = eventId;
+        break;
+
+      default:
+        throw new Error(`不明な操作です: ${operation}`);
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    Logger.log("Error occurred: " + err.stack);
+    const errorResult = {
+      status: "error",
+      message: err.message,
+      error: true // for client-side check
     };
-  }
-  
-  // Return the response. It must be JSON formatted and sent as a string.
-  return ContentService
-    .createTextOutput(JSON.stringify(response))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-// This is the main logic function that interacts with Google Calendar.
-function handleCalendarUpdate(args) {
-  const { operation, calendarId, eventId, title, description, startTime, endTime } = args;
-
-  // Validate required parameters.
-  if (!operation || !calendarId) {
-    throw new Error("Missing required parameters: operation and calendarId.");
-  }
-
-  // Get the calendar by its ID. If not found, throw an error.
-  const calendar = CalendarApp.getCalendarById(calendarId);
-  if (!calendar) {
-    throw new Error(`Calendar with ID "${calendarId}" not found or access denied.`);
-  }
-
-  // Use a switch statement to handle different operations.
-  switch (operation) {
-    case 'create':
-      if (!title || !startTime || !endTime) {
-        throw new Error("Missing parameters for 'create': title, startTime, and endTime are required.");
-      }
-      // Create a new event and get its ID.
-      const newEvent = calendar.createEvent(
-        title,
-        new Date(startTime),
-        new Date(endTime),
-        { description: description || '' }
-      );
-      return {
-        status: 'success',
-        message: 'Event created successfully.',
-        eventId: newEvent.getId() // Return the ID of the newly created event.
-      };
-
-    case 'update':
-      if (!eventId || !title || !startTime || !endTime) {
-        throw new Error("Missing parameters for 'update': eventId, title, startTime, and endTime are required.");
-      }
-      // Get the event by its ID.
-      const eventToUpdate = calendar.getEventById(eventId);
-      if (!eventToUpdate) {
-        throw new Error(`Event with ID "${eventId}" not found.`);
-      }
-      // Update the event's properties.
-      eventToUpdate.setTitle(title);
-      eventToUpdate.setTime(new Date(startTime), new Date(endTime));
-      eventToUpdate.setDescription(description || '');
-      return {
-        status: 'success',
-        message: 'Event updated successfully.',
-        eventId: eventId
-      };
-
-    case 'delete':
-      if (!eventId) {
-        throw new Error("Missing parameter for 'delete': eventId is required.");
-      }
-      // Get the event by its ID and delete it.
-      const eventToDelete = calendar.getEventById(eventId);
-      if (!eventToDelete) {
-        // If event is already deleted, consider it a success.
-        return { status: 'success', message: 'Event not found, may have been already deleted.' };
-      }
-      eventToDelete.deleteEvent();
-      return {
-        status: 'success',
-        message: 'Event deleted successfully.'
-      };
-
-    default:
-      // If the operation is unknown, throw an error.
-      throw new Error(`Unknown operation: "${operation}"`);
+    return ContentService
+      .createTextOutput(JSON.stringify(errorResult))
+      .setMimeType(ContentService.MimeType.JSON);
   }
 }
