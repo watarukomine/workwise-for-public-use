@@ -21,23 +21,18 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
     }
 
     try {
-        const args = { orderId, staffName };
-
-        // This is a workaround to match the GAS expectation of a JSON-stringified payload
-        // within a specific object structure.
-        const bodyPayload = JSON.stringify({
-            postData: {
-                contents: JSON.stringify(args)
-            }
-        });
+        const formData = new URLSearchParams();
+        formData.append('orderId', orderId);
+        // staffNameがnullやundefinedの場合も "" として追加
+        formData.append('staffName', staffName || '');
 
         const response = await fetch(gasUrl, {
             method: 'POST',
             cache: 'no-store',
             headers: {
-                'Content-Type': 'text/plain;charset=utf-8',
+                'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: bodyPayload,
+            body: formData.toString(),
             redirect: 'follow', 
         });
         

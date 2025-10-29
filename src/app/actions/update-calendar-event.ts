@@ -44,8 +44,7 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
             method: 'POST',
             cache: 'no-store',
             headers: {
-                // application/x-www-form-urlencoded is the default for URLSearchParams
-                // so we don't need to explicitly set it.
+                 'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: formData.toString(),
             redirect: 'follow',
