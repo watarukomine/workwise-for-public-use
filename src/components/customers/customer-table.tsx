@@ -17,14 +17,16 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import type { Customer } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
+type CustomerWithUrl = Customer & { Order_URL?: string };
 interface CustomerTableProps {
   customers: any[]; // Use any[] to be flexible with raw GAS data
   isLoading: boolean;
 }
 
 // Function to map raw data from GAS to the Customer type
-const mapRawDataToCustomers = (rawData: any[]): Customer[] => {
+const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
   if (!Array.isArray(rawData)) {
     return [];
   }
@@ -73,6 +75,13 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
   }, [filteredCustomers, page, rowsPerPage]);
 
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
+  
+  const handleRowDoubleClick = (customer: CustomerWithUrl) => {
+    if (customer && customer.Order_URL) {
+      window.open(customer.Order_URL, '_blank', 'noopener,noreferrer');
+    }
+  };
+
 
   const headers = [
     { key: 'userCode', label: 'ユーザーコード' },
@@ -112,7 +121,11 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
                 </TableRow>
               ) : paginatedCustomers.length > 0 ? (
                 paginatedCustomers.map((customer, index) => (
-                  <TableRow key={customer.id || index}>
+                  <TableRow 
+                    key={customer.id || index}
+                    onDoubleClick={() => handleRowDoubleClick(customer)}
+                    className={cn(customer.Order_URL && "cursor-pointer")}
+                  >
                     {headers.map(header => (
                       <TableCell key={header.key}>
                         {customer[header.key as keyof Customer] !== undefined && customer[header.key as keyof Customer] !== null ? String(customer[header.key as keyof Customer]) : ''}

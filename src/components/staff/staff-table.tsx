@@ -22,9 +22,10 @@ import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useUserProfile } from '@/hooks/use-user-profile';
+import { cn } from '@/lib/utils';
 
 interface StaffTableProps {
-    staff: WithId<Staff>[] | null;
+    staff: (WithId<Staff> & { Order_URL?: string })[] | null;
     isLoading: boolean;
 }
 
@@ -57,6 +58,12 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
           togglePendingStaffSelection(id);
         }
       });
+    }
+  };
+
+  const handleRowDoubleClick = (member: WithId<Staff> & { Order_URL?: string }) => {
+    if (member && member.Order_URL) {
+      window.open(member.Order_URL, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -106,7 +113,12 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   </TableRow>
               ) : staffList && staffList.length > 0 ? (
                 staffList.map((member) => (
-                  <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''}>
+                  <TableRow 
+                    key={member.id} 
+                    data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''}
+                    onDoubleClick={() => handleRowDoubleClick(member)}
+                    className={cn(member.Order_URL && "cursor-pointer")}
+                  >
                     {isAdmin && (
                         <TableCell>
                             <Checkbox
