@@ -25,26 +25,14 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
-    
-    // Use URLSearchParams for form-encoded data, which is more robust for GAS.
-    const body = new URLSearchParams();
-    // Append all keys from payload to the body. This ensures all needed data is sent.
-    for (const key in payload) {
-        if (Object.prototype.hasOwnProperty.call(payload, key)) {
-            const value = payload[key as keyof typeof payload];
-            if (value !== undefined && value !== null) {
-                body.append(key, String(value));
-            }
-        }
-    }
 
     try {
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                 'Content-Type': 'application/x-www-form-urlencoded',
+                 'Content-Type': 'application/json',
             },
-            body: body.toString(),
+            body: JSON.stringify(payload),
             cache: 'no-store',
             redirect: 'follow',
         });
