@@ -6,8 +6,6 @@ import type { Staff, WithId } from '@/lib/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { staffData as fallbackStaffData } from '@/lib/data'; // Import fallback data
 
-const LOCAL_STORAGE_KEY = 'appliedStaffIds';
-
 // This function is no longer fetching from GAS to ensure stability.
 // It will just return the hardcoded staff data.
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
@@ -39,6 +37,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [appliedSelectedStaffIds, setAppliedSelectedStaffIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const LOCAL_STORAGE_KEY = 'appliedStaffIds';
   
   useEffect(() => {
     const loadStaff = async () => {

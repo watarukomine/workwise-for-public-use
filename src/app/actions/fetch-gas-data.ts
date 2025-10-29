@@ -16,21 +16,12 @@ export async function fetchGasData(url: string): Promise<any> {
     const response = await fetch(url, {
       method: 'GET',
       cache: 'no-store',
-      redirect: 'manual', // Manually handle redirects to get more info
+      // Using 'follow' is simpler and often sufficient.
+      // If redirects persist, it's a clear sign of a permissions issue on the GAS side.
+      redirect: 'follow', 
     });
-
-    // Check for redirects (status 300-399)
-    if (response.status >= 300 && response.status < 400) {
-       const locationHeader = response.headers.get('location');
-       console.error(`[GAS DEBUG] Redirect detected. Status: ${response.status}. Location: ${locationHeader}`);
-       let redirectError = `GAS request was redirected. This usually indicates a permission issue. Please ensure your script is deployed with 'Who has access' set to 'Anyone' and that you have deployed a new version after any changes to the script. The doGet() function must also correctly return ContentService output, not an HTML page.`;
-       if (locationHeader && locationHeader.includes('accounts.google.com')) {
-           redirectError += ' Redirected to Google sign-in page.';
-       }
-       throw new Error(redirectError);
-    }
     
-    // As a fallback, check if the final URL is a Google sign-in page
+    // If the final URL after following redirects is a Google sign-in page, it's a clear error.
     if (response.url.includes('accounts.google.com')) {
         throw new Error('Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings.');
     }
@@ -39,15 +30,13 @@ export async function fetchGasData(url: string): Promise<any> {
     const responseText = await response.text();
 
     if (!response.ok || !contentType || !contentType.includes('application/json')) {
-      console.error(`[GAS DEBUG] Status: ${response.status}, Content-Type: ${contentType}, Response Body: ${responseText}`);
-      
       let errorMessage = `GAS request failed or did not return JSON. Status: ${response.status}.`;
       
-      // Check if the response looks like a Google login page HTML
+      // Check if the response looks like a Google login page HTML or a redirect message.
       if (responseText.toLowerCase().includes('<title>google') || responseText.toLowerCase().includes('signin')) {
           errorMessage = 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings and that you have deployed a new version after any changes.';
-      } else {
-          errorMessage += ` Response Preview: ${responseText.substring(0, 500)}...`;
+      } else if (response.status >= 300 && response.status < 400) {
+          errorMessage = "GAS request was redirected. This usually indicates a permission issue. Please ensure your script is deployed with 'Who has access' set to 'Anyone' and that you have deployed a new version after any changes to the script. The doGet() function must also correctly return ContentService output, not an HTML page.";
       }
       
       throw new Error(errorMessage);
@@ -55,19 +44,18 @@ export async function fetchGasData(url: string): Promise<any> {
 
     try {
         const result = JSON.parse(responseText);
-        // Check for error field within the JSON response from GAS itself
+        // Check for an explicit error field within the JSON response from GAS itself.
         if (result.error && result.message) {
           throw new Error(`GAS script returned an error: ${result.message}`);
         }
         return result;
     } catch (parseError) {
-        console.error("[GAS DEBUG] JSON Parse Error. Response was not valid JSON.", responseText);
         throw new Error(`Failed to parse response from GAS as JSON. Response text: ${responseText.substring(0, 500)}...`);
     }
     
   } catch (error: any) {
     console.error('Server-side fetch to GAS failed:', error.message);
-    // Re-throw the error to be caught by the client component
+    // Re-throw a cleaner error message to be caught by the client component.
     throw new Error(error.message || 'An unknown error occurred during the server fetch.');
   }
 }
