@@ -19,10 +19,9 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
-    // staffNameがnullの場合は、GAS側で正しく処理できるよう空文字を渡す
     const payload = {
         orderId: orderId,
-        staffName: staffName ?? "",
+        staffName: staffName || "", // Ensure staffName is not null or undefined, send empty string instead.
     };
 
     try {

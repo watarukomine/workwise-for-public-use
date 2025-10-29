@@ -320,8 +320,8 @@ export function ScheduleView({
         }
     }
     
-    // Find the original order from the complete list of orders, not just unassigned
-    const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
+    const orderIdToUpdate = eventToUnassign.rawOrderId;
+    const originalOrder = ordersData.find(o => o.raw?.['受注ID'] === orderIdToUpdate);
     
     // --- Restore Order to Unassigned List ---
     if (originalOrder) {
@@ -331,28 +331,26 @@ export function ScheduleView({
             }
             return [...currentOrders, originalOrder];
         });
+    }
 
-        // --- Update Google Sheet ---
-        const orderIdToUpdate = originalOrder.raw?.['受注ID'] || originalOrder.id;
-        
-        if (orderIdToUpdate && orderGasUrl) {
-            try {
-                const result = await updateSheetStatus({
-                    orderId: orderIdToUpdate,
-                    staffName: null, // Clear staff name
-                    gasUrl: orderGasUrl,
-                });
-                if (result.status === 'success') {
-                    toast({ title: 'スプレッドシート更新', description: `オーダー #${orderIdToUpdate} を未割当に戻しました。` });
-                } else {
-                    throw new Error(result.message || '不明なエラー');
-                }
-            } catch (e: any) {
-                toast({ variant: 'destructive', title: 'スプレッドシート更新エラー', description: `オーダーの割り当て解除に失敗しました: ${e.message}` });
+    // --- Update Google Sheet ---
+    if (orderIdToUpdate && orderGasUrl) {
+        try {
+            const result = await updateSheetStatus({
+                orderId: orderIdToUpdate,
+                staffName: null, // Clear staff name
+                gasUrl: orderGasUrl,
+            });
+            if (result.status === 'success') {
+                toast({ title: 'スプレッドシート更新', description: `オーダー #${orderIdToUpdate} を未割当に戻しました。` });
+            } else {
+                throw new Error(result.message || '不明なエラー');
             }
-        } else if (!orderGasUrl) {
-             toast({ variant: 'destructive', title: 'URL未設定', description: '担当者更新用のGAS URLが設定されていません。「受注管理」ページで設定してください。' });
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'スプレッドシート更新エラー', description: `オーダーの割り当て解除に失敗しました: ${e.message}` });
         }
+    } else if (!orderGasUrl) {
+         toast({ variant: 'destructive', title: 'URL未設定', description: '担当者更新用のGAS URLが設定されていません。「受注管理」ページで設定してください。' });
     }
 
     // --- Update Local Schedule State ---
@@ -497,11 +495,13 @@ export function ScheduleView({
                 start: travelStart,
                 end: taskStart,
             };
-
+            
+            const rawOrderId = order.raw?.['受注ID'] || order.id;
             const taskEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
                 id: taskEventId,
                 tripId: tripId,
                 orderId: order.id,
+                rawOrderId: rawOrderId,
                 title: order.taskDetails,
                 description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`,
                 staffId: newStaffId,
@@ -520,19 +520,17 @@ export function ScheduleView({
             setScheduleData(prev => [...prev, travelEvent, taskEvent]);
             
             // --- Update Google Sheet ---
-            const orderIdToUpdate = order.raw?.['受注ID'] || order.id;
-
-            if (staff && orderIdToUpdate && orderGasUrl) {
+            if (staff && rawOrderId && orderGasUrl) {
                  try {
                     const result = await updateSheetStatus({
-                        orderId: orderIdToUpdate,
+                        orderId: rawOrderId,
                         staffName: staff.name,
                         gasUrl: orderGasUrl,
                     });
                     if (result.status === 'success') {
                         toast({
                             title: 'スプレッドシート更新成功',
-                            description: `オーダー #${orderIdToUpdate} を ${staff.name} さんに割り当てました。`,
+                            description: `オーダー #${rawOrderId} を ${staff.name} さんに割り当てました。`,
                         });
                     } else {
                         throw new Error(result.message || '不明なエラー');
