@@ -19,7 +19,7 @@ interface GasResponse {
 }
 
 // 【重要】このURLは、ユーザーが作成するGoogleカレンダー連携用の新しいGASのウェブアプリURLに置き換える必要があります。
-const DEFAULT_CALENDAR_GAS_URL = 'https://script.google.com/macros/s/YOUR_NEW_CALENDAR_GAS_URL/exec';
+const DEFAULT_CALENDAR_GAS_URL = 'https://script.google.com/macros/s/AKfycbzoWDxQQlLCDBZ8tsXPCVavazZ14gkH--Q8AQ81rT7Ok1lxl_3lLNtgBdZ9ok6Run_X/exec';
 
 
 export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<GasResponse> {
