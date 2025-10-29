@@ -1,145 +1,114 @@
 
 /**
- * このGoogle Apps Scriptは、WorkWiseアプリケーションからGoogleカレンダーの予定を
- * 作成、更新、削除するためのバックエンド処理を提供します。
+ * @OnlyCurrentDoc
  *
- * 【設定方法】
- * 1. 新しいGoogle Apps Scriptプロジェクトを作成します (https://script.google.com/home)
- * 2. このファイルの内容をすべてコピーして、GASエディタに貼り付けます。
- * 3. 右上の「デプロイ」ボタン > 「新しいデプロイ」を選択します。
- * 4. 「種類の選択」で歯車アイコンをクリックし、「ウェブアプリ」を選択します。
- * 5. 説明を入力します（例: WorkWiseカレンダー連携）。
- * 6. 「次のユーザーとして実行」は「自分」のままにします。
- * 7. 「アクセスできるユーザー」を【重要】「全員」に変更します。
- * 8. 「デプロイ」ボタンをクリックします。
- * 9. 必要に応じてアクセス許可を承認します。
- * 10. 表示されたウェブアプリのURLをコピーし、WorkWiseアプリの指定された場所に設定します。
- *     (例: `src/app/actions/update-calendar-event.ts` の `DEFAULT_CALENDAR_GAS_URL`)
+ * The above comment directs App Script to limit the scope of file
+ * access for this script to only the current document containing the script.
+ * This is a security best practice.
  */
 
-
-/**
- * HTTP POSTリクエストを処理するメイン関数。
- * アプリケーションからのリクエストボディを解析し、カレンダー操作を振り分けます。
- * @param {object} e - POSTリクエストイベントオブジェクト。
- * @returns {ContentService.TextOutput} - JSON形式のレスポンス。
- */
+// This function handles all incoming POST requests from the web app.
 function doPost(e) {
-  // CORSプリフライトリクエストに対応
-  if (e.postData.type === "application/json" && e.postData.contents === '{"preflight":true}') {
-    return ContentService.createTextOutput(JSON.stringify({ status: 'preflight-ok' }))
-      .setMimeType(ContentService.MimeType.JSON);
-  }
-  
-  let response = {
-    status: 'error',
-    message: '不明なエラーが発生しました。',
-    error: true,
-  };
-
+  let response;
   try {
-    if (!e.postData || !e.postData.contents) {
-      throw new Error("リクエストデータがありません。");
+    // It's crucial to wrap this in a try-catch block to handle any errors.
+    // The `e` object contains information about the request.
+    // For a POST request with a JSON payload, the data is in `e.postData.string`.
+    if (!e || !e.postData || !e.postData.string) {
+      throw new Error("Invalid POST data received.");
     }
     
-    const args = JSON.parse(e.postData.contents);
-    const { operation, calendarId, eventId, title, description, startTime, endTime } = args;
+    // Parse the JSON string from the request body into a JavaScript object.
+    const args = JSON.parse(e.postData.string);
 
-    if (!operation || !calendarId) {
-      throw new Error("必須パラメーター（operation, calendarId）が不足しています。");
-    }
+    // Call the main handler function with the parsed arguments.
+    response = handleCalendarUpdate(args);
 
-    const calendar = CalendarApp.getCalendarById(calendarId);
-    if (!calendar) {
-      throw new Error(`指定されたカレンダーが見つかりません: ${calendarId}`);
-    }
-
-    switch (operation) {
-      case 'create':
-        if (!title || !startTime || !endTime) {
-          throw new Error("予定の作成には title, startTime, endTime が必要です。");
-        }
-        const newEvent = calendar.createEvent(
-          title,
-          new Date(startTime),
-          new Date(endTime),
-          { description: description || '' }
-        );
-        response = {
-          status: 'success',
-          message: '予定が正常に作成されました。',
-          eventId: newEvent.getId(),
-          error: false,
-        };
-        break;
-
-      case 'update':
-        if (!eventId || !title || !startTime || !endTime) {
-          throw new Error("予定の更新には eventId, title, startTime, endTime が必要です。");
-        }
-        const eventToUpdate = calendar.getEventById(eventId);
-        if (!eventToUpdate) {
-            throw new Error(`更新対象の予定が見つかりません: ${eventId}`);
-        }
-        eventToUpdate.setTitle(title);
-        eventToUpdate.setDescription(description || '');
-        eventToUpdate.setTime(new Date(startTime), new Date(endTime));
-        response = {
-          status: 'success',
-          message: '予定が正常に更新されました。',
-          eventId: eventId,
-          error: false,
-        };
-        break;
-
-      case 'delete':
-        if (!eventId) {
-          throw new Error("予定の削除には eventId が必要です。");
-        }
-        const eventToDelete = calendar.getEventById(eventId);
-        if (eventToDelete) {
-          eventToDelete.deleteEvent();
-          response = {
-            status: 'success',
-            message: '予定が正常に削除されました。',
-            error: false,
-          };
-        } else {
-          // すでに削除されている場合も成功とみなす
-          response = {
-            status: 'success',
-            message: '予定は既に削除されていました。',
-            error: false,
-          };
-        }
-        break;
-
-      default:
-        throw new Error(`未対応の操作です: ${operation}`);
-    }
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    // If an error occurs, create an error response object.
     response = {
       status: 'error',
-      message: err.toString(),
-      error: true,
+      message: 'GAS Script Error: ' + error.toString(),
     };
   }
-
-  return ContentService.createTextOutput(JSON.stringify(response))
+  
+  // Return the response. It must be JSON formatted and sent as a string.
+  return ContentService
+    .createTextOutput(JSON.stringify(response))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// This is the main logic function that interacts with Google Calendar.
+function handleCalendarUpdate(args) {
+  const { operation, calendarId, eventId, title, description, startTime, endTime } = args;
 
-/**
- * HTTP GETリクエストを処理する関数（疎通確認用）。
- * このURLにブラウザでアクセスすると、疎通確認メッセージが返ります。
- * @returns {ContentService.TextOutput} - JSON形式のレスポンス。
- */
-function doGet() {
-  return ContentService.createTextOutput(JSON.stringify({ 
-      status: 'success', 
-      message: 'Google Calendar連携用のGASスクリプトは正常に動作しています。' 
-    }))
-    .setMimeType(ContentService.MimeType.JSON);
+  // Validate required parameters.
+  if (!operation || !calendarId) {
+    throw new Error("Missing required parameters: operation and calendarId.");
+  }
+
+  // Get the calendar by its ID. If not found, throw an error.
+  const calendar = CalendarApp.getCalendarById(calendarId);
+  if (!calendar) {
+    throw new Error(`Calendar with ID "${calendarId}" not found or access denied.`);
+  }
+
+  // Use a switch statement to handle different operations.
+  switch (operation) {
+    case 'create':
+      if (!title || !startTime || !endTime) {
+        throw new Error("Missing parameters for 'create': title, startTime, and endTime are required.");
+      }
+      // Create a new event and get its ID.
+      const newEvent = calendar.createEvent(
+        title,
+        new Date(startTime),
+        new Date(endTime),
+        { description: description || '' }
+      );
+      return {
+        status: 'success',
+        message: 'Event created successfully.',
+        eventId: newEvent.getId() // Return the ID of the newly created event.
+      };
+
+    case 'update':
+      if (!eventId || !title || !startTime || !endTime) {
+        throw new Error("Missing parameters for 'update': eventId, title, startTime, and endTime are required.");
+      }
+      // Get the event by its ID.
+      const eventToUpdate = calendar.getEventById(eventId);
+      if (!eventToUpdate) {
+        throw new Error(`Event with ID "${eventId}" not found.`);
+      }
+      // Update the event's properties.
+      eventToUpdate.setTitle(title);
+      eventToUpdate.setTime(new Date(startTime), new Date(endTime));
+      eventToUpdate.setDescription(description || '');
+      return {
+        status: 'success',
+        message: 'Event updated successfully.',
+        eventId: eventId
+      };
+
+    case 'delete':
+      if (!eventId) {
+        throw new Error("Missing parameter for 'delete': eventId is required.");
+      }
+      // Get the event by its ID and delete it.
+      const eventToDelete = calendar.getEventById(eventId);
+      if (!eventToDelete) {
+        // If event is already deleted, consider it a success.
+        return { status: 'success', message: 'Event not found, may have been already deleted.' };
+      }
+      eventToDelete.deleteEvent();
+      return {
+        status: 'success',
+        message: 'Event deleted successfully.'
+      };
+
+    default:
+      // If the operation is unknown, throw an error.
+      throw new Error(`Unknown operation: "${operation}"`);
+  }
 }

@@ -37,13 +37,8 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
             method: 'POST',
             cache: 'no-store',
             headers: {
-                // 'Content-Type': 'application/json' // GAS doPost with payload doesn't need this
+                'Content-Type': 'application/json'
             },
-            // The `doPost(e)` in GAS expects the data in `e.postData.contents`.
-            // To achieve this with `fetch`, the body should be a stringified payload.
-            // However, some environments/fetch versions require it to be structured differently.
-            // A common way that works is to send it as 'payload'.
-            // Let's try sending a simple stringified body first.
             body: JSON.stringify(args),
             redirect: 'follow',
         });
