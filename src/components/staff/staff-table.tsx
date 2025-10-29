@@ -117,7 +117,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                     key={member.id} 
                     data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''}
                     onDoubleClick={() => handleRowDoubleClick(member)}
-                    className={cn(isAdmin && member.Order_URL && "cursor-pointer")}
+                    className={cn(isAdmin && member.Order_URL && "cursor-pointer hover:bg-muted/50")}
                   >
                     {isAdmin && (
                         <TableCell>
