@@ -18,13 +18,11 @@ interface GasResponse {
     error?: boolean;
 }
 
-// 【重要】このURLは、ユーザーが作成するGoogleカレンダー連携用の新しいGASのウェブアプリURLに置き換える必要があります。
 const DEFAULT_CALENDAR_GAS_URL = 'https://script.google.com/macros/s/AKfycbzoWDxQQlLCDBZ8tsXPCVavazZ14gkH--Q8AQ81rT7Ok1lxl_3lLNtgBdZ9ok6Run_X/exec';
 
 
 export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<GasResponse> {
     
-    // TODO: このURLをユーザーが設定できるように、将来的にはContextや設定ページから取得するように変更するのが望ましい。
     const gasUrl = process.env.CALENDAR_GAS_URL || DEFAULT_CALENDAR_GAS_URL;
 
     if (!gasUrl || gasUrl.includes('YOUR_NEW_CALENDAR_GAS_URL')) {
@@ -37,9 +35,11 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
             method: 'POST',
             cache: 'no-store',
             headers: {
-                'Content-Type': 'application/json'
+                // To be correctly parsed by e.postData.contents in GAS,
+                // the Content-Type should be text/plain.
+                'Content-Type': 'text/plain;charset=utf-8',
             },
-            body: JSON.stringify(args),
+            body: JSON.stringify(args), // Simply stringify the arguments
             redirect: 'follow',
         });
 
