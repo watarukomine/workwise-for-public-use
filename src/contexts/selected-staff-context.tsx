@@ -5,7 +5,6 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import { staffData as fallbackStaffData } from '@/lib/data';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
 const STAFF_GAS_URL_KEY = 'staffGasUrl';
@@ -23,13 +22,12 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
         
         if (dataToProcess.length === 0) {
             console.warn("GAS returned no staff data. Raw response:", result);
-            // This is now an error condition, as we expect data if the URL is set.
              throw new Error("GASからスタッフデータを取得できませんでした。GASのURLが正しいか、シートにデータが存在するか確認してください。");
         }
 
         // Map GAS data to Staff type
         return dataToProcess.map((item: any) => ({
-            id: String(item['id'] || item['ID'] || `gas-staff-${Math.random()}`),
+            id: String(item['id'] || item['ID'] || item['スタッフID'] || `gas-staff-${Math.random()}`),
             name: item['スタッフ名'] || 'No Name',
             email: item['メールアドレス'] || '',
             role: (item['権限'] === 'admin' || item['Role'] === 'admin') ? 'admin' : 'staff',
@@ -93,8 +91,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         } catch (e: any) {
           setError(`スタッフ情報の取得に失敗しました: ${e.message}`);
           console.error(e);
-          // If fetching fails, use fallback data so the app doesn't crash, but show error.
-          setAllStaffState(fallbackStaffData);
         } finally {
           setIsLoading(false);
         }
