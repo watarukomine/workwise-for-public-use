@@ -22,18 +22,19 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         return { status: 'error', message: '更新対象の受注IDが必要です。' };
     }
 
-    const payload = {
-      orderId: orderId,
-      staffName: staffName || "" // Ensure staffName is at least an empty string to signify un-assignment
-    };
+    // Use URLSearchParams for form-encoded data, which is more robust for GAS.
+    const body = new URLSearchParams();
+    body.append('orderId', orderId);
+    // Ensure staffName is always sent, even if it's an empty string to signify un-assignment.
+    body.append('staffName', staffName || "");
 
     try {
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                 'Content-Type': 'application/json',
+                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: JSON.stringify(payload),
+            body: body.toString(),
             cache: 'no-store',
             redirect: 'follow', // Important for handling GAS redirects
         });
