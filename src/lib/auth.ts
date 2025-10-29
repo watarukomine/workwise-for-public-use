@@ -43,11 +43,13 @@ const combineStaffData = (gasStaff: WithId<Staff>[]): WithId<Staff>[] => {
   const combinedStaffMap = new Map<string, WithId<Staff>>();
 
   // Add GAS data first
-  gasStaff.forEach(staff => {
-      if (staff.email) {
-        combinedStaffMap.set(staff.email.toLowerCase(), staff)
-      }
-  });
+  if (Array.isArray(gasStaff)) {
+    gasStaff.forEach(staff => {
+        if (staff.email) {
+          combinedStaffMap.set(staff.email.toLowerCase(), staff)
+        }
+    });
+  }
 
   // Add fallback data only if it doesn't already exist from GAS
   fallbackStaffData.forEach(staff => {
@@ -63,37 +65,51 @@ const combineStaffData = (gasStaff: WithId<Staff>[]): WithId<Staff>[] => {
 export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
   console.log(`Attempting to sign in with email: ${email}`);
   
-  // To sign in, we must fetch the latest staff data.
-  // We'll use a temporary direct fetch here, but the main app state uses the context.
-  const tempStaffList = await (async () => {
-      if (typeof window === 'undefined') return fallbackStaffData;
-      const staffGasUrl = localStorage.getItem('staffImporterUrl');
-      if (!staffGasUrl) return fallbackStaffData;
-      
-      try {
-        const response = await fetch(staffGasUrl, { cache: 'no-store' });
-        if (!response.ok) return fallbackStaffData;
-        const result = await response.json();
-        const rawStaffArray = result.data || (Array.isArray(result) ? result : []);
-         if (Array.isArray(rawStaffArray)) {
-            return rawStaffArray.map((item: any) => ({
-                id: String(item['スタッフID'] || item.id),
-                role: findRoleValue(item),
-                name: item['スタッフ名'] || item.name,
-                email: item['メールアドレス'] || item.email,
-                password: item['パスワード'] || item.password,
-                calendarId: item['カレンダーID'] || item.calendarId,
-                color: item['カラー'] || item.color,
-                avatarUrl: `https://picsum.photos/seed/${String(item['スタッフID'] || item.id)}/100/100`,
-            }));
+  let combinedStaff: WithId<Staff>[] = [];
+
+  // Try fetching from GAS, but have a fallback
+  try {
+      if (typeof window !== 'undefined') {
+        const staffGasUrl = localStorage.getItem('staffImporterUrl');
+        if (staffGasUrl) {
+            const response = await fetch(staffGasUrl, { cache: 'no-store' });
+            if (response.ok) {
+                const result = await response.json();
+                const rawStaffArray = result.data || (Array.isArray(result) ? result : []);
+                 if (Array.isArray(rawStaffArray)) {
+                    const gasStaff = rawStaffArray.map((item: any) => ({
+                        id: String(item['スタッフID'] || item.id),
+                        role: findRoleValue(item),
+                        name: item['スタッフ名'] || item.name,
+                        email: item['メールアドレス'] || item.email,
+                        password: item['パスワード'] || item.password,
+                        calendarId: item['カレンダーID'] || item.calendarId,
+                        color: item['カラー'] || item.color,
+                        avatarUrl: `https://picsum.photos/seed/${String(item['スタッフID'] || item.id)}/100/100`,
+                    }));
+                     combinedStaff = combineStaffData(gasStaff);
+                } else {
+                   // If GAS returns invalid data, use fallback only
+                   combinedStaff = combineStaffData([]);
+                }
+            } else {
+                // If response is not OK, use fallback
+                console.warn("Could not fetch from GAS, using fallback staff data.");
+                combinedStaff = combineStaffData([]);
+            }
+        } else {
+             // If no URL, use fallback
+            combinedStaff = combineStaffData([]);
         }
-      } catch {
-        return fallbackStaffData;
+      } else {
+         // If server-side, use fallback
+         combinedStaff = combineStaffData([]);
       }
-      return fallbackStaffData;
-  })();
+  } catch (error) {
+      console.error("Error fetching staff from GAS during sign in, using fallback.", error);
+      combinedStaff = combineStaffData([]); // Use fallback on any error
+  }
   
-  const combinedStaff = combineStaffData(tempStaffList);
   const user = combinedStaff.find(staff => staff.email && staff.email.toLowerCase() === email.toLowerCase() && staff.password === password);
 
   return new Promise((resolve, reject) => {
