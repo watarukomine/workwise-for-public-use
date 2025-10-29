@@ -13,37 +13,27 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 
-const STAFF_STATUS_UPDATE_URL_KEY = 'staffStatusUpdateGasUrl';
-
 export default function OrdersPage() {
   const { orders, isLoading: isLoadingOrders, error: orderError, orderGasUrl, setOrderGasUrl } = useOrder();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
 
-  const [localOrderUrl, setLocalOrderUrl] = useState(orderGasUrl);
-  const [localStatusUrl, setLocalStatusUrl] = useState('');
-  
-  const [isUpdatingOrderUrl, setIsUpdatingOrderUrl] = useState(false);
-  const [isUpdatingStatusUrl, setIsUpdatingStatusUrl] = useState(false);
+  const [localUrl, setLocalUrl] = useState(orderGasUrl);
+  const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
   
   useEffect(() => {
-    setLocalOrderUrl(orderGasUrl);
+    setLocalUrl(orderGasUrl);
   }, [orderGasUrl]);
 
-  useEffect(() => {
-    const savedUrl = localStorage.getItem(STAFF_STATUS_UPDATE_URL_KEY) || '';
-    setLocalStatusUrl(savedUrl);
-  }, []);
-
-  const handleOrderUrlUpdate = () => {
-    setIsUpdatingOrderUrl(true);
+  const handleUrlUpdate = () => {
+    setIsUpdating(true);
     try {
-      if (localOrderUrl !== orderGasUrl) {
-        setOrderGasUrl(localOrderUrl);
+      if (localUrl !== orderGasUrl) {
+        setOrderGasUrl(localUrl);
         toast({
-          title: "読込用URLを更新しました",
-          description: "新しいURLからデータを再取得します。",
+          title: "URLを更新しました",
+          description: "新しいURLからデータを再取得・更新します。",
         });
       }
     } catch (e) {
@@ -54,27 +44,7 @@ export default function OrdersPage() {
         description: "URLの更新に失敗しました。",
       });
     } finally {
-      setIsUpdatingOrderUrl(false);
-    }
-  };
-
-  const handleStatusUrlUpdate = () => {
-    setIsUpdatingStatusUrl(true);
-    try {
-      localStorage.setItem(STAFF_STATUS_UPDATE_URL_KEY, localStatusUrl);
-      toast({
-        title: "更新用URLを保存しました",
-        description: "タイムラインからの担当者割り当て時にこのURLが使用されます。",
-      });
-    } catch (e) {
-      console.error(e);
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: "URLの保存に失敗しました。",
-      });
-    } finally {
-      setIsUpdatingStatusUrl(false);
+      setIsUpdating(false);
     }
   };
 
@@ -153,7 +123,7 @@ export default function OrdersPage() {
         <CardHeader>
           <CardTitle>データソースURL設定</CardTitle>
           <CardDescription>
-            受注情報を読み込むGoogle Apps ScriptのURLです。
+            受注情報の読み込み、および担当者更新を行うGoogle Apps ScriptのURLです。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -161,60 +131,26 @@ export default function OrdersPage() {
             <Input
               type="url"
               placeholder="https://script.google.com/macros/s/..."
-              value={localOrderUrl}
-              onChange={(e) => setLocalOrderUrl(e.target.value)}
-              disabled={isUpdatingOrderUrl}
+              value={localUrl}
+              onChange={(e) => setLocalUrl(e.target.value)}
+              disabled={isUpdating}
             />
-            <Button onClick={handleOrderUrlUpdate} disabled={isUpdatingOrderUrl || localOrderUrl === orderGasUrl}>
-              {isUpdatingOrderUrl ? (
+            <Button onClick={handleUrlUpdate} disabled={isUpdating || localUrl === orderGasUrl}>
+              {isUpdating ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              読込用URLを更新
+              URLを更新
             </Button>
           </div>
         </CardContent>
         <CardFooter>
             <p className="text-xs text-muted-foreground">
-                URLを変更すると、データは自動的に再読み込みされます。
+                このURLは、データの読み込みと、タイムラインからの担当者割り当ての両方に使用されます。
             </p>
         </CardFooter>
       </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>担当者更新用 GAS URL設定</CardTitle>
-          <CardDescription>
-            タイムラインで担当者を割り当てた際に、スプレッドシートの「担当」列を更新するGASのURLです。
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex w-full max-w-xl items-center space-x-2">
-            <Input
-              type="url"
-              placeholder="https://script.google.com/macros/s/..."
-              value={localStatusUrl}
-              onChange={(e) => setLocalStatusUrl(e.target.value)}
-              disabled={isUpdatingStatusUrl}
-            />
-            <Button onClick={handleStatusUrlUpdate} disabled={isUpdatingStatusUrl}>
-              {isUpdatingStatusUrl ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              更新用URLを保存
-            </Button>
-          </div>
-        </CardContent>
-         <CardFooter>
-            <p className="text-xs text-muted-foreground">
-                このURLはブラウザ内に保存され、担当者割り当て時に使用されます。
-            </p>
-        </CardFooter>
-      </Card>
-
     </div>
   );
 }

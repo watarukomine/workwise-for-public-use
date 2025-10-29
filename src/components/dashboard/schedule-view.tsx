@@ -56,7 +56,6 @@ const timelineEndHour = 18;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
-const STAFF_STATUS_UPDATE_URL_KEY = 'staffStatusUpdateGasUrl';
 
 // --- Helper Functions ---
 const timeStringToDate = (timeStr: string) => {
@@ -73,7 +72,7 @@ const timeStringToDate = (timeStr: string) => {
 
 const formatTime = (date: Date | string) => {
   const d = typeof date === 'string' ? parseISO(date) : date;
-   if (!d || isNaN(d.getTime())) {
+   if (!d || !isValid(d) || isNaN(d.getTime())) {
     return "Invalid date";
   }
   return format(d, 'HH:mm');
@@ -264,6 +263,7 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { allStaff } = useSelectedStaff();
   const { toast } = useToast();
+  const { orderGasUrl } = useOrder();
 
   React.useEffect(() => {
     setIsClient(true);
@@ -318,6 +318,7 @@ export function ScheduleView({
         }
     }
     
+    // Find the original order from the complete list of orders, not just unassigned
     const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
     
     // --- Restore Order to Unassigned List ---
@@ -331,14 +332,13 @@ export function ScheduleView({
 
         // --- Update Google Sheet ---
         const orderIdToUpdate = originalOrder.raw?.['受注ID'] || originalOrder.id;
-        const staffStatusUpdateGasUrl = localStorage.getItem(STAFF_STATUS_UPDATE_URL_KEY) || '';
-
-        if (orderIdToUpdate && staffStatusUpdateGasUrl) {
+        
+        if (orderIdToUpdate && orderGasUrl) {
             try {
                 const result = await updateSheetStatus({
                     orderId: orderIdToUpdate,
-                    staffName: "", // Clear staff name
-                    gasUrl: staffStatusUpdateGasUrl,
+                    staffName: null, // Clear staff name
+                    gasUrl: orderGasUrl,
                 });
                 if (result.status === 'success') {
                     toast({ title: 'スプレッドシート更新', description: `オーダー #${orderIdToUpdate} を未割当に戻しました。` });
@@ -348,7 +348,7 @@ export function ScheduleView({
             } catch (e: any) {
                 toast({ variant: 'destructive', title: 'スプレッドシート更新エラー', description: `オーダーの割り当て解除に失敗しました: ${e.message}` });
             }
-        } else if (!staffStatusUpdateGasUrl) {
+        } else if (!orderGasUrl) {
              toast({ variant: 'destructive', title: 'URL未設定', description: '担当者更新用のGAS URLが設定されていません。「受注管理」ページで設定してください。' });
         }
     }
@@ -514,14 +514,13 @@ export function ScheduleView({
             
             // --- Update Google Sheet ---
             const orderIdToUpdate = order.raw?.['受注ID'] || order.id;
-            const staffStatusUpdateGasUrl = localStorage.getItem(STAFF_STATUS_UPDATE_URL_KEY) || '';
 
-            if (staff && orderIdToUpdate && staffStatusUpdateGasUrl) {
+            if (staff && orderIdToUpdate && orderGasUrl) {
                  try {
                     const result = await updateSheetStatus({
                         orderId: orderIdToUpdate,
                         staffName: staff.name,
-                        gasUrl: staffStatusUpdateGasUrl,
+                        gasUrl: orderGasUrl,
                     });
                     if (result.status === 'success') {
                         toast({
@@ -538,7 +537,7 @@ export function ScheduleView({
                         description: `オーダーの割り当てに失敗しました: ${e.message}`,
                     });
                 }
-            } else if (!staffStatusUpdateGasUrl) {
+            } else if (!orderGasUrl) {
                 toast({ variant: 'destructive', title: 'URL未設定', description: '担当者更新用のGAS URLが設定されていません。「受注管理」ページで設定してください。' });
             }
         }

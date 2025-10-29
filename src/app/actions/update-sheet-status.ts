@@ -1,10 +1,12 @@
 
 'use server';
 
+import { useOrder } from "@/contexts/order-context";
+
 interface UpdateSheetStatusArgs {
     orderId: string;
     staffName: string | null;
-    gasUrl: string;
+    gasUrl: string; // This URL will be passed from the component
 }
 
 interface GasResponse {
@@ -37,19 +39,16 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
             redirect: 'follow', 
         });
         
-        // Check if the final URL after redirects is a Google sign-in page, indicating a permissions error.
         if (response.url.includes('accounts.google.com')) {
             throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
 
         const responseText = await response.text();
         
-        // First, check for a non-OK HTTP status
         if (!response.ok) {
              throw new Error(`GAS script returned a non-OK response. Status: ${response.status}. Response: ${responseText}`);
         }
 
-        // If the response is not JSON, it's an error (e.g. HTML from a login page)
         let result: GasResponse;
         try {
             result = JSON.parse(responseText);
@@ -57,7 +56,6 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
              throw new Error(`GAS script returned a non-JSON response. This often indicates a script error or permission issue. Response: ${responseText}`);
         }
 
-        // Check for an application-level error within the JSON response
         if (result.error === true || result.status === 'error') {
             throw new Error(result.message || 'GAS script returned a JSON-formatted error.');
         }
