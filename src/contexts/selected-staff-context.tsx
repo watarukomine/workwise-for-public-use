@@ -28,6 +28,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     }
 
     try {
+        // The new GAS script returns background colors, which fetchGasData will retrieve.
         const result = await fetchGasData(url);
         
         const dataToProcess = result.data || (Array.isArray(result) ? result : []);
@@ -47,8 +48,8 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
             const staffId = String(item['id'] || item['ID'] || item['スタッフID'] || `gas-staff-${Math.random()}`);
             
-            // Generate a consistent color based on the staff ID hash
-            const consistentColor = `hsl(${simpleHash(staffId) % 360}, 70%, 60%)`;
+            // Generate a consistent color based on the staff ID hash as a fallback
+            const fallbackColor = `hsl(${simpleHash(staffId) % 360}, 70%, 60%)`;
 
             return {
                 id: staffId,
@@ -56,8 +57,8 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 email: item['メールアドレス'] || '',
                 role: getRole(),
                 password: item['パスワード'] || 'password',
-                // Use color from sheet if available (checking for 'color' or 'カラー'), otherwise use the consistent generated color
-                color: item['color'] || item['カラー'] || consistentColor,
+                // Prioritize background color from 'color' or 'カラー' column, then fallback to generated color
+                color: item['color'] || item['カラー'] || fallbackColor,
                 avatarUrl: item['avatarUrl'] || '',
                 ...item
             };
