@@ -18,8 +18,8 @@ interface GasResponse {
     error?: boolean;
 }
 
-// 【重要】このURLは、ユーザーが作成するGoogleカレンダー連携用の新しいGASのURLに置き換える必要があります。
-const DEFAULT_CALENDAR_GAS_URL = 'https://script.google.com/macros/s/AKfycbx-kQMoE5s_8pXkhk5o0A4L3a4_3x-I3JqW7L5vR8yNqP7sD6uC1B2aX/exec';
+// 【重要】このURLは、ユーザーが作成するGoogleカレンダー連携用の新しいGASのウェブアプリURLに置き換える必要があります。
+const DEFAULT_CALENDAR_GAS_URL = 'https://script.google.com/macros/s/YOUR_NEW_CALENDAR_GAS_URL/exec';
 
 
 export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<GasResponse> {
@@ -27,8 +27,8 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
     // TODO: このURLをユーザーが設定できるように、将来的にはContextや設定ページから取得するように変更するのが望ましい。
     const gasUrl = process.env.CALENDAR_GAS_URL || DEFAULT_CALENDAR_GAS_URL;
 
-    if (!gasUrl) {
-        console.error('GAS URL for Calendar is not provided.');
+    if (!gasUrl || gasUrl.includes('YOUR_NEW_CALENDAR_GAS_URL')) {
+        console.error('GAS URL for Calendar is not provided or is default.');
         return { status: 'error', message: 'カレンダー連携用のGAS URLが設定されていません。' };
     }
 
