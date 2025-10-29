@@ -339,11 +339,13 @@ export function ScheduleView({
     if (eventToUnassign.orderId) {
         const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
         if (!originalOrder) {
+             const start = typeof eventToUnassign.start === 'string' ? parseISO(eventToUnassign.start) : eventToUnassign.start;
+             const end = typeof eventToUnassign.end === 'string' ? parseISO(eventToUnassign.end) : eventToUnassign.end;
              const scheduledOrderData: WithId<Order> = {
                 id: eventToUnassign.orderId,
                 customerCode: getCustomerById(eventToUnassign.locationId)?.userCode || '',
                 taskDetails: eventToUnassign.title,
-                estimatedDuration: differenceInMinutes(parseISO(eventToUnassign.end as string), parseISO(eventToUnassign.start as string)),
+                estimatedDuration: differenceInMinutes(end, start),
                 raw: { '受注ID': eventToUnassign.rawOrderId }
             };
             setOrdersData(currentOrders => [...currentOrders, scheduledOrderData]);
@@ -528,7 +530,7 @@ export function ScheduleView({
                 end: taskStart,
             };
             
-            const taskEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId' | 'rawOrderId'> & { rawOrderId?: string } = {
+            const taskEventData: WithId<ScheduleEvent> = {
                 id: taskEventId,
                 tripId: tripId,
                 orderId: order.id,
@@ -545,10 +547,10 @@ export function ScheduleView({
             const taskCalendarId = await handleCalendarCreate(taskEventData);
 
             const travelEvent: WithId<ScheduleEvent> = { ...travelEventData, calendarEventId: travelCalendarId };
-            const taskEvent: WithId<ScheduleEvent> = { ...taskEventData, calendarEventId: taskCalendarId };
+            const taskEventWithCalendar: WithId<ScheduleEvent> = { ...taskEventData, calendarEventId: taskCalendarId };
             
             setOrdersData(prev => prev.filter(o => o.id !== order.id));
-            setScheduleData(prev => [...prev, travelEvent, taskEvent]);
+            setScheduleData(prev => [...prev, travelEvent, taskEventWithCalendar]);
             toast({ title: 'タスクを割り当てました', description: `${staff.name}さんに「${order.taskDetails.split('\n')[0]}」を割り当てました。`});
         }
     }
