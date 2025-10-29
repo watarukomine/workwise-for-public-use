@@ -1,10 +1,6 @@
 
 'use server';
 
-// This action is now a wrapper. The actual logic is handled by updateSheetStatus
-// to centralize the use of a single GAS URL from the order context.
-// We keep this file for now to avoid breaking imports, but the goal is to merge logic.
-
 interface UpdateSheetStatusArgs {
     orderId: string;
     staffName: string | null;
@@ -20,25 +16,46 @@ interface GasResponse {
 
 export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSheetStatusArgs): Promise<GasResponse> {
     
-    // The API proxy route is now more generic.
-    // We pass the specific URL to it, which this action receives from the calling component.
-    const response = await fetch(process.env.NEXT_PUBLIC_BASE_URL + '/api/gas-proxy', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        // Pass the URL to the proxy, along with other arguments
-        body: JSON.stringify({ gasUrl, orderId, staffName }),
-    });
+    if (!gasUrl) {
+        return { status: 'error', message: 'GAS URLが設定されていません。' };
+    }
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to call proxy for sheet update:', errorText);
+    const formData = new URLSearchParams();
+    formData.append('orderId', orderId);
+    if (staffName !== null) {
+        formData.append('staffName', staffName);
+    } else {
+        formData.append('staffName', ''); // Unassigning
+    }
+
+    try {
+        const response = await fetch(gasUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: formData.toString(),
+            cache: 'no-store',
+            redirect: 'follow'
+        });
+
+        if (response.redirected && response.url.includes('accounts.google.com')) {
+             throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
+        }
+        
+        const result = await response.json();
+
+        if (result.status === 'error') {
+            throw new Error(result.message || 'GASスクリプトでエラーが発生しました。');
+        }
+
+        return result;
+
+    } catch (error: any) {
+        console.error('Failed to call GAS for sheet update:', error);
         return {
             status: 'error',
-            message: `プロキシ経由でのシート更新に失敗しました: ${errorText}`,
+            message: `GASの呼び出しに失敗しました: ${error.message}`,
         };
     }
-    
-    return await response.json();
 }
