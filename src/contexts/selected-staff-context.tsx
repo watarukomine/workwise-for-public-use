@@ -1,65 +1,20 @@
-
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import { fetchGasData } from '@/app/actions/fetch-gas-data';
-
+import { staffData as fallbackStaffData } from '@/lib/data'; // Import fallback data
 
 const LOCAL_STORAGE_KEY = 'appliedStaffIds';
-const STAFF_GAS_URL_KEY = 'staffImporterUrl';
 
-const findRoleValue = (item: any): 'admin' | 'staff' => {
-  if (!item || typeof item !== 'object') return 'staff';
-  const roleValue = item['権限'];
-  if (roleValue && typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
-    return 'admin';
-  }
-  return 'staff';
-};
-
+// This function is no longer fetching from GAS to ensure stability.
+// It will just return the hardcoded staff data.
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
-    if (typeof window === 'undefined') return [];
-    const staffGasUrl = localStorage.getItem(STAFF_GAS_URL_KEY) || 'https://script.google.com/macros/s/AKfycbzLj_Y_rDFec0KKhJ9ZFJbLCskQ3joHzPuTKv4KeyXBOWoAlqo97qlBB_41-K7hdvsp/exec';
-    
-    if (!staffGasUrl) {
-        console.warn("No GAS URL for staff is defined.");
-        return [];
-    }
-
-    try {
-        const result = await fetchGasData(staffGasUrl);
-        
-        if (result.error && result.message) {
-          throw new Error(result.message);
-        }
-
-        const rawStaffArray = result.data || (Array.isArray(result) ? result : []);
-
-        if (Array.isArray(rawStaffArray)) {
-            return rawStaffArray.map((item: any, index: number) => {
-                const id = String(item['スタッフID'] || item.id || `staff-${index}`);
-                const color = item['カラー'] || item.color || `hsl(${(index * 137.5) % 360}, 70%, 50%)`;
-                return {
-                    id: id,
-                    role: findRoleValue(item),
-                    name: item['スタッフ名'] || item.name,
-                    email: item['メールアドレス'] || item.email,
-                    password: item['パスワード'] || item.password,
-                    calendarId: item['カレンダーID'] || item.calendarId,
-                    color: color,
-                    avatarUrl: `https://picsum.photos/seed/${id}/100/100`,
-                };
-            });
-        }
-         return [];
-    } catch (error: any) {
-        console.error('Error fetching staff data from GAS:', error);
-        throw new Error(error.message || 'Failed to fetch staff data from spreadsheet.');
-    }
+    console.log("Mock fetchStaffDataFromGAS: Returning static fallback data.");
+    return Promise.resolve(fallbackStaffData);
 };
+
 
 interface SelectedStaffContextType {
   pendingSelectedStaffIds: string[];
@@ -90,6 +45,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setError(null);
         try {
+          // This now uses the mock function that returns static data.
           const fetchedStaff = await fetchStaffDataFromGAS();
           setAllStaffState(fetchedStaff);
 
@@ -105,6 +61,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
           }
 
         } catch (e: any) {
+          // This part is now less likely to be triggered.
           setError(`スタッフ情報の取得に失敗しました: ${e.message}`);
           console.error(e);
         } finally {
