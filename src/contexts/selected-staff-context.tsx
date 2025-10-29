@@ -4,13 +4,43 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import { staffData as fallbackStaffData } from '@/lib/data'; // Import fallback data
+import { staffData as fallbackStaffData } from '@/lib/data';
+import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
-// This function is no longer fetching from GAS to ensure stability.
-// It will just return the hardcoded staff data.
+const STAFF_GAS_URL_KEY = 'staffGasUrl';
+
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
-    console.log("Mock fetchStaffDataFromGAS: Returning static fallback data.");
-    return Promise.resolve(fallbackStaffData);
+    const url = localStorage.getItem(STAFF_GAS_URL_KEY);
+    if (!url) {
+        console.log("Staff GAS URL not found, returning fallback data.");
+        return fallbackStaffData;
+    }
+
+    try {
+        const result = await fetchGasData(url);
+        const dataToProcess = result.data || (Array.isArray(result) ? result : []);
+        
+        if (dataToProcess.length === 0) {
+            console.warn("GAS returned no staff data, using fallback.");
+            return fallbackStaffData;
+        }
+
+        // Map GAS data to Staff type
+        return dataToProcess.map((item: any) => ({
+            id: String(item['id'] || item['ID'] || `gas-staff-${Math.random()}`),
+            name: item['スタッフ名'] || 'No Name',
+            email: item['メールアドレス'] || '',
+            role: (item['権限'] === 'admin' || item['Role'] === 'admin') ? 'admin' : 'staff',
+            password: item['パスワード'] || 'password',
+            color: item['color'] || `hsl(${Math.floor(Math.random() * 360)}, 70%, 60%)`,
+            avatarUrl: item['avatarUrl'] || '',
+        }));
+
+    } catch (error: any) {
+        console.error('Error fetching staff data from GAS, returning fallback:', error);
+        // Do not re-throw, just return fallback so the app remains usable.
+        return fallbackStaffData;
+    }
 };
 
 
@@ -44,7 +74,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         setIsLoading(true);
         setError(null);
         try {
-          // This now uses the mock function that returns static data.
           const fetchedStaff = await fetchStaffDataFromGAS();
           setAllStaffState(fetchedStaff);
 
@@ -60,7 +89,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
           }
 
         } catch (e: any) {
-          // This part is now less likely to be triggered.
           setError(`スタッフ情報の取得に失敗しました: ${e.message}`);
           console.error(e);
         } finally {

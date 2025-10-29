@@ -1,10 +1,12 @@
 'use client';
 
 // This is a mock authentication service.
-// It no longer depends on GAS to fetch users, making login more stable.
+// It uses static data as a fallback but prioritizes fetching from GAS.
 
 import type { Staff, WithId } from './types';
 import { staffData as fallbackStaffData } from './data';
+import { fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
+
 
 const MOCK_USER_SESSION_KEY = 'mockUserSession';
 
@@ -28,8 +30,10 @@ const setSession = (user: WithId<Staff> | null) => {
 export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
   console.log(`Attempting to sign in with email: ${email}`);
   
-  // This now only uses the static fallback data, ignoring GAS.
-  const user = fallbackStaffData.find(staff => 
+  // Prioritize fetching from GAS, but use fallback if it fails.
+  const staffList = await fetchStaffDataFromGAS();
+
+  const user = staffList.find(staff => 
       staff.email && 
       staff.email.toLowerCase() === email.toLowerCase() && 
       staff.password === password
@@ -42,7 +46,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
         setSession(user);
         resolve(user);
       } else {
-        console.log('Sign in failed: Invalid credentials');
+        console.log('Sign in failed: Invalid credentials. Checked against:', staffList);
         reject(new Error('メールアドレスまたはパスワードが正しくありません。'));
       }
     }, 500); // Simulate network delay
