@@ -1,11 +1,14 @@
 
 'use server';
 
-import { cookies } from 'next/headers';
+// This action is now a wrapper. The actual logic is handled by updateSheetStatus
+// to centralize the use of a single GAS URL from the order context.
+// We keep this file for now to avoid breaking imports, but the goal is to merge logic.
 
 interface UpdateSheetStatusArgs {
     orderId: string;
     staffName: string | null;
+    gasUrl: string; // The specific GAS URL for orders must now be passed in.
 }
 
 interface GasResponse {
@@ -15,17 +18,17 @@ interface GasResponse {
 }
 
 
-export async function updateSheetStatus({ orderId, staffName }: UpdateSheetStatusArgs): Promise<GasResponse> {
+export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSheetStatusArgs): Promise<GasResponse> {
     
-    // We will use a centralized proxy to handle this.
-    // The component calling this doesn't know the URL, so we pass `null`.
-    // The API route will retrieve the correct URL from the context's storage (localStorage via cookies).
+    // The API proxy route is now more generic.
+    // We pass the specific URL to it, which this action receives from the calling component.
     const response = await fetch(process.env.NEXT_PUBLIC_BASE_URL + '/api/gas-proxy', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ orderId, staffName, gasUrlSource: 'order' }),
+        // Pass the URL to the proxy, along with other arguments
+        body: JSON.stringify({ gasUrl, orderId, staffName }),
     });
 
     if (!response.ok) {

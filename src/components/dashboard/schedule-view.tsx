@@ -297,18 +297,20 @@ export function ScheduleView({
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
+    // A trip consists of multiple events (travel, task). Delete them all.
     const eventsToDelete = eventToUnassign.tripId 
         ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId)
         : [eventToUnassign];
     
     // --- Google Calendar Deletion ---
     for (const eventToDelete of eventsToDelete) {
-        if (staff.calendarId && eventToDelete.calendarEventId) {
+        if (staff.calendarId && eventToDelete.calendarEventId && orderGasUrl) {
             try {
                 const result = await updateCalendarEvent({
                     operation: 'delete',
                     calendarId: staff.calendarId,
                     eventId: eventToDelete.calendarEventId,
+                    gasUrl: orderGasUrl, // Use the unified URL
                 });
                 if (result.status === 'error') throw new Error(result.message);
                 toast({ title: "カレンダーから予定を削除しました" });
@@ -397,7 +399,7 @@ export function ScheduleView({
       
       // Update Google Calendar
       const staffMember = allStaff.find(s => s.id === finalStaffId);
-      if (staffMember?.calendarId && updatedEvent.calendarEventId) {
+      if (staffMember?.calendarId && updatedEvent.calendarEventId && orderGasUrl) {
         try {
           const result = await updateCalendarEvent({
             operation: 'update',
@@ -407,6 +409,7 @@ export function ScheduleView({
             description: updatedEvent.description,
             startTime: newStart.toISOString(),
             endTime: newEnd.toISOString(),
+            gasUrl: orderGasUrl, // Pass the unified URL
           });
           if (result.status === 'error') throw new Error(result.message);
           toast({ title: "カレンダー更新成功" });
@@ -433,7 +436,10 @@ export function ScheduleView({
         if (!staff) return;
 
         const handleCalendarCreate = async (event: Omit<WithId<ScheduleEvent>, 'calendarEventId'>): Promise<string | undefined> => {
-            if (!staff.calendarId) return;
+            if (!staff.calendarId || !orderGasUrl) {
+                if (!orderGasUrl) toast({ variant: 'destructive', title: 'URL未設定', description: 'カレンダー連携用のGAS URLが設定されていません。「受注管理」ページで設定してください。'});
+                return;
+            };
             try {
                 const result = await updateCalendarEvent({
                     operation: 'create',
@@ -442,6 +448,7 @@ export function ScheduleView({
                     description: event.description,
                     startTime: (event.start as Date).toISOString(),
                     endTime: (event.end as Date).toISOString(),
+                    gasUrl: orderGasUrl, // Pass the unified URL
                 });
                 if (result.status === 'success' && result.eventId) {
                     toast({ title: 'カレンダー登録成功', description: 'Googleカレンダーに予定を登録しました。' });
@@ -589,7 +596,7 @@ export function ScheduleView({
         if (!staff) return;
 
         let calendarEventId: string | undefined;
-        if (staff.calendarId) {
+        if (staff.calendarId && orderGasUrl) {
             try {
                 const result = await updateCalendarEvent({
                     operation: 'create',
@@ -598,6 +605,7 @@ export function ScheduleView({
                     description,
                     startTime: newStart.toISOString(),
                     endTime: newEnd.toISOString(),
+                    gasUrl: orderGasUrl,
                 });
                 if (result.status === 'success' && result.eventId) {
                     calendarEventId = result.eventId;
@@ -634,7 +642,7 @@ export function ScheduleView({
             end: newEnd,
         };
 
-        if (staff.calendarId && updatedEvent.calendarEventId) {
+        if (staff.calendarId && updatedEvent.calendarEventId && orderGasUrl) {
              try {
                 const result = await updateCalendarEvent({
                     operation: 'update',
@@ -644,6 +652,7 @@ export function ScheduleView({
                     description,
                     startTime: newStart.toISOString(),
                     endTime: newEnd.toISOString(),
+                    gasUrl: orderGasUrl,
                 });
                 if (result.status === 'error') throw new Error(result.message);
                 toast({ title: "カレンダー更新成功" });
@@ -910,14 +919,20 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let backgroundColor = staff.color || 'hsl(var(--primary))';
   let color = 'white';
 
-  const hslMatch = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+  const hslMatch = typeof backgroundColor === 'string' ? backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/) : null;
+  const hexMatch = typeof backgroundColor === 'string' ? backgroundColor.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i) : null;
+
 
   if (isTravelEvent) {
     if (hslMatch) {
       const [_, h, s] = hslMatch;
       backgroundColor = `hsl(${h}, ${Number(s) * 0.5}%, 50%)`;
       color = 'white';
-    } else {
+    } else if (hexMatch) {
+       backgroundColor = '#a0aec0'; // A generic gray color as hex fallback
+       color = 'white';
+    }
+     else {
       backgroundColor = 'hsl(210, 14%, 88%)'; // Muted color fallback
       color = 'hsl(var(--foreground))';
     }
@@ -926,6 +941,9 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       const [_, h, s] = hslMatch;
       backgroundColor = `hsl(${h}, ${s}%, 90%)`;
       color = 'hsl(var(--foreground))';
+    } else if (hexMatch) {
+        backgroundColor = '#c6f6d5'; // A generic light green as hex fallback
+        color = 'black';
     } else {
       backgroundColor = `hsl(120, 40%, 85%)`;
       color = 'hsl(var(--foreground))';

@@ -7,6 +7,7 @@ import type { Staff, WithId } from '@/lib/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
+// スタッフ用のGAS URLを保存するキーを明確に定義
 const STAFF_GAS_URL_KEY = 'staffGasUrl';
 
 // A simple hashing function to convert a string (like a staff ID) into a number.
@@ -21,6 +22,7 @@ const simpleHash = (str: string) => {
 };
 
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
+    // localStorageからスタッフ専用のURLを取得
     const url = localStorage.getItem(STAFF_GAS_URL_KEY);
     if (!url) {
         console.log("スタッフ情報を取得するためのGoogle Apps Script URLが設定されていません。");
@@ -28,7 +30,6 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     }
 
     try {
-        // The new GAS script returns background colors, which fetchGasData will retrieve.
         const result = await fetchGasData(url);
         
         const dataToProcess = result.data || (Array.isArray(result) ? result : []);
@@ -57,8 +58,8 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 email: item['メールアドレス'] || '',
                 role: getRole(),
                 password: item['パスワード'] || 'password',
-                // Prioritize background color from 'color' or 'カラー' column, then fallback to generated color
-                color: item['color'] || item['カラー'] || fallbackColor,
+                // GASから取得したセルの背景色'color'を最優先。なければフォールバック
+                color: item['color'] || fallbackColor,
                 avatarUrl: item['avatarUrl'] || '',
                 ...item
             };
@@ -100,6 +101,12 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     const loadStaff = async () => {
         setIsLoading(true);
         setError(null);
+        // localStorageにスタッフ用のURLがなければ何もしない
+        if (!localStorage.getItem(STAFF_GAS_URL_KEY)) {
+            setError("スタッフ情報を取得するためのURLが設定されていません。「スタッフ管理」ページで設定してください。");
+            setIsLoading(false);
+            return;
+        }
         try {
           const fetchedStaff = await fetchStaffDataFromGAS();
           setAllStaffState(fetchedStaff);
