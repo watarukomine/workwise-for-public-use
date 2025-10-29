@@ -1,10 +1,11 @@
 
 'use server';
 
+import { cookies } from 'next/headers';
+
 interface UpdateSheetStatusArgs {
     orderId: string;
     staffName: string | null;
-    gasUrl: string; // This URL will be passed from the component
 }
 
 interface GasResponse {
@@ -14,56 +15,27 @@ interface GasResponse {
 }
 
 
-export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSheetStatusArgs): Promise<GasResponse> {
-    if (!gasUrl) {
-        console.error('担当者更新用のGAS URLが提供されていません。');
-        return { status: 'error', message: '担当者更新用のGAS URLが設定されていません。「受注管理」ページで設定してください。' };
-    }
+export async function updateSheetStatus({ orderId, staffName }: UpdateSheetStatusArgs): Promise<GasResponse> {
+    
+    // We will use a centralized proxy to handle this.
+    // The component calling this doesn't know the URL, so we pass `null`.
+    // The API route will retrieve the correct URL from the context's storage (localStorage via cookies).
+    const response = await fetch(process.env.NEXT_PUBLIC_BASE_URL + '/api/gas-proxy', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ orderId, staffName, gasUrlSource: 'order' }),
+    });
 
-    try {
-        const formData = new URLSearchParams();
-        formData.append('orderId', orderId);
-        // staffNameがnullやundefinedの場合も "" として追加
-        formData.append('staffName', staffName || '');
-
-        const response = await fetch(gasUrl, {
-            method: 'POST',
-            cache: 'no-store',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: formData.toString(),
-            redirect: 'follow', 
-        });
-        
-        if (response.url.includes('accounts.google.com')) {
-            throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
-        }
-
-        const responseText = await response.text();
-        
-        if (!response.ok) {
-             throw new Error(`GAS script returned a non-OK response. Status: ${response.status}. Response: ${responseText}`);
-        }
-
-        let result: GasResponse;
-        try {
-            result = JSON.parse(responseText);
-        } catch (parseError) {
-             throw new Error(`GAS script returned a non-JSON response. This often indicates a script error or permission issue. Response: ${responseText}`);
-        }
-
-        if (result.error === true || result.status === 'error') {
-            throw new Error(result.message || 'GAS script returned a JSON-formatted error.');
-        }
-
-        return result;
-
-    } catch (error: any) {
-        console.error('Failed to call GAS for status update:', error.message);
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Failed to call proxy for sheet update:', errorText);
         return {
             status: 'error',
-            message: error.message || 'An unknown error occurred while updating the sheet.',
+            message: `プロキシ経由でのシート更新に失敗しました: ${errorText}`,
         };
     }
+    
+    return await response.json();
 }
