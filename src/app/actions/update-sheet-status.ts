@@ -38,6 +38,8 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
             method: 'POST',
             cache: 'no-store',
             headers: {
+                // This header is automatically set by fetch when body is URLSearchParams,
+                // but we set it explicitly for clarity.
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: formData.toString(),
@@ -51,15 +53,19 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
              throw new Error(`GAS script returned a non-OK response. Status: ${response.status}. Response: ${responseText}`);
         }
 
+        // GAS should always return JSON now.
         try {
             const result: GasResponse = JSON.parse(responseText);
 
             if(result.error === true || result.status === 'error'){
+                // The message from GAS is now the primary source of truth.
                 throw new Error(result.message || 'GAS returned a JSON-formatted error.');
             }
 
             return result;
         } catch (parseError) {
+             // This error happens if GAS returns something that isn't valid JSON,
+             // which points to an error happening *before* the `catch` block in the GAS code itself.
              throw new Error(`GAS script returned a non-JSON response. This often indicates a script error or permission issue. Response: ${responseText}`);
         }
 
