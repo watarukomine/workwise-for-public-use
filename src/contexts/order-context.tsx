@@ -26,7 +26,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const savedUrl = localStorage.getItem(ORDER_GAS_URL_KEY);
-    setOrderGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbzsD6kWSAoIen8ZApEJ4QPrIqyuIgDPcsKTU2A8kzh4phWzb0fDCyye9qx-8CjrRKNd/exec');
+    setOrderGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbwwU8WPnM5mFI7l8TJs9vlSXtV9pFmjBsRIecI4xyTZb0vymF2BpbLQb__nYk-JytmS/exec');
   }, []);
   
   const setOrderGasUrl = (url: string) => {

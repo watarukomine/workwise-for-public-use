@@ -22,7 +22,7 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
 
     const formData = new URLSearchParams();
     formData.append('orderId', orderId);
-    // staffName が null の場合でも、キー自体は送信するようにする
+    // staffName が null や undefined の場合でも、キー自体は送信するようにする
     formData.append('staffName', staffName || '');
 
 
@@ -42,6 +42,8 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
         }
         
         const resultText = await response.text();
+        // The response from a GAS script executed as a web app is often not a direct JSON object
+        // but text that needs to be parsed.
         const result = JSON.parse(resultText);
 
 
@@ -53,12 +55,9 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
 
     } catch (error: any) {
         console.error('Failed to call GAS for sheet update:', error);
-        // エラーメッセージにGASからの応答を含めることでデバッグしやすくする
         return {
             status: 'error',
             message: `GASの呼び出しに失敗しました: ${error.message}`,
         };
     }
 }
-
-

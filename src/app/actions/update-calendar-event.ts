@@ -27,6 +27,8 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
     }
     
     const formData = new URLSearchParams();
+    // Append all properties from the payload to the form data.
+    // This ensures that even if some values are undefined, the keys are handled correctly by URLSearchParams.
     for (const key in payload) {
         const value = payload[key as keyof typeof payload];
         if (value !== undefined && value !== null) {
@@ -42,9 +44,10 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
             },
             body: formData.toString(),
             cache: 'no-store',
-            redirect: 'follow',
+            redirect: 'follow', // Important for handling GAS redirects
         });
 
+        // If a redirect to a Google sign-in page occurs, it's a permissions error.
         if (response.redirected && response.url.includes('accounts.google.com')) {
              throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
