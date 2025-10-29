@@ -43,7 +43,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCustomer } from '@/contexts/customer-context';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { useToast } from '@/hooks/use-toast';
 import { useOrder } from '@/contexts/order-context';
 import { updateCalendarEvent } from '@/app/actions/update-calendar-event';
@@ -297,8 +296,7 @@ export function ScheduleView({
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
-    const eventTitle = eventToUnassign.title;
-
+    // --- Calendar Deletion Logic (Kept as is) ---
     const eventsToDelete = eventToUnassign.tripId 
         ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId)
         : [eventToUnassign];
@@ -320,31 +318,15 @@ export function ScheduleView({
         }
     }
     
+    // --- App State Update Logic (No GAS call) ---
     if (eventToUnassign.orderId) {
         const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
         if (originalOrder) {
            setOrdersData(currentOrders => [...currentOrders, originalOrder]);
+           toast({ title: 'タスクを未割り当てに戻しました', description: `オーダーID: ${eventToUnassign.orderId}` });
         }
-    }
-    
-    // Update the spreadsheet by sending the event title
-    if (eventTitle && orderGasUrl) {
-        try {
-            const result = await updateSheetStatus({
-                eventTitle: eventTitle,
-                staffName: null, // Set staff to null
-                gasUrl: orderGasUrl,
-            });
-            if (result.status === 'success') {
-                toast({ title: 'スプレッドシート更新', description: `タスク「${eventTitle}」を未割当に戻しました。` });
-            } else {
-                throw new Error(result.message || '不明なエラー');
-            }
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: 'スプレッドシート更新エラー', description: `オーダーの割り当て解除に失敗しました: ${e.message}` });
-        }
-    } else if (eventToUnassign.orderId && !orderGasUrl) {
-         toast({ variant: 'destructive', title: 'URL未設定', description: '担当者更新用のGAS URLが設定されていません。「受注管理」ページで設定してください。' });
+    } else {
+        toast({ title: 'タスクを削除しました', description: eventToUnassign.title });
     }
 
     setScheduleData(prev => prev.filter(e => !eventsToDelete.some(del => del.id === e.id)));
@@ -386,7 +368,9 @@ export function ScheduleView({
       };
 
       setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+      toast({ title: 'タスクを更新しました', description: `担当者または時間を変更しました。` });
       
+      // --- Calendar Update Logic (Kept as is) ---
       const staffMember = allStaff.find(s => s.id === finalStaffId);
       if (staffMember?.calendarId && updatedEvent.calendarEventId && orderGasUrl) {
         try {
@@ -424,6 +408,7 @@ export function ScheduleView({
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
+        // --- Calendar Creation Logic (Kept as is) ---
         const handleCalendarCreate = async (event: Omit<WithId<ScheduleEvent>, 'calendarEventId'>): Promise<string | undefined> => {
             if (!staff.calendarId || !orderGasUrl) {
                 if (!orderGasUrl) toast({ variant: 'destructive', title: 'URL未設定', description: 'カレンダー連携用のGAS URLが設定されていません。「受注管理」ページで設定してください。'});
@@ -474,9 +459,8 @@ export function ScheduleView({
             const tripId = `trip-${Date.now()}`;
             const travelEventId = `event-${Date.now()}-travel`;
             const taskEventId = `event-${Date.now()}-task`;
-
-            const rawOrderId = order.raw?.['受注ID'] || order.id;
-            const taskTitleWithId = `(ID: ${rawOrderId}) ${order.taskDetails.split('\n')[0]}`;
+            
+            const taskTitleWithId = `(ID: ${order.id}) ${order.taskDetails.split('\n')[0]}`;
             
             const travelEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
                 id: travelEventId,
@@ -506,35 +490,11 @@ export function ScheduleView({
 
             const travelEvent: WithId<ScheduleEvent> = { ...travelEventData, calendarEventId: travelCalendarId };
             const taskEvent: WithId<ScheduleEvent> = { ...taskEventData, calendarEventId: taskCalendarId };
-
+            
+            // --- App State Update Logic (No GAS call) ---
             setOrdersData(prev => prev.filter(o => o.id !== order.id));
             setScheduleData(prev => [...prev, travelEvent, taskEvent]);
-            
-            if (staff && orderGasUrl) {
-                 try {
-                    const result = await updateSheetStatus({
-                        eventTitle: taskTitleWithId, // Send the title with the ID
-                        staffName: staff.name,
-                        gasUrl: orderGasUrl,
-                    });
-                    if (result.status === 'success') {
-                        toast({
-                            title: 'スプレッドシート更新成功',
-                            description: `オーダー ${rawOrderId} を ${staff.name} さんに割り当てました。`,
-                        });
-                    } else {
-                        throw new Error(result.message || '不明なエラー');
-                    }
-                } catch (e: any) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'スプレッドシート更新エラー',
-                        description: `オーダーの割り当てに失敗しました: ${e.message}`,
-                    });
-                }
-            } else if (!orderGasUrl) {
-                toast({ variant: 'destructive', title: 'URL未設定', description: '担当者更新用のGAS URLが設定されていません。「受注管理」ページで設定してください。' });
-            }
+            toast({ title: 'タスクを割り当てました', description: `${staff.name}さんに「${taskTitleWithId}」を割り当てました。`});
         }
     }
 
@@ -977,3 +937,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    

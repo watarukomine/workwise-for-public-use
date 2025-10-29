@@ -56,7 +56,6 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
       taskDetails += `\n${line2}`;
   }
 
-
   return {
     id: String(rawOrder['受注ID'] || rawOrder.id || `ord-${Math.random()}`),
     customerCode: String(rawOrder['ユーザーコード'] || ''),
@@ -109,7 +108,8 @@ export default function DashboardPage() {
           const receptionDate = parseDate(order['受付日']);
           const isScheduledForToday = scheduledDate ? isToday(scheduledDate) : false;
           const isReceivedToday = receptionDate ? isToday(receptionDate) : false;
-          return isScheduledForToday || isReceivedToday;
+          // Show if EITHER scheduled for today OR received today (and not yet scheduled)
+          return isScheduledForToday || (isReceivedToday && !scheduledDate);
         })
         .map(mapRawToOrder);
       setOrders(filteredAndMapped);
@@ -117,6 +117,7 @@ export default function DashboardPage() {
       setOrders([]);
     }
   }, [rawOrders]);
+
 
   // Persist scheduleData to localStorage whenever it changes
   React.useEffect(() => {
@@ -223,3 +224,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
