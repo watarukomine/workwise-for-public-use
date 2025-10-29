@@ -52,14 +52,16 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
             // Generate a consistent color based on the staff ID hash as a fallback
             const fallbackColor = `hsl(${simpleHash(staffId) % 360}, 70%, 60%)`;
 
+            // スプレッドシートの'color'または'カラー'列の値を優先。なければフォールバック
+            const assignedColor = item['color'] || item['カラー'] || fallbackColor;
+
             return {
                 id: staffId,
                 name: item['スタッフ名'] || 'No Name',
                 email: item['メールアドレス'] || '',
                 role: getRole(),
                 password: item['パスワード'] || 'password',
-                // GASから取得したセルの背景色'color'を最優先。なければフォールバック
-                color: item['color'] || fallbackColor,
+                color: assignedColor,
                 avatarUrl: item['avatarUrl'] || '',
                 ...item
             };

@@ -1,6 +1,11 @@
 // 【重要】スタッフ情報が記載されているシート名に書き換えてください
-const SHEET_NAME = "【実際のシート名】";
+const SHEET_NAME = "スタッフマスタ";
 
+/**
+ * HTTP GETリクエストを処理します。
+ * 設定されたシートから全データを読み込み、JSON形式で返します。
+ * ★★★ セルの背景色を読み取る機能を追加 ★★★
+ */
 function doGet(e) {
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
@@ -11,8 +16,12 @@ function doGet(e) {
     const values = dataRange.getValues();
     const backgrounds = dataRange.getBackgrounds(); // セルの背景色を取得
 
+    if (values.length < 1) {
+      return ContentService.createTextOutput(JSON.stringify({ data: [] })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
     const headers = values.shift(); // 最初の行をヘッダーとして取得
-    backgrounds.shift(); // ヘッダー行の背景色は不要
+    backgrounds.shift(); // ヘッダー行の背景色は不要なので取り除く
 
     // 'color' または 'カラー' 列のインデックスを見つける
     let colorColIndex = headers.indexOf('color');
@@ -23,7 +32,6 @@ function doGet(e) {
     const data = values.map((row, rowIndex) => {
       const obj = {};
       headers.forEach((header, index) => {
-        // 日付オブジェクトはISO文字列に変換
         if (row[index] instanceof Date) {
           obj[header] = row[index].toISOString();
         } else {
@@ -49,4 +57,14 @@ function doGet(e) {
       .createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` }))
       .setMimeType(ContentService.MimeType.JSON);
   }
+}
+
+/**
+ * このスクリプトではPOSTリクエストは使用しません。
+ * 担当者の割り当ては受注管理用のGASが処理します。
+ */
+function doPost(e) {
+  return ContentService
+      .createTextOutput(JSON.stringify({ "status": "info", "message": "このスクリプトではPOSTリクエストは処理されません。" }))
+      .setMimeType(ContentService.MimeType.JSON);
 }

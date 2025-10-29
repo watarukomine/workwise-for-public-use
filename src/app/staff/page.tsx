@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { StaffTable } from '@/components/staff/staff-table';
-import { useSelectedStaff, fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
+import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2, Save } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -17,7 +17,7 @@ const STAFF_GAS_URL_KEY = 'staffGasUrl';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
-  const { allStaff, isLoading: isStaffLoading, error, setAllStaff } = useSelectedStaff();
+  const { allStaff, isLoading: isStaffLoading, error } = useSelectedStaff();
   
   const [localUrl, setLocalUrl] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -34,11 +34,11 @@ export default function StaffPage() {
     setIsUpdating(true);
     try {
       localStorage.setItem(STAFF_GAS_URL_KEY, localUrl);
-      // Force a reload of the page. The context's useEffect will handle fetching.
       toast({
         title: "URLを更新しました",
         description: "ページを再読み込みして、新しいURLからスタッフデータを取得します。",
       });
+      // A brief delay to allow the toast to be seen before the reload.
       setTimeout(() => window.location.reload(), 1000);
     } catch (e: any) {
       console.error(e);
@@ -89,7 +89,7 @@ export default function StaffPage() {
         </Alert>
       )}
       
-      {error && (
+      {error && !isStaffLoading && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>データ取得エラー</AlertTitle>
@@ -122,7 +122,7 @@ export default function StaffPage() {
       {profile?.role === 'admin' && (
         <Card>
           <CardHeader>
-            <CardTitle>データソースURL設定</CardTitle>
+            <CardTitle>スタッフマスタ用 データソースURL設定</CardTitle>
             <CardDescription>
               スタッフ情報を取得しているGoogle Apps ScriptのURLです。変更がある場合はここで更新できます。
             </CardDescription>
@@ -148,7 +148,7 @@ export default function StaffPage() {
           </CardContent>
            <CardFooter>
               <p className="text-xs text-muted-foreground">
-                  URLを変更すると、データは自動的に再読み込みされます。
+                  URLを変更すると、ページが再読み込みされ、新しいデータソースからスタッフ情報が取得されます。
               </p>
           </CardFooter>
         </Card>

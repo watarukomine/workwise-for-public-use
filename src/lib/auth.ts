@@ -30,7 +30,7 @@ const setSession = (user: WithId<Staff> | null) => {
 export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
   console.log(`Attempting to sign in with email: ${email}`);
   
-  // Use the single source of truth for fetching staff data
+  // Use the single source of truth for fetching staff data (from staff master)
   const staffList = await fetchStaffDataFromGAS();
 
   if (!staffList || staffList.length === 0) {
