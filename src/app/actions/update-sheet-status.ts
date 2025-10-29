@@ -4,7 +4,7 @@
 interface UpdateSheetStatusArgs {
     orderId: string;
     staffName: string | null;
-    gasUrl: string; // The specific GAS URL for orders must now be passed in.
+    gasUrl: string;
 }
 
 interface GasResponse {
@@ -13,26 +13,26 @@ interface GasResponse {
     error?: boolean; 
 }
 
-
 export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSheetStatusArgs): Promise<GasResponse> {
     
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
-    const formData = new URLSearchParams();
-    formData.append('orderId', orderId);
-    // staffName が null や undefined の場合でも、キー自体は送信するようにする
-    formData.append('staffName', staffName || '');
-
+    const payload = {
+        orderId: orderId,
+        staffName: staffName,
+    };
 
     try {
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                // 明示的にJSON形式で送信することを宣言
+                'Content-Type': 'application/json',
             },
-            body: formData.toString(),
+            // JavaScriptオブジェクトをJSON文字列に変換してbodyに設定
+            body: JSON.stringify(payload),
             cache: 'no-store',
             redirect: 'follow'
         });
@@ -41,13 +41,10 @@ export async function updateSheetStatus({ orderId, staffName, gasUrl }: UpdateSh
              throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
         
-        const resultText = await response.text();
-        // The response from a GAS script executed as a web app is often not a direct JSON object
-        // but text that needs to be parsed.
-        const result = JSON.parse(resultText);
+        // GASからのレスポンスは常にJSONとしてパースする
+        const result = await response.json();
 
-
-        if (result.status === 'error') {
+        if (result.status === 'error' || result.error) {
             throw new Error(result.message || 'GASスクリプトでエラーが発生しました。');
         }
 

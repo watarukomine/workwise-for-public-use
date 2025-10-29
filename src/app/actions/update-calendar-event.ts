@@ -9,7 +9,7 @@ interface UpdateCalendarEventArgs {
     description?: string;
     startTime?: string;
     endTime?: string;
-    gasUrl: string; // The GAS URL is now a required parameter.
+    gasUrl: string;
 }
 
 interface GasResponse {
@@ -26,36 +26,27 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
     
-    const formData = new URLSearchParams();
-    // Append all properties from the payload to the form data.
-    // This ensures that even if some values are undefined, the keys are handled correctly by URLSearchParams.
-    for (const key in payload) {
-        const value = payload[key as keyof typeof payload];
-        if (value !== undefined && value !== null) {
-            formData.append(key, String(value));
-        }
-    }
-
     try {
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
+                // 明示的にJSON形式で送信することを宣言
+                'Content-Type': 'application/json',
             },
-            body: formData.toString(),
+            // ペイロード全体をJSON文字列に変換してbodyに設定
+            body: JSON.stringify(payload),
             cache: 'no-store',
-            redirect: 'follow', // Important for handling GAS redirects
+            redirect: 'follow',
         });
 
-        // If a redirect to a Google sign-in page occurs, it's a permissions error.
         if (response.redirected && response.url.includes('accounts.google.com')) {
              throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
         
-        const resultText = await response.text();
-        const result = JSON.parse(resultText);
+        // GASからのレスポンスは常にJSONとしてパースする
+        const result = await response.json();
 
-        if (result.status === 'error') {
+        if (result.status === 'error' || result.error) {
             throw new Error(result.message || 'GASスクリプトでカレンダー操作エラーが発生しました。');
         }
 
