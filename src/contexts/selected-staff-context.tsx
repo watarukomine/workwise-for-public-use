@@ -9,12 +9,20 @@ import { fetchGasData } from '@/app/actions/fetch-gas-data';
 
 const STAFF_GAS_URL_KEY = 'staffGasUrl';
 
+// A simple hashing function to convert a string (like a staff ID) into a number.
+const simpleHash = (str: string) => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+};
 
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     const url = localStorage.getItem(STAFF_GAS_URL_KEY);
     if (!url) {
-        // Return empty array instead of throwing error if URL is not set.
-        // The UI will handle prompting the user.
         console.log("スタッフ情報を取得するためのGoogle Apps Script URLが設定されていません。");
         return [];
     }
@@ -28,9 +36,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
             return [];
         }
 
-        // Map GAS data to Staff type
         return dataToProcess.map((item: any) => {
-            
             const getRole = (): 'admin' | 'staff' => {
                 const roleValue = item['権限'] || item['Role'] || item['ロール'];
                 if (typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
@@ -39,13 +45,19 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 return 'staff';
             };
 
+            const staffId = String(item['id'] || item['ID'] || item['スタッフID'] || `gas-staff-${Math.random()}`);
+            
+            // Generate a consistent color based on the staff ID hash
+            const consistentColor = `hsl(${simpleHash(staffId) % 360}, 70%, 60%)`;
+
             return {
-                id: String(item['id'] || item['ID'] || item['スタッフID'] || `gas-staff-${Math.random()}`),
+                id: staffId,
                 name: item['スタッフ名'] || 'No Name',
                 email: item['メールアドレス'] || '',
                 role: getRole(),
                 password: item['パスワード'] || 'password',
-                color: item['color'] || `hsl(${Math.floor(Math.random() * 360)}, 70%, 60%)`,
+                // Use color from sheet if available, otherwise use the consistent generated color
+                color: item['color'] || consistentColor,
                 avatarUrl: item['avatarUrl'] || '',
                 ...item
             };
@@ -53,7 +65,6 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
     } catch (error: any) {
         console.error('Error fetching staff data from GAS:', error);
-        // Re-throw the specific error from fetchGasData or a generic one
         throw new Error(error.message || 'スプレッドシートからスタッフデータを取得できませんでした。');
     }
 };
