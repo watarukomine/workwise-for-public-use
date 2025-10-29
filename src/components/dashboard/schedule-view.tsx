@@ -297,7 +297,6 @@ export function ScheduleView({
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
-    // This is the event title that contains the ID, e.g., "(ID: 5) ABC Store"
     const eventTitle = eventToUnassign.title;
 
     const eventsToDelete = eventToUnassign.tripId 
@@ -321,7 +320,6 @@ export function ScheduleView({
         }
     }
     
-    // Restore the original order to the unassigned list
     if (eventToUnassign.orderId) {
         const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
         if (originalOrder) {
@@ -333,7 +331,7 @@ export function ScheduleView({
     if (eventTitle && orderGasUrl) {
         try {
             const result = await updateSheetStatus({
-                eventTitle: eventTitle, // Use the title which contains the ID
+                eventTitle: eventTitle,
                 staffName: null, // Set staff to null
                 gasUrl: orderGasUrl,
             });
@@ -477,11 +475,10 @@ export function ScheduleView({
             const travelEventId = `event-${Date.now()}-travel`;
             const taskEventId = `event-${Date.now()}-task`;
 
-            // ★★★ Your Suggestion Here: Embed the Raw Order ID into the title ★★★
             const rawOrderId = order.raw?.['受注ID'] || order.id;
-            const taskTitleWithId = `(ID: ${rawOrderId}) ${order.taskDetails}`;
+            const taskTitleWithId = `(ID: ${rawOrderId}) ${order.taskDetails.split('\n')[0]}`;
             
-            const travelEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId' | 'title'> & { title: string } = {
+            const travelEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
                 id: travelEventId,
                 tripId: tripId,
                 title: `移動: ${customer?.storeName || order.customerCode}`,
@@ -492,13 +489,12 @@ export function ScheduleView({
                 end: taskStart,
             };
             
-            const taskEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId' | 'title'> & { title: string } = {
+            const taskEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
                 id: taskEventId,
                 tripId: tripId,
                 orderId: order.id,
-                rawOrderId: rawOrderId,
-                title: taskTitleWithId, // Use the title with the embedded ID
-                description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`,
+                title: taskTitleWithId,
+                description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                 staffId: newStaffId,
                 locationId: customer?.id || '',
                 start: taskStart,
@@ -524,7 +520,7 @@ export function ScheduleView({
                     if (result.status === 'success') {
                         toast({
                             title: 'スプレッドシート更新成功',
-                            description: `オーダー ${taskTitleWithId} を ${staff.name} さんに割り当てました。`,
+                            description: `オーダー ${rawOrderId} を ${staff.name} さんに割り当てました。`,
                         });
                     } else {
                         throw new Error(result.message || '不明なエラー');

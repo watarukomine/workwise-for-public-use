@@ -29,7 +29,6 @@ export async function updateSheetStatus({ eventTitle, staffName, gasUrl }: Updat
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                // 明示的にJSON形式であることを指定
                 'Content-Type': 'application/json',
             },
             // オブジェクトをJSON文字列に変換してbodyに設定
