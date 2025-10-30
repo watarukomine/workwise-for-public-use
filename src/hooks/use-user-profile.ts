@@ -1,27 +1,40 @@
 'use client';
 
 import { useUser } from '@/firebase';
+import { useSelectedStaff } from '@/contexts/selected-staff-context';
+import { useMemo } from 'react';
+import type { WithId, Staff } from '@/lib/types';
 
-// This hook now returns data from our simplified, mock authentication context.
 export function useUserProfile() {
   const { user, isUserLoading, userError } = useUser();
-  // This is a temporary adapter to maintain compatibility with the old profile structure.
-  // In the future, components should be updated to use the Firebase User object directly.
-  const profile = user
-    ? {
-        id: user.uid,
-        name: user.displayName || user.email,
-        email: user.email,
-        avatarUrl: user.photoURL || undefined,
-        // The 'role' will need to be fetched from Firestore.
-        // For now, we'll assign a default role.
-        role: 'staff' as 'admin' | 'staff',
-      }
-    : null;
+  const { allStaff, isLoading: isStaffLoading } = useSelectedStaff();
+
+  const profile: WithId<Staff> | null = useMemo(() => {
+    if (!user || !allStaff || allStaff.length === 0) {
+      return null;
+    }
+
+    const staffProfile = allStaff.find(staff => staff.id === user.uid || staff.email === user.email);
+
+    return {
+      id: user.uid,
+      name: staffProfile?.name || user.displayName || user.email || 'Unknown User',
+      email: user.email,
+      avatarUrl: staffProfile?.avatarUrl || user.photoURL || undefined,
+      // Use role from the comprehensive staff list, default to 'staff'
+      role: staffProfile?.role || 'staff',
+      // Include other relevant details from staffProfile if they exist
+      calendarId: staffProfile?.calendarId,
+      color: staffProfile?.color,
+      password: staffProfile?.password, // Note: sensitive data
+    };
+  }, [user, allStaff]);
+  
+  const isLoading = isUserLoading || isStaffLoading;
 
   return {
     profile,
-    isLoading: isUserLoading,
+    isLoading,
     error: userError,
     // These functions are now no-ops as auth is handled by Firebase.
     setProfile: () => {}, 
