@@ -271,12 +271,6 @@ export function ScheduleView({
     if (!functions) return null;
     return httpsCallable(functions, 'updatecalendarevent');
   }, [functions]);
-  
-  // DEBUG: Create a memoized callable for the debug function
-  const debugCalendar = React.useMemo(() => {
-    if (!functions) return null;
-    return httpsCallable(functions, 'debugcalendar');
-  }, [functions]);
 
 
   React.useEffect(() => {
@@ -387,8 +381,7 @@ export function ScheduleView({
       return;
     }
     
-    // DEBUG: Switch to debug function
-    if (!debugCalendar || !updateCalendarEvent) {
+    if (!updateCalendarEvent) {
       toast({ variant: 'destructive', title: 'エラー', description: 'カレンダー連携機能が初期化されていません。' });
       setActiveItem(null);
       setCurrentOverStaffId(null);
@@ -510,30 +503,6 @@ export function ScheduleView({
                 endTime: (event.end as Date).toISOString(),
             };
 
-            // --- START DEBUG BLOCK ---
-            try {
-                toast({ title: "デバッグ関数を呼び出し中..." });
-                const debugResult: any = await debugCalendar(payload);
-                if (debugResult.data.status === 'success') {
-                    toast({
-                        title: "デバッグデータ受信",
-                        description: `Cloud Functionはデータを受け取りました: ${debugResult.data.message}`,
-                        duration: 5000,
-                    });
-                    console.log("Debug function success:", debugResult.data);
-                } else {
-                    throw new Error(debugResult.data.message || 'デバッグ関数がエラーを返しました。');
-                }
-            } catch (e: any) {
-                toast({ variant: "destructive", title: "デバッグ関数エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
-                console.error("Debug function error:", e);
-                // On debug failure, we stop to avoid calling the real function.
-                return undefined;
-            }
-            // --- END DEBUG BLOCK ---
-
-            // If debug is successful, you can comment it out and uncomment the real call.
-            // For now, we will call the real one anyway to see the error.
             try {
                 const result: any = await updateCalendarEvent(payload);
                 if (result.data.status === 'success' && result.data.eventId) {
@@ -542,7 +511,13 @@ export function ScheduleView({
                 }
                 throw new Error(result.data.message || 'カレンダーに登録できませんでした。');
             } catch (e: any) {
-                toast({ variant: "destructive", title: "カレンダー登録エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
+                const errorDetails = (e as any).details ? JSON.stringify((e as any).details) : '追加情報なし';
+                toast({ 
+                    variant: "destructive", 
+                    title: `カレンダー登録エラー: ${e.message || 'internal'}`,
+                    description: `詳細: ${errorDetails}`,
+                    duration: 9000,
+                });
                 return undefined;
             }
         };
@@ -695,7 +670,13 @@ export function ScheduleView({
                     throw new Error(result.data.message);
                 }
             } catch (e: any) {
-                toast({ variant: "destructive", title: "カレンダー登録エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
+                const errorDetails = (e as any).details ? JSON.stringify((e as any).details) : '追加情報なし';
+                toast({ 
+                    variant: "destructive", 
+                    title: `カレンダー登録エラー: ${e.message || 'internal'}`,
+                    description: `詳細: ${errorDetails}`,
+                    duration: 9000,
+                });
             }
         }
 
@@ -741,7 +722,13 @@ export function ScheduleView({
                 if (result.data.status === 'error') throw new Error(result.data.message);
                 toast({ title: "カレンダー更新成功" });
             } catch (e: any) {
-                toast({ variant: "destructive", title: "カレンダー更新エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
+                const errorDetails = (e as any).details ? JSON.stringify((e as any).details) : '追加情報なし';
+                toast({ 
+                    variant: "destructive", 
+                    title: `カレンダー更新エラー: ${e.message || 'internal'}`,
+                    description: `詳細: ${errorDetails}`,
+                    duration: 9000,
+                });
             }
         }
 

@@ -140,20 +140,3 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
         });
     }
 });
-
-
-/**
- * A simple debug function to check if data is being received from the client.
- */
-export const debugcalendar = onCall({ region: 'asia-northeast1' }, (request) => {
-    logger.info("--- DEBUG FUNCTION CALLED ---");
-    logger.info("Received auth context:", JSON.stringify(request.auth, null, 2));
-    logger.info("Received data:", JSON.stringify(request.data, null, 2));
-    logger.info("--- DEBUG FUNCTION END ---");
-    
-    return {
-        status: "success",
-        message: "デバッグデータを受信しました。",
-        receivedData: request.data
-    };
-});
