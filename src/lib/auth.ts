@@ -26,16 +26,16 @@ const setSession = (user: WithId<Staff> | null) => {
 export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
   console.log(`Attempting to sign in with email: ${email}`);
   
-  // Use the single source of truth for fetching staff data (from staff master)
   const staffList = await fetchStaffDataFromGAS();
 
   if (!staffList || staffList.length === 0) {
       throw new Error('スタッフマスタにアクセスできません。スタッフ管理ページでURLが正しく設定されているか確認してください。');
   }
 
+  // This is the corrected logic. It correctly checks the `email` and `password` properties
+  // on the Staff objects that were mapped in `fetchStaffDataFromGAS`.
   const user = staffList.find(staff => 
-      staff.email && 
-      staff.email.toLowerCase() === email.toLowerCase() && 
+      staff.email?.toLowerCase() === email.toLowerCase() && 
       staff.password === password
   );
 

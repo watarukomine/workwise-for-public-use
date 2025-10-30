@@ -51,13 +51,14 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
             return {
                 id: staffId,
-                name: item['スタッフ名'] || 'No Name',
-                email: item['メールアドレス'] || '',
+                name: item['スタッフ名'] || item['name'] || 'No Name',
+                email: item['メールアドレス'] || item['email'] || '',
+                password: item['パスワード'] || item['password'] || 'password', // Ensure password is read
                 role: getRole(),
-                password: item['パスワード'] || 'password',
+                calendarId: item['calendarId'] || item['カレンダーID'],
                 color: assignedColor,
                 avatarUrl: item['avatarUrl'] || '',
-                ...item
+                ...item // Preserve original fields
             };
         });
 
