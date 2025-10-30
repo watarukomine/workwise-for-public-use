@@ -462,7 +462,7 @@ export function ScheduleView({
         const order = item;
         const timelineRect = over.rect;
         
-        const dropX = (active.rect.current.initial?.left ?? 0) - timelineRect.left + delta.x;
+        const dropX = (active.rect.current.initial?.left ?? 0) - timelineRect.left + delta.x - 144;
         const dropMinutes = pixelsToMinutes(dropX);
 
         const today = new Date();
@@ -743,7 +743,7 @@ export function ScheduleView({
                     <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative">
                             <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm">
-                              <div className="relative h-8 ml-[144px]" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
+                              <div className="relative h-8" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`, marginLeft: '144px' }}>
                                   {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                       <div
                                           key={i}
@@ -899,10 +899,9 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
         ref={setNodeRef} 
         className={cn("relative flex-1 h-full", areaBgClass)} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
-        style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
-        <div className="h-full border-t border-b ml-[144px]"></div>
-        <div className="relative h-full ml-[144px]">
+        <div className="h-full border-t border-b ml-[144px]" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}></div>
+        <div className="relative h-full ml-[144px]" style={{marginTop: '-4rem'}}>
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
