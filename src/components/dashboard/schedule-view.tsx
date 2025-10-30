@@ -57,6 +57,19 @@ const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
 
+// Helper function to find a value from an object with multiple possible keys.
+const findKey = (item: any, possibleKeys: string[]) => {
+    for (const key of possibleKeys) {
+        const lowerKey = key.toLowerCase().trim();
+        for (const itemKey in item) {
+            if (itemKey.toLowerCase().trim() === lowerKey) {
+                return item[itemKey];
+            }
+        }
+    }
+    return undefined;
+};
+
 const timeStringToDate = (timeStr: string) => {
     if (!/^\d{2}:\d{2}$/.test(timeStr)) {
         console.error("Invalid time string format:", timeStr);
@@ -110,19 +123,6 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
   };
 };
 
-const findKey = (item: any, possibleKeys: string[]) => {
-    for (const key of possibleKeys) {
-        const lowerKey = key.toLowerCase().trim();
-        for (const itemKey in item) {
-            if (itemKey.toLowerCase().trim() === lowerKey) {
-                return item[itemKey];
-            }
-        }
-    }
-    return undefined;
-};
-
-
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
     const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : ''}`;
@@ -132,7 +132,7 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
         taskDetails += `\n${line2}`;
     }
     
-    const idKeys = ['受注 ID','受注id', '受注ID', 'id'];
+    const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
     const orderId = findKey(rawOrder, idKeys);
 
     return {
@@ -386,7 +386,7 @@ export function ScheduleView({
             return prev;
           });
         }
-    } else {
+    } else if (!eventToUnassign.id.startsWith('generic-')) {
          toast({ title: '汎用タスクを削除しました' });
     }
     

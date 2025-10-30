@@ -17,6 +17,7 @@ const simpleHash = (str: string) => {
     return Math.abs(hash);
 };
 
+// Helper function to find a value from an object with multiple possible keys.
 const findKey = (item: any, possibleKeys: string[]) => {
     for (const key of possibleKeys) {
         const lowerKey = key.toLowerCase().trim();

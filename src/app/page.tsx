@@ -26,6 +26,7 @@ export default function DashboardPage() {
   const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>(() => {
       if (typeof window === 'undefined') return [];
       try {
+          // 古いキーを削除
           Object.keys(localStorage).forEach(key => {
               if (key.startsWith('scheduleData-') && key !== getTodayStorageKey()) {
                   localStorage.removeItem(key);
@@ -54,20 +55,27 @@ export default function DashboardPage() {
       }
   }, [scheduleData]);
 
+  // 「スタッフ管理」で選択されたスタッフのみをフィルタリング
   const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || isStaffLoading || !profile) return [];
 
     const staffToUse = allStaff;
 
-    if (profile.role === 'admin') {
-        if (appliedSelectedStaffIds.length === 0) {
-            return staffToUse;
-        }
-        return staffToUse.filter(staff => appliedSelectedStaffIds.includes(staff.id));
+    // 管理者でない場合は、自分自身のみ表示
+    if (profile.role !== 'admin') {
+      return staffToUse.filter(staff => staff.id === profile.id);
     }
-    return staffToUse.filter(staff => staff.id === profile.id);
+    
+    // 管理者の場合、選択がなければ全員表示
+    if (appliedSelectedStaffIds.length === 0) {
+        return staffToUse;
+    }
+    // 選択があれば、そのスタッフのみ表示
+    return staffToUse.filter(staff => appliedSelectedStaffIds.includes(staff.id));
+
   }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
   
+  // フィルタリングされたスタッフに基づいてステータスもフィルタリング
   const filteredStatuses = React.useMemo(() => {
     if (!staffStatusData || !filteredStaff) return [];
     const selectedIds = new Set(filteredStaff.map(s => s.id));
