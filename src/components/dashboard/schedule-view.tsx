@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -45,9 +44,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useOrder } from '@/contexts/order-context';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Textarea } from '../ui/textarea';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { Download } from 'lucide-react';
 import * as ics from 'ics';
+import { useFunctions } from '@/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -293,6 +294,7 @@ export function ScheduleView({
     setIsClient(true);
   }, []);
   
+  const functions = useFunctions();
   const { customers: allCustomers } = useCustomer();
   const { allStaff } = useSelectedStaff();
   const { orderGasUrl } = useOrder();
@@ -343,35 +345,49 @@ export function ScheduleView({
       }
   };
 
+  const updateSheet = async (orderId: string | undefined, staffName: string | null) => {
+      if (!orderId) {
+          toast({ variant: 'destructive', title: 'エラー', description: '受注IDが見つからないためシートを更新できません。' });
+          return;
+      }
+      try {
+          // You need to get the spreadsheetId and sheetName from your settings or context
+          // For now, let's assume they are hardcoded or passed in.
+          const spreadsheetId = "1oB5f52y4a2a1B8z_Giy3z4qY5Z6X8C7e5A4d3c2b1a0"; // Replace with your actual Spreadsheet ID
+          const sheetName = "受注一覧"; // Replace with your actual sheet name
+
+          const updateFunction = httpsCallable(functions, 'updatecalendarevent');
+          const result = await updateFunction({
+              operation: 'updateSheetStatus',
+              spreadsheetId: spreadsheetId,
+              sheetName: sheetName,
+              orderId: orderId,
+              staffName: staffName,
+          });
+          toast({ title: 'シートを更新しました', description: `担当者を「${staffName || '未割り当て'}」に変更しました。` });
+
+      } catch (error: any) {
+          console.error("Failed to update sheet:", error);
+          toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${error.message}` });
+          throw error; // Re-throw to prevent UI changes if the sheet update fails
+      }
+  };
+
+
   const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
     const rawOrderId = eventToUnassign.rawOrderId;
     
-    // If it was a real order, update sheet and move it back to unassigned list
     if (rawOrderId) {
         try {
-            const sheetResult = await updateSheetStatus({
-                gasUrl: orderGasUrl,
-                orderId: rawOrderId,
-                staffName: null, 
-                eventTitle: eventToUnassign.title,
-            });
-
-            if (sheetResult.status === 'error') {
-                toast({ variant: 'destructive', title: 'シート更新エラー', description: `シート担当者のクリアに失敗: ${sheetResult.message}` });
-                return; // Prevent UI change if sheet update fails
-            }
-            toast({ title: '担当者をクリアしました', description: sheetResult.message });
-
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: 'シート更新エラー', description: `シート担当者のクリアに失敗しました: ${e.message}` });
-            return; // Prevent UI change if sheet update fails
+            await updateSheet(rawOrderId, null);
+        } catch (e) {
+            return; // Stop if sheet update fails
         }
 
         const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === rawOrderId);
         if (originalOrder) {
           const orderToAddBack = mapRawToOrder(originalOrder);
            setUnassignedOrders(prev => {
-            // Avoid adding duplicates
             if (!prev.some(o => o.id === orderToAddBack.id)) {
               return [...prev, orderToAddBack];
             }
@@ -380,7 +396,6 @@ export function ScheduleView({
         }
     }
     
-    // Remove the event and its associated travel event (if any) from the schedule
     setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
   };
 
@@ -395,7 +410,6 @@ export function ScheduleView({
       return;
     }
     
-    // Scenario 1: An existing event is dropped into the unassigned area
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         await handleUnassignEvent(item);
         return;
@@ -404,31 +418,40 @@ export function ScheduleView({
     const newStaffId = over.id as string;
     const staffRowElement = document.getElementById(`staff-row-${newStaffId}`);
     
-    // Check if dropping onto a valid staff row timeline
     if (!staffRowElement) return;
     
     const timelineRect = staffRowElement.getBoundingClientRect();
     const startOfDay = new Date();
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
-    const getNewStartFromDelta = () => {
-        const initialLeft = active.rect.current.initial?.left ?? 0;
-        const dropX = initialLeft - timelineRect.left + delta.x;
-        const newStartMinutes = pixelsToMinutes(dropX);
-        return addMinutes(startOfDay, newStartMinutes);
+    const getNewStartFromDelta = (isNew: boolean) => {
+      const initialLeft = active.rect.current.initial?.left ?? 0;
+      let dropX;
+      if (isNew) {
+        // For new items, we need to account for the initial position of the draggable order chip
+        // and the timeline's own position.
+        const orderListContainer = document.querySelector('[data-id="unassigned-tasks-container"]');
+        const containerRect = orderListContainer?.getBoundingClientRect() ?? { left: 0 };
+        dropX = (initialLeft - timelineRect.left + delta.x) ;
+      } else {
+        // For existing items, the initial.left is already relative to the timeline.
+         dropX = (initialLeft - timelineRect.left) + delta.x;
+      }
+      const newStartMinutes = pixelsToMinutes(dropX);
+      return addMinutes(startOfDay, newStartMinutes);
     };
 
-    // Scenario 2: An existing event is moved (within or between timelines)
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
         const staffMember = allStaff.find(s => s.id === newStaffId);
         if (!staffMember) return;
         
+        const newStart = getNewStartFromDelta(false);
+        
         let eventsToUpdate: WithId<ScheduleEvent>[] = [];
-        const newStart = getNewStartFromDelta();
+        let taskToUpdate: WithId<ScheduleEvent> | undefined;
 
         if (draggedEvent.tripId) {
-            // It's a grouped trip, move both events
             const travelEvent = scheduleData.find(e => e.tripId === draggedEvent.tripId && e.title.startsWith('移動'));
             const taskEvent = scheduleData.find(e => e.tripId === draggedEvent.tripId && !e.title.startsWith('移動'));
 
@@ -449,55 +472,44 @@ export function ScheduleView({
                     newTravelEnd = newTaskStart;
                     newTravelStart = subMinutes(newTravelEnd, travelDuration);
                 }
-
-                eventsToUpdate.push({ ...travelEvent, staffId: newStaffId, start: newTravelStart, end: newTravelEnd });
-                eventsToUpdate.push({ ...taskEvent, staffId: newStaffId, start: newTaskStart, end: newTaskEnd });
+                
+                const updatedTravelEvent = { ...travelEvent, staffId: newStaffId, start: newTravelStart, end: newTravelEnd };
+                const updatedTaskEvent = { ...taskEvent, staffId: newStaffId, start: newTaskStart, end: newTaskEnd };
+                eventsToUpdate.push(updatedTravelEvent, updatedTaskEvent);
+                taskToUpdate = updatedTaskEvent;
             }
         } else {
-            // It's a single, non-grouped event
             const originalDuration = differenceInMinutes(
                 typeof draggedEvent.end === 'string' ? parseISO(draggedEvent.end) : draggedEvent.end,
                 typeof draggedEvent.start === 'string' ? parseISO(draggedEvent.start) : draggedEvent.start
             );
             const newEnd = addMinutes(newStart, originalDuration);
-            eventsToUpdate.push({ ...draggedEvent, staffId: newStaffId, start: newStart, end: newEnd });
+            const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart, end: newEnd };
+            eventsToUpdate.push(updatedEvent);
+            taskToUpdate = updatedEvent;
         }
         
-        // If staff member changed for a real order, update the sheet
         if (draggedEvent.rawOrderId && draggedEvent.staffId !== newStaffId) {
             try {
-                const sheetResult = await updateSheetStatus({
-                    gasUrl: orderGasUrl,
-                    orderId: draggedEvent.rawOrderId,
-                    staffName: staffMember.name,
-                    eventTitle: draggedEvent.title,
-                });
-                if (sheetResult.status === 'error') {
-                   toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${sheetResult.message}` });
-                   return; // Don't update UI if sheet update fails
-                }
-                toast({ title: '担当者をシートで更新しました', description: `担当者を「${staffMember.name}」に変更しました。`});
-            } catch(e: any) {
-                toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+                await updateSheet(draggedEvent.rawOrderId, staffMember.name);
+            } catch(e) {
                 return;
             }
-        } else {
-             toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
         }
-
+        
         setScheduleData(prev => {
             const otherEvents = prev.filter(e => !eventsToUpdate.some(u => u.id === e.id));
             return [...otherEvents, ...eventsToUpdate];
         });
+        toast({ title: 'タスクを更新しました' });
 
     }
-    // Scenario 3: A new order is dropped onto a timeline
     else if ('estimatedDuration' in item) {
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
-        const newStart = getNewStartFromDelta();
+        const newStart = getNewStartFromDelta(true);
         const isGeneric = order.id.startsWith('generic-');
 
         if (isGeneric) {
@@ -520,25 +532,8 @@ export function ScheduleView({
             
             const rawOrderId = order.rawOrderId;
             
-            if (!rawOrderId) {
-                toast({ variant: 'destructive', title: 'エラー', description: '受注IDが見つかりません。シート更新はスキップされます。' });
-                return;
-            }
-
             try {
-              const sheetResult = await updateSheetStatus({
-                gasUrl: orderGasUrl,
-                orderId: rawOrderId,
-                staffName: staff.name,
-                eventTitle: order.taskDetails.split('\n')[0],
-              });
-
-              if (sheetResult.status === 'error') {
-                toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${sheetResult.message}` });
-                return; 
-              }
-              
-              toast({ title: '担当者をシートに記録しました', description: sheetResult.message });
+              await updateSheet(rawOrderId, staff.name);
 
               const taskEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-task`,
@@ -568,7 +563,7 @@ export function ScheduleView({
               setScheduleData(prev => [...prev, travelEvent, taskEvent]);
               
             } catch (e: any) {
-              toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+              // Error toast is handled inside updateSheet, so we just stop execution.
               return; 
             }
         }
@@ -586,7 +581,6 @@ export function ScheduleView({
   };
   
   const handleDoubleClickTimeline = (staffId: string, e: React.MouseEvent) => {
-    // Prevent creating new event if double clicking on an existing event
     if ((e.target as HTMLElement).closest('[data-event-chip="true"]')) {
       return;
     }
@@ -772,9 +766,7 @@ export function ScheduleView({
                 <CardContent className="pt-6">
                     <div className="relative">
                       <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                          {/* Staff Column Header */}
                           <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
-                          {/* Timeline Header */}
                           <div className="relative h-8 flex-1">
                               {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                   <div
@@ -922,7 +914,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
 
   return (
     <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className="sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center" style={{ width: `${STAFF_COL_WIDTH}px` }}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -990,13 +982,13 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const hslMatch = typeof backgroundColor === 'string' ? backgroundColor.match(/hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)/) : null;
 
   if (isTravelEvent) {
-      if (hslMatch) {
-        const [_, h, s, l] = hslMatch;
-        backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
-      } else {
-        backgroundColor = `rgba(128, 128, 128, 0.5)`;
-      }
-      color = 'hsl(var(--foreground))';
+    if (hslMatch) {
+      const [_, h, s, l] = hslMatch;
+      backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
+    } else {
+      backgroundColor = `rgba(128, 128, 128, 0.5)`;
+    }
+    color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
      if (hslMatch) {
       const [_, h, s] = hslMatch;
@@ -1046,6 +1038,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-
-    
