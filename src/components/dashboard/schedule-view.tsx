@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -348,7 +349,13 @@ export function ScheduleView({
     
     const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
         try {
-            const result = await updateSheetStatus({ gasUrl: orderGasUrl, eventTitle: eventToUnassign.title, staffName: null });
+            const result = await updateSheetStatus({ 
+              gasUrl: orderGasUrl, 
+              eventTitle: eventToUnassign.title, 
+              staffName: null,
+              statusColumnName: "ステータス",
+              statusValue: ""
+            });
             if (result.status === 'error') throw new Error(result.message);
             
             const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === eventToUnassign.rawOrderId);
@@ -397,13 +404,20 @@ export function ScheduleView({
         
         try {
             if (draggedEvent.rawOrderId && draggedEvent.staffId !== newStaffId) {
-                const result = await updateSheetStatus({ gasUrl: orderGasUrl, eventTitle: draggedEvent.title, staffName: staffMember.name });
+                const result = await updateSheetStatus({ 
+                  gasUrl: orderGasUrl, 
+                  eventTitle: draggedEvent.title, 
+                  staffName: staffMember.name,
+                  statusColumnName: "ステータス",
+                  statusValue: "作業待ち"
+                });
                 if (result.status === 'error') throw new Error(result.message);
                 toast({ title: '担当者を変更しました', description: result.message });
             }
 
             const newStart = getNewStartFromDrop();
             const eventsToUpdate: WithId<ScheduleEvent>[] = [];
+            
             if (draggedEvent.tripId) {
                 const tripEvents = scheduleData.filter(e => e.tripId === draggedEvent.tripId);
                 const travelEvent = tripEvents.find(e => e.title.startsWith('移動'));
@@ -415,7 +429,7 @@ export function ScheduleView({
                     
                     let newTravelStart, newTravelEnd, newTaskStart, newTaskEnd;
 
-                    if (draggedEvent.id === travelEvent.id) { // Travel chip was dragged
+                    if (active.id === travelEvent.id) { // Travel chip was dragged
                         newTravelStart = newStart;
                         newTravelEnd = addMinutes(newTravelStart, travelDuration);
                         newTaskStart = newTravelEnd;
@@ -427,14 +441,14 @@ export function ScheduleView({
                         newTravelStart = subMinutes(newTravelEnd, travelDuration);
                     }
                     
-                    const updatedTravelEvent = { ...travelEvent, staffId: newStaffId, start: newTravelStart, end: newTravelEnd };
-                    const updatedTaskEvent = { ...taskEvent, staffId: newStaffId, start: newTaskStart, end: newTaskEnd };
+                    const updatedTravelEvent = { ...travelEvent, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTravelEnd.toISOString() };
+                    const updatedTaskEvent = { ...taskEvent, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
                     eventsToUpdate.push(updatedTravelEvent, updatedTaskEvent);
                 }
             } else {
                 const originalDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                 const newEnd = addMinutes(newStart, originalDuration);
-                const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart, end: newEnd };
+                const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
                 eventsToUpdate.push(updatedEvent);
             }
 
@@ -464,8 +478,8 @@ export function ScheduleView({
                 description: '',
                 staffId: newStaffId,
                 locationId: '',
-                start: newStart,
-                end: newEnd,
+                start: newStart.toISOString(),
+                end: newEnd.toISOString(),
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
@@ -474,7 +488,13 @@ export function ScheduleView({
             const tripId = `trip-${Date.now()}`;
             
             try {
-              const result = await updateSheetStatus({ gasUrl: orderGasUrl, eventTitle, staffName: staff.name });
+              const result = await updateSheetStatus({ 
+                gasUrl: orderGasUrl, 
+                eventTitle, 
+                staffName: staff.name,
+                statusColumnName: "ステータス",
+                statusValue: "作業待ち"
+              });
               if (result.status === 'error') throw new Error(result.message);
               toast({ title: '担当者を割り当てました', description: result.message });
               
@@ -487,8 +507,8 @@ export function ScheduleView({
                   description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
-                  start: newStart,
-                  end: taskEnd,
+                  start: newStart.toISOString(),
+                  end: taskEnd.toISOString(),
               };
               
               const travelTitle = customer ? `移動: ${customer.storeName}` : `移動: ${order.customerCode}`;
@@ -499,8 +519,8 @@ export function ScheduleView({
                   description: `目的地: ${customer?.address || 'N/A'}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
-                  start: travelStart,
-                  end: newStart,
+                  start: travelStart.toISOString(),
+                  end: newStart.toISOString(),
               };
               
               setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
@@ -564,8 +584,8 @@ export function ScheduleView({
             description,
             staffId: dialogState.staffId,
             locationId: '',
-            start: newStart,
-            end: newEnd,
+            start: newStart.toISOString(),
+            end: newEnd.toISOString(),
         };
         setScheduleData(prev => [...prev, newEvent]);
 
@@ -577,8 +597,8 @@ export function ScheduleView({
             ...dialogState.event,
             title,
             description,
-            start: newStart,
-            end: newEnd,
+            start: newStart.toISOString(),
+            end: newEnd.toISOString(),
         };
         setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
     }
