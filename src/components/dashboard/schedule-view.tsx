@@ -49,6 +49,8 @@ import { Textarea } from '../ui/textarea';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { Download } from 'lucide-react';
 import * as ics from 'ics';
+import { findKey } from '@/lib/utils';
+
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 8;
@@ -56,19 +58,6 @@ const timelineEndHour = 18;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
-
-// Helper function to find a value from an object with multiple possible keys.
-const findKey = (item: any, possibleKeys: string[]) => {
-    for (const key of possibleKeys) {
-        const lowerKey = key.toLowerCase().trim();
-        for (const itemKey in item) {
-            if (itemKey.toLowerCase().trim() === lowerKey) {
-                return item[itemKey];
-            }
-        }
-    }
-    return undefined;
-};
 
 const timeStringToDate = (timeStr: string) => {
     if (!/^\d{2}:\d{2}$/.test(timeStr)) {
@@ -320,13 +309,18 @@ export function ScheduleView({
     const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
     
     const newUnassignedOrders = allMappedOrders.filter(order => {
+        // rawOrderIdがないタスクは除外
         if (!order.rawOrderId) return false;
+        
+        // すでにスケジュールされているタスクは除外
         if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
         
         const scheduledDateKey = findKey(order.raw, ['作業予定日']);
+        // 作業予定日がないタスクは除外
         if (!scheduledDateKey) return false;
 
         const scheduledDate = parseISO(scheduledDateKey);
+        // 日付が無効か、今日でないタスクは除外
         return isValid(scheduledDate) && isToday(scheduledDate);
     });
     setUnassignedOrders(newUnassignedOrders);
@@ -386,10 +380,9 @@ export function ScheduleView({
             return prev;
           });
         }
-    } else if (!eventToUnassign.id.startsWith('generic-')) {
-         toast({ title: '汎用タスクを削除しました' });
     }
     
+    // 汎用タスク (`generic-` ID) はリストに戻す必要がないので、単にスケジュールから削除するだけ
     setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
   };
 
@@ -896,11 +889,11 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
-    '県西': 'bg-blue-50',
-    '県央': 'bg-green-50',
-    '県東': 'bg-orange-50',
+    '横浜店': 'bg-blue-50',
+    '東名川崎店': 'bg-green-50',
+    '綾瀬店': 'bg-orange-50',
   };
-  const areaBgClass = staff.area ? areaColors[staff.area] : 'bg-background';
+  const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
     <div ref={setNodeRef} className={cn("flex h-20", isOver && "bg-primary/10")}>

@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { STAFF_GAS_URL } from '@/lib/settings';
+import { findKey } from '@/lib/utils';
 
 const simpleHash = (str: string) => {
     let hash = 0;
@@ -15,19 +16,6 @@ const simpleHash = (str: string) => {
         hash |= 0; 
     }
     return Math.abs(hash);
-};
-
-// Helper function to find a value from an object with multiple possible keys.
-const findKey = (item: any, possibleKeys: string[]) => {
-    for (const key of possibleKeys) {
-        const lowerKey = key.toLowerCase().trim();
-        for (const itemKey in item) {
-            if (itemKey.toLowerCase().trim() === lowerKey) {
-                return item[itemKey];
-            }
-        }
-    }
-    return undefined;
 };
 
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
@@ -70,6 +58,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 color: assignedColor || fallbackColor,
                 avatarUrl: findKey(item, ['avatarUrl']) || '',
                 area: findKey(item, ['エリア', 'area']),
+                '母店': findKey(item, ['母店']),
                 ...item
             };
         });

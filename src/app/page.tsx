@@ -55,23 +55,41 @@ export default function DashboardPage() {
       }
   }, [scheduleData]);
 
-  // 「スタッフ管理」で選択されたスタッフのみをフィルタリング
+  // 「スタッフ管理」で選択されたスタッフのみをフィルタリングし、「母店」で並び替え
   const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || isStaffLoading || !profile) return [];
 
     const staffToUse = allStaff;
 
+    let selectedStaff: WithId<Staff>[];
+
     // 管理者でない場合は、自分自身のみ表示
     if (profile.role !== 'admin') {
-      return staffToUse.filter(staff => staff.id === profile.id);
+      selectedStaff = staffToUse.filter(staff => staff.id === profile.id);
+    } else {
+      // 管理者の場合、選択がなければ全員表示
+      if (appliedSelectedStaffIds.length === 0) {
+        selectedStaff = staffToUse;
+      } else {
+        // 選択があれば、そのスタッフのみ表示
+        selectedStaff = staffToUse.filter(staff => appliedSelectedStaffIds.includes(staff.id));
+      }
     }
-    
-    // 管理者の場合、選択がなければ全員表示
-    if (appliedSelectedStaffIds.length === 0) {
-        return staffToUse;
-    }
-    // 選択があれば、そのスタッフのみ表示
-    return staffToUse.filter(staff => appliedSelectedStaffIds.includes(staff.id));
+
+    // 母店でソートする
+    const areaOrder: { [key: string]: number } = {
+      '横浜店': 1,
+      '東名川崎店': 2,
+      '綾瀬店': 3,
+    };
+
+    return selectedStaff.sort((a, b) => {
+      const areaA = a['母店'] || '';
+      const areaB = b['母店'] || '';
+      const orderA = areaOrder[areaA] || 99; // 未定義のエリアは最後に
+      const orderB = areaOrder[areaB] || 99;
+      return orderA - orderB;
+    });
 
   }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
   

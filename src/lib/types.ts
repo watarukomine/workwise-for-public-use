@@ -13,6 +13,7 @@ export type Staff = {
   color?: string; 
   role: 'admin' | 'staff';
   area?: '県西' | '県央' | '県東';
+  '母店'?: string;
   password?: string; 
   'ロール'?: 'admin' | 'staff';
 };
