@@ -299,13 +299,16 @@ export function ScheduleView({
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
-    // --- Sheet Update Logic (using rawOrderId) ---
-    if (eventToUnassign.rawOrderId) { // Only update sheet if it's a real order
+    // Find the original order to get the rawOrderId from it
+    const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
+    const rawOrderId = originalOrder?.raw?.['受注ID'] || eventToUnassign.rawOrderId;
+
+    if (rawOrderId) { // Only update sheet if it's a real order
       try {
           const sheetResult = await updateSheetStatus({
               gasUrl: orderGasUrl,
-              orderId: eventToUnassign.rawOrderId,
-              staffName: null, // Set staff name to null/empty
+              orderId: rawOrderId,
+              staffName: null,
               eventTitle: eventToUnassign.title,
           });
           if (sheetResult.status === 'error') throw new Error(sheetResult.message);
@@ -316,31 +319,17 @@ export function ScheduleView({
               ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
               : [eventToUnassign.id];
           
-          // --- App State Update Logic ---
-          if (eventToUnassign.orderId) {
-              const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
-              if (!originalOrder) {
-                   const start = typeof eventToUnassign.start === 'string' ? parseISO(eventToUnassign.start) : eventToUnassign.start;
-                   const end = typeof eventToUnassign.end === 'string' ? parseISO(eventToUnassign.end) : eventToUnassign.end;
-                   const scheduledOrderData: WithId<Order> = {
-                      id: eventToUnassign.orderId,
-                      customerCode: getCustomerById(eventToUnassign.locationId)?.userCode || '',
-                      taskDetails: eventToUnassign.title,
-                      estimatedDuration: differenceInMinutes(end, start),
-                      raw: { '受注ID': eventToUnassign.rawOrderId }
-                  };
-                  setOrdersData(currentOrders => [...currentOrders, scheduledOrderData]);
-              }
-              toast({ title: 'タスクを未割り当てに戻しました' });
+          if (eventToUnassign.orderId && originalOrder) {
+              setOrdersData(currentOrders => [...currentOrders, originalOrder]);
           }
           setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
 
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-          // Do not change UI if sheet update fails
+          return; // Do not change UI if sheet update fails
       }
     } else {
-        // If it's not a real order (e.g. break, travel), just remove from UI
+        // If it's a generic task (break, travel not associated with order), just remove from UI
         const eventsToDeleteIds = eventToUnassign.tripId 
             ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
             : [eventToUnassign.id];
@@ -382,20 +371,15 @@ export function ScheduleView({
 
       if (!staffMember) return;
       
-      // Keep old state to revert if update fails
-      const oldScheduleData = [...scheduleData];
-
-      // Optimistically update UI
       const updatedEvent = {
         ...eventToUpdate,
         staffId: finalStaffId,
         start: newStart,
         end: newEnd,
       };
-      setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
       
       // Update sheet if staff member changed
-      if (staffMember && eventToUpdate.staffId !== finalStaffId && updatedEvent.rawOrderId) {
+      if (updatedEvent.rawOrderId) {
           try {
               const sheetResult = await updateSheetStatus({
                   gasUrl: orderGasUrl,
@@ -405,11 +389,15 @@ export function ScheduleView({
               });
               if (sheetResult.status === 'error') throw new Error(sheetResult.message);
               toast({ title: '担当者をシートで更新しました', description: `担当者を「${staffMember.name}」に変更しました。`});
+              // Only update UI on success
+              setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           } catch(e: any) {
               toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-              setScheduleData(oldScheduleData); // Revert UI on failure
+              // Do not update UI on failure
           }
       } else {
+          // For generic events without a rawOrderId, just update the UI
+          setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
       }
     }

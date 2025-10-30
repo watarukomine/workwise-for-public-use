@@ -2,7 +2,7 @@
 'use server';
 
 interface UpdateSheetStatusArgs {
-    orderId: string;
+    orderId?: string | null; // Make orderId optional
     staffName?: string | null;
     eventTitle?: string | null;
     gasUrl: string;
@@ -19,8 +19,10 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
-     if (!orderId) {
-        return { status: 'error', message: '更新対象の受注IDが必要です。' };
+
+    // If there is no orderId, it's a generic task, so we can skip the sheet update.
+    if (!orderId) {
+        return { status: 'success', message: '汎用タスクのためシート更新はスキップされました。' };
     }
     
     // データがnullの場合でもキーが存在するように、明示的にnullを割り当て
