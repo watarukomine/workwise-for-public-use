@@ -41,10 +41,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
-import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Textarea } from '../ui/textarea';
-import { useFunctions } from '@/firebase';
-import { httpsCallable } from 'firebase/functions';
+import { useOrder } from '@/contexts/order-context';
+import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -289,8 +288,8 @@ export function ScheduleView({
     setIsClient(true);
   }, []);
   
-  const functions = useFunctions();
   const { customers: allCustomers } = useCustomer();
+  const { orderGasUrl } = useOrder();
   const { toast } = useToast();
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
@@ -338,55 +337,6 @@ export function ScheduleView({
       }
   };
 
- const updateSheet = async (orderId: string | undefined, staffName: string | null) => {
-    if (!orderId) {
-        toast({ title: '汎用タスク', description: 'シート更新は不要です。' });
-        return;
-    }
-
-    try {
-        const updateFunction = httpsCallable(functions, 'updatecalendarevent');
-        await updateFunction({
-            operation: 'updateSheetStatus',
-            spreadsheetId: '1t-s7y0o1-CS2f4j241f9h5N9s_A8g4k4E7B3g2a1Hj0', // This should ideally be a setting
-            sheetName: '受注一覧', // This should also be a setting
-            orderId: orderId,
-            staffName: staffName,
-        });
-        toast({ title: 'シートを更新しました', description: `担当者を「${staffName || '未割り当て'}」に変更しました。` });
-
-    } catch (error: any) {
-        console.error("Failed to update sheet via function:", error);
-        toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${error.message}` });
-        // Re-throw to prevent UI update on failure
-        throw error;
-    }
-  };
-
-  const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
-    try {
-        if (eventToUnassign.rawOrderId) {
-            await updateSheet(eventToUnassign.rawOrderId, null);
-        }
-        
-        const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === eventToUnassign.rawOrderId);
-        if (originalOrder) {
-          const orderToAddBack = mapRawToOrder(originalOrder);
-           setUnassignedOrders(prev => {
-            if (!prev.some(o => o.id === orderToAddBack.id)) {
-              return [...prev, orderToAddBack];
-            }
-            return prev;
-          });
-        }
-    
-        setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
-        toast({ title: 'タスクを未割当に戻しました' });
-    } catch(e) {
-        console.error("Unassignment failed:", e);
-    }
-  };
-
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     const item = active.data.current;
@@ -396,8 +346,34 @@ export function ScheduleView({
     
     if (!item || !over) return;
     
+    const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
+        try {
+            if (eventToUnassign.rawOrderId) {
+                const result = await updateSheetStatus({ gasUrl: orderGasUrl, orderId: eventToUnassign.rawOrderId, staffName: null });
+                if (result.status === 'error') throw new Error(result.message);
+            }
+            
+            const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === eventToUnassign.rawOrderId);
+            if (originalOrder) {
+              const orderToAddBack = mapRawToOrder(originalOrder);
+               setUnassignedOrders(prev => {
+                if (!prev.some(o => o.id === orderToAddBack.id)) {
+                  return [...prev, orderToAddBack];
+                }
+                return prev;
+              });
+            }
+        
+            setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
+            toast({ title: 'タスクを未割当に戻しました' });
+        } catch(e: any) {
+            console.error("Unassignment failed:", e);
+            toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+        }
+    };
+    
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
-        await handleUnassignEvent(item);
+        await unassignTask(item);
         return;
     }
     
@@ -427,7 +403,9 @@ export function ScheduleView({
         
         try {
             if (draggedEvent.rawOrderId && draggedEvent.staffId !== newStaffId) {
-                await updateSheet(draggedEvent.rawOrderId, staffMember.name);
+                const result = await updateSheetStatus({ gasUrl: orderGasUrl, orderId: draggedEvent.rawOrderId, staffName: staffMember.name });
+                if (result.status === 'error') throw new Error(result.message);
+                toast({ title: '担当者を変更しました', description: result.message });
             }
 
             if (draggedEvent.tripId) {
@@ -469,9 +447,9 @@ export function ScheduleView({
                 return [...otherEvents, ...eventsToUpdate];
             });
 
-        } catch(e) {
-             toast({ variant: 'destructive', title: '更新エラー', description: 'シートの更新に失敗したため、移動をキャンセルしました。' });
-            return; // Stop UI update if backend fails
+        } catch(e: any) {
+            toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
+            return; 
         }
     }
     else if ('estimatedDuration' in item) { // Adding a new event from orders
@@ -500,16 +478,16 @@ export function ScheduleView({
             const travelStart = subMinutes(newStart, TRAVEL_TIME_MINUTES);
             const tripId = `trip-${Date.now()}`;
             
-            const rawOrderId = order.rawOrderId;
-            
             try {
-              await updateSheet(rawOrderId, staff.name);
+              const result = await updateSheetStatus({ gasUrl: orderGasUrl, orderId: order.rawOrderId, staffName: staff.name });
+              if (result.status === 'error') throw new Error(result.message);
+              toast({ title: '担当者を割り当てました', description: result.message });
               
               const taskEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-task`,
                   tripId: tripId,
                   orderId: order.id,
-                  rawOrderId: rawOrderId,
+                  rawOrderId: order.rawOrderId,
                   title: order.taskDetails,
                   description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
@@ -532,7 +510,10 @@ export function ScheduleView({
               setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
               setScheduleData(prev => [...prev, travelEvent, taskEvent]);
               
-            } catch (e) { return; }
+            } catch (e: any) {
+                 toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+                 return; 
+            }
         }
     }
   };
@@ -611,7 +592,14 @@ export function ScheduleView({
 
   const handleDeleteEvent = async () => {
     if (dialogState.mode !== 'edit') return;
-    await handleUnassignEvent(dialogState.event);
+    const eventToDelete = dialogState.event;
+    
+    // This will handle both unassigning from sheet and removing from UI
+    await handleDragEnd({
+        active: { id: eventToDelete.id, data: { current: eventToDelete }, rect: { current: { translated: null, value: new DOMRect() }}},
+        over: { id: UNASSIGNED_TASKS_DROPPABLE_ID, rect: new DOMRect(), data: { current: {}}, disabled: false }
+    });
+
     setDialogState({ mode: 'closed' });
   };
 

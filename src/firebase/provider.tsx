@@ -12,7 +12,7 @@ interface FirebaseProviderProps {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
-  functions: Functions;
+  functions?: Functions;
 }
 
 // Internal state for user authentication
@@ -40,7 +40,7 @@ export interface FirebaseServicesAndUser {
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;
-  functions: Functions;
+  functions?: Functions;
   user: User | null;
   isUserLoading: boolean;
   userError: Error | null;
@@ -96,13 +96,13 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
 
   // Memoize the context value
   const contextValue = useMemo((): FirebaseContextState => {
-    const servicesAvailable = !!(firebaseApp && firestore && auth && functions);
+    const servicesAvailable = !!(firebaseApp && firestore && auth);
     return {
       areServicesAvailable: servicesAvailable,
       firebaseApp: servicesAvailable ? firebaseApp : null,
       firestore: servicesAvailable ? firestore : null,
       auth: servicesAvailable ? auth : null,
-      functions: servicesAvailable ? functions : null,
+      functions: functions || null,
       user: userAuthState.user,
       isUserLoading: userAuthState.isUserLoading,
       userError: userAuthState.userError,
@@ -128,7 +128,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     throw new Error('useFirebase must be used within a FirebaseProvider.');
   }
 
-  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth || !context.functions) {
+  if (!context.areServicesAvailable || !context.firebaseApp || !context.firestore || !context.auth) {
     throw new Error('Firebase core services not available. Check FirebaseProvider props.');
   }
 
@@ -136,7 +136,7 @@ export const useFirebase = (): FirebaseServicesAndUser => {
     firebaseApp: context.firebaseApp,
     firestore: context.firestore,
     auth: context.auth,
-    functions: context.functions,
+    functions: context.functions || undefined,
     user: context.user,
     isUserLoading: context.isUserLoading,
     userError: context.userError,
@@ -162,7 +162,7 @@ export const useFirebaseApp = (): FirebaseApp => {
 };
 
 /** Hook to access Functions instance. */
-export const useFunctions = (): Functions => {
+export const useFunctions = (): Functions | undefined => {
   const { functions } = useFirebase();
   return functions;
 };

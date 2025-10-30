@@ -34,11 +34,12 @@ export function initializeFirebase() {
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
+  const region = 'asia-northeast1';
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
     firestore: getFirestore(firebaseApp),
-    functions: getFunctions(firebaseApp, 'asia-northeast1'),
+    functions: getApps().length > 0 ? getFunctions(getApp(), region) : undefined,
   };
 }
 
