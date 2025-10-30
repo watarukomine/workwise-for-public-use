@@ -16,12 +16,14 @@
   "main": "lib/index.js",
   "dependencies": {
     "@google-cloud/functions-framework": "^3.0.0",
+    "cors": "^2.8.5",
     "firebase-admin": "^12.1.1",
     "firebase-functions": "^5.0.1",
     "google-auth-library": "^9.11.0",
     "googleapis": "^140.0.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
     "typescript": "^5",
     "firebase-functions-test": "^3.1.0"
   },

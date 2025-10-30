@@ -24,13 +24,12 @@ interface FunctionResponse {
 
 // Cloud FunctionのトリガーURLを構築
 const functionRegion = 'asia-northeast1';
-const functionName = 'updatecalendarevent';
+const functionName = 'updatecalendarevent'; // CRITICAL: This must be all lowercase.
 const functionUrl = `https://${functionRegion}-${firebaseConfig.projectId}.cloudfunctions.net/${functionName}`;
 
 
 /**
  * Google認証を行い、Cloud Functionを直接HTTPリクエストで呼び出します。
- * これにより、クライアントSDKとAdmin SDKの混同によるエラーを完全に回避します。
  * @param args - カレンダー操作のための引数
  * @returns - Cloud Functionからのレスポンス
  */
@@ -43,16 +42,17 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
         console.log(`Calling Cloud Function at: ${functionUrl}`);
         console.log('With args:', args);
 
-        // 認証済みのHTTPクライアントを使ってPOSTリクエストを送信
+        // onRequestトリガーはペイロードを直接受け取る
         const response = await client.request({
             url: functionUrl,
             method: 'POST',
-            data: { data: args }, // Cloud Functions (onCall)は 'data' オブジェクトでラップされたペイロードを期待する
+            data: args, // onCallと違い、dataでラップしない
+            headers: {
+                'Content-Type': 'application/json',
+            },
         });
 
-        // Cloud Functionsからのレスポンスを処理
-        // onCallトリガーのレスポンスは `result` キーの中にラップされている
-        const resultData = (response.data as any)?.result;
+        const resultData = response.data as any;
         
         if (!resultData) {
            throw new Error('Cloud Functionからのレスポンスの形式が不正です。');
@@ -64,7 +64,7 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
     } catch (error: any) {
         console.error('Failed to call Cloud Function for calendar update:', error.response?.data || error.message);
         
-        const errorMessage = error.response?.data?.error?.message || error.message || '不明なエラーです。';
+        const errorMessage = error.response?.data?.error?.message || error.response?.data || error.message || '不明なエラーです。';
         
         return {
             status: 'error',
