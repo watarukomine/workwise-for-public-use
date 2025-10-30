@@ -1,3 +1,4 @@
+
 'use client';
 
 import { CustomerTable } from '@/components/customers/customer-table';
@@ -11,6 +12,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { CUSTOMER_GAS_URL } from '@/lib/settings';
 
 export default function CustomersPage() {
   const { customers, isLoading: isLoadingCustomers, error: customerError, customerGasUrl, setCustomerGasUrl } = useCustomer();
@@ -44,8 +46,6 @@ export default function CustomersPage() {
         description: "URLの更新に失敗しました。",
       });
     } finally {
-      // The loading state in the context will handle showing spinners,
-      // so we can turn this off quickly.
       setIsUpdating(false);
     }
   };
@@ -106,7 +106,7 @@ export default function CustomersPage() {
               <AlertTitle>データ取得エラー</AlertTitle>
               <AlertDescription>
                 {customerError}
-                <p className="mt-2">下のフォームでURLが正しいか確認・更新してください。</p>
+                <p className="mt-2">下のフォームでURLが正しいか確認するか、`src/lib/settings.ts`の`CUSTOMER_GAS_URL`を確認してください。</p>
               </AlertDescription>
             </Alert>
           ) : null}
@@ -118,7 +118,7 @@ export default function CustomersPage() {
         <CardHeader>
           <CardTitle>データソースURL設定</CardTitle>
           <CardDescription>
-            販売店情報を取得しているGoogle Apps ScriptのURLです。変更がある場合はここで更新できます。
+            販売店情報を取得しているGoogle Apps ScriptのURLです。恒久的な変更は `src/lib/settings.ts` ファイルで行ってください。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -130,19 +130,19 @@ export default function CustomersPage() {
               onChange={(e) => setLocalUrl(e.target.value)}
               disabled={isUpdating}
             />
-            <Button onClick={handleUrlUpdate} disabled={isUpdating || localUrl === customerGasUrl}>
+            <Button onClick={handleUrlUpdate} disabled={isUpdating || localUrl === CUSTOMER_GAS_URL}>
               {isUpdating ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              URLを更新
+              このセッションでURLを更新
             </Button>
           </div>
         </CardContent>
         <CardFooter>
             <p className="text-xs text-muted-foreground">
-                URLを変更すると、データは自動的に再読み込みされます。
+                ここでの更新は一時的なものです。ページをリロードすると`settings.ts`の値に戻ります。
             </p>
         </CardFooter>
       </Card>

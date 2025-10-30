@@ -12,43 +12,29 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-
-const STAFF_GAS_URL_KEY = 'staffGasUrl';
+import { STAFF_GAS_URL } from '@/lib/settings';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, isLoading: isStaffLoading, error } = useSelectedStaff();
   
-  const [localUrl, setLocalUrl] = useState('');
+  // The local URL state now reflects the hardcoded URL from settings.
+  // We keep the state management UI to allow temporary overrides for debugging,
+  // but it won't persist.
+  const [localUrl, setLocalUrl] = useState(STAFF_GAS_URL);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [initialUrl, setInitialUrl] = useState('');
   const { toast } = useToast();
-
-  useEffect(() => {
-    const savedUrl = localStorage.getItem(STAFF_GAS_URL_KEY) || '';
-    setLocalUrl(savedUrl);
-    setInitialUrl(savedUrl);
-  }, []);
 
   const handleUrlUpdate = async () => {
     setIsUpdating(true);
-    try {
-      localStorage.setItem(STAFF_GAS_URL_KEY, localUrl);
-      toast({
+    toast({
         title: "URLを更新しました",
         description: "ページを再読み込みして、新しいURLからスタッフデータを取得します。",
       });
-      // A brief delay to allow the toast to be seen before the reload.
-      setTimeout(() => window.location.reload(), 1000);
-    } catch (e: any) {
-      console.error(e);
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: `URLの保存に失敗しました: ${e.message}`,
-      });
-      setIsUpdating(false);
-    }
+    // This will effectively reload the page with the new URL for this session.
+    // However, on next load, it will revert to the URL from settings.ts
+    // For a permanent change, the user should be instructed to change settings.ts
+    window.location.href = `${window.location.origin}${window.location.pathname}?gasUrl=${encodeURIComponent(localUrl)}`;
   };
 
 
@@ -95,7 +81,7 @@ export default function StaffPage() {
           <AlertTitle>データ取得エラー</AlertTitle>
           <AlertDescription>
             {error}
-             <p className="mt-2">下のフォームでURLが正しいか確認・更新してください。</p>
+             <p className="mt-2">下のフォームでURLが正しいか確認・更新するか、`src/lib/settings.ts`の`STAFF_GAS_URL`を確認してください。</p>
           </AlertDescription>
         </Alert>
       )}
@@ -124,7 +110,7 @@ export default function StaffPage() {
           <CardHeader>
             <CardTitle>スタッフマスタ用 データソースURL設定</CardTitle>
             <CardDescription>
-              スタッフ情報を取得しているGoogle Apps ScriptのURLです。変更がある場合はここで更新できます。
+              スタッフ情報を取得しているGoogle Apps ScriptのURLです。恒久的な変更は `src/lib/settings.ts` ファイルで行ってください。
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -136,19 +122,19 @@ export default function StaffPage() {
                 onChange={(e) => setLocalUrl(e.target.value)}
                 disabled={isUpdating}
               />
-              <Button onClick={handleUrlUpdate} disabled={isUpdating || localUrl === initialUrl}>
+              <Button onClick={handleUrlUpdate} disabled={isUpdating || localUrl === STAFF_GAS_URL}>
                 {isUpdating ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Save className="mr-2 h-4 w-4" />
                 )}
-                URLを更新
+                このセッションでURLを更新
               </Button>
             </div>
           </CardContent>
            <CardFooter>
               <p className="text-xs text-muted-foreground">
-                  URLを変更すると、ページが再読み込みされ、新しいデータソースからスタッフ情報が取得されます。
+                  ここでの更新は一時的なものです。ページをリロードすると`settings.ts`の値に戻ります。
               </p>
           </CardFooter>
         </Card>

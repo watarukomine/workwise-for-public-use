@@ -3,8 +3,7 @@
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
-
-const ORDER_GAS_URL_KEY = 'orderGasUrl';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
 interface OrderContextType {
   orders: any[];
@@ -21,16 +20,10 @@ const OrderContext = createContext<OrderContextType | undefined>(undefined);
 export function OrderProvider({ children }: { children: ReactNode }) {
   const [orders, setOrdersState] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [orderGasUrl, setOrderGasUrlState] = useState('');
+  const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
   const [error, setErrorState] = useState<string | null>(null);
 
-  useEffect(() => {
-    const savedUrl = localStorage.getItem(ORDER_GAS_URL_KEY);
-    setOrderGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbyDOr3PIri6AJEaFAcGVh7IMGme0Y6kiSj12vYfH5F6jAYcY2wf9sGdLI50bTSV4kwd/exec');
-  }, []);
-  
   const setOrderGasUrl = (url: string) => {
-    localStorage.setItem(ORDER_GAS_URL_KEY, url);
     setOrderGasUrlState(url);
   };
 

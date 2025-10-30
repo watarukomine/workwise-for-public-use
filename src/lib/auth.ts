@@ -1,12 +1,8 @@
 
 'use client';
 
-// This is a mock authentication service.
-// It uses the centralized fetchStaffDataFromGAS function which reads from the staff-specific GAS URL.
-
 import type { Staff, WithId } from './types';
 import { fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
-
 
 const MOCK_USER_SESSION_KEY = 'mockUserSession';
 

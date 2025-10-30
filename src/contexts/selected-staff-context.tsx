@@ -6,9 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
-
-// スタッフ用のGAS URLを保存するキーを明確に定義
-const STAFF_GAS_URL_KEY = 'staffGasUrl';
+import { STAFF_GAS_URL } from '@/lib/settings';
 
 // A simple hashing function to convert a string (like a staff ID) into a number.
 const simpleHash = (str: string) => {
@@ -22,11 +20,10 @@ const simpleHash = (str: string) => {
 };
 
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
-    // localStorageからスタッフ専用のURLを取得
-    const url = localStorage.getItem(STAFF_GAS_URL_KEY);
+    const url = STAFF_GAS_URL;
     if (!url) {
         console.log("スタッフ情報を取得するためのGoogle Apps Script URLが設定されていません。");
-        return [];
+        throw new Error("スタッフ情報を取得するためのURLが settings.ts で設定されていません。");
     }
 
     try {
@@ -49,10 +46,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
             const staffId = String(item['id'] || item['ID'] || item['スタッフID'] || `gas-staff-${Math.random()}`);
             
-            // Generate a consistent color based on the staff ID hash as a fallback
             const fallbackColor = `hsl(${simpleHash(staffId) % 360}, 70%, 60%)`;
-
-            // スプレッドシートの'color'または'カラー'列の値を優先。なければフォールバック
             const assignedColor = item['color'] || item['カラー'] || fallbackColor;
 
             return {
@@ -103,9 +97,8 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     const loadStaff = async () => {
         setIsLoading(true);
         setError(null);
-        // localStorageにスタッフ用のURLがなければ何もしない
-        if (!localStorage.getItem(STAFF_GAS_URL_KEY)) {
-            setError("スタッフ情報を取得するためのURLが設定されていません。「スタッフ管理」ページで設定してください。");
+        if (!STAFF_GAS_URL) {
+            setError("スタッフ情報を取得するためのURLが設定されていません。「/src/lib/settings.ts」ファイルで設定してください。");
             setIsLoading(false);
             return;
         }

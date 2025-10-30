@@ -3,8 +3,7 @@
 
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
-
-const CUSTOMER_GAS_URL_KEY = 'customerGasUrl';
+import { CUSTOMER_GAS_URL } from '@/lib/settings';
 
 interface CustomerContextType {
   customers: any[];
@@ -21,16 +20,12 @@ const CustomerContext = createContext<CustomerContextType | undefined>(undefined
 export function CustomerProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomersState] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [customerGasUrl, setCustomerGasUrlState] = useState('');
+  const [customerGasUrl, setCustomerGasUrlState] = useState(CUSTOMER_GAS_URL);
   const [error, setErrorState] = useState<string | null>(null);
 
-  useEffect(() => {
-    const savedUrl = localStorage.getItem(CUSTOMER_GAS_URL_KEY);
-    setCustomerGasUrlState(savedUrl || 'https://script.google.com/macros/s/AKfycbygUg4b1tD4Y489xg0Fz09e84DtDAy_35KhJ_VD4RyJ3J1DavI0B_aZP5ck8hssWPCi/exec');
-  }, []);
-  
+  // This function is kept for the UI, but the default URL now comes from settings.ts
   const setCustomerGasUrl = (url: string) => {
-    localStorage.setItem(CUSTOMER_GAS_URL_KEY, url);
+    // We can still allow overriding for the session if needed, but it won't persist across page loads.
     setCustomerGasUrlState(url);
   };
 

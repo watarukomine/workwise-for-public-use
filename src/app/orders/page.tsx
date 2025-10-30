@@ -12,6 +12,7 @@ import { useOrder } from '@/contexts/order-context';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
 export default function OrdersPage() {
   const { orders, isLoading: isLoadingOrders, error: orderError, orderGasUrl, setOrderGasUrl } = useOrder();
@@ -111,7 +112,7 @@ export default function OrdersPage() {
               <AlertTitle>データ取得エラー</AlertTitle>
               <AlertDescription>
                 {orderError}
-                <p className="mt-2">下のフォームでURLが正しいか確認・更新してください。</p>
+                <p className="mt-2">下のフォームでURLが正しいか確認するか、`src/lib/settings.ts`の`ORDER_GAS_URL`を確認してください。</p>
               </AlertDescription>
             </Alert>
           ) : null}
@@ -123,7 +124,7 @@ export default function OrdersPage() {
         <CardHeader>
           <CardTitle>データソースURL設定</CardTitle>
           <CardDescription>
-            受注情報の読み込み、および担当者更新を行うGoogle Apps ScriptのURLです。
+            受注情報の読み込み、および担当者更新を行うGoogle Apps ScriptのURLです。恒久的な変更は `src/lib/settings.ts` ファイルで行ってください。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -135,19 +136,19 @@ export default function OrdersPage() {
               onChange={(e) => setLocalUrl(e.target.value)}
               disabled={isUpdating}
             />
-            <Button onClick={handleUrlUpdate} disabled={isUpdating || localUrl === orderGasUrl}>
+            <Button onClick={handleUrlUpdate} disabled={isUpdating || localUrl === ORDER_GAS_URL}>
               {isUpdating ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              URLを更新
+              このセッションでURLを更新
             </Button>
           </div>
         </CardContent>
         <CardFooter>
             <p className="text-xs text-muted-foreground">
-                このURLは、データの読み込みと、タイムラインからの担当者割り当ての両方に使用されます。
+                ここでの更新は一時的なものです。ページをリロードすると`settings.ts`の値に戻ります。
             </p>
         </CardFooter>
       </Card>
