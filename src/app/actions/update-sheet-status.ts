@@ -2,10 +2,8 @@
 'use server';
 
 interface UpdateSheetStatusArgs {
-    staffId?: string | null;
     staffName?: string | null;
     eventTitle?: string | null;
-    orderId?: string | null;
     gasUrl: string;
     statusColumnName?: string;
     statusValue?: string;
@@ -17,19 +15,15 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, staffId, staffName, eventTitle, orderId, statusColumnName, statusValue } = args;
+    const { gasUrl, staffName, eventTitle, statusColumnName, statusValue } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
     
-    // The payload sent to the doPost function in Google Apps Script.
-    // The keys must match what the doPost function expects in e.parameter or e.postData.contents
     const payload = {
-        staffId,
         staffName, 
         eventTitle,
-        orderId,
         statusColumnName,
         statusValue,
     };

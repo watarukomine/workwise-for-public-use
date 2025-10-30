@@ -370,7 +370,7 @@ export function ScheduleView({
             }
         
             setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
-            toast({ title: 'タスクを未割当に戻しました' });
+            toast({ title: 'ステータスを未割当に戻しました' });
         } catch(e: any) {
             console.error("Unassignment failed:", e);
             toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
