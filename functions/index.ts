@@ -1,11 +1,11 @@
 
 /**
  * Firebase Cloud Functions for the WorkWise application.
- * This file contains the backend logic for interacting with Google Calendar and Google Sheets APIs.
+ * This file contains the backend logic for interacting with Google Sheets API.
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import { google, type calendar_v3, type sheets_v4 } from "googleapis";
+import { google, type sheets_v4 } from "googleapis";
 import { initializeApp, getApps } from "firebase-admin/app";
 
 // Set the timezone for the function environment to Japan Standard Time
@@ -21,7 +21,6 @@ if (getApps().length === 0) {
 async function getGoogleApis() {
     const auth = new google.auth.GoogleAuth({
         scopes: [
-            "https://www.googleapis.com/auth/calendar",
             "https://www.googleapis.com/auth/spreadsheets",
         ],
     });
@@ -38,12 +37,6 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
 
     const {
         operation,
-        calendarId,
-        eventId,
-        title,
-        startTime,
-        endTime,
-        description,
         spreadsheetId,
         sheetName,
         orderId,
@@ -54,65 +47,9 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
 
     try {
         const googleApi = await getGoogleApis();
-        const calendar = googleApi.calendar({ version: "v3" });
         const sheets = googleApi.sheets({ version: "v4" });
 
         switch (operation) {
-            case "create":
-                if (!calendarId || !startTime || !endTime || !title) {
-                    throw new HttpsError("invalid-argument", "For 'create', calendarId, startTime, endTime, and title are required.");
-                }
-                logger.info("Creating calendar event...");
-                const createdEvent = await calendar.events.insert({
-                    calendarId,
-                    requestBody: {
-                        summary: title,
-                        description: description || "",
-                        start: { dateTime: startTime, timeZone: "Asia/Tokyo" },
-                        end: { dateTime: endTime, timeZone: "Asia/Tokyo" },
-                    },
-                });
-                logger.info("Event created successfully:", { eventId: createdEvent.data.id });
-                return {
-                    status: "success",
-                    message: "イベントがカレンダーに作成されました。",
-                    eventId: createdEvent.data.id,
-                };
-
-            case "update":
-                 if (!calendarId || !eventId || !startTime || !endTime || !title) {
-                    throw new HttpsError("invalid-argument", "For 'update', eventId, startTime, endTime, and title are required.");
-                }
-                logger.info(`Updating event ${eventId}...`);
-                const updatedEvent = await calendar.events.update({
-                    calendarId,
-                    eventId,
-                    requestBody: {
-                        summary: title,
-                        description: description || "",
-                        start: { dateTime: startTime, timeZone: "Asia/Tokyo" },
-                        end: { dateTime: endTime, timeZone: "Asia/Tokyo" },
-                    },
-                });
-                logger.info("Event updated successfully:", { eventId: updatedEvent.data.id });
-                return {
-                    status: "success",
-                    message: "イベントが更新されました。",
-                    eventId: updatedEvent.data.id,
-                };
-
-            case "delete":
-                if (!calendarId || !eventId) {
-                    throw new HttpsError("invalid-argument", "For 'delete', calendarId and eventId are required.");
-                }
-                logger.info(`Deleting event ${eventId}...`);
-                await calendar.events.delete({
-                    calendarId,
-                    eventId,
-                });
-                logger.info("Event deleted successfully.");
-                return { status: "success", message: "イベントが削除されました。" };
-
             case "updateSheetStatus":
                  if (!spreadsheetId || !sheetName || !orderId) {
                     throw new HttpsError("invalid-argument", "For 'updateSheetStatus', spreadsheetId, sheetName, and orderId are required.");
@@ -121,7 +58,7 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
 
             default:
                  logger.error(`Unknown operation received: ${operation}`);
-                throw new HttpsError("invalid-argument", `Unknown operation: ${operation}`);
+                throw new HttpsError("invalid-argument", `Unknown operation: ${operation}. This function now only supports 'updateSheetStatus'.`);
         }
     } catch (error: any) {
         logger.error("--- Detailed Error Start ---");
@@ -169,25 +106,36 @@ async function updateSheet(
 
 
     // 2. Find the header row to identify column indices
-    let headers;
+    let headers: string[] = [];
     try {
         const headerRange = `${sheetName}!1:1`;
         const headerResponse = await sheets.spreadsheets.values.get({
             spreadsheetId,
             range: headerRange,
         });
-        headers = headerResponse.data.values?.[0];
-        if (!headers) {
+        const rawHeaders = headerResponse.data.values?.[0];
+        if (!rawHeaders) {
             throw new HttpsError("not-found", `Sheet "${sheetName}" is empty or header row not found.`);
         }
+        // Trim and normalize headers
+        headers = rawHeaders.map(h => String(h || '').trim());
+
     } catch (e: any) {
         logger.error("Failed to get header row.", { error: e.message });
         throw new HttpsError("internal", `Failed to read header row: ${e.message}`);
     }
+    
+    const findHeaderIndex = (possibleNames: string[]) => {
+      for (const name of possibleNames) {
+        const index = headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+        if (index !== -1) return index;
+      }
+      return -1;
+    };
 
-    const orderIdColIndex = headers.findIndex(h => ['受注 ID', '受注id', '受注ID', 'id'].includes(h));
-    const staffColIndex = headers.findIndex(h => h === '担当');
-    const statusColIndex = headers.findIndex(h => h === 'ステータス');
+    const orderIdColIndex = findHeaderIndex(['受注 ID', '受注id']);
+    const staffColIndex = findHeaderIndex(['担当']);
+    const statusColIndex = findHeaderIndex(['ステータス']);
 
     if (orderIdColIndex === -1) throw new HttpsError("not-found", "Could not find '受注 ID' column in the sheet.");
     if (staffColIndex === -1) throw new HttpsError("not-found", "Could not find '担当' column in the sheet.");
@@ -205,7 +153,7 @@ async function updateSheet(
             range: dataRange,
         });
         const allOrderIds = dataResponse.data.values?.flat() || [];
-        targetRowIndex = allOrderIds.findIndex(id => String(id) === String(orderId));
+        targetRowIndex = allOrderIds.findIndex(id => String(id).trim() === String(orderId).trim());
 
         if (targetRowIndex === -1) {
             throw new HttpsError("not-found", `Order with ID "${orderId}" not found in the sheet.`);
