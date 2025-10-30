@@ -299,11 +299,10 @@ export function ScheduleView({
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
-    // Find the original order to get the rawOrderId from it
-    const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
-    const rawOrderId = originalOrder?.raw?.['受注ID'] || eventToUnassign.rawOrderId;
+    // Directly use the rawOrderId from the event object itself.
+    const rawOrderId = eventToUnassign.rawOrderId;
 
-    if (rawOrderId) { // Only update sheet if it's a real order
+    if (rawOrderId) {
       try {
           const sheetResult = await updateSheetStatus({
               gasUrl: orderGasUrl,
@@ -311,7 +310,10 @@ export function ScheduleView({
               staffName: null,
               eventTitle: eventToUnassign.title,
           });
-          if (sheetResult.status === 'error') throw new Error(sheetResult.message);
+
+          if (sheetResult.status === 'error') {
+              throw new Error(sheetResult.message);
+          }
           
           toast({ title: "担当者をシートから削除しました", description: sheetResult.message });
 
@@ -319,17 +321,19 @@ export function ScheduleView({
               ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
               : [eventToUnassign.id];
           
+          // Find the original order to put it back into the unassigned list
+          const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
           if (eventToUnassign.orderId && originalOrder) {
               setOrdersData(currentOrders => [...currentOrders, originalOrder]);
           }
+          
           setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
 
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-          return; // Do not change UI if sheet update fails
+          return; 
       }
     } else {
-        // If it's a generic task (break, travel not associated with order), just remove from UI
         const eventsToDeleteIds = eventToUnassign.tripId 
             ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
             : [eventToUnassign.id];
@@ -379,7 +383,7 @@ export function ScheduleView({
       };
       
       // Update sheet if staff member changed
-      if (updatedEvent.rawOrderId) {
+      if (updatedEvent.rawOrderId && eventToUpdate.staffId !== finalStaffId) {
           try {
               const sheetResult = await updateSheetStatus({
                   gasUrl: orderGasUrl,
@@ -396,7 +400,7 @@ export function ScheduleView({
               // Do not update UI on failure
           }
       } else {
-          // For generic events without a rawOrderId, just update the UI
+          // For generic events or moves within the same staff, just update the UI
           setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
       }
