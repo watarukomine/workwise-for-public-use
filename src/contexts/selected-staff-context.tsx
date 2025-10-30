@@ -38,7 +38,12 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
         // More robust key finding
         const findKey = (item: any, possibleKeys: string[]) => {
             for (const key of possibleKeys) {
-                if (key in item) return item[key];
+                const lowerKey = key.toLowerCase();
+                for (const itemKey in item) {
+                    if (itemKey.toLowerCase() === lowerKey) {
+                        return item[itemKey];
+                    }
+                }
             }
             return undefined;
         };
@@ -62,7 +67,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 id: staffId,
                 name: findKey(item, ['スタッフ名', 'name']) || 'No Name',
                 email: findKey(item, ['メールアドレス', 'email']) || '',
-                password: findKey(item, ['パスワード', 'password']) || '', // Ensure password is read
+                password: findKey(item, ['パスワード', 'password', 'Password']) || '', // Ensure password is read
                 role: getRole(),
                 calendarId: findKey(item, ['calendarId', 'カレンダーID']),
                 color: assignedColor || fallbackColor,
