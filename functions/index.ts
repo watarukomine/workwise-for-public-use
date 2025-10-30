@@ -8,6 +8,11 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { GoogleAuth } from "google-auth-library";
 import { calendar_v3, google } from "googleapis";
+import { initializeApp } from "firebase-admin/app";
+
+// Initialize Firebase Admin SDK. This is crucial for the function to have the correct
+// permissions to call other Google Cloud services like the Calendar API.
+initializeApp();
 
 // Define the structure of the data expected from the client
 interface CalendarEventArgs {
@@ -23,11 +28,12 @@ interface CalendarEventArgs {
 // Helper function to get an authenticated Google Calendar API client
 async function getAuthenticatedCalendarClient(): Promise<calendar_v3.Calendar> {
     logger.info("Authenticating with Google Calendar API...");
+    // Use Application Default Credentials, which are available in the Cloud Functions environment.
     const auth = new GoogleAuth({
         scopes: ["https://www.googleapis.com/auth/calendar"],
     });
     const authClient = await auth.getClient();
-    const calendar = google.calendar({ version: "v3", auth: authClient as any });
+    const calendar = google.calendar({ version: "v3", auth: authClient });
     logger.info("Authentication successful.");
     return calendar;
 }

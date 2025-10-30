@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -341,7 +340,7 @@ export function ScheduleView({
                 if (result.data.status === 'error') throw new Error(result.data.message);
                 toast({ title: "カレンダーから予定を削除しました" });
             } catch (e: any) {
-                toast({ variant: 'destructive', title: 'カレンダー削除エラー', description: e.message });
+                toast({ variant: 'destructive', title: 'カレンダー削除エラー', description: `Cloud Function呼び出しに失敗しました: ${e.message}` });
             }
         }
     }
@@ -448,7 +447,7 @@ export function ScheduleView({
           if (result.data.status === 'error') throw new Error(result.data.message);
           toast({ title: "カレンダー更新成功" });
         } catch (e: any) {
-          toast({ variant: 'destructive', title: 'カレンダー更新エラー', description: e.message });
+          toast({ variant: 'destructive', title: 'カレンダー更新エラー', description: `Cloud Function呼び出しに失敗しました: ${e.message}` });
         }
       }
 
