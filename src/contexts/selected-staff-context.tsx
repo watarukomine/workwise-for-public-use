@@ -4,7 +4,6 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
-import { useUserProfile } from '@/hooks/use-user-profile';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { STAFF_GAS_URL } from '@/lib/settings';
 
@@ -98,7 +97,6 @@ interface SelectedStaffContextType {
 const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>(undefined);
 
 export function SelectedStaffProvider({ children }: { children: ReactNode }) {
-  const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { toast } = useToast();
 
   const [allStaff, setAllStaffState] = useState<WithId<Staff>[]>([]);
@@ -145,25 +143,11 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   }, []); 
 
 
-  useEffect(() => {
-    if (!profile || isProfileLoading || isLoading) return;
-
-    if (profile.role !== 'admin') {
-        setAppliedSelectedStaffIds([profile.id]);
-        setPendingSelectedStaffIds([profile.id]);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify([profile.id]));
-    }
-  }, [profile, isProfileLoading, isLoading]);
-
   const setAllStaff = (staff: WithId<Staff>[]) => {
     setAllStaffState(staff);
   };
 
   const togglePendingStaffSelection = (staffId: string) => {
-    if (profile?.role !== 'admin') {
-        toast({ title: "権限エラー", description: "スタッフの選択は管理者のみ可能です。", variant: "destructive" });
-        return;
-    }
     setPendingSelectedStaffIds(prevIds =>
       prevIds.includes(staffId)
         ? prevIds.filter(id => id !== staffId)
@@ -172,12 +156,10 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   };
   
   const setPendingSelection = (staffIds: string[]) => {
-    if (profile?.role !== 'admin') return;
     setPendingSelectedStaffIds(staffIds);
   };
 
   const applyPendingSelection = () => {
-    if (profile?.role !== 'admin') return;
     setAppliedSelectedStaffIds(pendingSelectedStaffIds);
     try {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pendingSelectedStaffIds));
@@ -203,7 +185,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     togglePendingStaffSelection,
     setPendingSelection,
     applyPendingSelection,
-    isLoading: isLoading || isProfileLoading,
+    isLoading: isLoading,
     error,
   };
 
