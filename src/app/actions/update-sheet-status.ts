@@ -1,11 +1,12 @@
 
 'use server';
+import type { StaffStatus } from '@/lib/types';
 
 interface UpdateSheetStatusArgs {
     gasUrl: string;
     eventTitle?: string | null;
     staffName?: string | null;
-    statusValue?: '未割当' | '作業待ち' | '移動中' | '作業中' | '作業完了' | '待機中' | '';
+    statusValue?: StaffStatus['status'] | '';
 }
 
 interface GasResponse {
@@ -23,12 +24,14 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
     // Build the payload dynamically based on provided arguments.
     // This makes the action more flexible and only sends what's necessary.
     const payload: { [key: string]: any } = {};
-    if (eventTitle !== undefined && eventTitle !== null) {
+    if (eventTitle) {
         payload.eventTitle = eventTitle;
     }
+    // Allow sending an empty string to clear the name
     if (staffName !== undefined && staffName !== null) {
         payload.staffName = staffName;
     }
+    // Allow sending an empty string to clear the status
     if (statusValue !== undefined && statusValue !== null) {
         payload.statusValue = statusValue;
     }
