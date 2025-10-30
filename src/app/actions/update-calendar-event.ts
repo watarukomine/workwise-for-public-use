@@ -31,7 +31,7 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
         // Firebase must be initialized to get the Functions instance.
         // This initialization is lightweight and safe to call multiple times.
         const { firebaseApp } = initializeFirebase();
-        const functions = getFunctions(firebaseApp, 'asia-northeast1'); // It's good practice to specify the region.
+        const functions = getFunctions(firebaseApp, 'asia-northeast1');
 
         // Get a callable reference to the Cloud Function.
         const callable = httpsCallable<UpdateCalendarEventArgs, FunctionResponse>(functions, 'updatecalendarevent');
