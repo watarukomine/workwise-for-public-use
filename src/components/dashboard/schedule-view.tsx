@@ -412,7 +412,6 @@ export function ScheduleView({
                   gasUrl: ORDER_GAS_URL,
                   eventTitle: draggedEvent.title, 
                   staffName: staffMember.name,
-                  statusValue: '作業待ち',
                 });
                 if (result.status === 'error') throw new Error(result.message);
                 toast({ title: '担当者を変更しました', description: result.message });
@@ -480,13 +479,12 @@ export function ScheduleView({
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
-            const eventTitle = `${customer?.storeName || order.taskDetails} (ID: ${order.rawOrderId})`;
+            const eventTitle = `${customer?.storeName || order.taskDetails.split('\n')[0]} (ID: ${order.rawOrderId})`;
             try {
               const result = await updateSheetStatus({ 
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: eventTitle, 
                 staffName: staff.name,
-                statusValue: "作業待ち",
               });
 
               if (result.status === 'error') throw new Error(result.message);

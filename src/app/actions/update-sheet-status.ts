@@ -20,12 +20,18 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
     
-    // GASのdoPostが期待するキー名に完全に一致させる
-    const payload = {
-        eventTitle: eventTitle,
-        staffName: staffName, 
-        statusValue: statusValue,
-    };
+    // Build the payload dynamically based on provided arguments.
+    // This makes the action more flexible and only sends what's necessary.
+    const payload: { [key: string]: any } = {};
+    if (eventTitle !== undefined) {
+        payload.eventTitle = eventTitle;
+    }
+    if (staffName !== undefined) {
+        payload.staffName = staffName;
+    }
+    if (statusValue !== undefined) {
+        payload.statusValue = statusValue;
+    }
 
     try {
         const response = await fetch(gasUrl, {
