@@ -319,13 +319,12 @@ export function ScheduleView({
         : [eventToUnassign];
     
     for (const eventToDelete of eventsToDelete) {
-        if (staff.calendarId && eventToDelete.calendarEventId && orderGasUrl) {
+        if (staff.calendarId && eventToDelete.calendarEventId) {
             try {
                 const result = await updateCalendarEvent({
                     operation: 'delete',
                     calendarId: staff.calendarId,
                     eventId: eventToDelete.calendarEventId,
-                    gasUrl: orderGasUrl,
                 });
                 if (result.status === 'error') throw new Error(result.message);
                 toast({ title: "カレンダーから予定を削除しました" });
@@ -412,7 +411,7 @@ export function ScheduleView({
       }
       
       // --- Calendar Update Logic (Kept as is) ---
-      if (staffMember?.calendarId && updatedEvent.calendarEventId && orderGasUrl) {
+      if (staffMember?.calendarId && updatedEvent.calendarEventId) {
         try {
           const result = await updateCalendarEvent({
             operation: 'update',
@@ -422,7 +421,6 @@ export function ScheduleView({
             description: updatedEvent.description,
             startTime: newStart.toISOString(),
             endTime: newEnd.toISOString(),
-            gasUrl: orderGasUrl,
           });
           if (result.status === 'error') throw new Error(result.message);
           toast({ title: "カレンダー更新成功" });
@@ -450,8 +448,7 @@ export function ScheduleView({
 
         // --- Calendar Creation Logic (Kept as is) ---
         const handleCalendarCreate = async (event: Omit<WithId<ScheduleEvent>, 'calendarEventId'>): Promise<string | undefined> => {
-            if (!staff.calendarId || !orderGasUrl) {
-                if (!orderGasUrl) toast({ variant: 'destructive', title: 'URL未設定', description: 'カレンダー連携用のGAS URLが設定されていません。「受注管理」ページで設定してください。'});
+            if (!staff.calendarId) {
                 return;
             };
             try {
@@ -462,7 +459,6 @@ export function ScheduleView({
                     description: event.description,
                     startTime: (event.start as Date).toISOString(),
                     endTime: (event.end as Date).toISOString(),
-                    gasUrl: orderGasUrl,
                 });
                 if (result.status === 'success' && result.eventId) {
                     toast({ title: 'カレンダー登録成功', description: 'Googleカレンダーに予定を登録しました。' });
@@ -601,7 +597,7 @@ export function ScheduleView({
         if (!staff) return;
 
         let calendarEventId: string | undefined;
-        if (staff.calendarId && orderGasUrl) {
+        if (staff.calendarId) {
             try {
                 const result = await updateCalendarEvent({
                     operation: 'create',
@@ -610,7 +606,6 @@ export function ScheduleView({
                     description,
                     startTime: newStart.toISOString(),
                     endTime: newEnd.toISOString(),
-                    gasUrl: orderGasUrl,
                 });
                 if (result.status === 'success' && result.eventId) {
                     calendarEventId = result.eventId;
@@ -647,7 +642,7 @@ export function ScheduleView({
             end: newEnd,
         };
 
-        if (staff.calendarId && updatedEvent.calendarEventId && orderGasUrl) {
+        if (staff.calendarId && updatedEvent.calendarEventId) {
              try {
                 const result = await updateCalendarEvent({
                     operation: 'update',
@@ -657,7 +652,6 @@ export function ScheduleView({
                     description,
                     startTime: newStart.toISOString(),
                     endTime: newEnd.toISOString(),
-                    gasUrl: orderGasUrl,
                 });
                 if (result.status === 'error') throw new Error(result.message);
                 toast({ title: "カレンダー更新成功" });
