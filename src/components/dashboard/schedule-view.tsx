@@ -45,10 +45,11 @@ import { Label } from '@/components/ui/label';
 import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { useOrder } from '@/contexts/order-context';
-import { updateCalendarEvent } from '@/app/actions/update-calendar-event';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Textarea } from '../ui/textarea';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { useFirebase } from '@/firebase';
+import { httpsCallable } from 'firebase/functions';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 8;
@@ -264,6 +265,9 @@ export function ScheduleView({
   const { allStaff } = useSelectedStaff();
   const { toast } = useToast();
   const { orderGasUrl } = useOrder();
+  const { functions } = useFirebase();
+
+  const updateCalendarEvent = httpsCallable(functions, 'updatecalendarevent');
 
   React.useEffect(() => {
     setIsClient(true);
@@ -321,12 +325,12 @@ export function ScheduleView({
     for (const eventToDelete of eventsToDelete) {
         if (staff.calendarId && eventToDelete.calendarEventId) {
             try {
-                const result = await updateCalendarEvent({
+                const result: any = await updateCalendarEvent({
                     operation: 'delete',
                     calendarId: staff.calendarId,
                     eventId: eventToDelete.calendarEventId,
                 });
-                if (result.status === 'error') throw new Error(result.message);
+                if (result.data.status === 'error') throw new Error(result.data.message);
                 toast({ title: "カレンダーから予定を削除しました" });
             } catch (e: any) {
                 toast({ variant: 'destructive', title: 'カレンダー削除エラー', description: e.message });
@@ -413,7 +417,7 @@ export function ScheduleView({
       // --- Calendar Update Logic (Kept as is) ---
       if (staffMember?.calendarId && updatedEvent.calendarEventId) {
         try {
-          const result = await updateCalendarEvent({
+          const result: any = await updateCalendarEvent({
             operation: 'update',
             calendarId: staffMember.calendarId,
             eventId: updatedEvent.calendarEventId,
@@ -422,7 +426,7 @@ export function ScheduleView({
             startTime: newStart.toISOString(),
             endTime: newEnd.toISOString(),
           });
-          if (result.status === 'error') throw new Error(result.message);
+          if (result.data.status === 'error') throw new Error(result.data.message);
           toast({ title: "カレンダー更新成功" });
         } catch (e: any) {
           toast({ variant: 'destructive', title: 'カレンダー更新エラー', description: e.message });
@@ -452,7 +456,7 @@ export function ScheduleView({
                 return;
             };
             try {
-                const result = await updateCalendarEvent({
+                const result: any = await updateCalendarEvent({
                     operation: 'create',
                     calendarId: staff.calendarId,
                     title: event.title,
@@ -460,13 +464,13 @@ export function ScheduleView({
                     startTime: (event.start as Date).toISOString(),
                     endTime: (event.end as Date).toISOString(),
                 });
-                if (result.status === 'success' && result.eventId) {
+                if (result.data.status === 'success' && result.data.eventId) {
                     toast({ title: 'カレンダー登録成功', description: 'Googleカレンダーに予定を登録しました。' });
-                    return result.eventId;
+                    return result.data.eventId;
                 }
-                throw new Error(result.message || 'カレンダーに登録できませんでした。');
+                throw new Error(result.data.message || 'カレンダーに登録できませんでした。');
             } catch (e: any) {
-                toast({ variant: 'destructive', title: 'カレンダー登録エラー', description: e.message });
+                toast({ variant: 'destructive', title: 'カレンダー登録エラー', description: `Cloud Function呼び出しに失敗しました: ${e.message}` });
                 return undefined;
             }
         };
@@ -599,7 +603,7 @@ export function ScheduleView({
         let calendarEventId: string | undefined;
         if (staff.calendarId) {
             try {
-                const result = await updateCalendarEvent({
+                const result: any = await updateCalendarEvent({
                     operation: 'create',
                     calendarId: staff.calendarId,
                     title,
@@ -607,14 +611,14 @@ export function ScheduleView({
                     startTime: newStart.toISOString(),
                     endTime: newEnd.toISOString(),
                 });
-                if (result.status === 'success' && result.eventId) {
-                    calendarEventId = result.eventId;
+                if (result.data.status === 'success' && result.data.eventId) {
+                    calendarEventId = result.data.eventId;
                     toast({ title: 'カレンダー登録成功' });
                 } else {
-                    throw new Error(result.message);
+                    throw new Error(result.data.message);
                 }
             } catch (e: any) {
-                toast({ variant: 'destructive', title: 'カレンダー登録エラー', description: e.message });
+                toast({ variant: 'destructive', title: 'カレンダー登録エラー', description: `Cloud Function呼び出しに失敗しました: ${e.message}` });
             }
         }
 
@@ -644,7 +648,7 @@ export function ScheduleView({
 
         if (staff.calendarId && updatedEvent.calendarEventId) {
              try {
-                const result = await updateCalendarEvent({
+                const result: any = await updateCalendarEvent({
                     operation: 'update',
                     calendarId: staff.calendarId,
                     eventId: updatedEvent.calendarEventId,
@@ -653,10 +657,10 @@ export function ScheduleView({
                     startTime: newStart.toISOString(),
                     endTime: newEnd.toISOString(),
                 });
-                if (result.status === 'error') throw new Error(result.message);
+                if (result.data.status === 'error') throw new Error(result.data.message);
                 toast({ title: "カレンダー更新成功" });
             } catch (e: any) {
-                toast({ variant: 'destructive', title: 'カレンダー更新エラー', description: e.message });
+                toast({ variant: 'destructive', title: 'カレンダー更新エラー', description: `Cloud Function呼び出しに失敗しました: ${e.message}` });
             }
         }
 
