@@ -339,17 +339,17 @@ export function ScheduleView({
   };
 
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
+      if (!eventToUnassign.rawOrderId) return;
       try {
-          const eventTitleForUpdate = `(ID: ${eventToUnassign.rawOrderId})`;
           const result = await updateSheetStatus({ 
             gasUrl: ORDER_GAS_URL,
-            eventTitle: eventTitleForUpdate, 
+            eventTitle: `(ID: ${eventToUnassign.rawOrderId})`, 
             staffName: "",
             statusValue: "未割当",
           });
           if (result.status === 'error') throw new Error(result.message);
           
-          const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === eventToUnassign.rawOrderId);
+          const originalOrder = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
           if (originalOrder) {
             const orderToAddBack = mapRawToOrder(originalOrder);
              setUnassignedOrders(prev => {
@@ -408,17 +408,16 @@ export function ScheduleView({
         if (!staffMember) return;
         
         try {
-            if (draggedEvent.staffId !== newStaffId) {
-                const eventTitleForUpdate = `(ID: ${draggedEvent.rawOrderId})`;
+            if (draggedEvent.staffId !== newStaffId && draggedEvent.rawOrderId) {
+                const customer = getCustomerByCode(draggedEvent.locationId);
                 const result = await updateSheetStatus({ 
                   gasUrl: ORDER_GAS_URL,
-                  eventTitle: eventTitleForUpdate, 
+                  eventTitle: `(ID: ${draggedEvent.rawOrderId})`, 
                   staffName: staffMember.name,
                   statusValue: '作業待ち',
                 });
                 if (result.status === 'error') throw new Error(result.message);
                 
-                const customer = getCustomerByCode(draggedEvent.locationId);
                 toast({
                   title: `${staffMember.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
                 });
@@ -434,7 +433,6 @@ export function ScheduleView({
                     const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
                     
                     let newTaskStart = newStart;
-                    // If a travel chip was dragged, the new start is for the travel chip
                     if (originalTravel && draggedEvent.id === originalTravel.id) {
                         newTaskStart = addMinutes(newStart, TRAVEL_TIME_MINUTES);
                     }
@@ -450,9 +448,9 @@ export function ScheduleView({
                         if (e.id.endsWith('-travel')) {
                             return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
                         }
-                        return e; // Should not happen
+                        return e;
                     });
-                } else { // It's a single event (generic or without travel)
+                } else {
                      const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                      const newEnd = addMinutes(newStart, duration);
                      return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
@@ -484,11 +482,10 @@ export function ScheduleView({
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
-            const eventTitleForUpdate = `(ID: ${order.rawOrderId})`;
             try {
               const result = await updateSheetStatus({ 
                 gasUrl: ORDER_GAS_URL,
-                eventTitle: eventTitleForUpdate, 
+                eventTitle: `(ID: ${order.rawOrderId})`, 
                 staffName: staff.name,
                 statusValue: '作業待ち'
               });

@@ -13,34 +13,35 @@ interface UpdateSheetStatusArgs {
 interface GasResponse {
     status: 'success' | 'error';
     message: string;
+    data?: any;
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName, statusValue } = args;
+    const { gasUrl, ...data } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
-    
-    // Build the URL with query parameters
-    const url = new URL(gasUrl);
-    if (eventTitle) {
-        url.searchParams.append('eventTitle', eventTitle);
-    }
-    // Allow sending an empty string to clear the name
-    if (staffName !== undefined && staffName !== null) {
-        url.searchParams.append('staffName', staffName);
-    }
-    // Allow sending an empty string or a specific status
-    if (statusValue) {
-        url.searchParams.append('statusValue', statusValue);
-    }
+
+    // dataオブジェクトからnullまたはundefinedのプロパティを削除
+    const filteredData = Object.entries(data).reduce((acc, [key, value]) => {
+        if (value !== null && value !== undefined) {
+            (acc as any)[key] = value;
+        }
+        return acc;
+    }, {});
+
 
     try {
-        const response = await fetch(url.toString(), {
+        const response = await fetch(gasUrl, {
             method: 'POST',
             cache: 'no-store',
             redirect: 'follow',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            // GASがe.postData.contentsで受け取るために、dataオブジェクトでラップする
+            body: JSON.stringify({ data: filteredData }),
         });
         
         if (response.redirected && response.url.includes('accounts.google.com')) {
