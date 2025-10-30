@@ -115,12 +115,6 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
   };
 };
 
-const parseDate = (dateString: any): Date | null => {
-  if (!dateString || typeof dateString !== 'string') return null;
-  const date = parseISO(dateString);
-  return isValid(date) ? date : null;
-};
-
 const findKey = (item: any, possibleKeys: string[]) => {
     for (const key of possibleKeys) {
         const lowerKey = key.toLowerCase();
@@ -335,19 +329,19 @@ export function ScheduleView({
     const allMappedOrders = rawOrdersData.map(mapRawToOrder);
     const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
     return allMappedOrders.filter(order => {
-        if (!order.rawOrderId) return false; // Must have a raw order ID
-        if (scheduledRawOrderIds.has(order.rawOrderId)) return false; // Already scheduled
+        if (!order.rawOrderId) return false;
+        if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
         
-        const scheduledDate = parseDate(findKey(order.raw, ['作業予定日']));
-        const receptionDate = parseDate(findKey(order.raw, ['受付日']));
-        const isScheduledForToday = scheduledDate ? isToday(scheduledDate) : false;
-        const isReceivedToday = receptionDate ? isToday(receptionDate) : false;
+        const scheduledDate = findKey(order.raw, ['作業予定日']);
+        const receptionDate = findKey(order.raw, ['受付日']);
+
+        const isScheduledForToday = scheduledDate ? isToday(parseISO(scheduledDate)) : false;
+        const isReceivedToday = receptionDate ? isToday(parseISO(receptionDate)) : false;
         
         return isScheduledForToday || isReceivedToday;
     });
   });
 
-  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.id === id);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
@@ -371,9 +365,9 @@ export function ScheduleView({
   };
 
   const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
-    const { rawOrderId } = eventToUnassign;
-
-    if (rawOrderId && !eventToUnassign.id.startsWith('generic-')) {
+    const rawOrderId = eventToUnassign.rawOrderId;
+    
+    if (rawOrderId) {
         try {
             const sheetResult = await updateSheetStatus({
                 gasUrl: orderGasUrl,
@@ -384,26 +378,29 @@ export function ScheduleView({
 
             if (sheetResult.status === 'error') {
                 toast({ variant: 'destructive', title: 'シート更新エラー', description: `シート担当者のクリアに失敗: ${sheetResult.message}` });
-                return; // Do not proceed if sheet update fails
+                return;
             }
             toast({ title: '担当者をクリアしました', description: sheetResult.message });
 
-            const originalRawOrder = rawOrdersData.find(o => findKey(o, ['受注ID', '受注 ID']) === rawOrderId);
-            if (originalRawOrder) {
-                const orderToAddBack = mapRawToOrder(originalRawOrder);
-                setUnassignedOrders(prev => {
-                    // Prevent duplicates
-                    if (prev.some(o => o.id === orderToAddBack.id)) return prev;
-                    return [...prev, orderToAddBack];
-                });
-            }
         } catch (e: any) {
             toast({ variant: 'destructive', title: 'シート更新エラー', description: `シート担当者のクリアに失敗しました: ${e.message}` });
-            return; // Do not proceed on error
+            return;
         }
     }
     
     setScheduleData(prev => prev.filter(e => e.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
+
+    // Also add the order back to the unassigned list if it was a real order
+    const originalOrder = rawOrdersData.find(o => findKey(o, ['受注ID', '受注 ID']) === rawOrderId);
+    if (originalOrder) {
+      const orderToAddBack = mapRawToOrder(originalOrder);
+      setUnassignedOrders(prev => {
+        if (!prev.some(o => o.id === orderToAddBack.id)) {
+          return [...prev, orderToAddBack];
+        }
+        return prev;
+      });
+    }
   };
 
 
@@ -449,6 +446,8 @@ export function ScheduleView({
         end: newEnd,
       };
       
+      let eventsToUpdate = [updatedEvent];
+
       // If there's a related travel event, update it too
       if (updatedEvent.tripId) {
           const travelDuration = differenceInMinutes(originalEnd, originalStart);
@@ -456,7 +455,7 @@ export function ScheduleView({
           if (travelEvent) {
               const travelStart = subMinutes(newStart, travelDuration);
               const updatedTravelEvent = { ...travelEvent, staffId: finalStaffId, start: travelStart, end: newStart };
-              setScheduleData(prev => prev.map(e => e.id === updatedTravelEvent.id ? updatedTravelEvent : e));
+              eventsToUpdate.push(updatedTravelEvent);
           }
       }
       
@@ -474,15 +473,19 @@ export function ScheduleView({
                  return; // Do not update UI if sheet update fails
               }
               toast({ title: '担当者をシートで更新しました', description: `担当者を「${staffMember.name}」に変更しました。`});
-              setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           } catch(e: any) {
               toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
               return; // Do not update UI on failure
           }
       } else {
-          setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
       }
+
+      setScheduleData(prev => prev.map(e => {
+        const update = eventsToUpdate.find(u => u.id === e.id);
+        return update || e;
+      }));
+
     }
     // Dropping a new order/task onto the timeline
     else if ('estimatedDuration' in item && newStaffId && over?.rect) {
@@ -517,10 +520,10 @@ export function ScheduleView({
             const taskStart = addMinutes(startOfDay, dropMinutes);
             const taskEnd = addMinutes(taskStart, order.estimatedDuration);
             const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-            const customer = getCustomerByCode(order.customerCode);
+            const customer = allCustomers?.find(c => c.userCode === order.customerCode);
             const tripId = `trip-${Date.now()}`;
             
-            const rawOrderId = findKey(order.raw, ['受注ID', '受注 ID']);
+            const rawOrderId = order.rawOrderId;
             
             const taskEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}-task`,
@@ -747,53 +750,52 @@ export function ScheduleView({
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
         <div className="space-y-4">
-          <GenericTasks />
-          <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
+            <GenericTasks />
+            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
 
-          <Card>
-              <CardHeader>
-                  <CardTitle>タイムライン</CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <ScrollArea className="w-full whitespace-nowrap">
-                      <div
-                          className="relative"
-                          style={{
-                          width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`,
-                          }}
-                      >
-                          {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                              <div
-                              key={i}
-                              className="absolute h-full border-l"
-                              style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                              >
-                              <span className="absolute -top-5 -translate-x-1/2 text-xs text-muted-foreground">
-                                  {timelineStartHour + i}:00
-                              </span>
-                              </div>
-                          ))}
-                      </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>タイムライン</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <ScrollArea className="w-full whitespace-nowrap">
+                        <div className="relative" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`, minHeight: '100px' }}>
+                            {/* Time markers */}
+                            <div className="absolute top-0 left-0 w-full h-full">
+                                {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className="absolute h-full border-l"
+                                        style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                    >
+                                        <span className="absolute -top-5 -translate-x-1/2 text-xs text-muted-foreground">
+                                            {timelineStartHour + i}:00
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
 
-                      <div className="space-y-2 mt-8">
-                          {staffData?.map((staff) => {
-                              const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                              return (
-                                  <StaffRow
-                                      key={staff.id}
-                                      staff={staff}
-                                      events={events}
-                                      getCustomer={getCustomerById}
-                                      isOver={currentOverStaffId === staff.id}
-                                      onDoubleClickEvent={handleDoubleClickEvent}
-                                      onDoubleClickTimeline={handleDoubleClickTimeline}
-                                  />
-                              );
-                          })}
-                      </div>
-                  </ScrollArea>
-              </CardContent>
-          </Card>
+                            {/* Staff Rows */}
+                            <div className="relative mt-8 space-y-2">
+                                {staffData?.map((staff) => {
+                                    const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                    return (
+                                        <StaffRow
+                                            key={staff.id}
+                                            staff={staff}
+                                            events={events}
+                                            getCustomer={getCustomerById}
+                                            isOver={currentOverStaffId === staff.id}
+                                            onDoubleClickEvent={handleDoubleClickEvent}
+                                            onDoubleClickTimeline={handleDoubleClickTimeline}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </ScrollArea>
+                </CardContent>
+            </Card>
         </div>
       
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
@@ -901,8 +903,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   return (
-    <div ref={setNodeRef} className={cn("flex items-start h-16 transition-colors", isOver && "bg-primary/10")}>
-      <div className="w-32 sticky left-0 bg-background/80 backdrop-blur-sm z-10 pr-2 pt-2">
+    <div ref={setNodeRef} className={cn("flex items-center h-16 transition-colors", isOver && "bg-primary/10")}>
+      <div className="w-32 sticky left-0 bg-background/80 backdrop-blur-sm z-10 pr-2">
         <div className="font-semibold flex items-center gap-2">
           <Avatar className="h-6 w-6">
             <AvatarImage src={staff.avatarUrl} />
@@ -1009,7 +1011,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         {...listeners}
         {...attributes}
         onDoubleClick={handleDoubleClick}
-        className="absolute h-12 rounded-md px-2 flex flex-col justify-center cursor-move"
+        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md px-2 flex flex-col justify-center cursor-move"
       >
         <div
           className="w-full h-full rounded-md flex flex-col justify-center"
