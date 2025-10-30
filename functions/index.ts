@@ -27,7 +27,7 @@ async function getAuthenticatedCalendarClient(): Promise<calendar_v3.Calendar> {
         scopes: ["https://www.googleapis.com/auth/calendar"],
     });
     const authClient = await auth.getClient();
-    const calendar = google.calendar({version: "v3", auth: authClient});
+    const calendar = google.calendar({version: "v3", auth: authClient as any});
     logger.info("Authentication successful.");
     return calendar;
 }
