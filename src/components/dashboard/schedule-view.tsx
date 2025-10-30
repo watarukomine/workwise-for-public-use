@@ -386,95 +386,108 @@ export function ScheduleView({
     setActiveItem(null);
     setCurrentOverStaffId(null);
     
-    if (!item) {
+    if (!item || !over) {
       return;
     }
-
-    if (over?.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
+    
+    // Scenario 1: An existing event is dropped into the unassigned area
+    if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         await handleUnassignEvent(item);
         return;
     }
     
-    const newStaffId = over?.id as string | undefined;
+    const newStaffId = over.id as string;
+    const staffRowElement = document.getElementById(`staff-row-${newStaffId}`);
+    
+    // Check if dropping onto a valid staff row timeline
+    if (!staffRowElement) return;
+    
+    const timelineRect = staffRowElement.getBoundingClientRect();
+    const startOfDay = new Date();
+    startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
-    if ('staffId' in item && 'start' in item && newStaffId && newStaffId !== UNASSIGNED_TASKS_DROPPABLE_ID) {
-      const eventToUpdate = item;
-      const dragMinutes = pixelsToMinutes(delta.x);
-      
-      const originalStart = typeof eventToUpdate.start === 'string' ? parseISO(eventToUpdate.start) : eventToUpdate.start;
-      const originalEnd = typeof eventToUpdate.end === 'string' ? parseISO(eventToUpdate.end) : eventToUpdate.end;
+    // Common calculation for drop position in minutes from timeline start
+    const dropX = (active.rect.current.initial?.left ?? 0) - timelineRect.left + delta.x;
+    const dropMinutes = pixelsToMinutes(dropX);
+    const newStart = addMinutes(startOfDay, dropMinutes);
 
-      const newStart = addMinutes(originalStart, dragMinutes);
-      const newEnd = addMinutes(originalEnd, dragMinutes);
-      
-      const finalStaffId = newStaffId || eventToUpdate.staffId;
-      const staffMember = allStaff.find(s => s.id === finalStaffId);
+    // Scenario 2: An existing event is moved (within or between timelines)
+    if ('staffId' in item) {
+        const eventToUpdate = item as WithId<ScheduleEvent>;
+        const staffMember = allStaff.find(s => s.id === newStaffId);
+        if (!staffMember) return;
 
-      if (!staffMember) return;
-      
-      let updatedEvent: WithId<ScheduleEvent> = {
-        ...eventToUpdate,
-        staffId: finalStaffId,
-        start: newStart,
-        end: newEnd,
-      };
-      
-      let eventsToUpdate = [updatedEvent];
+        const originalDuration = differenceInMinutes(
+            typeof eventToUpdate.end === 'string' ? parseISO(eventToUpdate.end) : eventToUpdate.end,
+            typeof eventToUpdate.start === 'string' ? parseISO(eventToUpdate.start) : eventToUpdate.start
+        );
+        const newEnd = addMinutes(newStart, originalDuration);
+        
+        let eventsToUpdate: WithId<ScheduleEvent>[] = [];
+        
+        const mainEventUpdate: WithId<ScheduleEvent> = {
+            ...eventToUpdate,
+            staffId: newStaffId,
+            start: newStart,
+            end: newEnd,
+        };
+        eventsToUpdate.push(mainEventUpdate);
 
-      if (updatedEvent.tripId) {
-          const travelDuration = differenceInMinutes(originalStart, subMinutes(originalStart, TRAVEL_TIME_MINUTES));
-          const travelEvent = scheduleData.find(e => e.tripId === updatedEvent.tripId && e.id !== updatedEvent.id);
-          if (travelEvent) {
-              const travelStart = subMinutes(newStart, travelDuration);
-              const updatedTravelEvent = { ...travelEvent, staffId: finalStaffId, start: travelStart, end: newStart };
-              eventsToUpdate.push(updatedTravelEvent);
-          }
-      }
-      
-      if (updatedEvent.rawOrderId && eventToUpdate.staffId !== finalStaffId) {
-          try {
-              const sheetResult = await updateSheetStatus({
-                  gasUrl: orderGasUrl,
-                  orderId: updatedEvent.rawOrderId,
-                  staffName: staffMember.name,
-                  eventTitle: updatedEvent.title,
-              });
-              if (sheetResult.status === 'error') {
-                 toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${sheetResult.message}` });
-                 return;
-              }
-              toast({ title: '担当者をシートで更新しました', description: `担当者を「${staffMember.name}」に変更しました。`});
-          } catch(e: any) {
-              toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-              return;
-          }
-      } else {
-          toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
-      }
+        // If it's part of a trip, update the travel event as well
+        if (eventToUpdate.tripId) {
+            const travelEvent = scheduleData.find(e => e.tripId === eventToUpdate.tripId && e.id !== eventToUpdate.id);
+            if (travelEvent) {
+                const originalTravelDuration = differenceInMinutes(
+                    typeof travelEvent.end === 'string' ? parseISO(travelEvent.end) : travelEvent.end,
+                    typeof travelEvent.start === 'string' ? parseISO(travelEvent.start) : travelEvent.start
+                );
+                const updatedTravelEvent = {
+                    ...travelEvent,
+                    staffId: newStaffId,
+                    start: subMinutes(newStart, originalTravelDuration),
+                    end: newStart,
+                };
+                eventsToUpdate.push(updatedTravelEvent);
+            }
+        }
+        
+        // If staff member changed, update the sheet
+        if (eventToUpdate.rawOrderId && eventToUpdate.staffId !== newStaffId) {
+            try {
+                const sheetResult = await updateSheetStatus({
+                    gasUrl: orderGasUrl,
+                    orderId: eventToUpdate.rawOrderId,
+                    staffName: staffMember.name,
+                    eventTitle: eventToUpdate.title,
+                });
+                if (sheetResult.status === 'error') {
+                   toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${sheetResult.message}` });
+                   return; // Don't update UI if sheet update fails
+                }
+                toast({ title: '担当者をシートで更新しました', description: `担当者を「${staffMember.name}」に変更しました。`});
+            } catch(e: any) {
+                toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+                return;
+            }
+        } else {
+             toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
+        }
 
-      setScheduleData(prev => prev.map(e => {
-        const update = eventsToUpdate.find(u => u.id === e.id);
-        return update || e;
-      }));
+        setScheduleData(prev => {
+            const otherEvents = prev.filter(e => !eventsToUpdate.some(u => u.id === e.id));
+            return [...otherEvents, ...eventsToUpdate];
+        });
 
     }
-    else if ('estimatedDuration' in item && newStaffId && over?.rect) {
-        const order = item;
-        const timelineRect = over.rect;
-        
-        const dropX = (active.rect.current.initial?.left ?? 0) - timelineRect.left + delta.x - 144;
-        const dropMinutes = pixelsToMinutes(dropX);
-
-        const today = new Date();
-        const startOfDay = new Date(today);
-        startOfDay.setHours(timelineStartHour, 0, 0, 0);
-        
-        const isGeneric = order.id.startsWith('generic-');
+    // Scenario 3: A new order is dropped onto a timeline
+    else if ('estimatedDuration' in item) {
+        const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
+        const isGeneric = order.id.startsWith('generic-');
+
         if (isGeneric) {
-             const newStart = addMinutes(startOfDay, dropMinutes);
              const newEnd = addMinutes(newStart, order.estimatedDuration);
              const newEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}`,
@@ -487,9 +500,8 @@ export function ScheduleView({
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
-            const taskStart = addMinutes(startOfDay, dropMinutes);
-            const taskEnd = addMinutes(taskStart, order.estimatedDuration);
-            const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+            const taskEnd = addMinutes(newStart, order.estimatedDuration);
+            const travelStart = subMinutes(newStart, TRAVEL_TIME_MINUTES);
             const customer = allCustomers?.find(c => c.userCode === order.customerCode);
             const tripId = `trip-${Date.now()}`;
             
@@ -524,7 +536,7 @@ export function ScheduleView({
                   description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
-                  start: taskStart,
+                  start: newStart,
                   end: taskEnd,
               };
 
@@ -536,7 +548,7 @@ export function ScheduleView({
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: travelStart,
-                  end: taskStart,
+                  end: newStart,
               };
               
               setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
@@ -741,9 +753,10 @@ export function ScheduleView({
                 </CardHeader>
                 <CardContent className="pt-6">
                     <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="relative">
-                            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm">
-                              <div className="relative h-8" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`, marginLeft: '144px' }}>
+                       <div className="relative">
+                           <div className="sticky left-0 top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                               <div className="w-36 flex-shrink-0"></div>
+                               <div className="relative h-8 flex-1" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
                                   {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                       <div
                                           key={i}
@@ -888,7 +901,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-16 relative", isOver && "bg-primary/10")}>
+    <div className={cn("flex h-16 relative")}>
       <div className="sticky left-0 z-10 w-36 flex-shrink-0 bg-background/80 backdrop-blur-sm pr-2 flex items-center">
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
@@ -896,12 +909,13 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
         </div>
       </div>
       <div 
+        id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-full", areaBgClass)} 
+        className={cn("relative flex-1 h-full", areaBgClass, isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
       >
-        <div className="h-full border-t border-b ml-[144px]" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}></div>
-        <div className="relative h-full ml-[144px]" style={{marginTop: '-4rem'}}>
+        <div className="h-full border-t border-b" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}></div>
+        <div className="absolute top-0 left-0 h-full">
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
