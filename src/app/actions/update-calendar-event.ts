@@ -30,7 +30,7 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
     try {
         // Use the server-side Firebase initialization.
         const { firebaseApp } = initializeServerFirebase();
-        const functions = getFunctions(firebaseApp, 'asia-northeast1');
+        const functions = getFunctions(firebaseApp, 'us-central1');
 
         // Get a callable reference to the Cloud Function.
         const callable = httpsCallable<UpdateCalendarEventArgs, FunctionResponse>(functions, 'updatecalendarevent');
