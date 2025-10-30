@@ -1,9 +1,8 @@
 
 'use server';
 
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFunctions as getAdminFunctions } from 'firebase-admin/functions';
+import { initializeApp, getApps, App } from 'firebase-admin/app';
+import { getFunctions } from 'firebase-admin/functions';
 import { firebaseConfig } from '@/firebase/config';
 
 interface UpdateCalendarEventArgs {
@@ -37,8 +36,8 @@ if (getApps().length === 0) {
  */
 export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<FunctionResponse> {
     try {
-        const functions = getAdminFunctions();
-        const callable = functions.httpsCallable('updatecalendarevent', { region: 'asia-northeast1' });
+        const functions = getFunctions();
+        const callable = functions.httpsCallable('updatecalendarevent');
 
         console.log("Calling 'updatecalendarevent' Cloud Function with args:", args);
 
