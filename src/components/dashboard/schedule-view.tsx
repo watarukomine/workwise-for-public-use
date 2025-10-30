@@ -27,7 +27,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, getYear, getMonth, getDate, getHours, getMinutes } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, findKey } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -49,12 +49,11 @@ import { Textarea } from '../ui/textarea';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { Download } from 'lucide-react';
 import * as ics from 'ics';
-import { findKey } from '@/lib/utils';
 
 
 const PIXELS_PER_MINUTE = 1.5;
-const timelineStartHour = 8;
-const timelineEndHour = 18;
+const timelineStartHour = 9;
+const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
@@ -309,18 +308,14 @@ export function ScheduleView({
     const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
     
     const newUnassignedOrders = allMappedOrders.filter(order => {
-        // rawOrderIdがないタスクは除外
         if (!order.rawOrderId) return false;
         
-        // すでにスケジュールされているタスクは除外
         if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
         
         const scheduledDateKey = findKey(order.raw, ['作業予定日']);
-        // 作業予定日がないタスクは除外
         if (!scheduledDateKey) return false;
 
         const scheduledDate = parseISO(scheduledDateKey);
-        // 日付が無効か、今日でないタスクは除外
         return isValid(scheduledDate) && isToday(scheduledDate);
     });
     setUnassignedOrders(newUnassignedOrders);
@@ -382,7 +377,6 @@ export function ScheduleView({
         }
     }
     
-    // 汎用タスク (`generic-` ID) はリストに戻す必要がないので、単にスケジュールから削除するだけ
     setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
   };
 
@@ -750,22 +744,29 @@ export function ScheduleView({
                     <ScrollArea className="w-full whitespace-nowrap">
                         <div 
                           className="relative" 
-                          style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`, minHeight: `${staffData.length * 5}rem` }}
+                          style={{ minHeight: `${staffData.length * 5}rem` }}
                         >
-                            <div className="absolute top-0 left-0 w-full h-full">
-                                {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                    <div
-                                        key={i}
-                                        className="absolute h-full border-l"
-                                        style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                    >
-                                        <span className="absolute -top-5 -translate-x-1/2 text-xs text-muted-foreground">
-                                            {timelineStartHour + i}:00
-                                        </span>
+                            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm">
+                                <div 
+                                    className="relative" 
+                                    style={{ width: `calc(144px + ${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px)` }}
+                                >
+                                    <div className="ml-[144px] h-8">
+                                        {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                            <div
+                                                key={i}
+                                                className="absolute h-full border-l"
+                                                style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                            >
+                                                <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                                    {timelineStartHour + i}:00
+                                                </span>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
                             </div>
-                            <div className="relative mt-8 space-y-2">
+                            <div className="relative mt-2 space-y-2">
                                 {staffData?.map((staff) => {
                                     const events = dailySchedule.filter((e) => e.staffId === staff.id);
                                     return (
@@ -896,21 +897,24 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div ref={setNodeRef} className={cn("flex h-20", isOver && "bg-primary/10")}>
-      <div className="sticky left-0 z-10 w-32 flex-shrink-0 bg-background/80 backdrop-blur-sm pr-2 flex items-center">
-        <div className="font-semibold flex items-center gap-2">
+    <div className={cn("flex h-20 relative", isOver && "bg-primary/10")}>
+      <div className="sticky left-0 z-10 w-36 flex-shrink-0 bg-background/80 backdrop-blur-sm pr-2 flex items-center">
+        <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-10 rounded-full' style={{backgroundColor: staff.color}}></div>
           <Avatar className="h-8 w-8">
             <AvatarImage src={staff.avatarUrl} />
             <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
           </Avatar>
-          <span className='truncate'>{staff.name}</span>
+          <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
-      <div className="relative flex-1 h-full" onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
-        <div className={cn("absolute top-0 left-0 h-full w-full", areaBgClass)}>
-            <div className="h-full border-t border-b"></div>
-        </div>
+      <div 
+        ref={setNodeRef} 
+        className={cn("relative flex-1 h-full", areaBgClass)} 
+        onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
+        style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+      >
+        <div className="h-full border-t border-b"></div>
         <div className="relative h-full">
           {events.map((event) => (
             <DraggableEvent
@@ -1015,3 +1019,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
