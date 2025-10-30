@@ -411,12 +411,22 @@ export function ScheduleView({
     const startOfDay = new Date();
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
-    const initialLeft = active.rect.current.initial?.left ?? 0;
-    const dropX = initialLeft - timelineRect.left + delta.x;
-    
-    // Calculate the new start time based on the absolute drop position, and snap to grid
-    const newStartMinutes = pixelsToMinutes(dropX);
-    const newStart = addMinutes(startOfDay, newStartMinutes);
+    const getNewStart = () => {
+        const initialLeft = active.rect.current.initial?.left ?? 0;
+        let dropX = initialLeft - timelineRect.left + delta.x;
+
+        if (active.data.current?.staffId) {
+             // It's an existing event being moved, calculate absolute position
+            dropX = initialLeft + delta.x - STAFF_COL_WIDTH;
+        } else {
+             // It's a new event from the unassigned list
+             dropX = initialLeft - timelineRect.left + delta.x;
+        }
+        const newStartMinutes = pixelsToMinutes(dropX);
+        return addMinutes(startOfDay, newStartMinutes);
+    };
+
+    const newStart = getNewStart();
 
     // Scenario 2: An existing event is moved (within or between timelines)
     if ('staffId' in item) {
@@ -985,20 +995,13 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const hslMatch = typeof backgroundColor === 'string' ? backgroundColor.match(/hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)/) : null;
 
   if (isTravelEvent) {
-    if (hslMatch) {
-      const [_, h, s, l] = hslMatch;
-      backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
+      if (hslMatch) {
+        const [_, h, s, l] = hslMatch;
+        backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
+      } else {
+        backgroundColor = `rgba(128, 128, 128, 0.5)`;
+      }
       color = 'hsl(var(--foreground))';
-    } else {
-      // Fallback for non-hsl colors, like hex
-      // This is a rough conversion to rgba
-      const hex = backgroundColor.replace('#', '');
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
-      backgroundColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
-      color = 'hsl(var(--foreground))';
-    }
   } else if (isBreakEvent) {
      if (hslMatch) {
       const [_, h, s] = hslMatch;
@@ -1021,7 +1024,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         {...listeners}
         {...attributes}
         onDoubleClick={handleDoubleClick}
-        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md px-2 flex flex-col justify-center cursor-move"
+        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
         data-event-chip="true"
       >
         <div
@@ -1048,4 +1051,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
