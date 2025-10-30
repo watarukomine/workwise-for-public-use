@@ -1,10 +1,10 @@
 
 'use server';
 
-import { initializeApp, getApps, App } from 'firebase-admin/app';
-import { getFunctions } from 'firebase-admin/functions';
+import { GoogleAuth } from 'google-auth-library';
 import { firebaseConfig } from '@/firebase/config';
 
+// 関数の引数の型定義
 interface UpdateCalendarEventArgs {
     operation: 'create' | 'update' | 'delete';
     calendarId: string;
@@ -15,48 +15,60 @@ interface UpdateCalendarEventArgs {
     endTime?: string;
 }
 
+// レスポンスの型定義
 interface FunctionResponse {
     status: 'success' | 'error';
     message: string;
     eventId?: string;
 }
 
-// Ensure Firebase Admin is initialized only once on the server
-if (getApps().length === 0) {
-    initializeApp({
-        projectId: firebaseConfig.projectId,
-    });
-}
+// Cloud FunctionのトリガーURLを構築
+const functionRegion = 'asia-northeast1';
+const functionName = 'updatecalendarevent';
+const functionUrl = `https://${functionRegion}-${firebaseConfig.projectId}.cloudfunctions.net/${functionName}`;
+
 
 /**
- * Calls the `updatecalendarevent` Cloud Function to interact with Google Calendar.
- * This server action acts as a client-side entry point to the secure backend function.
- * @param args - The arguments for the calendar operation.
- * @returns A promise that resolves to the response from the Cloud Function.
+ * Google認証を行い、Cloud Functionを直接HTTPリクエストで呼び出します。
+ * これにより、クライアントSDKとAdmin SDKの混同によるエラーを完全に回避します。
+ * @param args - カレンダー操作のための引数
+ * @returns - Cloud Functionからのレスポンス
  */
 export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<FunctionResponse> {
     try {
-        const functions = getFunctions();
-        const callable = functions.httpsCallable('updatecalendarevent', {
-          region: 'asia-northeast1'
+        // Google Cloud環境の認証情報を自動で取得
+        const auth = new GoogleAuth();
+        const client = await auth.getIdTokenClient(functionUrl);
+
+        console.log(`Calling Cloud Function at: ${functionUrl}`);
+        console.log('With args:', args);
+
+        // 認証済みのHTTPクライアントを使ってPOSTリクエストを送信
+        const response = await client.request({
+            url: functionUrl,
+            method: 'POST',
+            data: { data: args }, // Cloud Functions (onCall)は 'data' オブジェクトでラップされたペイロードを期待する
         });
 
-        console.log("Calling 'updatecalendarevent' Cloud Function with args:", args);
-
-        const result = await callable(args);
+        // Cloud Functionsからのレスポンスを処理
+        // onCallトリガーのレスポンスは `result` キーの中にラップされている
+        const resultData = (response.data as any)?.result;
         
-        console.log("Cloud Function response received:", result.data);
+        if (!resultData) {
+           throw new Error('Cloud Functionからのレスポンスの形式が不正です。');
+        }
 
-        // Assuming result.data is already in FunctionResponse format
-        return result.data as FunctionResponse;
+        console.log('Cloud Function response received:', resultData);
+        return resultData as FunctionResponse;
 
     } catch (error: any) {
-        console.error('Failed to call Cloud Function for calendar update:', error);
+        console.error('Failed to call Cloud Function for calendar update:', error.response?.data || error.message);
         
-        // Provide a more user-friendly error message
+        const errorMessage = error.response?.data?.error?.message || error.message || '不明なエラーです。';
+        
         return {
             status: 'error',
-            message: `カレンダー連携用のCloud Function呼び出しに失敗しました: ${error.details || error.message || '不明なエラーです。'}`,
+            message: `カレンダー連携用のCloud Function呼び出しに失敗しました: ${errorMessage}`,
         };
     }
 }
