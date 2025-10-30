@@ -746,42 +746,42 @@ export function ScheduleView({
                           className="relative" 
                           style={{ minHeight: `${staffData.length * 5}rem` }}
                         >
-                            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm">
-                                <div 
-                                    className="relative" 
-                                    style={{ width: `calc(144px + ${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px)` }}
-                                >
-                                    <div className="ml-[144px] h-8">
-                                        {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                            <div
-                                                key={i}
-                                                className="absolute h-full border-l"
-                                                style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                            >
-                                                <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                                    {timelineStartHour + i}:00
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="relative mt-2 space-y-2">
-                                {staffData?.map((staff) => {
-                                    const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                    return (
-                                        <StaffRow
-                                            key={staff.id}
-                                            staff={staff}
-                                            events={events}
-                                            getCustomer={getCustomerById}
-                                            isOver={currentOverStaffId === staff.id}
-                                            onDoubleClickEvent={handleDoubleClickEvent}
-                                            onDoubleClickTimeline={handleDoubleClickTimeline}
-                                        />
-                                    );
-                                })}
-                            </div>
+                          <div className="relative" style={{ width: `calc(144px + ${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px)`}}>
+                              <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm">
+                                  <div 
+                                      className="relative h-8"
+                                      style={{ width: `calc(100% - 144px)`, marginLeft: '144px' }}
+                                  >
+                                      {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                          <div
+                                              key={i}
+                                              className="absolute h-full border-l"
+                                              style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                          >
+                                              <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                                  {timelineStartHour + i}:00
+                                              </span>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+                              <div className="relative mt-2 space-y-2">
+                                  {staffData?.map((staff) => {
+                                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                      return (
+                                          <StaffRow
+                                              key={staff.id}
+                                              staff={staff}
+                                              events={events}
+                                              getCustomer={getCustomerById}
+                                              isOver={currentOverStaffId === staff.id}
+                                              onDoubleClickEvent={handleDoubleClickEvent}
+                                              onDoubleClickTimeline={handleDoubleClickTimeline}
+                                          />
+                                      );
+                                  })}
+                              </div>
+                          </div>
                         </div>
                     </ScrollArea>
                 </CardContent>
@@ -1019,5 +1019,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
 
     
