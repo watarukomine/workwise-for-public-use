@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -270,6 +271,12 @@ export function ScheduleView({
     if (!functions) return null;
     return httpsCallable(functions, 'updatecalendarevent');
   }, [functions]);
+  
+  // DEBUG: Create a memoized callable for the debug function
+  const debugCalendar = React.useMemo(() => {
+    if (!functions) return null;
+    return httpsCallable(functions, 'debugcalendar');
+  }, [functions]);
 
 
   React.useEffect(() => {
@@ -380,7 +387,8 @@ export function ScheduleView({
       return;
     }
     
-    if (!updateCalendarEvent) {
+    // DEBUG: Switch to debug function
+    if (!debugCalendar || !updateCalendarEvent) {
       toast({ variant: 'destructive', title: 'エラー', description: 'カレンダー連携機能が初期化されていません。' });
       setActiveItem(null);
       setCurrentOverStaffId(null);
@@ -443,7 +451,7 @@ export function ScheduleView({
           toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
       }
       
-      // --- Calendar Update Logic (Kept as is) ---
+      // --- Calendar Update Logic ---
       if (staffMember?.calendarId && updatedEvent.calendarEventId) {
         try {
           const result: any = await updateCalendarEvent({
@@ -486,21 +494,48 @@ export function ScheduleView({
           return;
         }
 
-        // --- Calendar Creation Logic (Kept as is) ---
+        // --- Calendar Creation Logic (using the DEBUG function first) ---
         const handleCalendarCreate = async (event: Omit<WithId<ScheduleEvent>, 'calendarEventId'>): Promise<string | undefined> => {
             if (!staff.calendarId) {
                 toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
                 return;
             };
+            
+            const payload = {
+                operation: 'create',
+                calendarId: staff.calendarId,
+                title: event.title,
+                description: event.description,
+                startTime: (event.start as Date).toISOString(),
+                endTime: (event.end as Date).toISOString(),
+            };
+
+            // --- START DEBUG BLOCK ---
             try {
-                const result: any = await updateCalendarEvent({
-                    operation: 'create',
-                    calendarId: staff.calendarId,
-                    title: event.title,
-                    description: event.description,
-                    startTime: (event.start as Date).toISOString(),
-                    endTime: (event.end as Date).toISOString(),
-                });
+                toast({ title: "デバッグ関数を呼び出し中..." });
+                const debugResult: any = await debugCalendar(payload);
+                if (debugResult.data.status === 'success') {
+                    toast({
+                        title: "デバッグデータ受信",
+                        description: `Cloud Functionはデータを受け取りました: ${debugResult.data.message}`,
+                        duration: 5000,
+                    });
+                    console.log("Debug function success:", debugResult.data);
+                } else {
+                    throw new Error(debugResult.data.message || 'デバッグ関数がエラーを返しました。');
+                }
+            } catch (e: any) {
+                toast({ variant: "destructive", title: "デバッグ関数エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
+                console.error("Debug function error:", e);
+                // On debug failure, we stop to avoid calling the real function.
+                return undefined;
+            }
+            // --- END DEBUG BLOCK ---
+
+            // If debug is successful, you can comment it out and uncomment the real call.
+            // For now, we will call the real one anyway to see the error.
+            try {
+                const result: any = await updateCalendarEvent(payload);
                 if (result.data.status === 'success' && result.data.eventId) {
                     toast({ title: 'カレンダー登録成功', description: 'Googleカレンダーに予定を登録しました。' });
                     return result.data.eventId;

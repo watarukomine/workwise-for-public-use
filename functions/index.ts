@@ -18,25 +18,12 @@ if (getApps().length === 0) {
 }
 
 
-// Define the structure of the data expected from the client
-interface CalendarEventArgs {
-    operation: "create" | "update" | "delete";
-    calendarId: string;
-    eventId?: string;
-    title?: string;
-    description?: string;
-    startTime?: string;
-    endTime?: string;
-}
-
 // Helper function to get an authenticated Google Calendar API client
-// This function now relies on Application Default Credentials provided by the Cloud Functions environment,
-// which is automatically handled when firebase-admin is initialized.
+// This function relies on Application Default Credentials provided by the Cloud Functions environment.
 async function getAuthenticatedCalendarClient(): Promise<calendar_v3.Calendar> {
     logger.info("Getting Google Calendar API client...");
-    // When running in a Google Cloud environment (like Cloud Functions),
-    // the googleapis library automatically uses the service account credentials.
-    // No manual authentication setup is needed here.
+    // When running in a Google Cloud environment, the googleapis library
+    // automatically uses the service account credentials of the function.
     const calendar = google.calendar({ version: "v3" });
     logger.info("Google Calendar API client obtained successfully.");
     return calendar;
@@ -45,6 +32,11 @@ async function getAuthenticatedCalendarClient(): Promise<calendar_v3.Calendar> {
 
 // CRITICAL: The function name must be all lowercase to be callable from the client SDK.
 export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (request) => {
+    // Log the entire raw request data for debugging
+    logger.info("Received request data:", JSON.stringify(request.data, null, 2));
+    logger.info("Auth context:", JSON.stringify(request.auth, null, 2));
+
+
     const {
         operation,
         calendarId,
@@ -53,9 +45,9 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
         startTime,
         endTime,
         description,
-    } = request.data as CalendarEventArgs;
+    } = request.data;
 
-    logger.info(`Received calendar request:`, { operation, calendarId, eventId });
+    logger.info(`Parsed calendar request:`, { operation, calendarId, eventId });
 
     if (!calendarId) {
         logger.error("Validation failed: calendarId is missing.");
@@ -129,16 +121,39 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
                 throw new HttpsError("invalid-argument", `Unknown operation: ${operation}`);
         }
     } catch (error: any) {
-        logger.error("Error calling Google Calendar API:", {
-            message: error.message,
-            code: error.code,
-            errors: error.errors, // Google API often returns detailed errors here
-            response: error.response?.data,
-        });
-        // Rethrow the entire error object for more detailed client-side debugging
+        logger.error("--- Detailed Error Start ---");
+        logger.error("Error Message:", error.message);
+        logger.error("Error Code:", error.code);
+        if (error.errors) {
+            logger.error("Google API Errors:", JSON.stringify(error.errors, null, 2));
+        }
+        if (error.response) {
+            logger.error("Error Response Data:", JSON.stringify(error.response.data, null, 2));
+        }
+        logger.error("Full Error Object:", JSON.stringify(error, null, 2));
+        logger.error("--- Detailed Error End ---");
+        
+        // Rethrow a detailed error for the client to potentially catch more info
         throw new HttpsError("internal", `Google Calendar API Error: ${error.message}`, {
             details: error.response?.data?.error || "No further details.",
             fullError: JSON.parse(JSON.stringify(error)) // Serialize the full error object
         });
     }
+});
+
+
+/**
+ * A simple debug function to check if data is being received from the client.
+ */
+export const debugcalendar = onCall({ region: 'asia-northeast1' }, (request) => {
+    logger.info("--- DEBUG FUNCTION CALLED ---");
+    logger.info("Received auth context:", JSON.stringify(request.auth, null, 2));
+    logger.info("Received data:", JSON.stringify(request.data, null, 2));
+    logger.info("--- DEBUG FUNCTION END ---");
+    
+    return {
+        status: "success",
+        message: "デバッグデータを受信しました。",
+        receivedData: request.data
+    };
 });
