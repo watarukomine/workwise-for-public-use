@@ -340,9 +340,10 @@ export function ScheduleView({
 
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
       try {
+          const eventTitleForUpdate = `(ID: ${eventToUnassign.rawOrderId})`;
           const result = await updateSheetStatus({ 
             gasUrl: ORDER_GAS_URL,
-            eventTitle: eventToUnassign.title, 
+            eventTitle: eventTitleForUpdate, 
             staffName: "",
             statusValue: "未割当",
           });
@@ -408,15 +409,18 @@ export function ScheduleView({
         
         try {
             if (draggedEvent.staffId !== newStaffId) {
+                const eventTitleForUpdate = `(ID: ${draggedEvent.rawOrderId})`;
                 const result = await updateSheetStatus({ 
                   gasUrl: ORDER_GAS_URL,
-                  eventTitle: draggedEvent.title, 
+                  eventTitle: eventTitleForUpdate, 
                   staffName: staffMember.name,
+                  statusValue: '作業待ち',
                 });
                 if (result.status === 'error') throw new Error(result.message);
+                
+                const customer = getCustomerByCode(draggedEvent.locationId);
                 toast({
-                  title: '担当者を変更しました',
-                  description: `${staffMember.name}に${draggedEvent.title}の作業を割り当てました`,
+                  title: `${staffMember.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
                 });
             }
 
@@ -480,11 +484,11 @@ export function ScheduleView({
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
-            const eventTitle = `${customer?.storeName || order.taskDetails.split('\n')[0]} (ID: ${order.rawOrderId})`;
+            const eventTitleForUpdate = `(ID: ${order.rawOrderId})`;
             try {
               const result = await updateSheetStatus({ 
                 gasUrl: ORDER_GAS_URL,
-                eventTitle: eventTitle, 
+                eventTitle: eventTitleForUpdate, 
                 staffName: staff.name,
                 statusValue: '作業待ち'
               });
@@ -492,8 +496,7 @@ export function ScheduleView({
               if (result.status === 'error') throw new Error(result.message);
               
               toast({
-                title: '担当者を割り当てました',
-                description: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
+                title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
               });
               
               const tripId = `trip-${Date.now()}`;
@@ -515,7 +518,7 @@ export function ScheduleView({
                   tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
-                  title: eventTitle,
+                  title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`,
                   description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
@@ -939,5 +942,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
 
     
