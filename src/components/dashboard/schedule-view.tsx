@@ -130,12 +130,12 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     taskDetails += `\n${line2}`;
   }
   return {
-    id: String(rawOrder['受注ID'] || rawOrder.id || `ord-${Math.random()}`),
+    id: String(rawOrder['受注 ID'] || rawOrder.id || `ord-${Math.random()}`),
     customerCode: String(rawOrder['ユーザーコード'] || ''),
     taskDetails: taskDetails.trim(),
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     raw: rawOrder,
-    rawOrderId: String(rawOrder['受注ID'] || rawOrder.id)
+    rawOrderId: String(rawOrder['受注 ID'] || rawOrder.id)
   };
 };
 
