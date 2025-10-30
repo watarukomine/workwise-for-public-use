@@ -21,28 +21,25 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
     
-    // Build the payload dynamically based on provided arguments.
-    // This makes the action more flexible and only sends what's necessary.
-    const payload: { [key: string]: any } = {};
+    // Build the URL with query parameters
+    const url = new URL(gasUrl);
     if (eventTitle) {
-        payload.eventTitle = eventTitle;
+        url.searchParams.append('eventTitle', eventTitle);
     }
     // Allow sending an empty string to clear the name
     if (staffName !== undefined && staffName !== null) {
-        payload.staffName = staffName;
+        url.searchParams.append('staffName', staffName);
     }
-    // Allow sending an empty string to clear the status
+    // Allow sending an empty string or a specific status
     if (statusValue !== undefined && statusValue !== null) {
-        payload.statusValue = statusValue;
+        url.searchParams.append('statusValue', statusValue);
     }
 
     try {
-        const response = await fetch(gasUrl, {
+        // Use a POST request with an empty body, parameters are in the URL.
+        // GAS doPost can access URL parameters via e.parameter.
+        const response = await fetch(url.toString(), {
             method: 'POST',
-            headers: {
-                 'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
             cache: 'no-store',
             redirect: 'follow',
         });

@@ -45,7 +45,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
-import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -414,7 +414,7 @@ export function ScheduleView({
                   staffName: staffMember.name,
                 });
                 if (result.status === 'error') throw new Error(result.message);
-                toast({ title: '担当者を変更しました', description: result.message });
+                toast({ title: '担当者を変更しました', description: `${staffMember.name}に${draggedEvent.title}の作業を割り当てました` });
             }
 
             const newStart = getNewStartFromDrop();
@@ -461,10 +461,8 @@ export function ScheduleView({
         if (!staff) return;
 
         const taskStart = getNewStartFromDrop();
-        const taskEnd = addMinutes(taskStart, order.estimatedDuration);
         
         const customer = getCustomerByCode(order.customerCode);
-        
         const isGeneric = order.id.startsWith('generic-');
 
         if (isGeneric) {
@@ -475,7 +473,7 @@ export function ScheduleView({
                 staffId: newStaffId,
                 locationId: '',
                 start: taskStart.toISOString(),
-                end: taskEnd.toISOString(),
+                end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
@@ -485,7 +483,7 @@ export function ScheduleView({
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: eventTitle, 
                 staffName: staff.name,
-                statusValue: '作業待ち',
+                statusValue: '作業待ち'
               });
 
               if (result.status === 'error') throw new Error(result.message);
@@ -496,6 +494,7 @@ export function ScheduleView({
               });
               
               const tripId = `trip-${Date.now()}`;
+              const taskEnd = addMinutes(taskStart, order.estimatedDuration);
               const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
 
               const travelEvent: WithId<ScheduleEvent> = {
