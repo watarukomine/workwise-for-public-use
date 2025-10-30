@@ -19,7 +19,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Tooltip,
   TooltipContent,
@@ -53,7 +52,7 @@ import * as ics from 'ics';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
-const timelineEndHour = 19;
+const timelineEndHour = 18;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
@@ -742,46 +741,41 @@ export function ScheduleView({
                 </CardHeader>
                 <CardContent className="pt-6">
                     <ScrollArea className="w-full whitespace-nowrap">
-                        <div 
-                          className="relative" 
-                          style={{ minHeight: `${staffData.length * 5}rem` }}
-                        >
-                          <div className="relative" style={{ width: `calc(144px + ${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px)`}}>
-                              <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm">
-                                  <div 
-                                      className="relative h-8"
-                                      style={{ width: `calc(100% - 144px)`, marginLeft: '144px' }}
-                                  >
-                                      {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                          <div
-                                              key={i}
-                                              className="absolute h-full border-l"
-                                              style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                          >
-                                              <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                                  {timelineStartHour + i}:00
-                                              </span>
-                                          </div>
-                                      ))}
-                                  </div>
-                              </div>
-                              <div className="relative mt-2 space-y-2">
-                                  {staffData?.map((staff) => {
-                                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                      return (
-                                          <StaffRow
-                                              key={staff.id}
-                                              staff={staff}
-                                              events={events}
-                                              getCustomer={getCustomerById}
-                                              isOver={currentOverStaffId === staff.id}
-                                              onDoubleClickEvent={handleDoubleClickEvent}
-                                              onDoubleClickTimeline={handleDoubleClickTimeline}
-                                          />
-                                      );
-                                  })}
-                              </div>
-                          </div>
+                        <div className="relative">
+                            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm ml-[144px]">
+                                <div 
+                                    className="relative h-8"
+                                    style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}
+                                >
+                                    {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className="absolute h-full border-l"
+                                            style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                        >
+                                            <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                                {timelineStartHour + i}:00
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="relative mt-2 space-y-2">
+                                {staffData?.map((staff) => {
+                                    const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                    return (
+                                        <StaffRow
+                                            key={staff.id}
+                                            staff={staff}
+                                            events={events}
+                                            getCustomer={getCustomerById}
+                                            isOver={currentOverStaffId === staff.id}
+                                            onDoubleClickEvent={handleDoubleClickEvent}
+                                            onDoubleClickTimeline={handleDoubleClickTimeline}
+                                        />
+                                    );
+                                })}
+                            </div>
                         </div>
                     </ScrollArea>
                 </CardContent>
@@ -897,14 +891,10 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-20 relative", isOver && "bg-primary/10")}>
+    <div className={cn("flex h-16 relative", isOver && "bg-primary/10")}>
       <div className="sticky left-0 z-10 w-36 flex-shrink-0 bg-background/80 backdrop-blur-sm pr-2 flex items-center">
         <div className="font-semibold flex items-center gap-2 w-full">
-          <div className='w-2 h-10 rounded-full' style={{backgroundColor: staff.color}}></div>
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={staff.avatarUrl} />
-            <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
-          </Avatar>
+          <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
@@ -993,7 +983,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         {...listeners}
         {...attributes}
         onDoubleClick={handleDoubleClick}
-        className="absolute h-16 top-1/2 -translate-y-1/2 rounded-md px-2 flex flex-col justify-center cursor-move"
+        className="absolute h-14 top-1/2 -translate-y-1/2 rounded-md px-2 flex flex-col justify-center cursor-move"
       >
         <div
           className="w-full h-full rounded-md flex flex-col justify-center p-1"
@@ -1019,7 +1009,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-    
-
-    
