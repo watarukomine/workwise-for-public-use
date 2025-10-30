@@ -267,7 +267,11 @@ export function ScheduleView({
   const { orderGasUrl } = useOrder();
   const { functions } = useFirebase();
 
-  const updateCalendarEvent = httpsCallable(functions, 'updatecalendarevent');
+  const updateCalendarEvent = React.useMemo(() => {
+    if (!functions) return null;
+    return httpsCallable(functions, 'updatecalendarevent');
+  }, [functions]);
+
 
   React.useEffect(() => {
     setIsClient(true);
@@ -298,6 +302,7 @@ export function ScheduleView({
   };
 
   const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
+    if (!updateCalendarEvent) return;
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
@@ -360,6 +365,10 @@ export function ScheduleView({
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    if (!updateCalendarEvent) {
+      toast({ variant: 'destructive', title: 'エラー', description: 'カレンダー連携機能が初期化されていません。' });
+      return;
+    }
     const { active, delta, over } = event;
     const item = active.data.current as WithId<ScheduleEvent> | WithId<Order>;
     
@@ -375,7 +384,7 @@ export function ScheduleView({
     const newStaffId = over?.id as string | undefined;
 
     // This block handles MOVING an existing event on the timeline
-    if ('staffId' in item && 'start' in item && newStaffId && newStaffId !== UNASSIGNED_TASKS_DROPPABLE_ID) {
+    if ('staffId' in item && 'start' in item && newStaffId && newStaffId !== UNASSIGNED_TASKS_DROPPable_ID) {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
       
@@ -584,7 +593,7 @@ export function ScheduleView({
   };
   
   const handleSaveEvent = async () => {
-    if (dialogState.mode === 'closed') return;
+    if (dialogState.mode === 'closed' || !updateCalendarEvent) return;
     
     const newStart = timeStringToDate(editedEventDetails.startTime);
     const newEnd = timeStringToDate(editedEventDetails.endTime);
