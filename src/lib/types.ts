@@ -12,7 +12,7 @@ export type Staff = {
   avatarUrl?: string; 
   color?: string; 
   role: 'admin' | 'staff';
-  // Add password for mock authentication, but it should not be stored in a real DB like this.
+  area?: '県西' | '県央' | '県東';
   password?: string; 
   'ロール'?: 'admin' | 'staff';
 };
@@ -30,7 +30,6 @@ export type Customer = {
   '経度'?: number;
   '電話番号'?: string;
   '営業時間'?: string;
-  // for compatibility
   name?: string; 
   address?: string;
   latitude?: number;
@@ -41,16 +40,16 @@ export type Customer = {
 
 export type ScheduleEvent = {
   id: string;
-  tripId?: string; // To group travel and task events
-  orderId?: string; // To link back to the original order
-  rawOrderId?: string; // To persist the original Sheet Order ID
+  tripId?: string; 
+  orderId?: string; 
+  rawOrderId?: string; 
   title: string;
   description?: string;
   locationId: string;
   staffId: string;
   start: Date | string | Timestamp;
   end: Date | string | Timestamp;
-  calendarEventId?: string; // To store the Google Calendar event ID
+  calendarEventId?: string; 
 };
 
 export type StaffStatus = {
@@ -67,6 +66,7 @@ export type Order = {
   id: string;
   customerCode: string;
   taskDetails: string;
-  estimatedDuration: number; // in minutes
-  raw?: any; // To hold the original data from GAS if needed
+  estimatedDuration: number; 
+  raw?: any; 
+  rawOrderId?: string;
 };

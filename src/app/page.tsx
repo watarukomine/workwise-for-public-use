@@ -4,8 +4,8 @@
 import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
-import { customerData, staffStatusData, staffData as allStaffData } from '@/lib/data';
-import type { Customer, ScheduleEvent, StaffStatus, WithId } from '@/lib/types';
+import { customerData, staffStatusData } from '@/lib/data';
+import type { Customer, ScheduleEvent, StaffStatus, WithId, Staff } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -13,7 +13,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { isValid, parseISO, format, startOfToday } from 'date-fns';
+import { format, startOfToday } from 'date-fns';
 
 const getTodayStorageKey = () => {
     const today = format(startOfToday(), 'yyyy-MM-dd');
@@ -23,11 +23,9 @@ const getTodayStorageKey = () => {
 export default function DashboardPage() {
   const [customers] = React.useState<WithId<Customer>[]>(customerData);
   
-  // Initialize scheduleData from localStorage
   const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>(() => {
       if (typeof window === 'undefined') return [];
       try {
-          // Clear old storage keys
           Object.keys(localStorage).forEach(key => {
               if (key.startsWith('scheduleData-') && key !== getTodayStorageKey()) {
                   localStorage.removeItem(key);
@@ -44,9 +42,8 @@ export default function DashboardPage() {
   const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
   
   const { profile, isLoading: isProfileLoading } = useUserProfile();
-  const { allStaff, appliedSelectedStaffIds } = useSelectedStaff();
+  const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
 
-  // Persist scheduleData to localStorage whenever it changes
   React.useEffect(() => {
       try {
           if (typeof window !== 'undefined') {
@@ -57,11 +54,10 @@ export default function DashboardPage() {
       }
   }, [scheduleData]);
 
-
   const filteredStaff = React.useMemo(() => {
-    if (isProfileLoading || !profile) return [];
+    if (isProfileLoading || isStaffLoading || !profile) return [];
 
-    const staffToUse = allStaff.length > 0 ? allStaff : allStaffData;
+    const staffToUse = allStaff;
 
     if (profile.role === 'admin') {
         if (appliedSelectedStaffIds.length === 0) {
@@ -70,24 +66,19 @@ export default function DashboardPage() {
         return staffToUse.filter(staff => appliedSelectedStaffIds.includes(staff.id));
     }
     return staffToUse.filter(staff => staff.id === profile.id);
-  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff]);
+  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
   
-  const filteredSchedule = React.useMemo(() => {
-    const selectedIds = new Set(filteredStaff.map(s => s.id));
-    return scheduleData.filter(event => selectedIds.has(event.staffId));
-  }, [filteredStaff, scheduleData]);
-
   const filteredStatuses = React.useMemo(() => {
+    if (!staffStatusData || !filteredStaff) return [];
     const selectedIds = new Set(filteredStaff.map(s => s.id));
     return staffStatusData.filter(status => selectedIds.has(status.staffId));
   }, [filteredStaff]);
-
 
   const selectedStaffNames = React.useMemo(() => {
     if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
       return null;
     }
-    const staffToUse = allStaff.length > 0 ? allStaff : allStaffData;
+    const staffToUse = allStaff;
     if (appliedSelectedStaffIds.length === staffToUse.length) {
       return "全スタッフ";
     }
@@ -95,7 +86,7 @@ export default function DashboardPage() {
     return selectedStaff.map(s => s.name).join('、');
   }, [allStaff, appliedSelectedStaffIds, profile]);
 
-  const isLoading = isProfileLoading || isLoadingOrders;
+  const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading;
 
   if (isLoading) {
       return (
@@ -142,7 +133,7 @@ export default function DashboardPage() {
             staffData={filteredStaff} 
             customerData={customers} 
             scheduleData={scheduleData}
-            rawOrdersData={rawOrders} // Pass raw orders
+            rawOrdersData={rawOrders}
             setScheduleData={setScheduleData}
         />
         <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />
@@ -150,5 +141,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

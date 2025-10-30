@@ -7,29 +7,27 @@ import type { Staff, WithId } from '@/lib/types';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { STAFF_GAS_URL } from '@/lib/settings';
 
-// A simple hashing function to convert a string (like a staff ID) into a number.
 const simpleHash = (str: string) => {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
-        hash |= 0; // Convert to 32bit integer
+        hash |= 0; 
     }
     return Math.abs(hash);
 };
 
 const findKey = (item: any, possibleKeys: string[]) => {
     for (const key of possibleKeys) {
-        const lowerKey = key.toLowerCase();
+        const lowerKey = key.toLowerCase().trim();
         for (const itemKey in item) {
-            if (itemKey.toLowerCase() === lowerKey) {
+            if (itemKey.toLowerCase().trim() === lowerKey) {
                 return item[itemKey];
             }
         }
     }
     return undefined;
 };
-
 
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     const url = STAFF_GAS_URL;
@@ -70,6 +68,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 calendarId: findKey(item, ['calendarId', 'カレンダーID']),
                 color: assignedColor || fallbackColor,
                 avatarUrl: findKey(item, ['avatarUrl']) || '',
+                area: findKey(item, ['エリア', 'area']),
                 ...item
             };
         });
@@ -79,7 +78,6 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
         throw new Error(error.message || 'スプレッドシートからスタッフデータを取得できませんでした。');
     }
 };
-
 
 interface SelectedStaffContextType {
   pendingSelectedStaffIds: string[];
