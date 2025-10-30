@@ -13,7 +13,7 @@ import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
-type StatusValue = '移動中' | '作業中' | '作業完了' | '待機中';
+type StatusValue = '移動中' | '作業中' | '作業完了' | '待機中' | '作業待ち';
 
 export default function CheckInPage() {
   const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
@@ -28,7 +28,7 @@ export default function CheckInPage() {
   // For example, from the user's schedule for the day.
   const MOCK_ORDER_ID = '1'; 
 
-  const handleAction = (action: ActionType) => {
+  const handleAction = async (action: ActionType) => {
     setIsLoading(action);
     setError(null);
     
@@ -68,6 +68,40 @@ export default function CheckInPage() {
         }, 1000);
         return;
     }
+    
+    // ***** DEBUGGING LOGIC FOR 'Begin Task' *****
+    if (action === 'Begin Task') {
+      console.log("DEBUG: 'Begin Task' button clicked. Simulating timeline assignment.");
+      try {
+        const result = await updateSheetStatus({
+          gasUrl: ORDER_GAS_URL,
+          eventTitle: `(ID: ${MOCK_ORDER_ID})`, // Specific ID for testing
+          staffName: "佐藤", // Specific name for testing
+        });
+        
+        if (result.status === 'error') {
+          throw new Error(result.message);
+        }
+        
+        toast({
+          title: 'デバッグ更新成功',
+          description: result.message,
+        });
+
+      } catch (e: any) {
+        setError(`デバッグ更新失敗: ${e.message}`);
+        toast({
+          variant: 'destructive',
+          title: 'デバッグ更新エラー',
+          description: e.message,
+        });
+      } finally {
+        setIsLoading(null);
+      }
+      return; // Stop further execution for this special case
+    }
+    // ***** END OF DEBUGGING LOGIC *****
+
 
     // All other actions update the spreadsheet
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
@@ -79,8 +113,6 @@ export default function CheckInPage() {
 
     const statusValue = statusMap[action];
     
-    // 'Arrive' is a location-based action but doesn't set a status itself.
-    // It's a prerequisite for 'Begin Task' or 'Wait'.
     if (!statusValue && action !== 'Arrive') {
         console.error("No status defined for this action:", action);
         setIsLoading(null);
@@ -101,7 +133,6 @@ export default function CheckInPage() {
         
         console.log(`Action: ${action}`, { latitude, longitude });
         
-        // Only update sheet if there's a status to update
         if (statusValue) {
             if (!profile?.id) {
                 setError('ユーザー情報が取得できません。ログインしているか確認してください。');
@@ -109,13 +140,10 @@ export default function CheckInPage() {
                 return;
             }
             try {
-                // This is a simplified call. For a real implementation, you would need to know
-                // which order/event this status update applies to.
                 const result = await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
-                    // The eventTitle needs to contain the Order ID for GAS to find it.
-                    eventTitle: `(ID: ${MOCK_ORDER_ID})`, // Mock title
-                    staffName: profile.name, // staffName is now used for status updates too in this logic
+                    eventTitle: `(ID: ${MOCK_ORDER_ID})`, 
+                    staffName: profile.name, 
                 });
 
                 if (result.status === 'error') {
@@ -137,10 +165,9 @@ export default function CheckInPage() {
             }
         }
         
-        // Update local UI state regardless of sheet update
         const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
         setLastAction({ action, time: currentTime });
-        if (!statusValue) { // For actions like 'Arrive'
+        if (!statusValue) {
              toast({
                 title: 'アクションを記録しました',
                 description: `${getJapaneseActionName(action)} at ${currentTime}`,
@@ -282,3 +309,5 @@ export default function CheckInPage() {
     </div>
   );
 }
+
+    
