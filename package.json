@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "firebase:emulators": "firebase emulators:start --import=./firebase-emulators-data --export-on-exit",
+    "firebase:emulators": "firebase emulators:start --export-on-exit",
     "deploy:functions": "firebase deploy --only functions"
   },
   "dependencies": {
