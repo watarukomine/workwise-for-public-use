@@ -31,13 +31,11 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         url.searchParams.append('staffName', staffName);
     }
     // Allow sending an empty string or a specific status
-    if (statusValue !== undefined && statusValue !== null) {
+    if (statusValue) {
         url.searchParams.append('statusValue', statusValue);
     }
 
     try {
-        // Use a POST request with an empty body, parameters are in the URL.
-        // GAS doPost can access URL parameters via e.parameter.
         const response = await fetch(url.toString(), {
             method: 'POST',
             cache: 'no-store',

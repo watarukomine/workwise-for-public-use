@@ -360,7 +360,7 @@ export function ScheduleView({
           }
       
           setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
-          toast({ title: 'ステータスを未割当に戻しました' });
+          toast({ title: 'タスクを未割り当てに戻しました' });
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
@@ -414,7 +414,10 @@ export function ScheduleView({
                   staffName: staffMember.name,
                 });
                 if (result.status === 'error') throw new Error(result.message);
-                toast({ title: '担当者を変更しました', description: `${staffMember.name}に${draggedEvent.title}の作業を割り当てました` });
+                toast({
+                  title: '担当者を変更しました',
+                  description: `${staffMember.name}に${draggedEvent.title}の作業を割り当てました`,
+                });
             }
 
             const newStart = getNewStartFromDrop();
@@ -489,7 +492,7 @@ export function ScheduleView({
               if (result.status === 'error') throw new Error(result.message);
               
               toast({
-                title: "担当者を割り当てました",
+                title: '担当者を割り当てました',
                 description: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
               });
               
@@ -936,3 +939,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
