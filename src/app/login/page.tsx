@@ -26,12 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useAuth } from '@/firebase';
-import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-} from 'firebase/auth';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { signInWithEmail, signUpWithEmail } from '@/lib/auth';
 
 const loginSchema = z.object({
   email: z.string().email({ message: '有効なメールアドレスを入力してください。' }),
@@ -52,7 +48,6 @@ export default function LoginPage() {
   const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const auth = useAuth();
 
   const loginForm = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -79,12 +74,13 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     try {
-      await signInWithEmailAndPassword(auth, data.email, data.password);
+      await signInWithEmail(data.email, data.password);
       toast({
         title: 'ログインしました',
         description: 'WorkWiseへようこそ！',
       });
       router.push('/');
+      router.refresh(); // Force a refresh to update app state
     } catch (e: any) {
       setError(e.message || 'ログイン中にエラーが発生しました。');
     } finally {
@@ -96,12 +92,13 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     try {
-      await createUserWithEmailAndPassword(auth, data.email, data.password);
-      toast({
-        title: 'アカウントを作成しました',
-        description: 'WorkWiseへようこそ！',
+      await signUpWithEmail(data.email, data.password, data.name);
+       toast({
+        title: 'アカウントを仮作成しました',
+        description: 'このアカウントはスプレッドシートには反映されません。',
       });
       router.push('/');
+      router.refresh(); // Force a refresh to update app state
     } catch (e: any) {
       setError(e.message || '新規登録中にエラーが発生しました。');
     } finally {
@@ -203,7 +200,7 @@ export default function LoginPage() {
             <CardHeader>
               <CardTitle>新規登録</CardTitle>
               <CardDescription>
-                新しいアカウントを作成します。
+                新しいアカウントを仮作成します（スプレッドシートには反映されません）。
               </CardDescription>
             </CardHeader>
             <Form {...signUpForm}>

@@ -40,8 +40,8 @@ import { useToast } from '@/hooks/use-toast';
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useUser, useAuth } from '@/firebase';
-import { signOut } from 'firebase/auth';
+import { useUserProfile } from '@/hooks/use-user-profile';
+import { signOut } from '@/lib/auth';
 
 const allNavItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'] },
@@ -54,13 +54,12 @@ const allNavItems = [
 
 function NavMenu() {
   const pathname = usePathname();
-  const { user, isUserLoading } = useUser();
+  const { profile, isLoading } = useUserProfile();
   const isMobile = useIsMobile();
-  // We will need to fetch the user's role from Firestore in a later step
-  const userRole = 'admin'; // Placeholder
+  const userRole = profile?.role;
 
   const navItems = React.useMemo(() => {
-    if (isUserLoading || !user) {
+    if (isLoading || !profile) {
       return [];
     }
     
@@ -69,13 +68,13 @@ function NavMenu() {
     }
 
     return allNavItems.filter(item => {
-        const roleMatch = item.roles.includes(userRole);
+        const roleMatch = item.roles.includes(userRole || 'staff');
         const deviceMatch = !item.mobileOnly || isMobile;
         return roleMatch && deviceMatch;
     });
-  }, [user, isUserLoading, isMobile, userRole]);
+  }, [profile, isLoading, isMobile, userRole]);
 
-  if (isUserLoading) {
+  if (isLoading) {
       return (
         <div className="p-4 space-y-2">
             <div className="h-8 bg-gray-200 rounded-md animate-pulse"></div>
@@ -109,18 +108,18 @@ function NavMenu() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const router = useRouter();
-  const { user, isUserLoading } = useUser();
-  const auth = useAuth();
+  const { profile, isLoading: isUserLoading } = useUserProfile();
   const [isAuthLoading, setIsAuthLoading] = React.useState(false);
 
-  const handleSignOut = async () => {
+  const handleSignOut = () => {
     setIsAuthLoading(true);
     try {
-      await signOut(auth);
+      signOut();
       toast({
         title: "ログアウトしました",
       });
       router.push('/login');
+      router.refresh();
     } catch (error) {
       console.error('Sign out error:', error);
       toast({
@@ -133,8 +132,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   };
   
-  const displayName = user?.displayName || user?.email || 'Anonymous';
-  const displayEmail = user?.email || '...';
+  const displayName = profile?.name || 'Anonymous';
+  const displayEmail = profile?.email || '...';
   const isLoading = isUserLoading || isAuthLoading;
 
   return (
@@ -149,19 +148,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          {user && <NavMenu />}
+          {profile && <NavMenu />}
         </SidebarContent>
         <SidebarFooter className="p-2">
           {isLoading ? (
              <div className="flex items-center justify-center p-4">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : user ? (
+          ) : profile ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-start items-center gap-3 p-2 h-auto text-left">
                    <Avatar className="h-9 w-9">
-                    <AvatarImage src={user?.photoURL || ''} data-ai-hint="person" />
+                    <AvatarImage src={profile?.avatarUrl || ''} data-ai-hint="person" />
                     <AvatarFallback>{displayName.charAt(0) ?? 'A'}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 -space-y-1">
