@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -45,6 +44,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -290,7 +290,6 @@ export function ScheduleView({
   }, []);
   
   const { customers: allCustomers } = useCustomer();
-  const { orderGasUrl } = useOrder();
   const { toast } = useToast();
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
@@ -350,11 +349,11 @@ export function ScheduleView({
     const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
         try {
             const result = await updateSheetStatus({ 
-              gasUrl: orderGasUrl, 
+              gasUrl: ORDER_GAS_URL, 
               eventTitle: eventToUnassign.title, 
-              staffName: null,
-              statusColumnName: "ステータス",
-              statusValue: ""
+              staffName: "", // Clear staff name
+              statusColumnName: STATUS_COLUMN_NAME,
+              statusValue: "" // Clear status
             });
             if (result.status === 'error') throw new Error(result.message);
             
@@ -403,12 +402,14 @@ export function ScheduleView({
         if (!staffMember) return;
         
         try {
+            const newTitle = draggedEvent.rawOrderId ? `${getCustomerByCode(draggedEvent.locationId)?.storeName} (ID: ${draggedEvent.rawOrderId})` : draggedEvent.title;
+
             if (draggedEvent.rawOrderId && draggedEvent.staffId !== newStaffId) {
                 const result = await updateSheetStatus({ 
-                  gasUrl: orderGasUrl, 
-                  eventTitle: draggedEvent.title, 
+                  gasUrl: ORDER_GAS_URL, 
+                  eventTitle: newTitle, 
                   staffName: staffMember.name,
-                  statusColumnName: "ステータス",
+                  statusColumnName: STATUS_COLUMN_NAME,
                   statusValue: "作業待ち"
                 });
                 if (result.status === 'error') throw new Error(result.message);
@@ -468,7 +469,7 @@ export function ScheduleView({
         const isGeneric = order.id.startsWith('generic-');
         
         const customer = getCustomerByCode(order.customerCode);
-        const eventTitle = customer ? `${customer.storeName} (ID: ${order.rawOrderId})` : `${order.taskDetails} (ID: ${order.rawOrderId})`;
+        const eventTitle = customer ? `${customer.storeName} (ID: ${order.rawOrderId})` : order.taskDetails;
 
         if (isGeneric) {
              const newEnd = addMinutes(newStart, order.estimatedDuration);
@@ -489,10 +490,10 @@ export function ScheduleView({
             
             try {
               const result = await updateSheetStatus({ 
-                gasUrl: orderGasUrl, 
-                eventTitle, 
+                gasUrl: ORDER_GAS_URL, 
+                eventTitle: eventTitle, 
                 staffName: staff.name,
-                statusColumnName: "ステータス",
+                statusColumnName: STATUS_COLUMN_NAME,
                 statusValue: "作業待ち"
               });
               if (result.status === 'error') throw new Error(result.message);

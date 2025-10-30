@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
-import { ORDER_GAS_URL } from '@/lib/settings';
+import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
 type StatusValue = '移動中' | '作業中' | '作業完了' | '待機中';
@@ -110,9 +110,8 @@ export default function CheckInPage() {
             try {
                 const result = await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
-                    staffId: profile.id,
                     orderId: MOCK_ORDER_ID, // This needs to be dynamic in a real app
-                    statusColumnName: 'ステータス',
+                    statusColumnName: STATUS_COLUMN_NAME,
                     statusValue: statusValue
                 });
 

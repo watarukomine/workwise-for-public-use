@@ -22,3 +22,8 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
 export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyDOr3PIri6AJEaFAcGVh7IMGme0Y6kiSj12vYfH5F6jAYcY2wf9sGdLI50bTSV4kwd/exec';
+
+/**
+ * スプレッドシートでステータスを管理している列のヘッダー名。
+ */
+export const STATUS_COLUMN_NAME = '受注ステータス';
