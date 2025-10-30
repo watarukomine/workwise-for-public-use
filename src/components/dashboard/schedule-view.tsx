@@ -297,7 +297,6 @@ export function ScheduleView({
   const functions = useFunctions();
   const { customers: allCustomers } = useCustomer();
   const { allStaff } = useSelectedStaff();
-  const { orderGasUrl } = useOrder();
   const { toast } = useToast();
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
@@ -346,45 +345,88 @@ export function ScheduleView({
   };
 
   const updateSheet = async (orderId: string | undefined, staffName: string | null) => {
-      if (!orderId) {
-          toast({ variant: 'destructive', title: 'エラー', description: '受注IDが見つからないためシートを更新できません。' });
-          return;
-      }
-      try {
-          // You need to get the spreadsheetId and sheetName from your settings or context
-          // For now, let's assume they are hardcoded or passed in.
-          const spreadsheetId = "1oB5f52y4a2a1B8z_Giy3z4qY5Z6X8C7e5A4d3c2b1a0"; // Replace with your actual Spreadsheet ID
-          const sheetName = "受注一覧"; // Replace with your actual sheet name
+    if (!orderId) {
+        // This is a generic task, no need to update the sheet.
+        return;
+    }
 
-          const updateFunction = httpsCallable(functions, 'updatecalendarevent');
-          const result = await updateFunction({
-              operation: 'updateSheetStatus',
-              spreadsheetId: spreadsheetId,
-              sheetName: sheetName,
-              orderId: orderId,
-              staffName: staffName,
-          });
-          toast({ title: 'シートを更新しました', description: `担当者を「${staffName || '未割り当て'}」に変更しました。` });
+    try {
+        const spreadsheetId = '1t-s7y0o1-CS2f4j241f9h5N9s_A8g4k4E7B3g2a1Hj0'; // Replace with your actual Spreadsheet ID
+        const sheetName = '受注一覧'; // Replace with your actual sheet name
 
-      } catch (error: any) {
-          console.error("Failed to update sheet:", error);
-          toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${error.message}` });
-          throw error; // Re-throw to prevent UI changes if the sheet update fails
+        const updateFunction = httpsCallable(functions, 'updatecalendarevent');
+        await updateFunction({
+            operation: 'updateSheetStatus',
+            spreadsheetId: spreadsheetId,
+            sheetName: sheetName,
+            orderId: orderId,
+            staffName: staffName,
+        });
+        toast({ title: 'シートを更新しました', description: `担当者を「${staffName || '未割り当て'}」に変更しました。` });
+
+    } catch (error: any) {
+        console.error("Failed to update sheet via function:", error);
+        toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${error.message}` });
+        throw error;
+    }
+  };
+
+  const updateCalendar = async (operation: 'create' | 'update' | 'delete', event: WithId<ScheduleEvent>) => {
+    const staff = getStaffById(event.staffId);
+    if (!staff?.calendarId) {
+      // Don't toast here, as it can be annoying if many staff don't have calendars
+      console.log(`Skipping calendar update for ${staff?.name} as no calendarId is set.`);
+      return event;
+    }
+
+    try {
+      const callable = httpsCallable(functions, 'updatecalendarevent');
+      const payload: any = {
+        operation,
+        calendarId: staff.calendarId,
+        eventId: event.calendarEventId,
+        title: event.title,
+        startTime: (typeof event.start === 'string' ? parseISO(event.start) : event.start).toISOString(),
+        endTime: (typeof event.end ==='string' ? parseISO(event.end) : event.end).toISOString(),
+        description: event.description || '',
+      };
+      
+      const result = await callable(payload);
+      const newEventId = (result.data as any)?.eventId;
+      
+      if (operation === 'create' && newEventId) {
+        toast({ title: 'カレンダー登録成功', description: 'Googleカレンダーに予定が登録されました。' });
+        return { ...event, calendarEventId: newEventId };
+      } else if (operation === 'update') {
+        toast({ title: 'カレンダー更新成功', description: 'Googleカレンダーの予定が更新されました。' });
+      } else if (operation === 'delete') {
+        toast({ title: 'カレンダー削除成功', description: 'Googleカレンダーの予定が削除されました。' });
+        const { calendarEventId, ...rest } = event;
+        return rest;
       }
+      return event;
+    } catch (error: any) {
+      console.error(`Failed to ${operation} calendar event:`, error);
+      toast({
+        variant: "destructive",
+        title: "カレンダー連携エラー",
+        description: `Googleカレンダーの${operation}に失敗しました: ${error.message}`,
+      });
+      throw error; // Re-throw to prevent UI changes if the backend fails
+    }
   };
 
 
   const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
-    const rawOrderId = eventToUnassign.rawOrderId;
-    
-    if (rawOrderId) {
-        try {
-            await updateSheet(rawOrderId, null);
-        } catch (e) {
-            return; // Stop if sheet update fails
+    try {
+        if (eventToUnassign.rawOrderId) {
+            await updateSheet(eventToUnassign.rawOrderId, null);
+        }
+        if (eventToUnassign.calendarEventId) {
+            await updateCalendar('delete', eventToUnassign);
         }
 
-        const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === rawOrderId);
+        const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === eventToUnassign.rawOrderId);
         if (originalOrder) {
           const orderToAddBack = mapRawToOrder(originalOrder);
            setUnassignedOrders(prev => {
@@ -394,9 +436,12 @@ export function ScheduleView({
             return prev;
           });
         }
-    }
     
-    setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
+        setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
+        toast({ title: 'タスクを未割当に戻しました' });
+    } catch(e) {
+        // Errors are toasted inside the helper functions
+    }
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -424,36 +469,27 @@ export function ScheduleView({
     const startOfDay = new Date();
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
-    const getNewStartFromDelta = (isNew: boolean) => {
+    const getNewStartFromDelta = () => {
       const initialLeft = active.rect.current.initial?.left ?? 0;
-      let dropX;
-      if (isNew) {
-        // For new items, we need to account for the initial position of the draggable order chip
-        // and the timeline's own position.
-        const orderListContainer = document.querySelector('[data-id="unassigned-tasks-container"]');
-        const containerRect = orderListContainer?.getBoundingClientRect() ?? { left: 0 };
-        dropX = (initialLeft - timelineRect.left + delta.x) ;
-      } else {
-        // For existing items, the initial.left is already relative to the timeline.
-         dropX = (initialLeft - timelineRect.left) + delta.x;
-      }
+      let dropX = (active.rect.current.translated?.left ?? initialLeft) - timelineRect.left;
       const newStartMinutes = pixelsToMinutes(dropX);
       return addMinutes(startOfDay, newStartMinutes);
     };
 
-    if ('staffId' in item) {
+    if ('staffId' in item) { // Moving an existing event
         const draggedEvent = item as WithId<ScheduleEvent>;
-        const staffMember = allStaff.find(s => s.id === newStaffId);
+        const staffMember = getStaffById(newStaffId);
         if (!staffMember) return;
         
-        const newStart = getNewStartFromDelta(false);
+        const newStart = getNewStartFromDelta();
         
         let eventsToUpdate: WithId<ScheduleEvent>[] = [];
         let taskToUpdate: WithId<ScheduleEvent> | undefined;
 
         if (draggedEvent.tripId) {
-            const travelEvent = scheduleData.find(e => e.tripId === draggedEvent.tripId && e.title.startsWith('移動'));
-            const taskEvent = scheduleData.find(e => e.tripId === draggedEvent.tripId && !e.title.startsWith('移動'));
+            const tripEvents = scheduleData.filter(e => e.tripId === draggedEvent.tripId);
+            const travelEvent = tripEvents.find(e => e.title.startsWith('移動'));
+            const taskEvent = tripEvents.find(e => !e.title.startsWith('移動'));
 
             if (travelEvent && taskEvent) {
                 const travelDuration = differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string));
@@ -479,37 +515,36 @@ export function ScheduleView({
                 taskToUpdate = updatedTaskEvent;
             }
         } else {
-            const originalDuration = differenceInMinutes(
-                typeof draggedEvent.end === 'string' ? parseISO(draggedEvent.end) : draggedEvent.end,
-                typeof draggedEvent.start === 'string' ? parseISO(draggedEvent.start) : draggedEvent.start
-            );
+            const originalDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
             const newEnd = addMinutes(newStart, originalDuration);
             const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart, end: newEnd };
             eventsToUpdate.push(updatedEvent);
             taskToUpdate = updatedEvent;
         }
         
-        if (draggedEvent.rawOrderId && draggedEvent.staffId !== newStaffId) {
-            try {
+        try {
+            if (draggedEvent.rawOrderId && draggedEvent.staffId !== newStaffId) {
                 await updateSheet(draggedEvent.rawOrderId, staffMember.name);
-            } catch(e) {
-                return;
             }
-        }
-        
-        setScheduleData(prev => {
-            const otherEvents = prev.filter(e => !eventsToUpdate.some(u => u.id === e.id));
-            return [...otherEvents, ...eventsToUpdate];
-        });
-        toast({ title: 'タスクを更新しました' });
+            if (taskToUpdate) {
+                const finalTaskEvent = await updateCalendar('update', taskToUpdate);
+                const finalEvents = eventsToUpdate.map(e => e.id === finalTaskEvent.id ? finalTaskEvent : e);
 
+                setScheduleData(prev => {
+                    const otherEvents = prev.filter(e => !finalEvents.some(u => u.id === e.id));
+                    return [...otherEvents, ...finalEvents];
+                });
+            }
+        } catch(e) {
+            return; // Stop UI update if backend fails
+        }
     }
-    else if ('estimatedDuration' in item) {
+    else if ('estimatedDuration' in item) { // Adding a new event from orders
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
-        const newStart = getNewStartFromDelta(true);
+        const newStart = getNewStartFromDelta();
         const isGeneric = order.id.startsWith('generic-');
 
         if (isGeneric) {
@@ -523,7 +558,10 @@ export function ScheduleView({
                 start: newStart,
                 end: newEnd,
              };
-             setScheduleData(prev => [...prev, newEvent]);
+             try {
+                const finalEvent = await updateCalendar('create', newEvent);
+                setScheduleData(prev => [...prev, finalEvent]);
+             } catch(e) { return; }
         } else {
             const taskEnd = addMinutes(newStart, order.estimatedDuration);
             const travelStart = subMinutes(newStart, TRAVEL_TIME_MINUTES);
@@ -534,7 +572,7 @@ export function ScheduleView({
             
             try {
               await updateSheet(rawOrderId, staff.name);
-
+              
               const taskEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-task`,
                   tripId: tripId,
@@ -559,13 +597,12 @@ export function ScheduleView({
                   end: newStart,
               };
               
+              const finalTaskEvent = await updateCalendar('create', taskEvent);
+
               setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-              setScheduleData(prev => [...prev, travelEvent, taskEvent]);
+              setScheduleData(prev => [...prev, travelEvent, finalTaskEvent]);
               
-            } catch (e: any) {
-              // Error toast is handled inside updateSheet, so we just stop execution.
-              return; 
-            }
+            } catch (e) { return; }
         }
     }
   };
@@ -611,36 +648,41 @@ export function ScheduleView({
     
     const { title, description } = editedEventDetails;
 
-    if (dialogState.mode === 'new') {
-        const staff = getStaffById(dialogState.staffId);
-        if (!staff) return;
+    try {
+        if (dialogState.mode === 'new') {
+            const staff = getStaffById(dialogState.staffId);
+            if (!staff) return;
 
-        const newEvent: WithId<ScheduleEvent> = {
-            id: `event-${Date.now()}`,
-            title,
-            description,
-            staffId: dialogState.staffId,
-            locationId: '',
-            start: newStart,
-            end: newEnd,
-        };
-        setScheduleData(prev => [...prev, newEvent]);
+            const newEvent: WithId<ScheduleEvent> = {
+                id: `event-${Date.now()}`,
+                title,
+                description,
+                staffId: dialogState.staffId,
+                locationId: '',
+                start: newStart,
+                end: newEnd,
+            };
+            const finalEvent = await updateCalendar('create', newEvent);
+            setScheduleData(prev => [...prev, finalEvent]);
 
-    } else if (dialogState.mode === 'edit') {
-        const staff = getStaffById(dialogState.event.staffId);
-        if (!staff) return;
+        } else if (dialogState.mode === 'edit') {
+            const staff = getStaffById(dialogState.event.staffId);
+            if (!staff) return;
 
-        const updatedEvent = {
-            ...dialogState.event,
-            title,
-            description,
-            start: newStart,
-            end: newEnd,
-        };
-
-        setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+            const updatedEvent = {
+                ...dialogState.event,
+                title,
+                description,
+                start: newStart,
+                end: newEnd,
+            };
+            const finalEvent = await updateCalendar('update', updatedEvent);
+            setScheduleData(prev => prev.map(e => e.id === finalEvent.id ? finalEvent : e));
+        }
+        setDialogState({ mode: 'closed' });
+    } catch(e) {
+      // Error is toasted inside updateCalendar
     }
-    setDialogState({ mode: 'closed' });
   };
 
   const handleDeleteEvent = async () => {
@@ -979,25 +1021,21 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let backgroundColor = staff.color || 'hsl(var(--primary))';
   let color = 'white';
 
-  const hslMatch = typeof backgroundColor === 'string' ? backgroundColor.match(/hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)/) : null;
-
   if (isTravelEvent) {
-    if (hslMatch) {
-      const [_, h, s, l] = hslMatch;
-      backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
-    } else {
-      backgroundColor = `rgba(128, 128, 128, 0.5)`;
-    }
-    color = 'hsl(var(--foreground))';
+      if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
+          backgroundColor = backgroundColor.replace('hsl', 'hsla').replace(')', ', 0.5)');
+      } else {
+         backgroundColor = 'hsla(var(--primary), 0.5)';
+      }
+      color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
-     if (hslMatch) {
-      const [_, h, s] = hslMatch;
-      backgroundColor = `hsl(${h}, ${s}%, 90%)`;
+     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
+        const [h, s] = backgroundColor.match(/\d+/g) || ['0', '0'];
+        backgroundColor = `hsl(${h}, ${s}%, 90%)`;
+      } else {
+        backgroundColor = `hsl(120, 40%, 85%)`;
+      }
       color = 'hsl(var(--foreground))';
-    } else {
-      backgroundColor = `hsl(120, 40%, 85%)`;
-      color = 'hsl(var(--foreground))';
-    }
   }
   
   const [line1, ...rest] = (event.title || '').split('\n');
