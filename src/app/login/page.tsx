@@ -24,7 +24,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { signInWithEmail, signUpWithEmail } from '@/lib/auth';
@@ -47,7 +46,6 @@ export default function LoginPage() {
   const [activeTab, setActiveTab] = React.useState('login');
   const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
   const { toast } = useToast();
-  const router = useRouter();
 
   const loginForm = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -79,10 +77,14 @@ export default function LoginPage() {
         title: 'ログインしました',
         description: 'WorkWiseへようこそ！',
       });
-      router.push('/');
-      router.refresh(); // Force a refresh to update app state
+      // Use window.location to ensure a full page reload, which helps in re-evaluating auth state.
+      window.location.href = '/'; 
     } catch (e: any) {
-      setError(e.message || 'ログイン中にエラーが発生しました。');
+      let errorMessage = 'ログイン中にエラーが発生しました。';
+      if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
+        errorMessage = 'メールアドレスまたはパスワードが正しくありません。';
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -94,13 +96,18 @@ export default function LoginPage() {
     try {
       await signUpWithEmail(data.email, data.password, data.name);
        toast({
-        title: 'アカウントを仮作成しました',
-        description: 'このアカウントはスプレッドシートには反映されません。',
+        title: 'アカウントを作成しました',
+        description: '自動的にログインします。',
       });
-      router.push('/');
-      router.refresh(); // Force a refresh to update app state
+       window.location.href = '/';
     } catch (e: any) {
-      setError(e.message || '新規登録中にエラーが発生しました。');
+      let errorMessage = '新規登録中にエラーが発生しました。';
+      if (e.code === 'auth/email-already-in-use') {
+        errorMessage = 'このメールアドレスは既に使用されています。';
+      } else if (e.code === 'auth/weak-password') {
+        errorMessage = 'パスワードは6文字以上で設定してください。';
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -200,7 +207,7 @@ export default function LoginPage() {
             <CardHeader>
               <CardTitle>新規登録</CardTitle>
               <CardDescription>
-                新しいアカウントを仮作成します（スプレッドシートには反映されません）。
+                新しいアカウントを作成します。
               </CardDescription>
             </CardHeader>
             <Form {...signUpForm}>
