@@ -7,19 +7,15 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { GoogleAuth } from "google-auth-library";
 import { calendar_v3, google } from "googleapis";
-import { initializeApp } from "firebase-admin/app";
+import { initializeApp, getApps } from "firebase-admin/app";
 
 // Set the timezone for the function environment to Japan Standard Time
 process.env.TZ = 'Asia/Tokyo';
 
-// Initialize Firebase Admin SDK. This is crucial for the function to have the correct
-// permissions to call other Google Cloud services like the Calendar API.
-// It's safe to call this at the top level; it initializes only once.
-try {
+// Initialize Firebase Admin SDK safely. This ensures it's done only once.
+if (getApps().length === 0) {
   initializeApp();
   logger.info("Firebase Admin SDK initialized successfully.");
-} catch (error) {
-  logger.warn("Firebase Admin SDK already initialized.");
 }
 
 
