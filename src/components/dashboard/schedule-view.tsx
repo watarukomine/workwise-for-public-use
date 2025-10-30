@@ -320,23 +320,14 @@ export function ScheduleView({
               ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
               : [eventToUnassign.id];
           
-          const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId) || scheduleData.find(e => e.id === eventToUnassign.id);
-          if (eventToUnassign.orderId && originalOrder) {
-                const orderToReassign = ordersData.find(o => o.id === eventToUnassign.orderId);
-                if (orderToReassign) {
-                    setOrdersData(currentOrders => [...currentOrders, orderToReassign]);
-                } else {
-                    // This case is tricky. The order might have been created from scheduleData.
-                    // For now, we'll rely on the fact that original ordersData is the source of truth.
-                    // Let's find the original order from the full list if it's not in the unassigned list yet.
-                    const fullOrderList = useOrder().orders.map(mapRawToOrder);
-                    const orderToPutBack = fullOrderList.find(o => o.id === eventToUnassign.orderId);
-                    if(orderToPutBack) {
-                        setOrdersData(currentOrders => [...currentOrders, orderToPutBack]);
-                    }
-                }
-          }
+          const fullOrderList = useOrder().orders.map(mapRawToOrder);
+          const orderToPutBack = fullOrderList.find(o => o.raw?.['受注ID'] === rawOrderId);
+
           setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
+
+          if (orderToPutBack && !ordersData.some(o => o.id === orderToPutBack.id)) {
+              setOrdersData(currentOrders => [...currentOrders, orderToPutBack]);
+          }
 
       } catch (e: any) {
           toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
