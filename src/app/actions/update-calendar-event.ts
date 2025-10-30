@@ -2,7 +2,7 @@
 'use server';
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { initializeFirebase } from '@/firebase';
+import { initializeServerFirebase } from '@/firebase/server-init';
 
 interface UpdateCalendarEventArgs {
     operation: 'create' | 'update' | 'delete';
@@ -28,9 +28,8 @@ interface FunctionResponse {
  */
 export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<FunctionResponse> {
     try {
-        // Firebase must be initialized to get the Functions instance.
-        // This initialization is lightweight and safe to call multiple times.
-        const { firebaseApp } = initializeFirebase();
+        // Use the server-side Firebase initialization.
+        const { firebaseApp } = initializeServerFirebase();
         const functions = getFunctions(firebaseApp, 'asia-northeast1');
 
         // Get a callable reference to the Cloud Function.
