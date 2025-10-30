@@ -411,72 +411,66 @@ export function ScheduleView({
     const startOfDay = new Date();
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
-    const getNewStart = () => {
+    const getNewStartFromDelta = () => {
         const initialLeft = active.rect.current.initial?.left ?? 0;
-        let dropX = initialLeft - timelineRect.left + delta.x;
-
-        if (active.data.current?.staffId) {
-             // It's an existing event being moved, calculate absolute position
-            dropX = initialLeft + delta.x - STAFF_COL_WIDTH;
-        } else {
-             // It's a new event from the unassigned list
-             dropX = initialLeft - timelineRect.left + delta.x;
-        }
+        const dropX = initialLeft - timelineRect.left + delta.x;
         const newStartMinutes = pixelsToMinutes(dropX);
         return addMinutes(startOfDay, newStartMinutes);
     };
 
-    const newStart = getNewStart();
-
     // Scenario 2: An existing event is moved (within or between timelines)
     if ('staffId' in item) {
-        const eventToUpdate = item as WithId<ScheduleEvent>;
+        const draggedEvent = item as WithId<ScheduleEvent>;
         const staffMember = allStaff.find(s => s.id === newStaffId);
         if (!staffMember) return;
         
-        const originalDuration = differenceInMinutes(
-            typeof eventToUpdate.end === 'string' ? parseISO(eventToUpdate.end) : eventToUpdate.end,
-            typeof eventToUpdate.start === 'string' ? parseISO(eventToUpdate.start) : eventToUpdate.start
-        );
-        const newEnd = addMinutes(newStart, originalDuration);
-        
         let eventsToUpdate: WithId<ScheduleEvent>[] = [];
-        
-        const mainEventUpdate: WithId<ScheduleEvent> = {
-            ...eventToUpdate,
-            staffId: newStaffId,
-            start: newStart,
-            end: newEnd,
-        };
-        eventsToUpdate.push(mainEventUpdate);
+        const newStart = getNewStartFromDelta();
 
-        // If it's part of a trip, update the travel event as well
-        if (eventToUpdate.tripId) {
-            const travelEvent = scheduleData.find(e => e.tripId === eventToUpdate.tripId && e.id !== eventToUpdate.id);
-            if (travelEvent) {
-                const originalTravelDuration = differenceInMinutes(
-                    typeof travelEvent.end === 'string' ? parseISO(travelEvent.end) : travelEvent.end,
-                    typeof travelEvent.start === 'string' ? parseISO(travelEvent.start) : travelEvent.start
-                );
-                const newTravelStart = subMinutes(newStart, originalTravelDuration);
-                const updatedTravelEvent = {
-                    ...travelEvent,
-                    staffId: newStaffId,
-                    start: newTravelStart,
-                    end: newStart, // newStart of main task is end of travel
-                };
-                eventsToUpdate.push(updatedTravelEvent);
+        if (draggedEvent.tripId) {
+            // It's a grouped trip, move both events
+            const travelEvent = scheduleData.find(e => e.tripId === draggedEvent.tripId && e.title.startsWith('移動'));
+            const taskEvent = scheduleData.find(e => e.tripId === draggedEvent.tripId && !e.title.startsWith('移動'));
+
+            if (travelEvent && taskEvent) {
+                const travelDuration = differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string));
+                const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
+                
+                let newTravelStart, newTravelEnd, newTaskStart, newTaskEnd;
+
+                if (draggedEvent.id === travelEvent.id) { // Travel chip was dragged
+                    newTravelStart = newStart;
+                    newTravelEnd = addMinutes(newTravelStart, travelDuration);
+                    newTaskStart = newTravelEnd;
+                    newTaskEnd = addMinutes(newTaskStart, taskDuration);
+                } else { // Task chip was dragged
+                    newTaskStart = newStart;
+                    newTaskEnd = addMinutes(newTaskStart, taskDuration);
+                    newTravelEnd = newTaskStart;
+                    newTravelStart = subMinutes(newTravelEnd, travelDuration);
+                }
+
+                eventsToUpdate.push({ ...travelEvent, staffId: newStaffId, start: newTravelStart, end: newTravelEnd });
+                eventsToUpdate.push({ ...taskEvent, staffId: newStaffId, start: newTaskStart, end: newTaskEnd });
             }
+        } else {
+            // It's a single, non-grouped event
+            const originalDuration = differenceInMinutes(
+                typeof draggedEvent.end === 'string' ? parseISO(draggedEvent.end) : draggedEvent.end,
+                typeof draggedEvent.start === 'string' ? parseISO(draggedEvent.start) : draggedEvent.start
+            );
+            const newEnd = addMinutes(newStart, originalDuration);
+            eventsToUpdate.push({ ...draggedEvent, staffId: newStaffId, start: newStart, end: newEnd });
         }
         
-        // If staff member changed, update the sheet
-        if (eventToUpdate.rawOrderId && eventToUpdate.staffId !== newStaffId) {
+        // If staff member changed for a real order, update the sheet
+        if (draggedEvent.rawOrderId && draggedEvent.staffId !== newStaffId) {
             try {
                 const sheetResult = await updateSheetStatus({
                     gasUrl: orderGasUrl,
-                    orderId: eventToUpdate.rawOrderId,
+                    orderId: draggedEvent.rawOrderId,
                     staffName: staffMember.name,
-                    eventTitle: eventToUpdate.title,
+                    eventTitle: draggedEvent.title,
                 });
                 if (sheetResult.status === 'error') {
                    toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${sheetResult.message}` });
@@ -503,6 +497,7 @@ export function ScheduleView({
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
+        const newStart = getNewStartFromDelta();
         const isGeneric = order.id.startsWith('generic-');
 
         if (isGeneric) {
@@ -926,8 +921,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-16 relative")}>
-      <div className="sticky left-0 z-10 flex-shrink-0 bg-background/80 backdrop-blur-sm pr-2 flex items-center" style={{ width: `${STAFF_COL_WIDTH}px` }}>
+    <div className={cn("flex h-16 relative", areaBgClass)}>
+      <div className="sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center" style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -936,7 +931,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-full", areaBgClass, isOver && "bg-primary/10")} 
+        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
@@ -1051,3 +1046,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+
+    
