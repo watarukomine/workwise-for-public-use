@@ -19,7 +19,7 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
     
-    // GASに渡すペイロードをstaffNameとeventTitleのみに単純化
+    // GASのdoPostが期待するキー名（eventTitle, staffName）に完全に一致させる
     const payload = {
         eventTitle,
         staffName, 
@@ -38,6 +38,11 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         
         if (response.redirected && response.url.includes('accounts.google.com')) {
              throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
+        }
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`GASへのリクエストに失敗しました。 Status: ${response.status}. Response: ${errorText}`);
         }
 
         const result = await response.json();
