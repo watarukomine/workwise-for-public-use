@@ -41,7 +41,7 @@ exports.updateCalendarEvent = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const google_auth_library_1 = require("google-auth-library");
-const calendar_1 = require("@googleapis/calendar");
+const googleapis_1 = require("googleapis");
 // Helper function to get an authenticated Google Calendar API client
 async function getAuthenticatedCalendarClient() {
     logger.info("Authenticating with Google Calendar API...");
@@ -49,7 +49,7 @@ async function getAuthenticatedCalendarClient() {
         scopes: ["https://www.googleapis.com/auth/calendar"],
     });
     const authClient = await auth.getClient();
-    const calendar = (0, calendar_1.calendar)({ version: "v3", auth: authClient });
+    const calendar = googleapis_1.google.calendar({ version: "v3", auth: authClient });
     logger.info("Authentication successful.");
     return calendar;
 }
