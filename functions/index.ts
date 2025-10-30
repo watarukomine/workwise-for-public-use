@@ -1,3 +1,4 @@
+
 /**
  * Firebase Cloud Functions for the WorkWise application.
  * This file contains the backend logic for interacting with Google Calendar API.
@@ -6,7 +7,7 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import {GoogleAuth} from "google-auth-library";
-import {calendar as getCalendarApi} from "@googleapis/calendar";
+import {calendar_v3, google} from "googleapis";
 
 // Define the structure of the data expected from the client
 interface CalendarEventArgs {
@@ -20,13 +21,13 @@ interface CalendarEventArgs {
 }
 
 // Helper function to get an authenticated Google Calendar API client
-async function getAuthenticatedCalendarClient() {
+async function getAuthenticatedCalendarClient(): Promise<calendar_v3.Calendar> {
     logger.info("Authenticating with Google Calendar API...");
     const auth = new GoogleAuth({
         scopes: ["https://www.googleapis.com/auth/calendar"],
     });
     const authClient = await auth.getClient();
-    const calendar = getCalendarApi({version: "v3", auth: authClient});
+    const calendar = google.calendar({version: "v3", auth: authClient});
     logger.info("Authentication successful.");
     return calendar;
 }
