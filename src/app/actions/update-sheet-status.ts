@@ -30,6 +30,7 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         if (eventTitle) {
             params.append('eventTitle', eventTitle);
         }
+        // staffName は空文字列も許容するため、undefined/null のみチェック
         if (staffName !== null && staffName !== undefined) {
             params.append('staffName', staffName);
         }
@@ -37,7 +38,7 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
             params.append('statusValue', statusValue);
         }
         
-        // POSTリクエストだが、データはURLパラメータとして送信する
+        // データはURLパラメータとして送信し、リクエスト自体はPOSTで行う
         const response = await fetch(`${url.origin}${url.pathname}?${params.toString()}`, {
             method: 'POST',
             cache: 'no-store',
