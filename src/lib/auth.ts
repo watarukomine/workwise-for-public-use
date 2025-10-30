@@ -9,12 +9,14 @@ import {
   type UserCredential
 } from 'firebase/auth';
 import { initializeFirebase } from '@/firebase';
+import { fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
 
 // This ensures Firebase is initialized before we use getAuth()
 const { auth } = initializeFirebase();
 
 /**
- * Signs in a user with email and password using Firebase Authentication.
+ * Signs in a user with email and password. If the user does not exist in Firebase Auth,
+ * it attempts to find them in the GAS-provided staff list and automatically creates an account.
  * @param email The user's email.
  * @param password The user's password.
  * @returns A promise that resolves with the user credential.
@@ -25,9 +27,30 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log('Firebase sign in successful for:', userCredential.user.email);
     return userCredential;
-  } catch (error) {
+  } catch (error: any) {
+    // If user is not found, try to provision them from the spreadsheet data.
+    if (error.code === 'auth/user-not-found') {
+      console.log('User not found in Firebase. Attempting to provision from spreadsheet...');
+      try {
+        const allStaff = await fetchStaffDataFromGAS();
+        const staffMember = allStaff.find(s => s.email === email && s.password === password);
+
+        if (staffMember) {
+          console.log(`Found matching staff in spreadsheet: ${staffMember.name}. Creating Firebase user.`);
+          // User exists in spreadsheet, create them in Firebase
+          return await signUpWithEmail(email, password, staffMember.name);
+        } else {
+          // If not in spreadsheet either, then it's a true invalid credential case.
+           throw new Error('メールアドレスまたはパスワードが正しくありません。');
+        }
+      } catch (provisionError: any) {
+        console.error('Error during user provisioning from spreadsheet:', provisionError);
+        throw new Error(`アカウントの自動作成に失敗しました: ${provisionError.message}`);
+      }
+    }
+    
     console.error('Firebase sign in error:', error);
-    // Re-throw the error so the UI layer can handle it (e.g., show a specific message)
+    // Re-throw other errors so the UI layer can handle them
     throw error;
   }
 };
@@ -46,7 +69,9 @@ export const signUpWithEmail = async (email: string, password: string, name: str
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         
         // After creating the user, update their profile with the name.
-        await updateProfile(userCredential.user, { displayName: name });
+        if (name) {
+          await updateProfile(userCredential.user, { displayName: name });
+        }
 
         console.log('Firebase sign up successful for new user:', userCredential.user.email);
         return userCredential;
