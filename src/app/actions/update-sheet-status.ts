@@ -23,13 +23,13 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
     // Build the payload dynamically based on provided arguments.
     // This makes the action more flexible and only sends what's necessary.
     const payload: { [key: string]: any } = {};
-    if (eventTitle !== undefined) {
+    if (eventTitle !== undefined && eventTitle !== null) {
         payload.eventTitle = eventTitle;
     }
-    if (staffName !== undefined) {
+    if (staffName !== undefined && staffName !== null) {
         payload.staffName = staffName;
     }
-    if (statusValue !== undefined) {
+    if (statusValue !== undefined && statusValue !== null) {
         payload.statusValue = statusValue;
     }
 

@@ -485,13 +485,14 @@ export function ScheduleView({
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: eventTitle, 
                 staffName: staff.name,
+                statusValue: '作業待ち',
               });
 
               if (result.status === 'error') throw new Error(result.message);
               
               toast({
                 title: "担当者を割り当てました",
-                description: "必要であれば、汎用タスクから「移動」もドラッグしてください。",
+                description: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
               });
               
               const tripId = `trip-${Date.now()}`;
