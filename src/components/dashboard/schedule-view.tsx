@@ -52,7 +52,7 @@ import * as ics from 'ics';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
-const timelineEndHour = 18;
+const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
@@ -742,23 +742,20 @@ export function ScheduleView({
                 <CardContent className="pt-6">
                     <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative">
-                            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm ml-[144px]">
-                                <div 
-                                    className="relative h-8"
-                                    style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}
-                                >
-                                    {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                        <div
-                                            key={i}
-                                            className="absolute h-full border-l"
-                                            style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                        >
-                                            <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                                {timelineStartHour + i}:00
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
+                            <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm">
+                              <div className="relative h-8 ml-[144px]" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
+                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                      <div
+                                          key={i}
+                                          className="absolute h-full border-l"
+                                          style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                      >
+                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                              {timelineStartHour + i}:00
+                                          </span>
+                                      </div>
+                                  ))}
+                              </div>
                             </div>
                             <div className="relative mt-2 space-y-2">
                                 {staffData?.map((staff) => {
@@ -904,8 +901,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
-        <div className="h-full border-t border-b"></div>
-        <div className="relative h-full">
+        <div className="h-full border-t border-b ml-[144px]"></div>
+        <div className="relative h-full ml-[144px]">
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
