@@ -302,7 +302,10 @@ export function ScheduleView({
   };
 
   const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
-    if (!updateCalendarEvent) return;
+    if (!updateCalendarEvent) {
+      toast({ variant: 'destructive', title: 'エラー', description: 'カレンダー連携機能が初期化されていません。' });
+      return;
+    }
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
@@ -365,14 +368,21 @@ export function ScheduleView({
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    if (!updateCalendarEvent) {
-      toast({ variant: 'destructive', title: 'エラー', description: 'カレンダー連携機能が初期化されていません。' });
-      return;
-    }
     const { active, delta, over } = event;
     const item = active.data.current as WithId<ScheduleEvent> | WithId<Order>;
     
-    if (!item) return;
+    if (!item) {
+      setActiveItem(null);
+      setCurrentOverStaffId(null);
+      return;
+    }
+    
+    if (!updateCalendarEvent) {
+      toast({ variant: 'destructive', title: 'エラー', description: 'カレンダー連携機能が初期化されていません。' });
+      setActiveItem(null);
+      setCurrentOverStaffId(null);
+      return;
+    }
 
     if (over?.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         handleUnassignEvent(item);
@@ -384,7 +394,7 @@ export function ScheduleView({
     const newStaffId = over?.id as string | undefined;
 
     // This block handles MOVING an existing event on the timeline
-    if ('staffId' in item && 'start' in item && newStaffId && newStaffId !== UNASSIGNED_TASKS_DROPPable_ID) {
+    if ('staffId' in item && 'start' in item && newStaffId && newStaffId !== UNASSIGNED_TASKS_DROPPABLE_ID) {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
       
