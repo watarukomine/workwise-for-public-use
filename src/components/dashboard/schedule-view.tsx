@@ -45,8 +45,6 @@ import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Textarea } from '../ui/textarea';
 import { useFunctions } from '@/firebase';
 import { httpsCallable } from 'firebase/functions';
-import { ORDER_GAS_URL } from '@/lib/settings';
-
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -319,7 +317,7 @@ export function ScheduleView({
     setUnassignedOrders(newUnassignedOrders);
   }, [rawOrdersData, scheduleData]);
 
-  const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.id === id);
+  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
   const [activeItem, setActiveItem] = React.useState<any | null>(null);
@@ -340,21 +338,18 @@ export function ScheduleView({
       }
   };
 
-  const updateSheet = async (orderId: string | undefined, staffName: string | null) => {
+ const updateSheet = async (orderId: string | undefined, staffName: string | null) => {
     if (!orderId) {
-        // This is a generic task, no need to update the sheet.
+        toast({ title: '汎用タスク', description: 'シート更新は不要です。' });
         return;
     }
 
     try {
-        const spreadsheetId = '1t-s7y0o1-CS2f4j241f9h5N9s_A8g4k4E7B3g2a1Hj0'; // Replace with your actual Spreadsheet ID
-        const sheetName = '受注一覧'; // Replace with your actual sheet name
-
         const updateFunction = httpsCallable(functions, 'updatecalendarevent');
         await updateFunction({
             operation: 'updateSheetStatus',
-            spreadsheetId: spreadsheetId,
-            sheetName: sheetName,
+            spreadsheetId: '1t-s7y0o1-CS2f4j241f9h5N9s_A8g4k4E7B3g2a1Hj0', // This should ideally be a setting
+            sheetName: '受注一覧', // This should also be a setting
             orderId: orderId,
             staffName: staffName,
         });
@@ -363,6 +358,7 @@ export function ScheduleView({
     } catch (error: any) {
         console.error("Failed to update sheet via function:", error);
         toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${error.message}` });
+        // Re-throw to prevent UI update on failure
         throw error;
     }
   };
@@ -387,7 +383,7 @@ export function ScheduleView({
         setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
         toast({ title: 'タスクを未割当に戻しました' });
     } catch(e) {
-        // Errors are toasted inside the helper functions
+        console.error("Unassignment failed:", e);
     }
   };
 
@@ -398,9 +394,7 @@ export function ScheduleView({
     setActiveItem(null);
     setCurrentOverStaffId(null);
     
-    if (!item || !over) {
-      return;
-    }
+    if (!item || !over) return;
     
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         await handleUnassignEvent(item);
@@ -471,11 +465,12 @@ export function ScheduleView({
             }
             
             setScheduleData(prev => {
-                const otherEvents = prev.filter(e => !eventsToUpdate.some(u => u.id === e.id));
+                const otherEvents = prev.filter(e => !eventsToUpdate.some(u => u.id === e.id || (e.tripId && e.tripId === draggedEvent.tripId)));
                 return [...otherEvents, ...eventsToUpdate];
             });
 
         } catch(e) {
+             toast({ variant: 'destructive', title: '更新エラー', description: 'シートの更新に失敗したため、移動をキャンセルしました。' });
             return; // Stop UI update if backend fails
         }
     }
@@ -500,7 +495,7 @@ export function ScheduleView({
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
-            const customer = allCustomers?.find(c => c.userCode === order.customerCode);
+            const customer = getCustomerByCode(order.customerCode);
             const taskEnd = addMinutes(newStart, order.estimatedDuration);
             const travelStart = subMinutes(newStart, TRAVEL_TIME_MINUTES);
             const tripId = `trip-${Date.now()}`;
@@ -624,7 +619,7 @@ export function ScheduleView({
     if (dialogState.mode === 'edit') {
       const { event } = dialogState;
       const staff = getStaffById(event.staffId);
-      const customer = getCustomerById(event.locationId);
+      const customer = getCustomerByCode(event.locationId);
       return { event, staff, customer, title: '予定の編集' };
     }
     if (dialogState.mode === 'new') {
@@ -698,7 +693,7 @@ export function ScheduleView({
                                         key={staff.id}
                                         staff={staff}
                                         events={events}
-                                        getCustomer={getCustomerById}
+                                        getCustomerByCode={getCustomerByCode}
                                         isOver={currentOverStaffId === staff.id}
                                         onDoubleClickEvent={handleDoubleClickEvent}
                                         onDoubleClickTimeline={handleDoubleClickTimeline}
@@ -798,13 +793,13 @@ export function ScheduleView({
 interface StaffRowProps {
   staff: WithId<Staff>;
   events: WithId<ScheduleEvent>[];
-  getCustomer: (id: string | undefined) => WithId<Customer> | undefined;
+  getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   isOver: boolean;
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
@@ -836,7 +831,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
               key={event.id}
               event={event}
               staff={staff}
-              getCustomer={getCustomer}
+              getCustomerByCode={getCustomerByCode}
               onDoubleClick={() => onDoubleClickEvent(event)}
             />
           ))}
@@ -849,17 +844,17 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
 interface DraggableEventProps {
   event: WithId<ScheduleEvent>;
   staff: WithId<Staff>;
-  getCustomer: (id: string | undefined) => WithId<Customer> | undefined;
+  getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   onDoubleClick: () => void;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomer, onDoubleClick }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
   });
 
-  const customer = getCustomer(event.locationId);
+  const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
   const { left, width } = getEventDimensions(event.start, event.end);
 
   const style = {
