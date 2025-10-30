@@ -11,9 +11,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
+import type { StaffStatus } from '@/lib/types';
 
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
-type StatusValue = '移動中' | '作業中' | '作業完了' | '待機中' | '作業待ち';
+type StatusValue = StaffStatus['status'];
 
 export default function CheckInPage() {
   const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
@@ -24,15 +25,26 @@ export default function CheckInPage() {
   const { toast } = useToast();
   const { profile } = useUserProfile();
 
-  // A mock order ID for demonstration. In a real app, this would be dynamically determined.
-  // For example, from the user's schedule for the day.
   const MOCK_ORDER_ID = '1'; 
+
+  const getJapaneseActionName = (action: ActionType) => {
+    const map: Record<ActionType, string> = {
+        'Clock In': '出勤',
+        'Clock Out': '退勤',
+        'Start Travel': '移動開始',
+        'Arrive': '現場到着',
+        'Begin Task': '作業開始',
+        'Finish Task': '作業終了',
+        'Wait': '待機中',
+        'Send Message': 'メッセージ送信'
+    };
+    return map[action];
+  };
 
   const handleAction = async (action: ActionType) => {
     setIsLoading(action);
     setError(null);
     
-    // These actions don't interact with the spreadsheet status
     if (action === 'Clock In' || action === 'Clock Out') {
         console.log(`Action: ${action}`);
         setTimeout(() => {
@@ -47,7 +59,6 @@ export default function CheckInPage() {
         return;
     }
     
-    // Message to admin
     if (action === 'Send Message') {
         if (!message.trim()) {
             setError('メッセージを入力してください。');
@@ -55,7 +66,6 @@ export default function CheckInPage() {
             return;
         }
         console.log(`Message to admin: ${message}`);
-        // TODO: ここでメッセージをFirestoreに保存する
         setTimeout(() => {
           toast({
             title: 'メッセージを送信しました',
@@ -63,60 +73,29 @@ export default function CheckInPage() {
           });
           const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           setLastAction({ action: 'Send Message', time: currentTime });
-          setMessage(''); // Clear textarea
+          setMessage('');
           setIsLoading(null);
         }, 1000);
         return;
     }
-    
-    // ***** DEBUGGING LOGIC FOR 'Begin Task' *****
-    if (action === 'Begin Task') {
-      console.log("DEBUG: 'Begin Task' button clicked. Simulating timeline assignment.");
-      try {
-        const result = await updateSheetStatus({
-          gasUrl: ORDER_GAS_URL,
-          eventTitle: `(ID: ${MOCK_ORDER_ID})`, // Specific ID for testing
-          staffName: "佐藤", // Specific name for testing
-        });
-        
-        if (result.status === 'error') {
-          throw new Error(result.message);
-        }
-        
-        toast({
-          title: 'デバッグ更新成功',
-          description: result.message,
-        });
 
-      } catch (e: any) {
-        setError(`デバッグ更新失敗: ${e.message}`);
-        toast({
-          variant: 'destructive',
-          title: 'デバッグ更新エラー',
-          description: e.message,
-        });
-      } finally {
-        setIsLoading(null);
-      }
-      return; // Stop further execution for this special case
-    }
-    // ***** END OF DEBUGGING LOGIC *****
-
-
-    // All other actions update the spreadsheet
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
       'Finish Task': '作業完了',
       'Wait': '待機中',
+      'Arrive': '作業待ち', // Arrive sets the status to '作業待ち'
     };
 
     const statusValue = statusMap[action];
     
-    if (!statusValue && action !== 'Arrive') {
+    if (!statusValue) {
         console.error("No status defined for this action:", action);
-        setIsLoading(null);
-        return;
+        // For actions like 'Arrive' which don't have a statusValue but proceed
+        if (action !== 'Arrive') {
+          setIsLoading(null);
+          return;
+        }
     }
 
 
@@ -133,17 +112,20 @@ export default function CheckInPage() {
         
         console.log(`Action: ${action}`, { latitude, longitude });
         
+        // All actions that have a statusValue will update the sheet
         if (statusValue) {
-            if (!profile?.id) {
+            if (!profile?.name) {
                 setError('ユーザー情報が取得できません。ログインしているか確認してください。');
                 setIsLoading(null);
                 return;
             }
             try {
+                const eventTitleForUpdate = `(ID: ${MOCK_ORDER_ID})`;
                 const result = await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${MOCK_ORDER_ID})`, 
-                    staffName: profile.name, 
+                    eventTitle: eventTitleForUpdate,
+                    staffName: profile.name, // Pass staff name to identify row if needed
+                    statusValue: statusValue,
                 });
 
                 if (result.status === 'error') {
@@ -167,6 +149,8 @@ export default function CheckInPage() {
         
         const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
         setLastAction({ action, time: currentTime });
+        
+        // Show toast for actions that don't update status, like 'Arrive' before it had a status
         if (!statusValue) {
              toast({
                 title: 'アクションを記録しました',
@@ -212,20 +196,6 @@ export default function CheckInPage() {
     { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
     { action: 'Wait', label: '待機中', icon: Hourglass },
   ];
-
-  const getJapaneseActionName = (action: ActionType) => {
-    const map: Record<ActionType, string> = {
-        'Clock In': '出勤',
-        'Clock Out': '退勤',
-        'Start Travel': '移動開始',
-        'Arrive': '現場到着',
-        'Begin Task': '作業開始',
-        'Finish Task': '作業終了',
-        'Wait': '待機中',
-        'Send Message': 'メッセージ送信'
-    };
-    return map[action];
-  }
 
   return (
     <div className="max-w-md mx-auto space-y-6">
@@ -309,5 +279,3 @@ export default function CheckInPage() {
     </div>
   );
 }
-
-    

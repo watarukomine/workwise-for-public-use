@@ -45,7 +45,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
-import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -352,7 +352,8 @@ export function ScheduleView({
             const result = await updateSheetStatus({ 
               gasUrl: ORDER_GAS_URL,
               eventTitle: eventToUnassign.title, 
-              staffName: "", //担当者を空にする
+              staffName: "",
+              statusValue: "未割当",
             });
             if (result.status === 'error') throw new Error(result.message);
             
@@ -376,7 +377,12 @@ export function ScheduleView({
     };
     
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
-        await unassignTask(item);
+        if (item.rawOrderId) {
+          await unassignTask(item);
+        } else {
+           setScheduleData(prev => prev.filter(e => e.id !== item.id));
+           toast({ title: '汎用タスクを削除しました' });
+        }
         return;
     }
     
@@ -406,6 +412,7 @@ export function ScheduleView({
                   gasUrl: ORDER_GAS_URL,
                   eventTitle: draggedEvent.title, 
                   staffName: staffMember.name,
+                  statusValue: "作業待ち",
                 });
                 if (result.status === 'error') throw new Error(result.message);
                 toast({ title: '担当者を変更しました', description: result.message });
@@ -420,7 +427,23 @@ export function ScheduleView({
                     if (e.id === draggedEvent.id) {
                         return { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
                     }
-                    if (e.tripId === draggedEvent.tripId && e.id !== draggedEvent.id) {
+                    if (draggedEvent.tripId && e.tripId === draggedEvent.tripId && e.id !== draggedEvent.id) {
+                        const isTask = e.id.endsWith('-task');
+                        const isTravel = e.id.endsWith('-travel');
+                        if (isTask) {
+                           // This is the task, it should follow the moved travel
+                           const travelEnd = newStart;
+                           const travelStart = subMinutes(travelEnd, TRAVEL_TIME_MINUTES);
+                           return { ...e, staffId: newStaffId, start: travelEnd.toISOString(), end: addMinutes(travelEnd, duration).toISOString() };
+
+                        } else if (isTravel) {
+                           // This is the travel, the task should follow it
+                           const taskStart = newEnd;
+                           const taskDuration = differenceInMinutes(parseISO(e.end as string), parseISO(e.start as string));
+                           return { ...e, staffId: newStaffId, start: taskStart.toISOString(), end: addMinutes(taskStart, taskDuration).toISOString() };
+                        }
+
+                        // Fallback for trip-based movement
                         const travelStart = subMinutes(newStart, TRAVEL_TIME_MINUTES);
                         return { ...e, staffId: newStaffId, start: travelStart.toISOString(), end: newStart.toISOString() };
                     }
@@ -455,12 +478,13 @@ export function ScheduleView({
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
-             const eventTitle = customer ? `${customer.storeName} (ID: ${order.rawOrderId})` : `${order.taskDetails} (ID: ${order.rawOrderId})`;
+            const eventTitle = customer ? `${customer.storeName} (ID: ${order.rawOrderId})` : `${order.taskDetails} (ID: ${order.rawOrderId})`;
             try {
               const result = await updateSheetStatus({ 
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: eventTitle, 
                 staffName: staff.name,
+                statusValue: "作業待ち",
               });
 
               if (result.status === 'error') throw new Error(result.message);

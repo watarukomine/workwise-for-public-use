@@ -5,6 +5,7 @@ interface UpdateSheetStatusArgs {
     gasUrl: string;
     eventTitle?: string | null;
     staffName?: string | null;
+    statusValue?: '未割当' | '作業待ち' | '移動中' | '作業中' | '作業完了' | '待機中' | '';
 }
 
 interface GasResponse {
@@ -13,16 +14,17 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName } = args;
+    const { gasUrl, eventTitle, staffName, statusValue } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
     
-    // GASのdoPostが期待するキー名（eventTitle, staffName）に完全に一致させる
+    // GASのdoPostが期待するキー名に完全に一致させる
     const payload = {
-        eventTitle,
-        staffName, 
+        eventTitle: eventTitle,
+        staffName: staffName, 
+        statusValue: statusValue,
     };
 
     try {
