@@ -56,6 +56,8 @@ const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
+const STAFF_COL_WIDTH = 144;
+
 
 const timeStringToDate = (timeStr: string) => {
     if (!/^\d{2}:\d{2}$/.test(timeStr)) {
@@ -344,6 +346,7 @@ export function ScheduleView({
   const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
     const rawOrderId = eventToUnassign.rawOrderId;
     
+    // If it was a real order, update sheet and move it back to unassigned list
     if (rawOrderId) {
         try {
             const sheetResult = await updateSheetStatus({
@@ -355,19 +358,20 @@ export function ScheduleView({
 
             if (sheetResult.status === 'error') {
                 toast({ variant: 'destructive', title: 'シート更新エラー', description: `シート担当者のクリアに失敗: ${sheetResult.message}` });
-                return;
+                return; // Prevent UI change if sheet update fails
             }
             toast({ title: '担当者をクリアしました', description: sheetResult.message });
 
         } catch (e: any) {
             toast({ variant: 'destructive', title: 'シート更新エラー', description: `シート担当者のクリアに失敗しました: ${e.message}` });
-            return;
+            return; // Prevent UI change if sheet update fails
         }
 
         const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === rawOrderId);
         if (originalOrder) {
           const orderToAddBack = mapRawToOrder(originalOrder);
            setUnassignedOrders(prev => {
+            // Avoid adding duplicates
             if (!prev.some(o => o.id === orderToAddBack.id)) {
               return [...prev, orderToAddBack];
             }
@@ -376,6 +380,7 @@ export function ScheduleView({
         }
     }
     
+    // Remove the event and its associated travel event (if any) from the schedule
     setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
   };
 
@@ -579,6 +584,11 @@ export function ScheduleView({
   };
   
   const handleDoubleClickTimeline = (staffId: string, e: React.MouseEvent) => {
+    // Prevent creating new event if double clicking on an existing event
+    if ((e.target as HTMLElement).closest('[data-event-chip="true"]')) {
+      return;
+    }
+
     const timelineRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const clickX = e.clientX - timelineRect.left;
     const clickMinutes = pixelsToMinutes(clickX);
@@ -758,42 +768,44 @@ export function ScheduleView({
                     <CardTitle>タイムライン</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
-                    <ScrollArea className="w-full whitespace-nowrap">
-                       <div className="relative">
-                           <div className="sticky left-0 top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                               <div className="w-36 flex-shrink-0"></div>
-                               <div className="relative h-8 flex-1" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
-                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                      <div
-                                          key={i}
-                                          className="absolute h-full border-l"
-                                          style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                      >
-                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                              {timelineStartHour + i}:00
-                                          </span>
-                                      </div>
-                                  ))}
-                              </div>
-                            </div>
-                            <div className="relative mt-2 space-y-2">
-                                {staffData?.map((staff) => {
-                                    const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                    return (
-                                        <StaffRow
-                                            key={staff.id}
-                                            staff={staff}
-                                            events={events}
-                                            getCustomer={getCustomerById}
-                                            isOver={currentOverStaffId === staff.id}
-                                            onDoubleClickEvent={handleDoubleClickEvent}
-                                            onDoubleClickTimeline={handleDoubleClickTimeline}
-                                        />
-                                    );
-                                })}
-                            </div>
+                    <div className="relative">
+                      <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                          {/* Staff Column Header */}
+                          <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
+                          {/* Timeline Header */}
+                          <div className="relative h-8 flex-1">
+                              {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                  <div
+                                      key={i}
+                                      className="absolute h-full border-l"
+                                      style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                  >
+                                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                          {timelineStartHour + i}:00
+                                      </span>
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                      <ScrollArea className="w-full whitespace-nowrap">
+                        <div className="relative mt-2 space-y-2">
+                            {staffData?.map((staff) => {
+                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                return (
+                                    <StaffRow
+                                        key={staff.id}
+                                        staff={staff}
+                                        events={events}
+                                        getCustomer={getCustomerById}
+                                        isOver={currentOverStaffId === staff.id}
+                                        onDoubleClickEvent={handleDoubleClickEvent}
+                                        onDoubleClickTimeline={handleDoubleClickTimeline}
+                                    />
+                                );
+                            })}
                         </div>
-                    </ScrollArea>
+                      </ScrollArea>
+                    </div>
                 </CardContent>
             </Card>
         </div>
@@ -908,7 +920,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
 
   return (
     <div className={cn("flex h-16 relative")}>
-      <div className="sticky left-0 z-10 w-36 flex-shrink-0 bg-background/80 backdrop-blur-sm pr-2 flex items-center">
+      <div className="sticky left-0 z-10 flex-shrink-0 bg-background/80 backdrop-blur-sm pr-2 flex items-center" style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -919,8 +931,9 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
         ref={setNodeRef} 
         className={cn("relative flex-1 h-full", areaBgClass, isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
+        style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
-        <div className="h-full border-t border-b" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}></div>
+        <div className="h-full border-t border-b"></div>
         <div className="absolute top-0 left-0 h-full">
           {events.map((event) => (
             <DraggableEvent
@@ -972,7 +985,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let backgroundColor = staff.color || 'hsl(var(--primary))';
   let color = 'white';
 
-  const hslMatch = typeof backgroundColor === 'string' ? backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/) : null;
+  const hslMatch = typeof backgroundColor === 'string' ? backgroundColor.match(/hsl\((\d+),\s*([\d.]+)%,\s*([\d.]+)%\)/) : null;
 
   if (isTravelEvent) {
     if (hslMatch) {
@@ -980,9 +993,14 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
       color = 'hsl(var(--foreground))';
     } else {
-      // Fallback for non-hsl colors, though less likely with current setup
-      backgroundColor = 'rgba(128, 128, 128, 0.5)';
-      color = 'white';
+      // Fallback for non-hsl colors, like hex
+      // This is a rough conversion to rgba
+      const hex = backgroundColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      backgroundColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
+      color = 'hsl(var(--foreground))';
     }
   } else if (isBreakEvent) {
      if (hslMatch) {
@@ -1006,7 +1024,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         {...listeners}
         {...attributes}
         onDoubleClick={handleDoubleClick}
-        className="absolute h-14 top-1/2 -translate-y-1/2 rounded-md px-2 flex flex-col justify-center cursor-move"
+        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md px-2 flex flex-col justify-center cursor-move"
+        data-event-chip="true"
       >
         <div
           className="w-full h-full rounded-md flex flex-col justify-center p-1"
@@ -1032,5 +1051,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-    
