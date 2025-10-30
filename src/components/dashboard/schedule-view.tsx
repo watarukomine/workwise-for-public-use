@@ -45,7 +45,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
-import { ORDER_GAS_URL } from '@/lib/settings';
+import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -469,20 +469,20 @@ export function ScheduleView({
                 title: '担当者を割り当てました',
                 description: '必要であれば、汎用タスクから「移動」もドラッグしてください。',
               });
-
+              
               const tripId = `trip-${Date.now()}`;
               const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
 
               const travelEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-travel`,
                   tripId: tripId,
-                  title: `移動: ${customer?.storeName || 'N/A'}`,
+                  title: `移動: ${customer?.storeName || order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: travelStart.toISOString(),
                   end: taskStart.toISOString(),
               };
-              
+
               const taskEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-task`,
                   tripId: tripId,
