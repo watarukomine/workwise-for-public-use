@@ -119,7 +119,7 @@ const findKey = (item: any, possibleKeys: string[]) => {
     for (const key of possibleKeys) {
         const lowerKey = key.toLowerCase();
         for (const itemKey in item) {
-            if (itemKey.toLowerCase() === lowerKey) {
+            if (itemKey.toLowerCase().trim() === lowerKey) {
                 return item[itemKey];
             }
         }
@@ -137,7 +137,7 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
         taskDetails += `\n${line2}`;
     }
     
-    const idKeys = ['受注ID', '受注 ID', '受注 id', 'id'];
+    const idKeys = ['受注 id', '受注id', '受注id', 'id'];
     const orderId = findKey(rawOrder, idKeys);
 
     return {
@@ -367,6 +367,13 @@ export function ScheduleView({
   const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
     const rawOrderId = eventToUnassign.rawOrderId;
     
+    // Check if it's a generic task, which won't have a rawOrderId from a sheet
+    if (eventToUnassign.id.startsWith('generic-')) {
+        setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id));
+        toast({ title: '汎用タスクを削除しました' });
+        return;
+    }
+    
     if (rawOrderId) {
         try {
             const sheetResult = await updateSheetStatus({
@@ -391,7 +398,7 @@ export function ScheduleView({
     setScheduleData(prev => prev.filter(e => e.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
 
     // Also add the order back to the unassigned list if it was a real order
-    const originalOrder = rawOrdersData.find(o => findKey(o, ['受注ID', '受注 ID']) === rawOrderId);
+    const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID', '受注id', '受注ID', 'id']) === rawOrderId);
     if (originalOrder) {
       const orderToAddBack = mapRawToOrder(originalOrder);
       setUnassignedOrders(prev => {
