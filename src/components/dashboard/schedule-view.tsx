@@ -367,8 +367,8 @@ export function ScheduleView({
               });
             }
         
-            setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id));
-            toast({ title: 'タスクを未割当に戻しました' });
+            setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
+            toast({ title: 'ステータスを未割当に戻しました' });
         } catch(e: any) {
             console.error("Unassignment failed:", e);
             toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
@@ -411,12 +411,23 @@ export function ScheduleView({
                 toast({ title: '担当者を変更しました', description: result.message });
             }
 
-            const originalDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+            const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
             const newStart = getNewStartFromDrop();
-            const newEnd = addMinutes(newStart, originalDuration);
-            const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
+            const newEnd = addMinutes(newStart, duration);
 
-            setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+            setScheduleData(prev => {
+                return prev.map(e => {
+                    if (e.id === draggedEvent.id) {
+                        return { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
+                    }
+                    if (e.tripId === draggedEvent.tripId && e.id !== draggedEvent.id) {
+                        const travelStart = subMinutes(newStart, TRAVEL_TIME_MINUTES);
+                        return { ...e, staffId: newStaffId, start: travelStart.toISOString(), end: newStart.toISOString() };
+                    }
+                    return e;
+                });
+            });
+
         } catch(e: any) {
             toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
         }
@@ -425,11 +436,10 @@ export function ScheduleView({
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
-        const newStart = getNewStartFromDrop();
-        const newEnd = addMinutes(newStart, order.estimatedDuration);
+        const taskStart = getNewStartFromDrop();
+        const taskEnd = addMinutes(taskStart, order.estimatedDuration);
         
         const customer = getCustomerByCode(order.customerCode);
-        const eventTitle = customer ? `${customer.storeName} (ID: ${order.rawOrderId})` : order.taskDetails;
         
         const isGeneric = order.id.startsWith('generic-');
 
@@ -440,11 +450,12 @@ export function ScheduleView({
                 description: '',
                 staffId: newStaffId,
                 locationId: '',
-                start: newStart.toISOString(),
-                end: newEnd.toISOString(),
+                start: taskStart.toISOString(),
+                end: taskEnd.toISOString(),
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
+             const eventTitle = customer ? `${customer.storeName} (ID: ${order.rawOrderId})` : `${order.taskDetails} (ID: ${order.rawOrderId})`;
             try {
               const result = await updateSheetStatus({ 
                 gasUrl: ORDER_GAS_URL,
@@ -458,21 +469,35 @@ export function ScheduleView({
                 title: '担当者を割り当てました',
                 description: '必要であれば、汎用タスクから「移動」もドラッグしてください。',
               });
+
+              const tripId = `trip-${Date.now()}`;
+              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+
+              const travelEvent: WithId<ScheduleEvent> = {
+                  id: `event-${Date.now()}-travel`,
+                  tripId: tripId,
+                  title: `移動: ${customer?.storeName || 'N/A'}`,
+                  staffId: newStaffId,
+                  locationId: customer?.id || '',
+                  start: travelStart.toISOString(),
+                  end: taskStart.toISOString(),
+              };
               
               const taskEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-task`,
+                  tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
                   title: eventTitle,
                   description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
-                  start: newStart.toISOString(),
-                  end: newEnd.toISOString(),
+                  start: taskStart.toISOString(),
+                  end: taskEnd.toISOString(),
               };
               
               setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-              setScheduleData(prev => [...prev, taskEvent]);
+              setScheduleData(prev => [...prev, travelEvent, taskEvent]);
               
             } catch (e: any) {
                  toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
