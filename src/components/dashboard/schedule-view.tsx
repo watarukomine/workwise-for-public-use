@@ -123,6 +123,11 @@ const parseDate = (dateString: any): Date | null => {
 
 const findKey = (item: any, possibleKeys: string[]) => {
     for (const key of possibleKeys) {
+        // Look for an exact match first
+        if (item[key] !== undefined) {
+            return item[key];
+        }
+        // Then look for a case-insensitive match
         const lowerKey = key.toLowerCase();
         for (const itemKey in item) {
             if (itemKey.toLowerCase() === lowerKey) {
@@ -134,14 +139,17 @@ const findKey = (item: any, possibleKeys: string[]) => {
 };
 
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
-    const duration = parseInt(rawOrder['作業時間（分）'], 10);
-    const line1 = `${rawOrder['お取引先名'] || ''}${rawOrder['予定時間'] ? `：${formatTime(rawOrder['予定時間'])}` : ''}`;
-    const line2 = `${rawOrder['タイヤサイズ'] || ''}${rawOrder['本数'] ? `：${rawOrder['本数']}本` : ''}`;
+    const duration = parseInt(findKey(rawOrder, ['作業時間（分）']), 10);
+    const line1 = `${findKey(rawOrder, ['お取引先名']) || ''}${findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : ''}`;
+    const line2 = `${findKey(rawOrder, ['タイヤサイズ']) || ''}${findKey(rawOrder, ['本数']) ? `：${findKey(rawOrder, ['本数'])}本` : ''}`;
     let taskDetails = line1;
     if (line2.trim()) {
         taskDetails += `\n${line2}`;
     }
-    const orderId = findKey(rawOrder, ['受注id', '受注id', 'id', '受注 ID']);
+    
+    const idKeys = ['受注ID', '受注 ID', '受注 id', 'id'];
+    const orderId = findKey(rawOrder, idKeys);
+
     return {
         id: String(orderId || `ord-${Math.random()}`),
         customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
@@ -226,9 +234,9 @@ type EditedEventDetails = {
 
 interface ScheduleViewProps {
     staffData: WithId<Staff>[];
-    customerData: WithId<Customer>[]; // This is static, from lib/data, might be empty
+    customerData: WithId<Customer>[];
     scheduleData: WithId<ScheduleEvent>[];
-    rawOrdersData: any[]; // These are the dynamic, unassigned orders
+    rawOrdersData: any[]; 
     setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
 }
 
@@ -245,6 +253,28 @@ const genericTasks: WithId<Order>[] = [
       { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60 },
 ];
 
+function GenericTasks() {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-base">汎用タスク</CardTitle>
+            </CardHeader>
+            <CardContent>
+                 <div className="flex flex-wrap gap-2">
+                    {genericTasks.map((task) => (
+                        <DraggableOrder
+                            key={task.id}
+                            order={task}
+                            className={getDraggableClassName(task)}
+                        />
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+
 function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], customers: WithId<Customer>[] }) {
     const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
     const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
@@ -255,20 +285,13 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
             className={cn("transition-colors", isOver && "bg-primary/10 border-primary/50")}
         >
             <CardHeader>
-                <CardTitle className="text-lg">ドラッグ可能なタスク</CardTitle>
+                <CardTitle className="text-lg">本日の受注タスク</CardTitle>
                 <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。タイムラインからここに戻すと未割り当てになります。</CardDescription>
             </CardHeader>
             <CardContent>
                 <ScrollArea className="w-full whitespace-nowrap">
                     <div className="pr-4 min-h-[6rem]">
                         <div className="flex flex-wrap gap-2">
-                            {genericTasks.map((task) => (
-                                <DraggableOrder
-                                    key={task.id}
-                                    order={task}
-                                    className={getDraggableClassName(task)}
-                                />
-                            ))}
                             {orders.map((order) => (
                                 <DraggableOrder
                                     key={order.id}
@@ -299,111 +322,94 @@ export function ScheduleView({
     setScheduleData,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
-  
-  const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
-  
-  const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({
-    title: '',
-    description: '',
-    startTime: '',
-    endTime: '',
-  });
-
-  const { customers: allCustomers } = useCustomer();
-  const { allStaff } = useSelectedStaff();
-  const { toast } = useToast();
-  const { orderGasUrl } = useOrder();
-
-  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
-
-  React.useEffect(() => {
-      const scheduledOrderIds = new Set(scheduleData.map(e => e.orderId).filter(Boolean));
-      const todaysOrders = rawOrdersData
-        .filter(order => {
-          const scheduledDate = parseDate(order['作業予定日']);
-          const receptionDate = parseDate(order['受付日']);
-          const isScheduledForToday = scheduledDate ? isToday(scheduledDate) : false;
-          const isReceivedToday = receptionDate ? isToday(receptionDate) : false;
-          return isScheduledForToday || (isReceivedToday && !scheduledDate);
-        })
-        .map(mapRawToOrder)
-        .filter(order => !scheduledOrderIds.has(order.id));
-
-      setUnassignedOrders(todaysOrders);
-  }, [rawOrdersData, scheduleData]);
-
-
   React.useEffect(() => {
     setIsClient(true);
   }, []);
   
+  const { customers: allCustomers } = useCustomer();
+  const { allStaff } = useSelectedStaff();
+  const { orderGasUrl } = useOrder();
+  const { toast } = useToast();
+
+  const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
+  const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
+  
+  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>(() => {
+    if (!rawOrdersData) return [];
+    const allMappedOrders = rawOrdersData.map(mapRawToOrder);
+    return allMappedOrders.filter(order => {
+        const scheduledDate = parseDate(findKey(order.raw, ['作業予定日']));
+        const receptionDate = parseDate(findKey(order.raw, ['受付日']));
+        const isScheduledForToday = scheduledDate ? isToday(scheduledDate) : false;
+        const isReceivedToday = receptionDate ? isToday(receptionDate) : false;
+        const isAlreadyScheduled = scheduleData.some(e => e.rawOrderId === order.rawOrderId && e.rawOrderId);
+        return (isScheduledForToday || isReceivedToday) && !isAlreadyScheduled;
+    });
+  });
+
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.id === id);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
 
-  const [activeItem, setActiveItem] = React.useState<WithId<ScheduleEvent> | WithId<Order> | null>(null);
-  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<UniqueIdentifier | null>(null);
-
+  const [activeItem, setActiveItem] = React.useState<any | null>(null);
+  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
+  
   const handleDragStart = (event: DragStartEvent) => {
-    const item = event.active.data.current as WithId<ScheduleEvent> | WithId<Order>;
-    setActiveItem(item);
+    setActiveItem(event.active.data.current);
   };
-
+  
   const handleDragOver = (event: DragOverEvent) => {
-     const { over } = event;
-     setCurrentOverStaffId(over ? over.id : null);
+      const { over } = event;
+      const overId = over?.id;
+
+      if (typeof overId === 'string' && overId.startsWith('staff-')) {
+          setCurrentOverStaffId(overId);
+      } else {
+          setCurrentOverStaffId(null);
+      }
   };
 
   const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
-    const staff = getStaffById(eventToUnassign.staffId);
-    if (!staff) return;
+    const { rawOrderId } = eventToUnassign;
 
-    const rawOrderId = eventToUnassign.rawOrderId;
-    
-    if (rawOrderId) {
-      try {
-          const sheetResult = await updateSheetStatus({
-              gasUrl: orderGasUrl,
-              orderId: rawOrderId,
-              staffName: null, 
-              eventTitle: eventToUnassign.title,
-          });
+    if (rawOrderId && !eventToUnassign.id.startsWith('generic-')) {
+        try {
+            const sheetResult = await updateSheetStatus({
+                gasUrl: orderGasUrl,
+                orderId: rawOrderId,
+                staffName: null, 
+                eventTitle: eventToUnassign.title,
+            });
 
-          if (sheetResult.status === 'error') {
-              throw new Error(sheetResult.message);
-          }
-          
-          toast({ title: "担当者をシートから削除しました", description: sheetResult.message });
+            if (sheetResult.status === 'error') {
+                toast({ variant: 'destructive', title: 'シート更新エラー', description: `シート担当者のクリアに失敗: ${sheetResult.message}` });
+                return;
+            }
+            toast({ title: '担当者をクリアしました', description: sheetResult.message });
 
-          const eventsToDeleteIds = eventToUnassign.tripId 
-              ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
-              : [eventToUnassign.id];
-          
-          const orderToPutBack = rawOrdersData.map(mapRawToOrder).find(o => o.rawOrderId === rawOrderId);
-
-          setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
-          
-          if (orderToPutBack && !unassignedOrders.some(o => o.id === orderToPutBack.id)) {
-              setUnassignedOrders(currentOrders => [...currentOrders, orderToPutBack]);
-          }
-
-      } catch (e: any) {
-          toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-          return; 
-      }
-    } else {
-        const eventsToDeleteIds = eventToUnassign.tripId 
-            ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
-            : [eventToUnassign.id];
-        setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
+            const originalRawOrder = rawOrdersData.find(o => findKey(o, ['受注ID', '受注 ID']) === rawOrderId);
+            if (originalRawOrder) {
+                const orderToAddBack = mapRawToOrder(originalRawOrder);
+                setUnassignedOrders(prev => {
+                    if (prev.some(o => o.id === orderToAddBack.id)) return prev;
+                    return [...prev, orderToAddBack];
+                });
+            }
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'シート更新エラー', description: `シート担当者のクリアに失敗しました: ${e.message}` });
+            return;
+        }
     }
+    
+    setScheduleData(prev => prev.filter(e => e.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
   };
 
+
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, delta, over } = event;
-    const item = active.data.current as WithId<ScheduleEvent> | WithId<Order>;
-    
+    const { active, over, delta } = event;
+    const item = active.data.current;
+
     setActiveItem(null);
     setCurrentOverStaffId(null);
     
@@ -418,7 +424,6 @@ export function ScheduleView({
     
     const newStaffId = over?.id as string | undefined;
 
-    // This block handles MOVING an existing event on the timeline
     if ('staffId' in item && 'start' in item && newStaffId && newStaffId !== UNASSIGNED_TASKS_DROPPABLE_ID) {
       const eventToUpdate = item;
       const dragMinutes = pixelsToMinutes(delta.x);
@@ -451,7 +456,7 @@ export function ScheduleView({
               });
               if (sheetResult.status === 'error') {
                  toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${sheetResult.message}` });
-                 return; // Do not update UI if sheet update fails
+                 return;
               }
               toast({ title: '担当者をシートで更新しました', description: `担当者を「${staffMember.name}」に変更しました。`});
               setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
@@ -463,7 +468,6 @@ export function ScheduleView({
           toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
       }
     }
-    // This block handles ADDING a NEW event from the unassigned list
     else if ('estimatedDuration' in item && newStaffId && over?.rect) {
         const order = item;
         const timelineRect = over.rect;
@@ -525,27 +529,32 @@ export function ScheduleView({
                 end: taskStart,
             };
             
-            try {
-              const sheetResult = await updateSheetStatus({
-                gasUrl: orderGasUrl,
-                orderId: rawOrderId,
-                staffName: staff.name,
-                eventTitle: taskEvent.title,
-              });
-
-              if (sheetResult.status === 'error') {
-                toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${sheetResult.message}` });
-                return; // Do not update UI if sheet fails
-              }
-              
-              toast({ title: '担当者をシートに記録しました', description: sheetResult.message });
-              
-              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-              setScheduleData(prev => [...prev, travelEvent, taskEvent]);
-              
-            } catch (e: any) {
-              toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+            if (!rawOrderId) {
+                toast({ variant: 'destructive', title: 'エラー', description: '受注IDが見つかりません。シート更新はスキップされます。' });
+            } else {
+                try {
+                  const sheetResult = await updateSheetStatus({
+                    gasUrl: orderGasUrl,
+                    orderId: rawOrderId,
+                    staffName: staff.name,
+                    eventTitle: taskEvent.title,
+                  });
+    
+                  if (sheetResult.status === 'error') {
+                    toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${sheetResult.message}` });
+                    return;
+                  }
+                  
+                  toast({ title: '担当者をシートに記録しました', description: sheetResult.message });
+                  
+                } catch (e: any) {
+                  toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+                  return;
+                }
             }
+
+            setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
+            setScheduleData(prev => [...prev, travelEvent, taskEvent]);
         }
     }
   };
@@ -721,124 +730,140 @@ export function ScheduleView({
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
         <div className="space-y-4">
-            <UnassignedTasks orders={unassignedOrders} customers={allCustomers} />
-            <Card>
-                <CardHeader>
-                    <CardTitle>タイムライン</CardTitle>
-                    <CardDescription>空白部分をダブルクリックして新規作成もできます。</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4 select-none overflow-x-auto pr-6">
-                    <div className="sticky top-0 z-10 bg-card py-2" style={{ gridTemplateColumns: '8rem 1fr', display: 'grid' }}>
-                        <div />
-                        <div className="relative grid border-l border-border text-xs text-muted-foreground" style={{ gridTemplateColumns: `repeat(${timelineTotalHours}, ${minutesToPixels(60)}px)` }}>
-                        {Array.from({ length: timelineTotalHours }, (_, i) => timelineStartHour + i).map((hour) => (
-                            <div key={hour} className="text-center border-r border-border py-1">
-                            {hour}:00
+            <GenericTasks />
+            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
+        </div>
+        
+        <Card className="mt-4">
+            <CardHeader>
+                <CardTitle>タイムライン</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea className="w-full whitespace-nowrap">
+                    <div
+                        className="relative"
+                        style={{
+                        width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`,
+                        }}
+                    >
+                        {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                            <div
+                            key={i}
+                            className="absolute h-full border-l"
+                            style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                            >
+                            <span className="absolute -top-5 -translate-x-1/2 text-xs text-muted-foreground">
+                                {timelineStartHour + i}:00
+                            </span>
                             </div>
                         ))}
-                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                        {staffData?.map((staff) => (
-                            <StaffRow
-                            key={staff.id}
-                            staff={staff}
-                            events={dailySchedule.filter(e => e.staffId === staff.id)}
-                            getCustomer={getCustomerById}
-                            isOver={currentOverStaffId === staff.id}
-                            onDoubleClickEvent={handleDoubleClickEvent}
-                            onDoubleClickTimeline={handleDoubleClickTimeline}
-                            />
-                        ))}
+                    <div className="space-y-2 mt-8">
+                        {staffData?.map((staff) => {
+                            const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                            return (
+                                <StaffRow
+                                    key={staff.id}
+                                    staff={staff}
+                                    events={events}
+                                    getCustomer={getCustomerById}
+                                    isOver={currentOverStaffId === staff.id}
+                                    onDoubleClickEvent={handleDoubleClickEvent}
+                                    onDoubleClickTimeline={handleDoubleClickTimeline}
+                                />
+                            );
+                        })}
                     </div>
-                </CardContent>
-            </Card>
-        </div>
+                </ScrollArea>
+            </CardContent>
+        </Card>
+      
+      <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>{title}</DialogTitle>
+                  <DialogDescription>
+                      {dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}
+                  </DialogDescription>
+              </DialogHeader>
+      
+              <div className="grid gap-4 py-4">
+                      {dialogState.mode === 'edit' && (
+                          <div className="text-sm space-y-1">
+                              <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
+                              {customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}
+                          </div>
+                      )}
+                       {dialogState.mode === 'new' && (
+                          <div className="text-sm">
+                              <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
+                          </div>
+                      )}
+                      <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="title" className="text-right">タスク名</Label>
+                          <Input
+                              id="title"
+                              value={editedEventDetails.title}
+                              onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))}
+                              className="col-span-3"
+                              placeholder="例：定期メンテナンス"
+                          />
+                      </div>
+                       <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="description" className="text-right">詳細</Label>
+                          <Textarea
+                              id="description"
+                              value={editedEventDetails.description}
+                              onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))}
+                              className="col-span-3"
+                              placeholder="予定の詳細やメモ"
+                          />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                          <div className="col-span-2 grid gap-2">
+                              <Label htmlFor="start-time">開始時間</Label>
+                              <Input
+                                  id="start-time"
+                                  type="time"
+                                  value={editedEventDetails.startTime}
+                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}
+                              />
+                          </div>
+                          <div className="col-span-2 grid gap-2">
+                              <Label htmlFor="end-time">終了時間</Label>
+                              <Input
+                                  id="end-time"
+                                  type="time"
+                                  value={editedEventDetails.endTime}
+                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}
+                              />
+                          </div>
+                      </div>
+                  </div>
+      
+                  <DialogFooter>
+                      <div className="flex justify-between w-full">
+                          {dialogState.mode === 'edit' && (
+                              <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
+                          )}
+                           {dialogState.mode === 'edit' && (
+                            <Button variant="outline" onClick={handleExportToIcs}>
+                              <Download className="mr-2 h-4 w-4" />
+                              エクスポート (.ics)
+                            </Button>
+                          )}
+                      </div>
+                      <div className="flex gap-2">
+                          <DialogClose asChild>
+                              <Button variant="ghost">キャンセル</Button>
+                          </DialogClose>
+                          <Button onClick={handleSaveEvent}>保存</Button>
+                      </div>
+                  </DialogFooter>
+              </DialogContent>
+          </Dialog>
       </TooltipProvider>
-      <Dialog open={dialogState.mode !== 'closed'} onOpenChange={(open) => !open && setDialogState({ mode: 'closed' })}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>{title}</DialogTitle>
-                <DialogDescription>
-                    {dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}
-                </DialogDescription>
-            </DialogHeader>
-    
-            <div className="space-y-4 py-4">
-                {dialogState.mode === 'edit' && (
-                    <div className="text-sm space-y-1">
-                        <p><span className="font-semibold">担当:</span> {staff?.name}</p>
-                        <p><span className="font-semibold">顧客:</span> {customer?.storeName || 'N/A'}</p>
-                    </div>
-                )}
-                 {dialogState.mode === 'new' && (
-                    <div className="text-sm space-y-1">
-                        <p><span className="font-semibold">担当:</span> {staff?.name}</p>
-                    </div>
-                )}
-                <div className="space-y-2">
-                    <Label htmlFor="event-title">タスク名</Label>
-                    <Input
-                        id="event-title"
-                        value={editedEventDetails.title}
-                        onChange={(e) => setEditedEventDetails(prev => ({ ...prev, title: e.target.value }))}
-                        placeholder="例：定期メンテナンス"
-                        disabled={!!(dialogState.mode === 'edit' && event?.orderId)}
-                    />
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="event-description">詳細</Label>
-                    <Textarea
-                        id="event-description"
-                        value={editedEventDetails.description}
-                        onChange={(e) => setEditedEventDetails(prev => ({ ...prev, description: e.target.value }))}
-                        placeholder="予定の詳細やメモ"
-                    />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="start-time">開始時間</Label>
-                        <Input
-                            id="start-time"
-                            type="time"
-                            value={editedEventDetails.startTime}
-                            onChange={(e) => setEditedEventDetails(prev => ({ ...prev, startTime: e.target.value }))}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="end-time">終了時間</Label>
-                        <Input
-                            id="end-time"
-                            type="time"
-                            value={editedEventDetails.endTime}
-                            onChange={(e) => setEditedEventDetails(prev => ({ ...prev, endTime: e.target.value }))}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            <DialogFooter className="justify-between sm:justify-between w-full">
-                <div className="flex gap-2">
-                  {dialogState.mode === 'edit' && (
-                      <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
-                  )}
-                   {dialogState.mode === 'edit' && (
-                    <Button variant="outline" onClick={handleExportToIcs}>
-                      <Download className="mr-2 h-4 w-4" />
-                      エクスポート (.ics)
-                    </Button>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <DialogClose asChild>
-                      <Button variant="outline">キャンセル</Button>
-                  </DialogClose>
-                  <Button onClick={handleSaveEvent} disabled={!editedEventDetails.title && !(dialogState.mode === 'edit' && dialogState.event.orderId)}>保存</Button>
-                </div>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </DndContext>
   );
 }
@@ -859,31 +884,26 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomer, isOver,
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   return (
-     <div className="grid items-center transition-colors duration-200 rounded-md" style={{ gridTemplateColumns: '8rem 1fr' }}>
-      <div className="flex items-center gap-2 pr-2">
-        <Avatar className="h-8 w-8">
-          <AvatarImage src={staff.avatarUrl} alt={staff.name} />
-          <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
-        </Avatar>
-        <span className="text-sm font-medium truncate">{staff.name}</span>
-      </div>
-      <div 
-        ref={setNodeRef} 
-        onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
-        className="relative h-14 rounded-md border-l border-border"
-        style={{ backgroundColor: isOver ? 'hsl(var(--accent))' : 'hsl(var(--muted) / 0.5)' }}
-      >
-        <div className="absolute inset-y-0 left-0 grid" style={{gridTemplateColumns: `repeat(${timelineTotalHours * 2}, ${minutesToPixels(30)}px)`}}>
-          {Array.from({ length: timelineTotalHours * 2 }).map((_, i) => (
-            <div key={i} className={`h-full ${i % 2 === 0 ? 'border-r border-border/80' : 'border-r border-dashed border-border/40'}`}></div>
-          ))}
+    <div ref={setNodeRef} className={cn("flex items-start h-16 transition-colors", isOver && "bg-primary/10")}>
+      <div className="w-32 sticky left-0 bg-background/80 backdrop-blur-sm z-10 pr-2 pt-2">
+        <div className="font-semibold flex items-center gap-2">
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={staff.avatarUrl} />
+            <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
+          </Avatar>
+          {staff.name}
         </div>
-        <div className="absolute inset-0 h-full p-1">
+      </div>
+      <div className="relative flex-1 h-full" onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
+        <div className="absolute top-0 left-0 h-full w-full">
+            <div className="h-full border-t border-b"></div>
+        </div>
+        <div className="relative h-full">
           {events.map((event) => (
-            <DraggableEvent 
-              key={event.id} 
-              event={event} 
-              staff={staff} 
+            <DraggableEvent
+              key={event.id}
+              event={event}
+              staff={staff}
               getCustomer={getCustomer}
               onDoubleClick={() => onDoubleClickEvent(event)}
             />
@@ -966,18 +986,17 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
+      <TooltipTrigger
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
+        onDoubleClick={handleDoubleClick}
+        className="absolute h-12 rounded-md px-2 flex flex-col justify-center cursor-move"
+      >
         <div
-          ref={setNodeRef}
-          {...listeners}
-          {...attributes}
-          onDoubleClick={handleDoubleClick}
-          className="absolute h-12 rounded-md px-2 flex flex-col justify-center cursor-move"
-          style={{
-            ...style,
-            backgroundColor,
-            color,
-          }}
+          className="w-full h-full rounded-md flex flex-col justify-center"
+          style={{ backgroundColor, color }}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
@@ -991,11 +1010,12 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       </TooltipTrigger>
       <TooltipContent>
         <p className="font-bold">{event.title?.replace('\n', ' - ') || '未定のタスク'}</p>
-        <p>顧客: {customer?.storeName || '未定'}</p>
-        <p>時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
-        <p>担当: {staff.name}</p>
-        {event.description && <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{event.description}</p>}
+        {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
+        <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
+        <p className="text-sm">担当: {staff.name}</p>
+        {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
       </TooltipContent>
     </Tooltip>
   );
 };
+    
