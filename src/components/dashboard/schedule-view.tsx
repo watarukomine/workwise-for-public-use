@@ -309,51 +309,58 @@ export function ScheduleView({
               eventTitle: eventToUnassign.title,
           });
           if (sheetResult.status === 'error') throw new Error(sheetResult.message);
+          
           toast({ title: "担当者をシートから削除しました", description: sheetResult.message });
+
+          const eventsToDeleteIds = eventToUnassign.tripId 
+              ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
+              : [eventToUnassign.id];
+          
+          // --- App State Update Logic ---
+          if (eventToUnassign.orderId) {
+              const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
+              if (!originalOrder) {
+                   const start = typeof eventToUnassign.start === 'string' ? parseISO(eventToUnassign.start) : eventToUnassign.start;
+                   const end = typeof eventToUnassign.end === 'string' ? parseISO(eventToUnassign.end) : eventToUnassign.end;
+                   const scheduledOrderData: WithId<Order> = {
+                      id: eventToUnassign.orderId,
+                      customerCode: getCustomerById(eventToUnassign.locationId)?.userCode || '',
+                      taskDetails: eventToUnassign.title,
+                      estimatedDuration: differenceInMinutes(end, start),
+                      raw: { '受注ID': eventToUnassign.rawOrderId }
+                  };
+                  setOrdersData(currentOrders => [...currentOrders, scheduledOrderData]);
+              }
+              toast({ title: 'タスクを未割り当てに戻しました' });
+          }
+          setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
+
       } catch (e: any) {
-          toast({ variant: 'destructive', title: 'シート更新エラー', description: e.message });
+          toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+          // Do not change UI if sheet update fails
       }
+    } else {
+        // If it's not a real order (e.g. break, travel), just remove from UI
+        const eventsToDeleteIds = eventToUnassign.tripId 
+            ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
+            : [eventToUnassign.id];
+        setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
     }
-
-    const eventsToDeleteIds = eventToUnassign.tripId 
-        ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
-        : [eventToUnassign.id];
-    
-    // --- App State Update Logic ---
-    if (eventToUnassign.orderId) {
-        const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
-        if (!originalOrder) {
-             const start = typeof eventToUnassign.start === 'string' ? parseISO(eventToUnassign.start) : eventToUnassign.start;
-             const end = typeof eventToUnassign.end === 'string' ? parseISO(eventToUnassign.end) : eventToUnassign.end;
-             const scheduledOrderData: WithId<Order> = {
-                id: eventToUnassign.orderId,
-                customerCode: getCustomerById(eventToUnassign.locationId)?.userCode || '',
-                taskDetails: eventToUnassign.title,
-                estimatedDuration: differenceInMinutes(end, start),
-                raw: { '受注ID': eventToUnassign.rawOrderId }
-            };
-            setOrdersData(currentOrders => [...currentOrders, scheduledOrderData]);
-        }
-        toast({ title: 'タスクを未割り当てに戻しました' });
-    }
-
-    setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, delta, over } = event;
     const item = active.data.current as WithId<ScheduleEvent> | WithId<Order>;
     
+    setActiveItem(null);
+    setCurrentOverStaffId(null);
+    
     if (!item) {
-      setActiveItem(null);
-      setCurrentOverStaffId(null);
       return;
     }
 
     if (over?.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
-        handleUnassignEvent(item);
-        setActiveItem(null);
-        setCurrentOverStaffId(null);
+        await handleUnassignEvent(item);
         return;
     }
     
@@ -374,14 +381,17 @@ export function ScheduleView({
       const staffMember = allStaff.find(s => s.id === finalStaffId);
 
       if (!staffMember) return;
+      
+      // Keep old state to revert if update fails
+      const oldScheduleData = [...scheduleData];
 
+      // Optimistically update UI
       const updatedEvent = {
         ...eventToUpdate,
         staffId: finalStaffId,
         start: newStart,
         end: newEnd,
       };
-
       setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
       
       // Update sheet if staff member changed
@@ -396,7 +406,8 @@ export function ScheduleView({
               if (sheetResult.status === 'error') throw new Error(sheetResult.message);
               toast({ title: '担当者をシートで更新しました', description: `担当者を「${staffMember.name}」に変更しました。`});
           } catch(e: any) {
-              toast({ variant: 'destructive', title: 'シート更新エラー', description: e.message });
+              toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+              setScheduleData(oldScheduleData); // Revert UI on failure
           }
       } else {
           toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
@@ -453,24 +464,6 @@ export function ScheduleView({
                 end: taskEnd,
             };
 
-            // --- Sheet Update Logic ---
-            try {
-              const sheetResult = await updateSheetStatus({
-                gasUrl: orderGasUrl,
-                orderId: rawOrderId,
-                staffName: staff.name,
-                eventTitle: taskEvent.title,
-              });
-              if (sheetResult.status === 'error') throw new Error(sheetResult.message);
-              toast({ title: '担当者をシートに記録しました', description: sheetResult.message });
-            } catch (e: any) {
-              toast({ variant: 'destructive', title: 'シート更新エラー', description: e.message });
-              // Do not proceed if sheet update fails
-              setActiveItem(null);
-              setCurrentOverStaffId(null);
-              return;
-            }
-
             const travelEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}-travel`,
                 tripId: tripId,
@@ -482,14 +475,28 @@ export function ScheduleView({
                 end: taskStart,
             };
             
-            setOrdersData(prev => prev.filter(o => o.id !== order.id));
-            setScheduleData(prev => [...prev, travelEvent, taskEvent]);
-            toast({ title: 'タスクを割り当てました', description: `${staff.name}さんに「${order.taskDetails.split('\n')[0]}」を割り当てました。`});
+            // --- Sheet Update Logic ---
+            try {
+              const sheetResult = await updateSheetStatus({
+                gasUrl: orderGasUrl,
+                orderId: rawOrderId,
+                staffName: staff.name,
+                eventTitle: taskEvent.title,
+              });
+              if (sheetResult.status === 'error') throw new Error(sheetResult.message);
+              
+              toast({ title: '担当者をシートに記録しました', description: sheetResult.message });
+              
+              // Only update UI after successful sheet update
+              setOrdersData(prev => prev.filter(o => o.id !== order.id));
+              setScheduleData(prev => [...prev, travelEvent, taskEvent]);
+              
+            } catch (e: any) {
+              toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+              // Do not change UI if sheet update fails
+            }
         }
     }
-
-    setActiveItem(null);
-    setCurrentOverStaffId(null);
   };
 
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
@@ -564,7 +571,7 @@ export function ScheduleView({
 
   const handleDeleteEvent = async () => {
     if (dialogState.mode !== 'edit') return;
-    handleUnassignEvent(dialogState.event);
+    await handleUnassignEvent(dialogState.event);
     setDialogState({ mode: 'closed' });
   };
 

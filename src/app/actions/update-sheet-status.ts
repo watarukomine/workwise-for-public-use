@@ -48,6 +48,7 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         const result = await response.json();
         
         if (result.status === 'error' || result.error) {
+            // GAS側から返されたエラーメッセージを優先的に使用
             throw new Error(result.message || 'GASスクリプトでシート更新エラーが発生しました。');
         }
 
