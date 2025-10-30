@@ -151,14 +151,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {profile && <NavMenu />}
         </SidebarContent>
         <SidebarFooter className="p-2">
-          {!profile && !isLoading && (
+          {isLoading ? (
+            <div className="flex items-center justify-center p-4">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : !profile ? (
             <Button asChild className="w-full">
               <Link href="/login">
-                 <LogIn className="mr-2 h-4 w-4" />
-                 ログイン / 新規登録
+                <LogIn className="mr-2 h-4 w-4" />
+                ログイン / 新規登録
               </Link>
             </Button>
-          )}
+          ) : null}
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
