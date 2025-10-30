@@ -37,7 +37,9 @@ if (getApps().length === 0) {
 export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<FunctionResponse> {
     try {
         const functions = getFunctions();
-        const callable = functions.httpsCallable('updatecalendarevent');
+        const callable = functions.httpsCallable('updatecalendarevent', {
+          region: 'asia-northeast1'
+        });
 
         console.log("Calling 'updatecalendarevent' Cloud Function with args:", args);
 
@@ -54,7 +56,7 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
         // Provide a more user-friendly error message
         return {
             status: 'error',
-            message: `カレンダー連携用のCloud Function呼び出しに失敗しました: ${error.message || '不明なエラーです。'}`,
+            message: `カレンダー連携用のCloud Function呼び出しに失敗しました: ${error.details || error.message || '不明なエラーです。'}`,
         };
     }
 }
