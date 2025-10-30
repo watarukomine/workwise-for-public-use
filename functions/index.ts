@@ -3,16 +3,25 @@
  * Firebase Cloud Functions for the WorkWise application.
  * This file contains the backend logic for interacting with Google Calendar API.
  */
-
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { GoogleAuth } from "google-auth-library";
 import { calendar_v3, google } from "googleapis";
 import { initializeApp } from "firebase-admin/app";
 
+// Set the timezone for the function environment to Japan Standard Time
+process.env.TZ = 'Asia/Tokyo';
+
 // Initialize Firebase Admin SDK. This is crucial for the function to have the correct
 // permissions to call other Google Cloud services like the Calendar API.
-initializeApp();
+// It's safe to call this at the top level; it initializes only once.
+try {
+  initializeApp();
+  logger.info("Firebase Admin SDK initialized successfully.");
+} catch (error) {
+  logger.warn("Firebase Admin SDK already initialized.");
+}
+
 
 // Define the structure of the data expected from the client
 interface CalendarEventArgs {
@@ -29,8 +38,9 @@ interface CalendarEventArgs {
 async function getAuthenticatedCalendarClient(): Promise<calendar_v3.Calendar> {
     logger.info("Authenticating with Google Calendar API...");
     // Use Application Default Credentials, which are available in the Cloud Functions environment.
+    // The scope is specified to request permission for calendar events.
     const auth = new GoogleAuth({
-        scopes: ["https://www.googleapis.com/auth/calendar"],
+        scopes: ["https://www.googleapis.com/auth/calendar.events"],
     });
     const authClient = await auth.getClient();
     const calendar = google.calendar({ version: "v3", auth: authClient });
@@ -119,8 +129,15 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
                 throw new HttpsError("invalid-argument", `Unknown operation: ${operation}`);
         }
     } catch (error: any) {
-        logger.error("Error calling Google Calendar API:", error);
+        logger.error("Error calling Google Calendar API:", {
+            message: error.message,
+            code: error.code,
+            errors: error.errors, // Google API often returns detailed errors here
+            response: error.response?.data,
+        });
         // Rethrow a more specific error for the client
-        throw new HttpsError("internal", `Google Calendar API Error: ${error.message}`, error.response?.data);
+        throw new HttpsError("internal", `Google Calendar API Error: ${error.message}`, {
+            details: error.response?.data?.error?.message || "No further details.",
+        });
     }
 });
