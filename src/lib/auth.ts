@@ -28,30 +28,50 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     console.log('Firebase sign in successful for:', userCredential.user.email);
     return userCredential;
   } catch (error: any) {
-    // Recent Firebase versions use 'auth/invalid-credential' for both wrong password and user not found.
-    // Therefore, we attempt to provision a new user in this case.
-    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-      console.log('User not found or invalid credential. Attempting to provision from spreadsheet...');
+    // This is the key logic block for auto-provisioning.
+    // 'auth/invalid-credential' can mean EITHER user not found OR wrong password.
+    // We can't distinguish, so if it fails, we check our source of truth (the spreadsheet).
+    if (error.code === 'auth/invalid-credential') {
+      console.log('Invalid credential. Checking spreadsheet for potential new user...');
       try {
         const allStaff = await fetchStaffDataFromGAS();
         const staffMember = allStaff.find(s => s.email === email && s.password === password);
 
+        // If a match is found in the spreadsheet, it means the user should exist.
+        // We attempt to create them in Firebase. If this fails with 'email-already-in-use',
+        // it confirms the user exists but the initial password was wrong.
         if (staffMember) {
-          console.log(`Found matching staff in spreadsheet: ${staffMember.name}. Creating Firebase user.`);
-          // User exists in spreadsheet, create them in Firebase
-          return await signUpWithEmail(email, password, staffMember.name);
+          console.log(`Found matching staff in spreadsheet: ${staffMember.name}. Attempting to create Firebase user.`);
+          try {
+            return await signUpWithEmail(email, password, staffMember.name);
+          } catch (signUpError: any) {
+            // This is the crucial part: if sign-up fails because the email is already in use,
+            // it means the user exists in Firebase, but their initial login attempt had the wrong password.
+            // So, we throw the original 'invalid credential' error message.
+            if (signUpError.code === 'auth/email-already-in-use') {
+              console.log('User already exists in Firebase. The initial password was incorrect.');
+              throw new Error('メールアドレスまたはパスワードが正しくありません。');
+            }
+            // If it's a different sign-up error, throw that.
+            throw signUpError;
+          }
         } else {
-          // If not in spreadsheet either, then it's a true invalid credential case.
-           throw new Error('メールアドレスまたはパスワードが正しくありません。');
+          // If no match is found in the spreadsheet, it's a genuine invalid credential case.
+          console.log('No matching user found in spreadsheet.');
+          throw new Error('メールアドレスまたはパスワードが正しくありません。');
         }
       } catch (provisionError: any) {
         console.error('Error during user provisioning from spreadsheet:', provisionError);
+        // If the error is the one we threw intentionally, re-throw it. Otherwise, wrap it.
+        if (provisionError.message === 'メールアドレスまたはパスワードが正しくありません。') {
+          throw provisionError;
+        }
         throw new Error(`アカウントの自動作成に失敗しました: ${provisionError.message}`);
       }
     }
     
     console.error('Firebase sign in error:', error);
-    // Re-throw other errors so the UI layer can handle them
+    // Re-throw other Firebase errors so the UI layer can handle them (e.g., network errors)
     throw error;
   }
 };
