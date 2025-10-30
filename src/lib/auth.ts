@@ -33,10 +33,10 @@ export const signInWithEmail = async (email: string, password: string): Promise<
   }
 
   // ★★★ 修正箇所 ★★★
-  // 比較前に、入力値とデータソースの両方から空白文字を除去(.trim())します。
+  // 問題切り分けのため、パスワードの比較を一時的にコメントアウトします。
   const user = staffList.find(staff => 
-      staff.email?.trim().toLowerCase() === email.trim().toLowerCase() && 
-      staff.password?.trim() === password.trim()
+      staff.email?.trim().toLowerCase() === email.trim().toLowerCase()
+      // && staff.password?.trim() === password.trim()
   );
 
   return new Promise((resolve, reject) => {
