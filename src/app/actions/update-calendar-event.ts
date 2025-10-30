@@ -33,9 +33,10 @@ export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promis
         const functions = getFunctions(firebaseApp, 'asia-northeast1');
 
         // Get a callable reference to the Cloud Function.
+        // CRITICAL: The function name MUST be all lowercase for the callable to work.
         const callable = httpsCallable<UpdateCalendarEventArgs, FunctionResponse>(functions, 'updatecalendarevent');
 
-        console.log("Calling 'updateCalendarEvent' Cloud Function with args:", args);
+        console.log("Calling 'updatecalendarevent' Cloud Function with args:", args);
 
         // Call the function with the provided arguments.
         const result = await callable(args);

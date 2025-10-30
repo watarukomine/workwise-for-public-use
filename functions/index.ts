@@ -32,8 +32,8 @@ async function getAuthenticatedCalendarClient(): Promise<calendar_v3.Calendar> {
     return calendar;
 }
 
-
-export const updateCalendarEvent = onCall({region: 'asia-northeast1'}, async (request) => {
+// CRITICAL: The function name must be all lowercase to be callable from the client SDK.
+export const updatecalendarevent = onCall({region: 'asia-northeast1'}, async (request) => {
     const {
         operation,
         calendarId,
