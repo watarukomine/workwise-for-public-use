@@ -2,8 +2,10 @@
 'use server';
 
 interface UpdateSheetStatusArgs {
+    staffId?: string | null;
     staffName?: string | null;
     eventTitle?: string | null;
+    orderId?: string | null;
     gasUrl: string;
     statusColumnName?: string;
     statusValue?: string;
@@ -15,25 +17,21 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, staffName, eventTitle, statusColumnName, statusValue } = args;
+    const { gasUrl, staffId, staffName, eventTitle, orderId, statusColumnName, statusValue } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
-
-    if (!eventTitle) {
-        // This case is handled by the GAS script, but we can short-circuit here too.
-        return { status: 'success', message: '汎用タスクのためシート更新はスキップされました。' };
-    }
     
     // The payload sent to the doPost function in Google Apps Script.
-    // The keys ('staffName', 'eventTitle', 'statusColumnName', etc.) must match
-    // what the doPost function expects in its `e.parameter` or `postData`.
+    // The keys must match what the doPost function expects in e.parameter or e.postData.contents
     const payload = {
-        staffName: staffName, 
-        eventTitle: eventTitle,
-        statusColumnName: statusColumnName,
-        statusValue: statusValue,
+        staffId,
+        staffName, 
+        eventTitle,
+        orderId,
+        statusColumnName,
+        statusValue,
     };
 
     try {

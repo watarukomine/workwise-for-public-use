@@ -16,19 +16,21 @@ import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '../ui/alert';
 
 const statusColors: Record<StaffStatus['status'], string> = {
-  'Idle': 'bg-gray-400',
-  'En Route': 'bg-yellow-500',
-  'On Site': 'bg-blue-500',
-  'Working': 'bg-green-500',
-  'Departing': 'bg-orange-500',
+  '待機中': 'bg-gray-400',
+  '移動中': 'bg-yellow-500',
+  '作業待ち': 'bg-blue-500',
+  '作業中': 'bg-green-500',
+  '作業完了': 'bg-purple-500',
+  '未割当': 'bg-red-500',
 };
 
 const statusJapanese: Record<StaffStatus['status'], string> = {
-  'Idle': '待機中',
-  'En Route': '移動中',
-  'On Site': '現場到着',
-  'Working': '作業中',
-  'Departing': '出発',
+  '待機中': '待機中',
+  '移動中': '移動中',
+  '作業待ち': '作業待ち',
+  '作業中': '作業中',
+  '作業完了': '作業完了',
+  '未割当': '未割当',
 }
 
 interface StatusUpdatesProps {

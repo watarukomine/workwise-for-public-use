@@ -55,7 +55,7 @@ export type ScheduleEvent = {
 
 export type StaffStatus = {
   staffId: string;
-  status: 'Idle' | 'En Route' | 'On Site' | 'Working' | 'Departing';
+  status: '未割当' | '作業待ち' | '移動中' | '作業中' | '作業完了' | '待機中';
   lastAction: string;
   distanceFromSite?: string;
   latitude?: number;

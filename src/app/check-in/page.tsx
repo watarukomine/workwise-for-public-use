@@ -4,11 +4,15 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, Hourglass } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import { useUserProfile } from '@/hooks/use-user-profile';
+import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Send Message';
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
+type StatusValue = '移動中' | '作業中' | '作業完了' | '待機中';
 
 export default function CheckInPage() {
   const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
@@ -17,12 +21,17 @@ export default function CheckInPage() {
   const [lastAction, setLastAction] = React.useState<{ action: ActionType; time: string } | null>(null);
   const [message, setMessage] = React.useState('');
   const { toast } = useToast();
+  const { profile } = useUserProfile();
+
+  // A mock order ID for demonstration. In a real app, this would be dynamically determined.
+  // For example, from the user's schedule for the day.
+  const MOCK_ORDER_ID = '1'; 
 
   const handleAction = (action: ActionType) => {
     setIsLoading(action);
     setError(null);
-
-    // For actions that don't require location, handle them immediately.
+    
+    // These actions don't interact with the spreadsheet status
     if (action === 'Clock In' || action === 'Clock Out') {
         console.log(`Action: ${action}`);
         setTimeout(() => {
@@ -37,6 +46,7 @@ export default function CheckInPage() {
         return;
     }
     
+    // Message to admin
     if (action === 'Send Message') {
         if (!message.trim()) {
             setError('メッセージを入力してください。');
@@ -50,13 +60,29 @@ export default function CheckInPage() {
             title: 'メッセージを送信しました',
             description: '管理者にメッセージが送信されました。',
           });
-          // Also update the local state to show the message in the status
-          // This is a mock implementation. In a real app, this would be driven by Firestore.
           const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           setLastAction({ action: 'Send Message', time: currentTime });
           setMessage(''); // Clear textarea
           setIsLoading(null);
         }, 1000);
+        return;
+    }
+
+    // All other actions update the spreadsheet
+    const statusMap: Partial<Record<ActionType, StatusValue>> = {
+      'Start Travel': '移動中',
+      'Begin Task': '作業中',
+      'Finish Task': '作業完了',
+      'Wait': '待機中',
+    };
+
+    const statusValue = statusMap[action];
+    
+    // 'Arrive' is a location-based action but doesn't set a status itself.
+    // It's a prerequisite for 'Begin Task' or 'Wait'.
+    if (!statusValue && action !== 'Arrive') {
+        console.error("No status defined for this action:", action);
+        setIsLoading(null);
         return;
     }
 
@@ -68,22 +94,58 @@ export default function CheckInPage() {
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const { latitude, longitude } = position.coords;
         setLocation({ latitude, longitude });
-
-        // TODO: ここで緯度・経度とアクションをFirestoreに保存する
+        
         console.log(`Action: ${action}`, { latitude, longitude });
+        
+        // Only update sheet if there's a status to update
+        if (statusValue) {
+            if (!profile?.id) {
+                setError('ユーザー情報が取得できません。ログインしているか確認してください。');
+                setIsLoading(null);
+                return;
+            }
+            try {
+                const result = await updateSheetStatus({
+                    gasUrl: ORDER_GAS_URL,
+                    staffId: profile.id,
+                    orderId: MOCK_ORDER_ID, // This needs to be dynamic in a real app
+                    statusColumnName: 'ステータス',
+                    statusValue: statusValue
+                });
 
-        setTimeout(() => {
-          const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action, time: currentTime });
-          toast({
-            title: 'アクションを記録しました',
-            description: `${getJapaneseActionName(action)} at ${currentTime}`,
-          });
-          setIsLoading(null);
-        }, 1000); // Simulate network request
+                if (result.status === 'error') {
+                    throw new Error(result.message);
+                }
+
+                toast({
+                    title: 'ステータスを更新しました',
+                    description: result.message,
+                });
+
+            } catch (e: any) {
+                setError(e.message || 'スプレッドシートの更新に失敗しました。');
+                toast({
+                    variant: 'destructive',
+                    title: '更新エラー',
+                    description: e.message || 'スプレッドシートの更新に失敗しました。'
+                });
+            }
+        }
+        
+        // Update local UI state regardless of sheet update
+        const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        setLastAction({ action, time: currentTime });
+        if (!statusValue) { // For actions like 'Arrive'
+             toast({
+                title: 'アクションを記録しました',
+                description: `${getJapaneseActionName(action)} at ${currentTime}`,
+            });
+        }
+        
+        setIsLoading(null);
       },
       (err) => {
         let message = '';
@@ -119,6 +181,7 @@ export default function CheckInPage() {
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },
     { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
+    { action: 'Wait', label: '待機中', icon: Hourglass },
   ];
 
   const getJapaneseActionName = (action: ActionType) => {
@@ -129,6 +192,7 @@ export default function CheckInPage() {
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
         'Finish Task': '作業終了',
+        'Wait': '待機中',
         'Send Message': 'メッセージ送信'
     };
     return map[action];
@@ -177,7 +241,7 @@ export default function CheckInPage() {
               <AlertTitle>最後の記録</AlertTitle>
               <AlertDescription>
                 {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
-                {location && (lastAction.action !== 'Clock In' && lastAction.action !== 'Clock Out' && lastAction.action !== 'Send Message') && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
+                {location && !['Clock In', 'Clock Out', 'Send Message'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
               </AlertDescription>
             </Alert>
           )}
