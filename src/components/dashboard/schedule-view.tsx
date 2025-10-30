@@ -412,18 +412,18 @@ export function ScheduleView({
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
     const initialLeft = active.rect.current.initial?.left ?? 0;
+    const dropX = initialLeft - timelineRect.left + delta.x;
     
+    // Calculate the new start time based on the absolute drop position, and snap to grid
+    const newStartMinutes = pixelsToMinutes(dropX);
+    const newStart = addMinutes(startOfDay, newStartMinutes);
+
     // Scenario 2: An existing event is moved (within or between timelines)
     if ('staffId' in item) {
         const eventToUpdate = item as WithId<ScheduleEvent>;
         const staffMember = allStaff.find(s => s.id === newStaffId);
         if (!staffMember) return;
         
-        // Calculate the new start time based on the absolute drop position on the timeline
-        const dropX = initialLeft - timelineRect.left + delta.x;
-        const newStartMinutes = pixelsToMinutes(dropX);
-        const newStart = addMinutes(startOfDay, newStartMinutes);
-
         const originalDuration = differenceInMinutes(
             typeof eventToUpdate.end === 'string' ? parseISO(eventToUpdate.end) : eventToUpdate.end,
             typeof eventToUpdate.start === 'string' ? parseISO(eventToUpdate.start) : eventToUpdate.start
@@ -448,11 +448,12 @@ export function ScheduleView({
                     typeof travelEvent.end === 'string' ? parseISO(travelEvent.end) : travelEvent.end,
                     typeof travelEvent.start === 'string' ? parseISO(travelEvent.start) : travelEvent.start
                 );
+                const newTravelStart = subMinutes(newStart, originalTravelDuration);
                 const updatedTravelEvent = {
                     ...travelEvent,
                     staffId: newStaffId,
-                    start: subMinutes(newStart, originalTravelDuration),
-                    end: newStart,
+                    start: newTravelStart,
+                    end: newStart, // newStart of main task is end of travel
                 };
                 eventsToUpdate.push(updatedTravelEvent);
             }
@@ -491,10 +492,6 @@ export function ScheduleView({
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
-
-        const dropX = initialLeft - timelineRect.left + delta.x;
-        const dropMinutes = pixelsToMinutes(dropX);
-        const newStart = addMinutes(startOfDay, dropMinutes);
 
         const isGeneric = order.id.startsWith('generic-');
 
@@ -1051,3 +1048,4 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+

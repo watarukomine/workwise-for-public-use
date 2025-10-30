@@ -38,11 +38,8 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
-                 // The 'Content-Type' is not strictly 'application/json' for a standard POST
-                 // from a form, but GAS can handle it if we parse the body.
-                 // For simplicity, we'll keep it as-is, but a more common approach is
-                 // to send it as 'application/x-www-form-urlencoded'.
-                 // However, sending JSON is fine if the GAS `doPost` is set up to parse it.
+                 // To send a JSON payload, you must set the Content-Type to application/json.
+                 // GAS's `doPost` will then receive it in `e.postData.contents`.
                  'Content-Type': 'application/json',
             },
             body: JSON.stringify(payload),
