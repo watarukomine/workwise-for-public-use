@@ -406,16 +406,18 @@ export function ScheduleView({
     const startOfDay = new Date();
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
-    // Common calculation for drop position in minutes from timeline start
-    const dropX = (active.rect.current.initial?.left ?? 0) - timelineRect.left + delta.x;
-    const dropMinutes = pixelsToMinutes(dropX);
-    const newStart = addMinutes(startOfDay, dropMinutes);
-
+    const initialLeft = active.rect.current.initial?.left ?? 0;
+    
     // Scenario 2: An existing event is moved (within or between timelines)
     if ('staffId' in item) {
         const eventToUpdate = item as WithId<ScheduleEvent>;
         const staffMember = allStaff.find(s => s.id === newStaffId);
         if (!staffMember) return;
+        
+        // Calculate the new start time based on the absolute drop position on the timeline
+        const dropX = initialLeft - timelineRect.left + delta.x;
+        const newStartMinutes = pixelsToMinutes(dropX);
+        const newStart = addMinutes(startOfDay, newStartMinutes);
 
         const originalDuration = differenceInMinutes(
             typeof eventToUpdate.end === 'string' ? parseISO(eventToUpdate.end) : eventToUpdate.end,
@@ -484,6 +486,10 @@ export function ScheduleView({
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
+
+        const dropX = initialLeft - timelineRect.left + delta.x;
+        const dropMinutes = pixelsToMinutes(dropX);
+        const newStart = addMinutes(startOfDay, dropMinutes);
 
         const isGeneric = order.id.startsWith('generic-');
 
@@ -969,8 +975,15 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const hslMatch = typeof backgroundColor === 'string' ? backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/) : null;
 
   if (isTravelEvent) {
-    backgroundColor = `repeating-linear-gradient(45deg, ${staff.color}, ${staff.color} 10px, hsl(var(--secondary)) 10px, hsl(var(--secondary)) 20px)`;
-    color = 'hsl(var(--foreground))';
+    if (hslMatch) {
+      const [_, h, s, l] = hslMatch;
+      backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
+      color = 'hsl(var(--foreground))';
+    } else {
+      // Fallback for non-hsl colors, though less likely with current setup
+      backgroundColor = 'rgba(128, 128, 128, 0.5)';
+      color = 'white';
+    }
   } else if (isBreakEvent) {
      if (hslMatch) {
       const [_, h, s] = hslMatch;
@@ -1019,3 +1032,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
