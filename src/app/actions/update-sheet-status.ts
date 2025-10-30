@@ -2,7 +2,6 @@
 'use server';
 
 interface UpdateSheetStatusArgs {
-    orderId?: string | null;
     staffName?: string | null;
     eventTitle?: string | null;
     gasUrl: string;
@@ -14,22 +13,20 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, orderId, staffName, eventTitle } = args;
+    const { gasUrl, staffName, eventTitle } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
-    // If there's no orderId, it's a generic task, so skip sheet update.
-    if (!orderId) {
+    if (!eventTitle) {
         return { status: 'success', message: '汎用タスクのためシート更新はスキップされました。' };
     }
     
     // This payload will be sent to the doPost function in Google Apps Script.
-    // It's crucial that the keys here ('orderId', 'staffName', 'eventTitle')
-    // match what the doPost function expects in its e.parameter.
+    // It's crucial that the keys here ('staffName', 'eventTitle')
+    // match what the doPost function expects in its e.parameter or postData.
     const payload = {
-        orderId: orderId,
         staffName: staffName, // Can be null, which means un-assigning the task.
         eventTitle: eventTitle,
     };

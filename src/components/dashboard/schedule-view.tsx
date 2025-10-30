@@ -348,10 +348,8 @@ export function ScheduleView({
     
     const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
         try {
-            if (eventToUnassign.rawOrderId) {
-                const result = await updateSheetStatus({ gasUrl: orderGasUrl, orderId: eventToUnassign.rawOrderId, staffName: null });
-                if (result.status === 'error') throw new Error(result.message);
-            }
+            const result = await updateSheetStatus({ gasUrl: orderGasUrl, eventTitle: eventToUnassign.title, staffName: null });
+            if (result.status === 'error') throw new Error(result.message);
             
             const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === eventToUnassign.rawOrderId);
             if (originalOrder) {
@@ -397,17 +395,15 @@ export function ScheduleView({
         const staffMember = getStaffById(newStaffId);
         if (!staffMember) return;
         
-        const newStart = getNewStartFromDrop();
-        
-        let eventsToUpdate: WithId<ScheduleEvent>[] = [];
-        
         try {
             if (draggedEvent.rawOrderId && draggedEvent.staffId !== newStaffId) {
-                const result = await updateSheetStatus({ gasUrl: orderGasUrl, orderId: draggedEvent.rawOrderId, staffName: staffMember.name });
+                const result = await updateSheetStatus({ gasUrl: orderGasUrl, eventTitle: draggedEvent.title, staffName: staffMember.name });
                 if (result.status === 'error') throw new Error(result.message);
                 toast({ title: '担当者を変更しました', description: result.message });
             }
 
+            const newStart = getNewStartFromDrop();
+            const eventsToUpdate: WithId<ScheduleEvent>[] = [];
             if (draggedEvent.tripId) {
                 const tripEvents = scheduleData.filter(e => e.tripId === draggedEvent.tripId);
                 const travelEvent = tripEvents.find(e => e.title.startsWith('移動'));
@@ -441,24 +437,24 @@ export function ScheduleView({
                 const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart, end: newEnd };
                 eventsToUpdate.push(updatedEvent);
             }
-            
+
             setScheduleData(prev => {
                 const otherEvents = prev.filter(e => !eventsToUpdate.some(u => u.id === e.id || (e.tripId && e.tripId === draggedEvent.tripId)));
                 return [...otherEvents, ...eventsToUpdate];
             });
-
         } catch(e: any) {
             toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
-            return; 
         }
-    }
-    else if ('estimatedDuration' in item) { // Adding a new event from orders
+    } else if ('estimatedDuration' in item) { // Adding a new event from orders
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
         const newStart = getNewStartFromDrop();
         const isGeneric = order.id.startsWith('generic-');
+        
+        const customer = getCustomerByCode(order.customerCode);
+        const eventTitle = customer ? `${customer.storeName} (ID: ${order.rawOrderId})` : `${order.taskDetails} (ID: ${order.rawOrderId})`;
 
         if (isGeneric) {
              const newEnd = addMinutes(newStart, order.estimatedDuration);
@@ -473,13 +469,12 @@ export function ScheduleView({
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
-            const customer = getCustomerByCode(order.customerCode);
             const taskEnd = addMinutes(newStart, order.estimatedDuration);
             const travelStart = subMinutes(newStart, TRAVEL_TIME_MINUTES);
             const tripId = `trip-${Date.now()}`;
             
             try {
-              const result = await updateSheetStatus({ gasUrl: orderGasUrl, orderId: order.rawOrderId, staffName: staff.name });
+              const result = await updateSheetStatus({ gasUrl: orderGasUrl, eventTitle, staffName: staff.name });
               if (result.status === 'error') throw new Error(result.message);
               toast({ title: '担当者を割り当てました', description: result.message });
               
@@ -488,18 +483,19 @@ export function ScheduleView({
                   tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
-                  title: order.taskDetails,
+                  title: eventTitle,
                   description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: newStart,
                   end: taskEnd,
               };
-
+              
+              const travelTitle = customer ? `移動: ${customer.storeName}` : `移動: ${order.customerCode}`;
               const travelEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-travel`,
                   tripId: tripId,
-                  title: `移動: ${customer?.storeName || order.customerCode}`,
+                  title: travelTitle,
                   description: `目的地: ${customer?.address || 'N/A'}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
@@ -512,7 +508,6 @@ export function ScheduleView({
               
             } catch (e: any) {
                  toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                 return; 
             }
         }
     }
@@ -842,7 +837,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     data: event,
   });
 
-  const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
   const { left, width } = getEventDimensions(event.start, event.end);
 
   const style = {
@@ -883,6 +877,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   
   const [line1, ...rest] = (event.title || '').split('\n');
   const line2 = rest.join('\n');
+  const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
+  const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
   return (
     <Tooltip>
@@ -910,7 +906,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         </div>
       </TooltipTrigger>
       <TooltipContent>
-        <p className="font-bold">{event.title?.replace('\n', ' - ') || '未定のタスク'}</p>
+        <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
         {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
         <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
         <p className="text-sm">担当: {staff.name}</p>
