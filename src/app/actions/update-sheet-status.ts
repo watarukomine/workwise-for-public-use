@@ -5,8 +5,6 @@ interface UpdateSheetStatusArgs {
     staffName?: string | null;
     eventTitle?: string | null;
     gasUrl: string;
-    statusColumnName?: string;
-    statusValue?: string;
 }
 
 interface GasResponse {
@@ -15,17 +13,16 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, staffName, eventTitle, statusColumnName, statusValue } = args;
+    const { gasUrl, staffName, eventTitle } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
     
+    // GASに渡すペイロードをstaffNameとeventTitleのみに単純化
     const payload = {
         staffName, 
         eventTitle,
-        statusColumnName,
-        statusValue,
     };
 
     try {

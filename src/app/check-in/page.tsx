@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -108,11 +109,13 @@ export default function CheckInPage() {
                 return;
             }
             try {
+                // This is a simplified call. For a real implementation, you would need to know
+                // which order/event this status update applies to.
                 const result = await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
-                    orderId: MOCK_ORDER_ID, // This needs to be dynamic in a real app
-                    statusColumnName: STATUS_COLUMN_NAME,
-                    statusValue: statusValue
+                    // The eventTitle needs to contain the Order ID for GAS to find it.
+                    eventTitle: `(ID: ${MOCK_ORDER_ID})`, // Mock title
+                    staffName: profile.name, // staffName is now used for status updates too in this logic
                 });
 
                 if (result.status === 'error') {

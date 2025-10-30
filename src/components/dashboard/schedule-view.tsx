@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -44,7 +45,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
-import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -348,12 +349,11 @@ export function ScheduleView({
     
     const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
         try {
+            // GASに担当者名=空で送信
             const result = await updateSheetStatus({ 
               gasUrl: ORDER_GAS_URL, 
               eventTitle: eventToUnassign.title, 
-              staffName: "", // Clear staff name
-              statusColumnName: STATUS_COLUMN_NAME,
-              statusValue: "" // Clear status
+              staffName: "", 
             });
             if (result.status === 'error') throw new Error(result.message);
             
@@ -402,15 +402,12 @@ export function ScheduleView({
         if (!staffMember) return;
         
         try {
-            const newTitle = draggedEvent.rawOrderId ? `${getCustomerByCode(draggedEvent.locationId)?.storeName} (ID: ${draggedEvent.rawOrderId})` : draggedEvent.title;
-
+            // タイトルは不変なので、GASへの送信時に使用
             if (draggedEvent.rawOrderId && draggedEvent.staffId !== newStaffId) {
                 const result = await updateSheetStatus({ 
                   gasUrl: ORDER_GAS_URL, 
-                  eventTitle: newTitle, 
+                  eventTitle: draggedEvent.title, 
                   staffName: staffMember.name,
-                  statusColumnName: STATUS_COLUMN_NAME,
-                  statusValue: "作業待ち"
                 });
                 if (result.status === 'error') throw new Error(result.message);
                 toast({ title: '担当者を変更しました', description: result.message });
@@ -469,6 +466,8 @@ export function ScheduleView({
         const isGeneric = order.id.startsWith('generic-');
         
         const customer = getCustomerByCode(order.customerCode);
+        
+        // GASがIDを抽出できるよう、タイトルにIDを含める
         const eventTitle = customer ? `${customer.storeName} (ID: ${order.rawOrderId})` : order.taskDetails;
 
         if (isGeneric) {
@@ -489,12 +488,11 @@ export function ScheduleView({
             const tripId = `trip-${Date.now()}`;
             
             try {
+              // GASにeventTitleとstaffNameを送信
               const result = await updateSheetStatus({ 
                 gasUrl: ORDER_GAS_URL, 
                 eventTitle: eventTitle, 
                 staffName: staff.name,
-                statusColumnName: STATUS_COLUMN_NAME,
-                statusValue: "作業待ち"
               });
               if (result.status === 'error') throw new Error(result.message);
               toast({ title: '担当者を割り当てました', description: result.message });
@@ -504,7 +502,7 @@ export function ScheduleView({
                   tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
-                  title: eventTitle,
+                  title: eventTitle, // IDを含んだタイトル
                   description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
