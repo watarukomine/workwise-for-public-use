@@ -100,6 +100,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                 )}
                 <TableHead>スタッフ名</TableHead>
                 <TableHead>メールアドレス</TableHead>
+                <TableHead>母店</TableHead>
                 <TableHead>ロール</TableHead>
                 <TableHead>スタッフID</TableHead>
               </TableRow>
@@ -107,7 +108,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
             <TableBody>
               {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                       スタッフ情報を読み込んでいます...
                     </TableCell>
                   </TableRow>
@@ -138,6 +139,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{member.email}</TableCell>
+                    <TableCell className="text-muted-foreground">{member['母店']}</TableCell>
                     <TableCell>
                         <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>
                             {member.role}
@@ -148,7 +150,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                 ))
               ) : (
                 <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
+                    <TableCell colSpan={6} className="h-24 text-center">
                       表示するスタッフ情報がありません。
                     </TableCell>
                 </TableRow>
