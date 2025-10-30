@@ -28,9 +28,10 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     console.log('Firebase sign in successful for:', userCredential.user.email);
     return userCredential;
   } catch (error: any) {
-    // If user is not found, try to provision them from the spreadsheet data.
-    if (error.code === 'auth/user-not-found') {
-      console.log('User not found in Firebase. Attempting to provision from spreadsheet...');
+    // Recent Firebase versions use 'auth/invalid-credential' for both wrong password and user not found.
+    // Therefore, we attempt to provision a new user in this case.
+    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+      console.log('User not found or invalid credential. Attempting to provision from spreadsheet...');
       try {
         const allStaff = await fetchStaffDataFromGAS();
         const staffMember = allStaff.find(s => s.email === email && s.password === password);
@@ -69,7 +70,7 @@ export const signUpWithEmail = async (email: string, password: string, name: str
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         
         // After creating the user, update their profile with the name.
-        if (name) {
+        if (name && userCredential.user) {
           await updateProfile(userCredential.user, { displayName: name });
         }
 
