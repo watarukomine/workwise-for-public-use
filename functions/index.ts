@@ -131,9 +131,10 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
             errors: error.errors, // Google API often returns detailed errors here
             response: error.response?.data,
         });
-        // Rethrow a more specific error for the client
+        // Rethrow the entire error object for more detailed client-side debugging
         throw new HttpsError("internal", `Google Calendar API Error: ${error.message}`, {
             details: error.response?.data?.error?.message || "No further details.",
+            fullError: JSON.parse(JSON.stringify(error)) // Serialize the full error object
         });
     }
 });
