@@ -17,31 +17,31 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, ...data } = args;
+    const { gasUrl, eventTitle, staffName, statusValue } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
-    // dataオブジェクトからnullまたはundefinedのプロパティを削除
-    const filteredData = Object.entries(data).reduce((acc, [key, value]) => {
-        if (value !== null && value !== undefined) {
-            (acc as any)[key] = value;
-        }
-        return acc;
-    }, {});
-
-
     try {
-        const response = await fetch(gasUrl, {
+        const url = new URL(gasUrl);
+        const params = new URLSearchParams();
+
+        if (eventTitle) {
+            params.append('eventTitle', eventTitle);
+        }
+        if (staffName !== null && staffName !== undefined) {
+            params.append('staffName', staffName);
+        }
+        if (statusValue) {
+            params.append('statusValue', statusValue);
+        }
+        
+        // POSTリクエストだが、データはURLパラメータとして送信する
+        const response = await fetch(`${url.origin}${url.pathname}?${params.toString()}`, {
             method: 'POST',
             cache: 'no-store',
             redirect: 'follow',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            // GASがe.postData.contentsで受け取るために、dataオブジェクトでラップする
-            body: JSON.stringify({ data: filteredData }),
         });
         
         if (response.redirected && response.url.includes('accounts.google.com')) {
@@ -56,7 +56,12 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         const result = await response.json();
         
         if (result.status === 'error' || result.error) {
-            throw new Error(result.message || 'GASスクリプトでシート更新エラーが発生しました。');
+            const errorMessage = result.message || 'GASスクリプトでシート更新エラーが発生しました。';
+            // エラーメッセージにGASからの詳細が含まれているか確認
+            if (errorMessage.includes('doPost Error')) {
+                 throw new Error(errorMessage);
+            }
+            throw new Error(`GASスクリプトエラー: ${errorMessage}`);
         }
 
         return result;
