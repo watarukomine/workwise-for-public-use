@@ -1,6 +1,9 @@
 
 'use server';
 
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { initializeFirebase } from '@/firebase';
+
 interface UpdateCalendarEventArgs {
     operation: 'create' | 'update' | 'delete';
     calendarId: string;
@@ -9,50 +12,46 @@ interface UpdateCalendarEventArgs {
     description?: string;
     startTime?: string;
     endTime?: string;
-    gasUrl: string;
 }
 
-interface GasResponse {
+interface FunctionResponse {
     status: 'success' | 'error';
     message: string;
     eventId?: string;
-    error?: boolean;
 }
 
-export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<GasResponse> {
-    const { gasUrl, ...payload } = args;
-
-    if (!gasUrl) {
-        return { status: 'error', message: 'GAS URLが設定されていません。' };
-    }
-
+/**
+ * Calls the `updateCalendarEvent` Cloud Function to interact with Google Calendar.
+ * This server action acts as a client-side entry point to the secure backend function.
+ * @param args - The arguments for the calendar operation.
+ * @returns A promise that resolves to the response from the Cloud Function.
+ */
+export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<FunctionResponse> {
     try {
-        const response = await fetch(gasUrl, {
-            method: 'POST',
-            headers: {
-                 'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-            cache: 'no-store',
-            redirect: 'follow',
-        });
+        // Firebase must be initialized to get the Functions instance.
+        // This initialization is lightweight and safe to call multiple times.
+        const { firebaseApp } = initializeFirebase();
+        const functions = getFunctions(firebaseApp, 'asia-northeast1'); // It's good practice to specify the region.
 
-        if (response.redirected && response.url.includes('accounts.google.com')) {
-             throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
-        }
+        // Get a callable reference to the Cloud Function.
+        const callable = httpsCallable<UpdateCalendarEventArgs, FunctionResponse>(functions, 'updatecalendarevent');
+
+        console.log("Calling 'updateCalendarEvent' Cloud Function with args:", args);
+
+        // Call the function with the provided arguments.
+        const result = await callable(args);
         
-        const result = await response.json();
+        console.log("Cloud Function response received:", result.data);
 
-        if (result.status === 'error' || result.error) {
-            throw new Error(result.message || 'GASスクリプトでカレンダー操作エラーが発生しました。');
-        }
+        return result.data;
 
-        return result;
     } catch (error: any) {
-        console.error('Failed to call GAS for calendar update:', error);
+        console.error('Failed to call Cloud Function for calendar update:', error);
+        
+        // Provide a more user-friendly error message
         return {
             status: 'error',
-            message: `カレンダー連携用のGAS呼び出しに失敗しました: ${error.message}`,
+            message: `カレンダー連携用のCloud Function呼び出しに失敗しました: ${error.message || '不明なエラーです。'}`,
         };
     }
 }
