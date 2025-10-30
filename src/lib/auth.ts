@@ -25,57 +25,43 @@ const { auth } = initializeFirebase();
 export const signInWithEmail = async (email: string, password: string): Promise<UserCredential> => {
   console.log(`Attempting to sign in with Firebase for email: ${email}`);
   try {
-    // 1. First, try to sign in normally.
+    // 1. First, try to sign in normally. This will succeed if the user exists in Firebase with the correct password.
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log('Firebase sign in successful for:', userCredential.user.email);
     return userCredential;
 
   } catch (error: any) {
-    // 2. If login fails with 'invalid-credential', it could be a wrong password OR a non-existent user.
+    // 2. If login fails, check if it's an "invalid credential" error.
+    // This code is returned for both "user not found" and "wrong password".
     if (error.code === 'auth/invalid-credential') {
-      console.log('Invalid credential. Checking spreadsheet for user and password match...');
+      console.log('Invalid credential. Checking spreadsheet for user to auto-provision account...');
       
       try {
         // 3. Fetch the source of truth: the staff list from the spreadsheet.
         const allStaff = await fetchStaffDataFromGAS();
         const staffMember = allStaff.find(s => s.email === email);
 
-        // 4. If no staff member with that email exists in the sheet, it's a true invalid credential case.
-        if (!staffMember) {
-          console.log('No staff member found in spreadsheet with that email.');
+        // 4. If no staff member with that email exists, or the password doesn't match the sheet, it's a true invalid credential case.
+        if (!staffMember || staffMember.password !== password) {
+          console.log('No staff member found in spreadsheet with matching email and password.');
           throw new Error('メールアドレスまたはパスワードが正しくありません。');
         }
 
-        // 5. If the staff member exists but the password does not match the sheet, it's a wrong password.
-        if (staffMember.password !== password) {
-          console.log('Password does not match spreadsheet record.');
-          throw new Error('メールアドレスまたはパスワードが正しくありません。');
-        }
-
-        // 6. If we reach here, the user is a valid staff member with the correct password according to the sheet.
-        // This means they either don't exist in Firebase yet, or their Firebase password is out of sync.
-        // Let's try to create the user.
+        // 5. If we reach here, the user is a valid staff member according to the sheet.
+        // We can now confidently attempt to create their Firebase account.
         console.log(`Valid staff member found in sheet: ${staffMember.name}. Attempting to create Firebase account...`);
         try {
-          // 7. Attempt to sign up the user. This will create them if they don't exist.
           return await signUpWithEmail(email, password, staffMember.name);
-
         } catch (signUpError: any) {
-          // 8. If sign-up fails because the email is already in use, it confirms the user exists in Firebase
-          // but the password from the initial login attempt was wrong. This is the scenario you pointed out!
-          if (signUpError.code === 'auth/email-already-in-use') {
-            console.log('User exists in Firebase, but password was incorrect. The source of truth (spreadsheet) and Firebase are out of sync.');
-            // We throw the original, user-friendly error. The developer can see from the logs what the real issue is.
-            throw new Error('メールアドレスまたはパスワードが正しくありません。');
-          }
-          // If it was a different sign-up error (e.g., weak password), throw that.
-          throw signUpError;
+           console.error('An unexpected error occurred during automatic sign-up:', signUpError);
+           // This could happen due to network issues or other Firebase problems.
+           throw new Error('アカウントの自動作成中にエラーが発生しました。もう一度お試しください。');
         }
 
       } catch (provisionError: any) {
+        // This catches errors from fetchStaffDataFromGAS or the explicit "not found" error.
         console.error('Error during user check/provision from spreadsheet:', provisionError.message);
-        // Re-throw the specific, user-facing error message.
-        throw provisionError;
+        throw provisionError; // Re-throw the specific, user-facing error.
       }
     }
     
