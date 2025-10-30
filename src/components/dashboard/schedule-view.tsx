@@ -299,15 +299,14 @@ export function ScheduleView({
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
 
-    // Directly use the rawOrderId from the event object itself.
     const rawOrderId = eventToUnassign.rawOrderId;
-
+    
     if (rawOrderId) {
       try {
           const sheetResult = await updateSheetStatus({
               gasUrl: orderGasUrl,
               orderId: rawOrderId,
-              staffName: null,
+              staffName: null, 
               eventTitle: eventToUnassign.title,
           });
 
@@ -321,12 +320,22 @@ export function ScheduleView({
               ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
               : [eventToUnassign.id];
           
-          // Find the original order to put it back into the unassigned list
-          const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId);
+          const originalOrder = ordersData.find(o => o.id === eventToUnassign.orderId) || scheduleData.find(e => e.id === eventToUnassign.id);
           if (eventToUnassign.orderId && originalOrder) {
-              setOrdersData(currentOrders => [...currentOrders, originalOrder]);
+                const orderToReassign = ordersData.find(o => o.id === eventToUnassign.orderId);
+                if (orderToReassign) {
+                    setOrdersData(currentOrders => [...currentOrders, orderToReassign]);
+                } else {
+                    // This case is tricky. The order might have been created from scheduleData.
+                    // For now, we'll rely on the fact that original ordersData is the source of truth.
+                    // Let's find the original order from the full list if it's not in the unassigned list yet.
+                    const fullOrderList = useOrder().orders.map(mapRawToOrder);
+                    const orderToPutBack = fullOrderList.find(o => o.id === eventToUnassign.orderId);
+                    if(orderToPutBack) {
+                        setOrdersData(currentOrders => [...currentOrders, orderToPutBack]);
+                    }
+                }
           }
-          
           setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
 
       } catch (e: any) {
@@ -382,7 +391,6 @@ export function ScheduleView({
         end: newEnd,
       };
       
-      // Update sheet if staff member changed
       if (updatedEvent.rawOrderId && eventToUpdate.staffId !== finalStaffId) {
           try {
               const sheetResult = await updateSheetStatus({
@@ -393,14 +401,11 @@ export function ScheduleView({
               });
               if (sheetResult.status === 'error') throw new Error(sheetResult.message);
               toast({ title: '担当者をシートで更新しました', description: `担当者を「${staffMember.name}」に変更しました。`});
-              // Only update UI on success
               setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           } catch(e: any) {
               toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-              // Do not update UI on failure
           }
       } else {
-          // For generic events or moves within the same staff, just update the UI
           setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
       }
@@ -467,7 +472,6 @@ export function ScheduleView({
                 end: taskStart,
             };
             
-            // --- Sheet Update Logic ---
             try {
               const sheetResult = await updateSheetStatus({
                 gasUrl: orderGasUrl,
@@ -475,17 +479,16 @@ export function ScheduleView({
                 staffName: staff.name,
                 eventTitle: taskEvent.title,
               });
+
               if (sheetResult.status === 'error') throw new Error(sheetResult.message);
               
               toast({ title: '担当者をシートに記録しました', description: sheetResult.message });
               
-              // Only update UI after successful sheet update
               setOrdersData(prev => prev.filter(o => o.id !== order.id));
               setScheduleData(prev => [...prev, travelEvent, taskEvent]);
               
             } catch (e: any) {
               toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-              // Do not change UI if sheet update fails
             }
         }
     }
@@ -560,12 +563,64 @@ export function ScheduleView({
     setDialogState({ mode: 'closed' });
   };
 
+  const { orders: rawOrders } = useOrder();
+  const mapRawToOrder = (rawOrder: any): WithId<Order> => {
+    const duration = parseInt(rawOrder['作業時間（分）'], 10);
+    const line1 = `${rawOrder['お取引先名'] || ''}${rawOrder['予定時間'] ? `：${formatTime(rawOrder['予定時間'])}` : ''}`;
+    const line2 = `${rawOrder['タイヤサイズ'] || ''}${rawOrder['本数'] ? `：${rawOrder['本数']}本` : ''}`;
+    let taskDetails = line1;
+    if (line2.trim()) {
+      taskDetails += `\n${line2}`;
+    }
+    return {
+      id: String(rawOrder['受注ID'] || rawOrder.id || `ord-${Math.random()}`),
+      customerCode: String(rawOrder['ユーザーコード'] || ''),
+      taskDetails: taskDetails.trim(),
+      estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
+      raw: rawOrder,
+    };
+  };
 
   const handleDeleteEvent = async () => {
     if (dialogState.mode !== 'edit') return;
-    await handleUnassignEvent(dialogState.event);
+
+    const eventToUnassign = dialogState.event;
+    const staff = getStaffById(eventToUnassign.staffId);
+    if (!staff) return;
+
+    const rawOrderId = eventToUnassign.rawOrderId;
+    
+    if (rawOrderId) {
+        try {
+            const sheetResult = await updateSheetStatus({
+                gasUrl: orderGasUrl,
+                orderId: rawOrderId,
+                staffName: null,
+                eventTitle: eventToUnassign.title,
+            });
+            if (sheetResult.status === 'error') {
+                throw new Error(sheetResult.message);
+            }
+            toast({ title: "担当者をシートから削除しました", description: sheetResult.message });
+            
+            const fullOrderList = rawOrders.map(mapRawToOrder);
+            const orderToPutBack = fullOrderList.find(o => o.raw?.['受注ID'] === rawOrderId);
+
+            setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
+            
+            if (orderToPutBack && !ordersData.some(o => o.id === orderToPutBack.id)) {
+                setOrdersData(currentOrders => [...currentOrders, orderToPutBack]);
+            }
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+        }
+    } else {
+        setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id));
+    }
+    
     setDialogState({ mode: 'closed' });
-  };
+};
+
 
   const handleExportToIcs = () => {
     if (dialogState.mode !== 'edit') return;

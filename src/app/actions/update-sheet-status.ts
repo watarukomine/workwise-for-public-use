@@ -2,7 +2,7 @@
 'use server';
 
 interface UpdateSheetStatusArgs {
-    orderId?: string | null; // Make orderId optional
+    orderId?: string | null;
     staffName?: string | null;
     eventTitle?: string | null;
     gasUrl: string;
@@ -20,16 +20,14 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
-    // If there is no orderId, it's a generic task, so we can skip the sheet update.
     if (!orderId) {
         return { status: 'success', message: '汎用タスクのためシート更新はスキップされました。' };
     }
     
-    // データがnullの場合でもキーが存在するように、明示的にnullを割り当て
     const payload = {
         orderId: orderId,
-        staffName: staffName === undefined ? null : staffName,
-        eventTitle: eventTitle === undefined ? null : eventTitle,
+        staffName: staffName, // Can be null, which means un-assigning
+        eventTitle: eventTitle,
     };
 
     try {
@@ -50,7 +48,6 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         const result = await response.json();
         
         if (result.status === 'error' || result.error) {
-            // GAS側から返されたエラーメッセージを優先的に使用
             throw new Error(result.message || 'GASスクリプトでシート更新エラーが発生しました。');
         }
 
