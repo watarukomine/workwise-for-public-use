@@ -33,7 +33,7 @@ async function getAuthenticatedCalendarClient(): Promise<calendar_v3.Calendar> {
 }
 
 
-export const updateCalendarEvent = onCall<CalendarEventArgs>(async (request) => {
+export const updateCalendarEvent = onCall({region: 'asia-northeast1'}, async (request) => {
     const {
         operation,
         calendarId,
