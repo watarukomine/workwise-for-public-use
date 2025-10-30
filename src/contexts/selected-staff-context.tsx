@@ -21,9 +21,9 @@ const simpleHash = (str: string) => {
 
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     const url = STAFF_GAS_URL;
-    if (!url) {
+    if (!url || url.includes('TODO_REPLACE_THIS_URL')) {
         console.log("スタッフ情報を取得するためのGoogle Apps Script URLが設定されていません。");
-        throw new Error("スタッフ情報を取得するためのURLが settings.ts で設定されていません。");
+        throw new Error("スタッフ情報を取得するためのURLが /src/lib/settings.ts で設定されていません。");
     }
 
     try {
@@ -35,29 +35,38 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
             return [];
         }
 
+        // More robust key finding
+        const findKey = (item: any, possibleKeys: string[]) => {
+            for (const key of possibleKeys) {
+                if (key in item) return item[key];
+            }
+            return undefined;
+        };
+
         return dataToProcess.map((item: any) => {
             const getRole = (): 'admin' | 'staff' => {
-                const roleValue = item['権限'] || item['Role'] || item['ロール'];
+                const roleValue = findKey(item, ['権限', 'role', 'Role', 'ロール']);
                 if (typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
                     return 'admin';
                 }
                 return 'staff';
             };
 
-            const staffId = String(item['id'] || item['ID'] || item['スタッフID'] || `gas-staff-${Math.random()}`);
+            const staffId = String(findKey(item, ['id', 'ID', 'スタッフID']) || `gas-staff-${Math.random()}`);
             
+            // Priority: color from GAS, then fallback to hash
+            const assignedColor = findKey(item, ['color', 'カラー']);
             const fallbackColor = `hsl(${simpleHash(staffId) % 360}, 70%, 60%)`;
-            const assignedColor = item['color'] || item['カラー'] || fallbackColor;
 
             return {
                 id: staffId,
-                name: item['スタッフ名'] || item['name'] || 'No Name',
-                email: item['メールアドレス'] || item['email'] || '',
-                password: item['パスワード'] || item['password'] || 'password', // Ensure password is read
+                name: findKey(item, ['スタッフ名', 'name']) || 'No Name',
+                email: findKey(item, ['メールアドレス', 'email']) || '',
+                password: findKey(item, ['パスワード', 'password']) || '', // Ensure password is read
                 role: getRole(),
-                calendarId: item['calendarId'] || item['カレンダーID'],
-                color: assignedColor,
-                avatarUrl: item['avatarUrl'] || '',
+                calendarId: findKey(item, ['calendarId', 'カレンダーID']),
+                color: assignedColor || fallbackColor,
+                avatarUrl: findKey(item, ['avatarUrl']) || '',
                 ...item // Preserve original fields
             };
         });
@@ -98,7 +107,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     const loadStaff = async () => {
         setIsLoading(true);
         setError(null);
-        if (!STAFF_GAS_URL) {
+        if (!STAFF_GAS_URL || STAFF_GAS_URL.includes('TODO_REPLACE_THIS_URL')) {
             setError("スタッフ情報を取得するためのURLが設定されていません。「/src/lib/settings.ts」ファイルで設定してください。");
             setIsLoading(false);
             return;

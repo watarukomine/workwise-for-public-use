@@ -8,8 +8,9 @@
 /**
  * スタッフマスターのデータを取得・更新するためのGoogle Apps ScriptのURL。
  * 主に staff-context.tsx や auth.ts で使用されます。
+ * お客様の新しいGASのデプロイURLに置き換える必要があります。
  */
-export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b1tD4Y489xg0Fz09e84DtDAy_35KhJ_VD4RyJ3J1DavI0B_aZP5ck8hssWPCi/exec';
+export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbz_TODO_REPLACE_THIS_URL/exec';
 
 /**
  * 顧客情報（販売店情報）を取得・更新するためのGoogle Apps ScriptのURL。

@@ -32,11 +32,9 @@ export const signInWithEmail = async (email: string, password: string): Promise<
       throw new Error('スタッフマスタにアクセスできません。スタッフ管理ページでURLが正しく設定されているか確認してください。');
   }
 
-  // ★★★ 修正箇所 ★★★
-  // 問題切り分けのため、パスワードの比較を一時的にコメントアウトします。
   const user = staffList.find(staff => 
       staff.email?.trim().toLowerCase() === email.trim().toLowerCase()
-      // && staff.password?.trim() === password.trim()
+      && staff.password?.trim() === password.trim()
   );
 
   return new Promise((resolve, reject) => {
