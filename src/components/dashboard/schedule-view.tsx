@@ -307,6 +307,10 @@ export function ScheduleView({
     }
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
+     if (!staff.calendarId) {
+      toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
+      return;
+    }
 
     // --- Sheet Update Logic (using rawOrderId) ---
     if (eventToUnassign.rawOrderId) { // Only update sheet if it's a real order
@@ -340,7 +344,7 @@ export function ScheduleView({
                 if (result.data.status === 'error') throw new Error(result.data.message);
                 toast({ title: "カレンダーから予定を削除しました" });
             } catch (e: any) {
-                toast({ variant: 'destructive', title: 'カレンダー削除エラー', description: `Cloud Function呼び出しに失敗しました: ${e.message}` });
+                 toast({ variant: "destructive", title: "カレンダー削除エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
             }
         }
     }
@@ -406,6 +410,13 @@ export function ScheduleView({
       const finalStaffId = newStaffId || eventToUpdate.staffId;
       const staffMember = allStaff.find(s => s.id === finalStaffId);
 
+      if (!staffMember || !staffMember.calendarId) {
+        toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staffMember?.name}」にカレンダーIDが設定されていません。`});
+        setActiveItem(null);
+        setCurrentOverStaffId(null);
+        return;
+      }
+
       const updatedEvent = {
         ...eventToUpdate,
         staffId: finalStaffId,
@@ -447,7 +458,7 @@ export function ScheduleView({
           if (result.data.status === 'error') throw new Error(result.data.message);
           toast({ title: "カレンダー更新成功" });
         } catch (e: any) {
-          toast({ variant: 'destructive', title: 'カレンダー更新エラー', description: `Cloud Function呼び出しに失敗しました: ${e.message}` });
+          toast({ variant: "destructive", title: "カレンダー更新エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
         }
       }
 
@@ -468,9 +479,17 @@ export function ScheduleView({
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
+         if (!staff.calendarId) {
+          toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
+          setActiveItem(null);
+          setCurrentOverStaffId(null);
+          return;
+        }
+
         // --- Calendar Creation Logic (Kept as is) ---
         const handleCalendarCreate = async (event: Omit<WithId<ScheduleEvent>, 'calendarEventId'>): Promise<string | undefined> => {
             if (!staff.calendarId) {
+                toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
                 return;
             };
             try {
@@ -488,7 +507,7 @@ export function ScheduleView({
                 }
                 throw new Error(result.data.message || 'カレンダーに登録できませんでした。');
             } catch (e: any) {
-                toast({ variant: 'destructive', title: 'カレンダー登録エラー', description: `Cloud Function呼び出しに失敗しました: ${e.message}` });
+                toast({ variant: "destructive", title: "カレンダー登録エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
                 return undefined;
             }
         };
@@ -617,6 +636,11 @@ export function ScheduleView({
     if (dialogState.mode === 'new') {
         const staff = getStaffById(dialogState.staffId);
         if (!staff) return;
+         if (!staff.calendarId) {
+            toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
+            return;
+        }
+
 
         let calendarEventId: string | undefined;
         if (staff.calendarId) {
@@ -636,7 +660,7 @@ export function ScheduleView({
                     throw new Error(result.data.message);
                 }
             } catch (e: any) {
-                toast({ variant: 'destructive', title: 'カレンダー登録エラー', description: `Cloud Function呼び出しに失敗しました: ${e.message}` });
+                toast({ variant: "destructive", title: "カレンダー登録エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
             }
         }
 
@@ -655,6 +679,10 @@ export function ScheduleView({
     } else if (dialogState.mode === 'edit') {
         const staff = getStaffById(dialogState.event.staffId);
         if (!staff) return;
+        if (!staff.calendarId) {
+            toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
+            return;
+        }
 
         const updatedEvent = {
             ...dialogState.event,
@@ -678,7 +706,7 @@ export function ScheduleView({
                 if (result.data.status === 'error') throw new Error(result.data.message);
                 toast({ title: "カレンダー更新成功" });
             } catch (e: any) {
-                toast({ variant: 'destructive', title: 'カレンダー更新エラー', description: `Cloud Function呼び出しに失敗しました: ${e.message}` });
+                toast({ variant: "destructive", title: "カレンダー更新エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
             }
         }
 
