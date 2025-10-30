@@ -18,6 +18,19 @@ const simpleHash = (str: string) => {
     return Math.abs(hash);
 };
 
+const findKey = (item: any, possibleKeys: string[]) => {
+    for (const key of possibleKeys) {
+        const lowerKey = key.toLowerCase();
+        for (const itemKey in item) {
+            if (itemKey.toLowerCase() === lowerKey) {
+                return item[itemKey];
+            }
+        }
+    }
+    return undefined;
+};
+
+
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     const url = STAFF_GAS_URL;
     if (!url || url.includes('TODO_REPLACE_THIS_URL')) {
@@ -34,19 +47,6 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
             return [];
         }
 
-        // More robust key finding
-        const findKey = (item: any, possibleKeys: string[]) => {
-            for (const key of possibleKeys) {
-                const lowerKey = key.toLowerCase();
-                for (const itemKey in item) {
-                    if (itemKey.toLowerCase() === lowerKey) {
-                        return item[itemKey];
-                    }
-                }
-            }
-            return undefined;
-        };
-
         return dataToProcess.map((item: any) => {
             const getRole = (): 'admin' | 'staff' => {
                 const roleValue = findKey(item, ['権限', 'role', 'Role', 'ロール']);
@@ -58,7 +58,6 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
             const staffId = String(findKey(item, ['id', 'ID', 'スタッフID']) || `gas-staff-${Math.random()}`);
             
-            // Priority: color from GAS, then fallback to hash
             const assignedColor = findKey(item, ['color', 'カラー']);
             const fallbackColor = `hsl(${simpleHash(staffId) % 360}, 70%, 60%)`;
 
@@ -66,12 +65,12 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 id: staffId,
                 name: findKey(item, ['スタッフ名', 'name']) || 'No Name',
                 email: findKey(item, ['メールアドレス', 'email']) || '',
-                password: findKey(item, ['パスワード', 'password', 'Password']) || '', // Ensure password is read
+                password: findKey(item, ['パスワード', 'password', 'Password']) || '',
                 role: getRole(),
                 calendarId: findKey(item, ['calendarId', 'カレンダーID']),
                 color: assignedColor || fallbackColor,
                 avatarUrl: findKey(item, ['avatarUrl']) || '',
-                ...item // Preserve original fields
+                ...item
             };
         });
 

@@ -121,22 +121,35 @@ const parseDate = (dateString: any): Date | null => {
   return isValid(date) ? date : null;
 };
 
+const findKey = (item: any, possibleKeys: string[]) => {
+    for (const key of possibleKeys) {
+        const lowerKey = key.toLowerCase();
+        for (const itemKey in item) {
+            if (itemKey.toLowerCase() === lowerKey) {
+                return item[itemKey];
+            }
+        }
+    }
+    return undefined;
+};
+
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
-  const duration = parseInt(rawOrder['作業時間（分）'], 10);
-  const line1 = `${rawOrder['お取引先名'] || ''}${rawOrder['予定時間'] ? `：${formatTime(rawOrder['予定時間'])}` : ''}`;
-  const line2 = `${rawOrder['タイヤサイズ'] || ''}${rawOrder['本数'] ? `：${rawOrder['本数']}本` : ''}`;
-  let taskDetails = line1;
-  if (line2.trim()) {
-    taskDetails += `\n${line2}`;
-  }
-  return {
-    id: String(rawOrder['受注 ID'] || rawOrder.id || `ord-${Math.random()}`),
-    customerCode: String(rawOrder['ユーザーコード'] || ''),
-    taskDetails: taskDetails.trim(),
-    estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
-    raw: rawOrder,
-    rawOrderId: String(rawOrder['受注 ID'] || rawOrder.id)
-  };
+    const duration = parseInt(rawOrder['作業時間（分）'], 10);
+    const line1 = `${rawOrder['お取引先名'] || ''}${rawOrder['予定時間'] ? `：${formatTime(rawOrder['予定時間'])}` : ''}`;
+    const line2 = `${rawOrder['タイヤサイズ'] || ''}${rawOrder['本数'] ? `：${rawOrder['本数']}本` : ''}`;
+    let taskDetails = line1;
+    if (line2.trim()) {
+        taskDetails += `\n${line2}`;
+    }
+    const orderId = findKey(rawOrder, ['受注id', '受注id', 'id', '受注 ID']);
+    return {
+        id: String(orderId || `ord-${Math.random()}`),
+        customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
+        taskDetails: taskDetails.trim(),
+        estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
+        raw: rawOrder,
+        rawOrderId: String(orderId || '')
+    };
 };
 
 
