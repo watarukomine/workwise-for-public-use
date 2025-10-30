@@ -9,7 +9,6 @@ import {
   type DragEndEvent,
   type DragStartEvent,
   type DragOverEvent,
-  type UniqueIdentifier,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import type { ScheduleEvent, Staff, Customer, Order, WithId } from '@/lib/types';
@@ -117,7 +116,7 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
 const findKey = (item: any, possibleKeys: string[]) => {
     for (const key of possibleKeys) {
-        const lowerKey = key.toLowerCase();
+        const lowerKey = key.toLowerCase().trim();
         for (const itemKey in item) {
             if (itemKey.toLowerCase().trim() === lowerKey) {
                 return item[itemKey];
@@ -137,7 +136,7 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
         taskDetails += `\n${line2}`;
     }
     
-    const idKeys = ['受注 id', '受注id', '受注id', 'id'];
+    const idKeys = ['受注 ID','受注id', '受注ID', 'id'];
     const orderId = findKey(rawOrder, idKeys);
 
     return {
@@ -324,11 +323,13 @@ export function ScheduleView({
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   
-  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>(() => {
-    if (!rawOrdersData) return [];
+  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
+  
+  React.useEffect(() => {
+    if (!rawOrdersData) return;
     const allMappedOrders = rawOrdersData.map(mapRawToOrder);
     const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
-    return allMappedOrders.filter(order => {
+    const newUnassignedOrders = allMappedOrders.filter(order => {
         if (!order.rawOrderId) return false;
         if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
         
@@ -340,7 +341,9 @@ export function ScheduleView({
         
         return isScheduledForToday || isReceivedToday;
     });
-  });
+    setUnassignedOrders(newUnassignedOrders);
+  }, [rawOrdersData, scheduleData]);
+
 
   const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.id === id);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -367,13 +370,7 @@ export function ScheduleView({
   const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
     const rawOrderId = eventToUnassign.rawOrderId;
     
-    // Check if it's a generic task, which won't have a rawOrderId from a sheet
-    if (eventToUnassign.id.startsWith('generic-')) {
-        setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id));
-        toast({ title: '汎用タスクを削除しました' });
-        return;
-    }
-    
+    // It's a real order from the sheet, not a generic task
     if (rawOrderId) {
         try {
             const sheetResult = await updateSheetStatus({
@@ -393,21 +390,25 @@ export function ScheduleView({
             toast({ variant: 'destructive', title: 'シート更新エラー', description: `シート担当者のクリアに失敗しました: ${e.message}` });
             return;
         }
+
+        // Find the original full order object to add back to the unassigned list
+        const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === rawOrderId);
+        if (originalOrder) {
+          const orderToAddBack = mapRawToOrder(originalOrder);
+           setUnassignedOrders(prev => {
+             // Prevent duplicates
+            if (!prev.some(o => o.id === orderToAddBack.id)) {
+              return [...prev, orderToAddBack];
+            }
+            return prev;
+          });
+        }
+    } else {
+         toast({ title: '汎用タスクを削除しました' });
     }
     
-    setScheduleData(prev => prev.filter(e => e.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
-
-    // Also add the order back to the unassigned list if it was a real order
-    const originalOrder = rawOrdersData.find(o => findKey(o, ['受注 ID', '受注id', '受注ID', 'id']) === rawOrderId);
-    if (originalOrder) {
-      const orderToAddBack = mapRawToOrder(originalOrder);
-      setUnassignedOrders(prev => {
-        if (!prev.some(o => o.id === orderToAddBack.id)) {
-          return [...prev, orderToAddBack];
-        }
-        return prev;
-      });
-    }
+    // Remove the event (and its travel buddy) from the schedule
+    setScheduleData(prev => prev.filter(e => eventToUnassign.tripId ? e.tripId !== eventToUnassign.tripId : e.id !== eventToUnassign.id));
   };
 
 
