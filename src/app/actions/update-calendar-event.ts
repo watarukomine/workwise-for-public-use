@@ -2,7 +2,9 @@
 'use server';
 
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { initializeServerFirebase } from '@/firebase/server-init';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFunctions as getAdminFunctions } from 'firebase-admin/functions';
+import { firebaseConfig } from '@/firebase/config';
 
 interface UpdateCalendarEventArgs {
     operation: 'create' | 'update' | 'delete';
@@ -20,30 +22,32 @@ interface FunctionResponse {
     eventId?: string;
 }
 
+// Ensure Firebase Admin is initialized only once on the server
+if (getApps().length === 0) {
+    initializeApp({
+        projectId: firebaseConfig.projectId,
+    });
+}
+
 /**
- * Calls the `updateCalendarEvent` Cloud Function to interact with Google Calendar.
+ * Calls the `updatecalendarevent` Cloud Function to interact with Google Calendar.
  * This server action acts as a client-side entry point to the secure backend function.
  * @param args - The arguments for the calendar operation.
  * @returns A promise that resolves to the response from the Cloud Function.
  */
 export async function updateCalendarEvent(args: UpdateCalendarEventArgs): Promise<FunctionResponse> {
     try {
-        // Use the server-side Firebase initialization.
-        const { firebaseApp } = initializeServerFirebase();
-        const functions = getFunctions(firebaseApp, 'asia-northeast1');
-
-        // Get a callable reference to the Cloud Function.
-        // CRITICAL: The function name MUST be all lowercase for the callable to work.
-        const callable = httpsCallable<UpdateCalendarEventArgs, FunctionResponse>(functions, 'updatecalendarevent');
+        const functions = getAdminFunctions();
+        const callable = functions.httpsCallable('updatecalendarevent', { region: 'asia-northeast1' });
 
         console.log("Calling 'updatecalendarevent' Cloud Function with args:", args);
 
-        // Call the function with the provided arguments.
         const result = await callable(args);
         
         console.log("Cloud Function response received:", result.data);
 
-        return result.data;
+        // Assuming result.data is already in FunctionResponse format
+        return result.data as FunctionResponse;
 
     } catch (error: any) {
         console.error('Failed to call Cloud Function for calendar update:', error);
