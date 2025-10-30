@@ -1,42 +1,50 @@
-
 'use client';
 
-// This file's functionality is largely disabled for the simplified mock auth flow.
-// It is kept to avoid breaking imports across the application.
-// The core logic now resides in `src/lib/auth.ts` and contexts.
+import { firebaseConfig } from '@/firebase/config';
+import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
+import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore'
 
+// IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
-  // This function no longer initializes Firebase.
-  // Returns mock objects to satisfy downstream dependencies.
-  console.log("Firebase initialization is mocked.");
+  if (!getApps().length) {
+    // Important! initializeApp() is called without any arguments because Firebase App Hosting
+    // integrates with the initializeApp() function to provide the environment variables needed to
+    // populate the FirebaseOptions in production. It is critical that we attempt to call initializeApp()
+    // without arguments.
+    let firebaseApp;
+    try {
+      // Attempt to initialize via Firebase App Hosting environment variables
+      firebaseApp = initializeApp();
+    } catch (e) {
+      // Only warn in production because it's normal to use the firebaseConfig to initialize
+      // during development
+      if (process.env.NODE_ENV === "production") {
+        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
+      }
+      firebaseApp = initializeApp(firebaseConfig);
+    }
+
+    return getSdks(firebaseApp);
+  }
+
+  // If already initialized, return the SDKs with the already initialized App
+  return getSdks(getApp());
+}
+
+export function getSdks(firebaseApp: FirebaseApp) {
   return {
-    firebaseApp: {},
-    auth: {},
-    firestore: {},
+    firebaseApp,
+    auth: getAuth(firebaseApp),
+    firestore: getFirestore(firebaseApp)
   };
 }
 
-export const getSdks = (app: any) => ({
-  firebaseApp: app,
-  auth: {},
-  firestore: {},
-});
-
-// Exporting mock/dummy versions of functions and hooks
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';
 export * from './firestore/use-doc';
+export * from './non-blocking-updates';
+export * from './non-blocking-login';
 export * from './errors';
 export * from './error-emitter';
-
-// Mock non-blocking updates if they are imported elsewhere
-export const setDocumentNonBlocking = () => console.warn('setDocumentNonBlocking is mocked.');
-export const addDocumentNonBlocking = () => console.warn('addDocumentNonBlocking is mocked.');
-export const updateDocumentNonBlocking = () => console.warn('updateDocumentNonBlocking is mocked.');
-export const deleteDocumentNonBlocking = () => console.warn('deleteDocumentNonBlocking is mocked.');
-
-// Mock non-blocking login if they are imported elsewhere
-export const initiateAnonymousSignIn = () => console.warn('initiateAnonymousSignIn is mocked.');
-export const initiateEmailSignUp = () => console.warn('initiateEmailSignUp is mocked.');
-export const initiateEmailSignIn = () => console.warn('initiateEmailSignIn is mocked.');
