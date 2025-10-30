@@ -45,6 +45,7 @@ import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Textarea } from '../ui/textarea';
 import { useFunctions } from '@/firebase';
 import { httpsCallable } from 'firebase/functions';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
 
 const PIXELS_PER_MINUTE = 1.5;
