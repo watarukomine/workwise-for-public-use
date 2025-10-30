@@ -45,6 +45,7 @@ export default function CheckInPage() {
     setIsLoading(action);
     setError(null);
     
+    // Actions that don't require location or sheet updates
     if (action === 'Clock In' || action === 'Clock Out') {
         console.log(`Action: ${action}`);
         setTimeout(() => {
@@ -79,25 +80,22 @@ export default function CheckInPage() {
         return;
     }
 
+    // Map actions to their corresponding status values for the sheet update
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '作業完了',
+      'Finish Task': '待機中', // As per user request, Finish Task sets status to "待機中"
       'Wait': '待機中',
-      'Arrive': '作業待ち', // Arrive sets the status to '作業待ち'
+      'Arrive': '作業待ち',
     };
 
     const statusValue = statusMap[action];
     
     if (!statusValue) {
         console.error("No status defined for this action:", action);
-        // For actions like 'Arrive' which don't have a statusValue but proceed
-        if (action !== 'Arrive') {
-          setIsLoading(null);
-          return;
-        }
+        setIsLoading(null);
+        return;
     }
-
 
     if (!navigator.geolocation) {
       setError('お使いのブラウザは位置情報取得に対応していません。');
@@ -112,49 +110,42 @@ export default function CheckInPage() {
         
         console.log(`Action: ${action}`, { latitude, longitude });
         
-        // All actions that have a statusValue will update the sheet
-        if (statusValue) {
-            if (!profile?.name) {
-                setError('ユーザー情報が取得できません。ログインしているか確認してください。');
-                setIsLoading(null);
-                return;
-            }
-            try {
-                const eventTitleForUpdate = `(ID: ${MOCK_ORDER_ID})`;
-                const result = await updateSheetStatus({
-                    gasUrl: ORDER_GAS_URL,
-                    eventTitle: eventTitleForUpdate,
-                    staffName: profile.name, // Pass staff name to identify row if needed
-                    statusValue: statusValue,
-                });
-
-                if (result.status === 'error') {
-                    throw new Error(result.message);
-                }
-
-                toast({
-                    title: 'ステータスを更新しました',
-                    description: result.message,
-                });
-
-            } catch (e: any) {
-                setError(e.message || 'スプレッドシートの更新に失敗しました。');
-                toast({
-                    variant: 'destructive',
-                    title: '更新エラー',
-                    description: e.message || 'スプレッドシートの更新に失敗しました。'
-                });
-            }
+        if (!profile?.name) {
+            setError('ユーザー情報が取得できません。ログインしているか確認してください。');
+            setIsLoading(null);
+            return;
         }
-        
-        const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-        setLastAction({ action, time: currentTime });
-        
-        // Show toast for actions that don't update status, like 'Arrive' before it had a status
-        if (!statusValue) {
-             toast({
-                title: 'アクションを記録しました',
-                description: `${getJapaneseActionName(action)} at ${currentTime}`,
+
+        try {
+            // For check-in, we might not have a specific order, so we use a mock or a convention.
+            // Here, we use a placeholder that the GAS script might need to identify the row.
+            // If the row is identified by staff name, eventTitle can be less specific.
+            const eventTitleForUpdate = `(ID: ${MOCK_ORDER_ID})`;
+            const result = await updateSheetStatus({
+                gasUrl: ORDER_GAS_URL,
+                eventTitle: eventTitleForUpdate, // The title GAS uses to find the row
+                staffName: profile.name, // The staff member performing the action
+                statusValue: statusValue, // The new status to set
+            });
+
+            if (result.status === 'error') {
+                throw new Error(result.message);
+            }
+
+            toast({
+                title: 'ステータスを更新しました',
+                description: result.message,
+            });
+
+            const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            setLastAction({ action, time: currentTime });
+
+        } catch (e: any) {
+            setError(e.message || 'スプレッドシートの更新に失敗しました。');
+            toast({
+                variant: 'destructive',
+                title: '更新エラー',
+                description: e.message || 'スプレッドシートの更新に失敗しました。'
             });
         }
         
