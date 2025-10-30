@@ -45,6 +45,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -349,6 +350,7 @@ export function ScheduleView({
     const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
         try {
             const result = await updateSheetStatus({ 
+              gasUrl: ORDER_GAS_URL,
               eventTitle: eventToUnassign.title, 
               staffName: "", //担当者を空にする
             });
@@ -366,7 +368,7 @@ export function ScheduleView({
             }
         
             setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id));
-            toast({ title: 'ステータスを未割当に戻しました' });
+            toast({ title: 'タスクを未割当に戻しました' });
         } catch(e: any) {
             console.error("Unassignment failed:", e);
             toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
@@ -401,6 +403,7 @@ export function ScheduleView({
         try {
             if (draggedEvent.rawOrderId && draggedEvent.staffId !== newStaffId) {
                 const result = await updateSheetStatus({ 
+                  gasUrl: ORDER_GAS_URL,
                   eventTitle: draggedEvent.title, 
                   staffName: staffMember.name,
                 });
@@ -444,15 +447,16 @@ export function ScheduleView({
         } else {
             try {
               const result = await updateSheetStatus({ 
+                gasUrl: ORDER_GAS_URL,
                 eventTitle: eventTitle, 
                 staffName: staff.name,
               });
 
               if (result.status === 'error') throw new Error(result.message);
 
-              toast({ 
-                  title: '担当者を割り当てました', 
-                  description: '必要であれば、汎用タスクから「移動」もドラッグしてください。'
+              toast({
+                title: '担当者を割り当てました',
+                description: '必要であれば、汎用タスクから「移動」もドラッグしてください。',
               });
               
               const taskEvent: WithId<ScheduleEvent> = {
