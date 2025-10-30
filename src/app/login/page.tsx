@@ -27,7 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { signInWithEmail, signUpWithEmail } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useUserProfile } from '@/hooks/use-user-profile';
 
@@ -47,6 +47,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [activeTab, setActiveTab] = React.useState('login');
+  const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
   const { toast } = useToast();
   const router = useRouter();
   const { setProfile } = useUserProfile();
@@ -107,6 +108,8 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+  
+  const togglePasswordVisibility = () => setIsPasswordVisible(prev => !prev);
 
   return (
     <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
@@ -144,9 +147,24 @@ export default function LoginPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>パスワード</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="password" {...field} />
-                        </FormControl>
+                        <div className="relative">
+                          <FormControl>
+                            <Input 
+                              type={isPasswordVisible ? 'text' : 'password'} 
+                              placeholder="password" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute inset-y-0 right-0 h-full px-3 text-muted-foreground"
+                            onClick={togglePasswordVisibility}
+                          >
+                            {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -214,9 +232,24 @@ export default function LoginPage() {
                         render={({ field }) => (
                         <FormItem>
                             <FormLabel>パスワード</FormLabel>
-                            <FormControl>
-                            <Input type="password" placeholder="6文字以上" {...field} />
-                            </FormControl>
+                            <div className="relative">
+                              <FormControl>
+                                <Input 
+                                  type={isPasswordVisible ? 'text' : 'password'} 
+                                  placeholder="6文字以上" 
+                                  {...field} 
+                                />
+                              </FormControl>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute inset-y-0 right-0 h-full px-3 text-muted-foreground"
+                                onClick={togglePasswordVisibility}
+                              >
+                                {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </Button>
+                            </div>
                             <FormMessage />
                         </FormItem>
                         )}
