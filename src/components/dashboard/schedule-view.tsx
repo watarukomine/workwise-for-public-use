@@ -306,6 +306,7 @@ export function ScheduleView({
               gasUrl: orderGasUrl,
               orderId: eventToUnassign.rawOrderId,
               staffName: null, // Set staff name to null/empty
+              eventTitle: eventToUnassign.title,
           });
           if (sheetResult.status === 'error') throw new Error(sheetResult.message);
           toast({ title: "担当者をシートから削除しました", description: sheetResult.message });
@@ -390,6 +391,7 @@ export function ScheduleView({
                   gasUrl: orderGasUrl,
                   orderId: updatedEvent.rawOrderId,
                   staffName: staffMember.name,
+                  eventTitle: updatedEvent.title,
               });
               if (sheetResult.status === 'error') throw new Error(sheetResult.message);
               toast({ title: '担当者をシートで更新しました', description: `担当者を「${staffMember.name}」に変更しました。`});
@@ -438,12 +440,26 @@ export function ScheduleView({
             
             const rawOrderId = order.raw?.['受注ID'] || order.id;
             
+            const taskEvent: WithId<ScheduleEvent> = {
+                id: `event-${Date.now()}-task`,
+                tripId: tripId,
+                orderId: order.id,
+                rawOrderId: rawOrderId,
+                title: order.taskDetails,
+                description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
+                staffId: newStaffId,
+                locationId: customer?.id || '',
+                start: taskStart,
+                end: taskEnd,
+            };
+
             // --- Sheet Update Logic ---
             try {
               const sheetResult = await updateSheetStatus({
                 gasUrl: orderGasUrl,
                 orderId: rawOrderId,
                 staffName: staff.name,
+                eventTitle: taskEvent.title,
               });
               if (sheetResult.status === 'error') throw new Error(sheetResult.message);
               toast({ title: '担当者をシートに記録しました', description: sheetResult.message });
@@ -464,19 +480,6 @@ export function ScheduleView({
                 locationId: customer?.id || '',
                 start: travelStart,
                 end: taskStart,
-            };
-            
-            const taskEvent: WithId<ScheduleEvent> = {
-                id: `event-${Date.now()}-task`,
-                tripId: tripId,
-                orderId: order.id,
-                rawOrderId: rawOrderId,
-                title: order.taskDetails,
-                description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
-                staffId: newStaffId,
-                locationId: customer?.id || '',
-                start: taskStart,
-                end: taskEnd,
             };
             
             setOrdersData(prev => prev.filter(o => o.id !== order.id));

@@ -4,6 +4,7 @@
 interface UpdateSheetStatusArgs {
     orderId: string;
     staffName?: string | null;
+    eventTitle?: string | null;
     gasUrl: string;
 }
 
@@ -13,7 +14,7 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, orderId, staffName } = args;
+    const { gasUrl, orderId, staffName, eventTitle } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
@@ -26,6 +27,7 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
     const payload = {
         orderId: orderId,
         staffName: staffName === undefined ? null : staffName,
+        eventTitle: eventTitle === undefined ? null : eventTitle,
     };
 
     try {
