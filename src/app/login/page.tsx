@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -24,12 +23,15 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { signInWithEmail, signUpWithEmail } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useAuth } from '@/firebase';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from 'firebase/auth';
 
 const loginSchema = z.object({
   email: z.string().email({ message: '有効なメールアドレスを入力してください。' }),
@@ -37,7 +39,7 @@ const loginSchema = z.object({
 });
 
 const signUpSchema = loginSchema.extend({
-    name: z.string().min(1, { message: '名前を入力してください。' }),
+  name: z.string().min(1, { message: '名前を入力してください。' }),
 });
 
 type LoginSchema = z.infer<typeof loginSchema>;
@@ -50,7 +52,7 @@ export default function LoginPage() {
   const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const { setProfile } = useUserProfile();
+  const auth = useAuth();
 
   const loginForm = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -62,13 +64,13 @@ export default function LoginPage() {
 
   const signUpForm = useForm<SignUpSchema>({
     resolver: zodResolver(signUpSchema),
-     defaultValues: {
+    defaultValues: {
       name: '',
       email: '',
       password: '',
     },
   });
-  
+
   React.useEffect(() => {
     setError(null);
   }, [activeTab]);
@@ -77,13 +79,12 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const user = await signInWithEmail(data.email, data.password);
-      setProfile(user); // Update the global profile
+      await signInWithEmailAndPassword(auth, data.email, data.password);
       toast({
         title: 'ログインしました',
         description: 'WorkWiseへようこそ！',
       });
-      router.push('/'); 
+      router.push('/');
     } catch (e: any) {
       setError(e.message || 'ログイン中にエラーが発生しました。');
     } finally {
@@ -94,36 +95,41 @@ export default function LoginPage() {
   const handleSignUp = async (data: SignUpSchema) => {
     setIsLoading(true);
     setError(null);
-     try {
-      const user = await signUpWithEmail(data.email, data.password, data.name);
-      setProfile(user); // Update the global profile
+    try {
+      await createUserWithEmailAndPassword(auth, data.email, data.password);
       toast({
-        title: user.id.startsWith('new-') ? 'アカウントを作成しました' : 'ログインしました',
+        title: 'アカウントを作成しました',
         description: 'WorkWiseへようこそ！',
       });
-       router.push('/');
+      router.push('/');
     } catch (e: any) {
       setError(e.message || '新規登録中にエラーが発生しました。');
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const togglePasswordVisibility = () => setIsPasswordVisible(prev => !prev);
+
+  const togglePasswordVisibility = () => setIsPasswordVisible((prev) => !prev);
 
   return (
     <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
-      <Tabs defaultValue="login" className="w-full max-w-md" onValueChange={setActiveTab}>
+      <Tabs
+        defaultValue="login"
+        className="w-full max-w-md"
+        onValueChange={setActiveTab}
+      >
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="login">ログイン</TabsTrigger>
           <TabsTrigger value="signup">新規登録</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="login">
           <Card>
             <CardHeader>
               <CardTitle>ログイン</CardTitle>
-              <CardDescription>アカウント情報を入力してログインしてください。</CardDescription>
+              <CardDescription>
+                アカウント情報を入力してログインしてください。
+              </CardDescription>
             </CardHeader>
             <Form {...loginForm}>
               <form onSubmit={loginForm.handleSubmit(handleLogin)}>
@@ -149,10 +155,10 @@ export default function LoginPage() {
                         <FormLabel>パスワード</FormLabel>
                         <div className="relative">
                           <FormControl>
-                            <Input 
-                              type={isPasswordVisible ? 'text' : 'password'} 
-                              placeholder="password" 
-                              {...field} 
+                            <Input
+                              type={isPasswordVisible ? 'text' : 'password'}
+                              placeholder="password"
+                              {...field}
                             />
                           </FormControl>
                           <Button
@@ -162,7 +168,11 @@ export default function LoginPage() {
                             className="absolute inset-y-0 right-0 h-full px-3 text-muted-foreground"
                             onClick={togglePasswordVisibility}
                           >
-                            {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            {isPasswordVisible ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
                           </Button>
                         </div>
                         <FormMessage />
@@ -171,94 +181,103 @@ export default function LoginPage() {
                   />
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4">
-                   {error && activeTab === 'login' && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {error && activeTab === 'login' && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     ログイン
                   </Button>
-                   <Alert variant="default" className="mt-4">
-                    <AlertTitle>サンプルアカウント</AlertTitle>
-                    <AlertDescription className="text-xs">
-                        <p>テスト用に、以下のアカウントでログインできます。</p>
-                        <p className="mt-2"><strong>管理者ID:</strong> admin@example.com</p>
-                        <p><strong>一般ID:</strong> staff@example.com</p>
-                        <p><strong>PW (共通):</strong> password</p>
-                    </AlertDescription>
-                   </Alert>
                 </CardFooter>
               </form>
             </Form>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="signup">
           <Card>
             <CardHeader>
               <CardTitle>新規登録</CardTitle>
-              <CardDescription>新しいアカウントを作成します。（このセッションでのみ有効です）</CardDescription>
+              <CardDescription>
+                新しいアカウントを作成します。
+              </CardDescription>
             </CardHeader>
-             <Form {...signUpForm}>
+            <Form {...signUpForm}>
               <form onSubmit={signUpForm.handleSubmit(handleSignUp)}>
-                 <CardContent className="space-y-4">
-                    <FormField
-                        control={signUpForm.control}
-                        name="name"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>名前</FormLabel>
-                            <FormControl>
-                            <Input placeholder="山田 太郎" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={signUpForm.control}
-                        name="email"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>メールアドレス</FormLabel>
-                            <FormControl>
-                            <Input placeholder="email@example.com" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={signUpForm.control}
-                        name="password"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>パスワード</FormLabel>
-                            <div className="relative">
-                              <FormControl>
-                                <Input 
-                                  type={isPasswordVisible ? 'text' : 'password'} 
-                                  placeholder="6文字以上" 
-                                  {...field} 
-                                />
-                              </FormControl>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute inset-y-0 right-0 h-full px-3 text-muted-foreground"
-                                onClick={togglePasswordVisibility}
-                              >
-                                {isPasswordVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </Button>
-                            </div>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={signUpForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>名前</FormLabel>
+                        <FormControl>
+                          <Input placeholder="山田 太郎" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signUpForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>メールアドレス</FormLabel>
+                        <FormControl>
+                          <Input placeholder="email@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signUpForm.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>パスワード</FormLabel>
+                        <div className="relative">
+                          <FormControl>
+                            <Input
+                              type={isPasswordVisible ? 'text' : 'password'}
+                              placeholder="6文字以上"
+                              {...field}
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="absolute inset-y-0 right-0 h-full px-3 text-muted-foreground"
+                            onClick={togglePasswordVisibility}
+                          >
+                            {isPasswordVisible ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </CardContent>
                 <CardFooter className="flex flex-col gap-4">
-                  {error && activeTab === 'signup' && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+                  {error && activeTab === 'signup' && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isLoading && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     登録する
                   </Button>
                 </CardFooter>

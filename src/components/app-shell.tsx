@@ -39,9 +39,9 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import React from 'react';
 import { Loader2 } from 'lucide-react';
-import { useUserProfile } from '@/hooks/use-user-profile';
 import { useIsMobile } from '@/hooks/use-mobile';
-
+import { useUser, useAuth } from '@/firebase';
+import { signOut } from 'firebase/auth';
 
 const allNavItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'] },
@@ -54,26 +54,28 @@ const allNavItems = [
 
 function NavMenu() {
   const pathname = usePathname();
-  const { profile, isLoading } = useUserProfile();
+  const { user, isUserLoading } = useUser();
   const isMobile = useIsMobile();
+  // We will need to fetch the user's role from Firestore in a later step
+  const userRole = 'admin'; // Placeholder
 
   const navItems = React.useMemo(() => {
-    if (isLoading || !profile) {
+    if (isUserLoading || !user) {
       return [];
     }
     
-    if (profile.role === 'admin') {
+    if (userRole === 'admin') {
       return allNavItems.filter(item => !item.mobileOnly || isMobile);
     }
 
     return allNavItems.filter(item => {
-        const roleMatch = item.roles.includes(profile.role);
+        const roleMatch = item.roles.includes(userRole);
         const deviceMatch = !item.mobileOnly || isMobile;
         return roleMatch && deviceMatch;
     });
-  }, [profile, isLoading, isMobile]);
+  }, [user, isUserLoading, isMobile, userRole]);
 
-  if (isLoading) {
+  if (isUserLoading) {
       return (
         <div className="p-4 space-y-2">
             <div className="h-8 bg-gray-200 rounded-md animate-pulse"></div>
@@ -107,21 +109,33 @@ function NavMenu() {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const router = useRouter();
-  const { profile, isLoading, clearProfile } = useUserProfile();
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
   const [isAuthLoading, setIsAuthLoading] = React.useState(false);
 
   const handleSignOut = async () => {
     setIsAuthLoading(true);
-    clearProfile();
-    toast({
-      title: "ログアウトしました",
-    });
-    router.push('/login');
-    setIsAuthLoading(false);
+    try {
+      await signOut(auth);
+      toast({
+        title: "ログアウトしました",
+      });
+      router.push('/login');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      toast({
+        title: "ログアウトエラー",
+        description: "ログアウト中に問題が発生しました。",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
   
-  const displayName = profile?.name || 'Anonymous';
-  const displayEmail = profile?.email || '...';
+  const displayName = user?.displayName || user?.email || 'Anonymous';
+  const displayEmail = user?.email || '...';
+  const isLoading = isUserLoading || isAuthLoading;
 
   return (
     <SidebarProvider>
@@ -135,19 +149,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          {profile && <NavMenu />}
+          {user && <NavMenu />}
         </SidebarContent>
         <SidebarFooter className="p-2">
-          {isLoading || isAuthLoading ? (
+          {isLoading ? (
              <div className="flex items-center justify-center p-4">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : profile ? (
+          ) : user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="w-full justify-start items-center gap-3 p-2 h-auto text-left">
                    <Avatar className="h-9 w-9">
-                    <AvatarImage src={profile?.avatarUrl} data-ai-hint="person" />
+                    <AvatarImage src={user?.photoURL || ''} data-ai-hint="person" />
                     <AvatarFallback>{displayName.charAt(0) ?? 'A'}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 -space-y-1">
