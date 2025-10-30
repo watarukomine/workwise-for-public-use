@@ -5,8 +5,7 @@
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
-import { GoogleAuth } from "google-auth-library";
-import { calendar_v3, google } from "googleapis";
+import { google, type calendar_v3 } from "googleapis";
 import { initializeApp, getApps } from "firebase-admin/app";
 
 // Set the timezone for the function environment to Japan Standard Time
@@ -31,18 +30,18 @@ interface CalendarEventArgs {
 }
 
 // Helper function to get an authenticated Google Calendar API client
+// This function now relies on Application Default Credentials provided by the Cloud Functions environment,
+// which is automatically handled when firebase-admin is initialized.
 async function getAuthenticatedCalendarClient(): Promise<calendar_v3.Calendar> {
-    logger.info("Authenticating with Google Calendar API...");
-    // Use Application Default Credentials, which are available in the Cloud Functions environment.
-    // The scope is specified to request permission for calendar events.
-    const auth = new GoogleAuth({
-        scopes: ["https://www.googleapis.com/auth/calendar.events"],
-    });
-    const authClient = await auth.getClient();
-    const calendar = google.calendar({ version: "v3", auth: authClient });
-    logger.info("Authentication successful.");
+    logger.info("Getting Google Calendar API client...");
+    // When running in a Google Cloud environment (like Cloud Functions),
+    // the googleapis library automatically uses the service account credentials.
+    // No manual authentication setup is needed here.
+    const calendar = google.calendar({ version: "v3" });
+    logger.info("Google Calendar API client obtained successfully.");
     return calendar;
 }
+
 
 // CRITICAL: The function name must be all lowercase to be callable from the client SDK.
 export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (request) => {
@@ -62,9 +61,9 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
         throw new HttpsError("invalid-argument", "A calendarId must be provided.");
     }
 
-    const calendar = await getAuthenticatedCalendarClient();
-
     try {
+        const calendar = await getAuthenticatedCalendarClient();
+
         switch (operation) {
             case "create":
                 if (!startTime || !endTime || !title) {
@@ -133,7 +132,7 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
         });
         // Rethrow the entire error object for more detailed client-side debugging
         throw new HttpsError("internal", `Google Calendar API Error: ${error.message}`, {
-            details: error.response?.data?.error?.message || "No further details.",
+            details: error.response?.data?.error || "No further details.",
             fullError: JSON.parse(JSON.stringify(error)) // Serialize the full error object
         });
     }
