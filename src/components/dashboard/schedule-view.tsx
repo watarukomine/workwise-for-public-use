@@ -75,7 +75,18 @@ const timeStringToDate = (timeStr: string) => {
 const formatTime = (date: Date | string) => {
   const d = typeof date === 'string' ? parseISO(date) : date;
    if (!d || !isValid(d) || isNaN(d.getTime())) {
-    return "Invalid date";
+    // Try to parse just time part like "10:00"
+     if (typeof date === 'string') {
+        const today = new Date();
+        const [hours, minutes] = date.split(':');
+        if (hours && minutes) {
+            today.setHours(parseInt(hours, 10), parseInt(minutes, 10));
+            if (isValid(today)) {
+                return format(today, 'HH:mm');
+            }
+        }
+     }
+    return "Invalid time";
   }
   return format(d, 'HH:mm');
 };
@@ -103,6 +114,31 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
     width: minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30), // Ensure minimum width
   };
 };
+
+const parseDate = (dateString: any): Date | null => {
+  if (!dateString || typeof dateString !== 'string') return null;
+  const date = parseISO(dateString);
+  return isValid(date) ? date : null;
+};
+
+const mapRawToOrder = (rawOrder: any): WithId<Order> => {
+  const duration = parseInt(rawOrder['作業時間（分）'], 10);
+  const line1 = `${rawOrder['お取引先名'] || ''}${rawOrder['予定時間'] ? `：${formatTime(rawOrder['予定時間'])}` : ''}`;
+  const line2 = `${rawOrder['タイヤサイズ'] || ''}${rawOrder['本数'] ? `：${rawOrder['本数']}本` : ''}`;
+  let taskDetails = line1;
+  if (line2.trim()) {
+    taskDetails += `\n${line2}`;
+  }
+  return {
+    id: String(rawOrder['受注ID'] || rawOrder.id || `ord-${Math.random()}`),
+    customerCode: String(rawOrder['ユーザーコード'] || ''),
+    taskDetails: taskDetails.trim(),
+    estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
+    raw: rawOrder,
+    rawOrderId: String(rawOrder['受注ID'] || rawOrder.id)
+  };
+};
+
 
 // --- Draggable Task Components ---
 
@@ -179,9 +215,8 @@ interface ScheduleViewProps {
     staffData: WithId<Staff>[];
     customerData: WithId<Customer>[]; // This is static, from lib/data, might be empty
     scheduleData: WithId<ScheduleEvent>[];
-    ordersData: WithId<Order>[]; // These are the dynamic, unassigned orders
+    rawOrdersData: any[]; // These are the dynamic, unassigned orders
     setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
-    setOrdersData: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
 }
 
 const getDraggableClassName = (task: Order) => {
@@ -230,7 +265,7 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
                             ))}
                             {orders.length === 0 && (
                                 <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
-                                    <p>未割り当てのオーダーはありません。</p>
+                                    <p>本日の未割り当てオーダーはありません。</p>
                                 </div>
                             )}
                         </div>
@@ -247,9 +282,8 @@ export function ScheduleView({
     staffData, 
     customerData,
     scheduleData, 
-    ordersData, // These are the unassigned orders from page.tsx
+    rawOrdersData,
     setScheduleData,
-    setOrdersData
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
   
@@ -267,6 +301,25 @@ export function ScheduleView({
   const { toast } = useToast();
   const { orderGasUrl } = useOrder();
 
+  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
+
+  React.useEffect(() => {
+      const scheduledOrderIds = new Set(scheduleData.map(e => e.orderId).filter(Boolean));
+      const todaysOrders = rawOrdersData
+        .filter(order => {
+          const scheduledDate = parseDate(order['作業予定日']);
+          const receptionDate = parseDate(order['受付日']);
+          const isScheduledForToday = scheduledDate ? isToday(scheduledDate) : false;
+          const isReceivedToday = receptionDate ? isToday(receptionDate) : false;
+          return isScheduledForToday || (isReceivedToday && !scheduledDate);
+        })
+        .map(mapRawToOrder)
+        .filter(order => !scheduledOrderIds.has(order.id));
+
+      setUnassignedOrders(todaysOrders);
+  }, [rawOrdersData, scheduleData]);
+
+
   React.useEffect(() => {
     setIsClient(true);
   }, []);
@@ -274,12 +327,6 @@ export function ScheduleView({
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.id === id);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
-
-
-  const unassignedOrders = React.useMemo(() => {
-    const scheduledOrderIds = new Set(scheduleData.map(e => e.orderId).filter(Boolean));
-    return ordersData.filter(order => !scheduledOrderIds.has(order.id));
-  }, [ordersData, scheduleData]);
 
 
   const [activeItem, setActiveItem] = React.useState<WithId<ScheduleEvent> | WithId<Order> | null>(null);
@@ -320,13 +367,12 @@ export function ScheduleView({
               ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
               : [eventToUnassign.id];
           
-          const fullOrderList = useOrder().orders.map(mapRawToOrder);
-          const orderToPutBack = fullOrderList.find(o => o.raw?.['受注ID'] === rawOrderId);
+          const orderToPutBack = rawOrdersData.map(mapRawToOrder).find(o => o.rawOrderId === rawOrderId);
 
           setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
-
-          if (orderToPutBack && !ordersData.some(o => o.id === orderToPutBack.id)) {
-              setOrdersData(currentOrders => [...currentOrders, orderToPutBack]);
+          
+          if (orderToPutBack && !unassignedOrders.some(o => o.id === orderToPutBack.id)) {
+              setUnassignedOrders(currentOrders => [...currentOrders, orderToPutBack]);
           }
 
       } catch (e: any) {
@@ -390,7 +436,10 @@ export function ScheduleView({
                   staffName: staffMember.name,
                   eventTitle: updatedEvent.title,
               });
-              if (sheetResult.status === 'error') throw new Error(sheetResult.message);
+              if (sheetResult.status === 'error') {
+                 toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${sheetResult.message}` });
+                 return; // Do not update UI if sheet update fails
+              }
               toast({ title: '担当者をシートで更新しました', description: `担当者を「${staffMember.name}」に変更しました。`});
               setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           } catch(e: any) {
@@ -437,7 +486,7 @@ export function ScheduleView({
             const customer = getCustomerByCode(order.customerCode);
             const tripId = `trip-${Date.now()}`;
             
-            const rawOrderId = order.raw?.['受注ID'] || order.id;
+            const rawOrderId = order.rawOrderId;
             
             const taskEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}-task`,
@@ -471,11 +520,14 @@ export function ScheduleView({
                 eventTitle: taskEvent.title,
               });
 
-              if (sheetResult.status === 'error') throw new Error(sheetResult.message);
+              if (sheetResult.status === 'error') {
+                toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${sheetResult.message}` });
+                return; // Do not update UI if sheet fails
+              }
               
               toast({ title: '担当者をシートに記録しました', description: sheetResult.message });
               
-              setOrdersData(prev => prev.filter(o => o.id !== order.id));
+              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
               setScheduleData(prev => [...prev, travelEvent, taskEvent]);
               
             } catch (e: any) {
@@ -554,63 +606,11 @@ export function ScheduleView({
     setDialogState({ mode: 'closed' });
   };
 
-  const { orders: rawOrders } = useOrder();
-  const mapRawToOrder = (rawOrder: any): WithId<Order> => {
-    const duration = parseInt(rawOrder['作業時間（分）'], 10);
-    const line1 = `${rawOrder['お取引先名'] || ''}${rawOrder['予定時間'] ? `：${formatTime(rawOrder['予定時間'])}` : ''}`;
-    const line2 = `${rawOrder['タイヤサイズ'] || ''}${rawOrder['本数'] ? `：${rawOrder['本数']}本` : ''}`;
-    let taskDetails = line1;
-    if (line2.trim()) {
-      taskDetails += `\n${line2}`;
-    }
-    return {
-      id: String(rawOrder['受注ID'] || rawOrder.id || `ord-${Math.random()}`),
-      customerCode: String(rawOrder['ユーザーコード'] || ''),
-      taskDetails: taskDetails.trim(),
-      estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
-      raw: rawOrder,
-    };
-  };
-
   const handleDeleteEvent = async () => {
     if (dialogState.mode !== 'edit') return;
-
-    const eventToUnassign = dialogState.event;
-    const staff = getStaffById(eventToUnassign.staffId);
-    if (!staff) return;
-
-    const rawOrderId = eventToUnassign.rawOrderId;
-    
-    if (rawOrderId) {
-        try {
-            const sheetResult = await updateSheetStatus({
-                gasUrl: orderGasUrl,
-                orderId: rawOrderId,
-                staffName: null,
-                eventTitle: eventToUnassign.title,
-            });
-            if (sheetResult.status === 'error') {
-                throw new Error(sheetResult.message);
-            }
-            toast({ title: "担当者をシートから削除しました", description: sheetResult.message });
-            
-            const fullOrderList = rawOrders.map(mapRawToOrder);
-            const orderToPutBack = fullOrderList.find(o => o.raw?.['受注ID'] === rawOrderId);
-
-            setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
-            
-            if (orderToPutBack && !ordersData.some(o => o.id === orderToPutBack.id)) {
-                setOrdersData(currentOrders => [...currentOrders, orderToPutBack]);
-            }
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: 'シート更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-        }
-    } else {
-        setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id));
-    }
-    
+    await handleUnassignEvent(dialogState.event);
     setDialogState({ mode: 'closed' });
-};
+  };
 
 
   const handleExportToIcs = () => {

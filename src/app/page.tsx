@@ -5,7 +5,7 @@ import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
 import { customerData, staffStatusData, staffData as allStaffData } from '@/lib/data';
-import type { Customer, Order, ScheduleEvent, StaffStatus, WithId } from '@/lib/types';
+import type { Customer, ScheduleEvent, StaffStatus, WithId } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -13,57 +13,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { isToday, parseISO, isValid, format, startOfToday } from 'date-fns';
-
-const parseDate = (dateString: any): Date | null => {
-  if (!dateString || typeof dateString !== 'string') return null;
-  const date = parseISO(dateString);
-  return isValid(date) ? date : null;
-};
-
-const formatTime = (timeString: string): string => {
-    if (!timeString) return '';
-    const date = new Date(timeString);
-    if (!isValid(date)) {
-        const today = new Date();
-        const [hours, minutes] = timeString.split(':');
-        if (hours && minutes) {
-            today.setHours(parseInt(hours, 10), parseInt(minutes, 10));
-            if (isValid(today)) {
-                return format(today, 'HH:mm');
-            }
-        }
-        return timeString;
-    }
-    try {
-        return format(date, 'HH:mm');
-    } catch {
-        return timeString;
-    }
-};
-
-
-// Map raw order data from GAS to a structured Order object
-const mapRawToOrder = (rawOrder: any): WithId<Order> => {
-  const duration = parseInt(rawOrder['作業時間（分）'], 10);
-  
-  // Construct the detailed task description
-  const line1 = `${rawOrder['お取引先名'] || ''}${rawOrder['予定時間'] ? `：${formatTime(rawOrder['予定時間'])}` : ''}`;
-  const line2 = `${rawOrder['タイヤサイズ'] || ''}${rawOrder['本数'] ? `：${rawOrder['本数']}本` : ''}`;
-
-  let taskDetails = line1;
-  if (line2.trim()) {
-      taskDetails += `\n${line2}`;
-  }
-
-  return {
-    id: String(rawOrder['受注ID'] || rawOrder.id || `ord-${Math.random()}`),
-    customerCode: String(rawOrder['ユーザーコード'] || ''),
-    taskDetails: taskDetails.trim(),
-    estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
-    raw: rawOrder,
-  };
-};
+import { isValid, parseISO, format, startOfToday } from 'date-fns';
 
 const getTodayStorageKey = () => {
     const today = format(startOfToday(), 'yyyy-MM-dd');
@@ -93,31 +43,8 @@ export default function DashboardPage() {
 
   const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
   
-  const [orders, setOrders] = React.useState<WithId<Order>[]>([]);
-  const [statuses] = React.useState<StaffStatus[]>(staffStatusData);
-
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds } = useSelectedStaff();
-
-  // Filter orders for today and map them to the Order type
-  React.useEffect(() => {
-    if (rawOrders && rawOrders.length > 0) {
-      const filteredAndMapped = rawOrders
-        .filter(order => {
-          const scheduledDate = parseDate(order['作業予定日']);
-          const receptionDate = parseDate(order['受付日']);
-          const isScheduledForToday = scheduledDate ? isToday(scheduledDate) : false;
-          const isReceivedToday = receptionDate ? isToday(receptionDate) : false;
-          // Show if EITHER scheduled for today OR received today (and not yet scheduled)
-          return isScheduledForToday || (isReceivedToday && !scheduledDate);
-        })
-        .map(mapRawToOrder);
-      setOrders(filteredAndMapped);
-    } else {
-      setOrders([]);
-    }
-  }, [rawOrders]);
-
 
   // Persist scheduleData to localStorage whenever it changes
   React.useEffect(() => {
@@ -215,9 +142,8 @@ export default function DashboardPage() {
             staffData={filteredStaff} 
             customerData={customers} 
             scheduleData={scheduleData}
-            ordersData={orders}
+            rawOrdersData={rawOrders} // Pass raw orders
             setScheduleData={setScheduleData}
-            setOrdersData={setOrders}
         />
         <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />
       </div>
