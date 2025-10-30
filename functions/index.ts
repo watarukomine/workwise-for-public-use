@@ -58,6 +58,7 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
     logger.info(`Received calendar request:`, { operation, calendarId, eventId });
 
     if (!calendarId) {
+        logger.error("Validation failed: calendarId is missing.");
         throw new HttpsError("invalid-argument", "A calendarId must be provided.");
     }
 
@@ -67,6 +68,7 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
         switch (operation) {
             case "create":
                 if (!startTime || !endTime || !title) {
+                    logger.error("Validation failed for 'create': Missing required fields.", { startTime, endTime, title });
                     throw new HttpsError("invalid-argument", "For 'create' operation, startTime, endTime, and title are required.");
                 }
                 logger.info("Creating event...");
@@ -88,6 +90,7 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
 
             case "update":
                 if (!eventId || !startTime || !endTime || !title) {
+                     logger.error("Validation failed for 'update': Missing required fields.", { eventId, startTime, endTime, title });
                     throw new HttpsError("invalid-argument", "For 'update' operation, eventId, startTime, endTime, and title are required.");
                 }
                 logger.info(`Updating event ${eventId}...`);
@@ -110,6 +113,7 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
 
             case "delete":
                 if (!eventId) {
+                    logger.error("Validation failed for 'delete': eventId is missing.");
                     throw new HttpsError("invalid-argument", "For 'delete' operation, eventId is required.");
                 }
                 logger.info(`Deleting event ${eventId}...`);
@@ -121,6 +125,7 @@ export const updatecalendarevent = onCall({ region: 'asia-northeast1' }, async (
                 return { status: "success", message: "イベントが削除されました。" };
 
             default:
+                 logger.error(`Unknown operation received: ${operation}`);
                 throw new HttpsError("invalid-argument", `Unknown operation: ${operation}`);
         }
     } catch (error: any) {
