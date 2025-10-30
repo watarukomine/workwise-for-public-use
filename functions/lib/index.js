@@ -37,7 +37,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateCalendarEvent = void 0;
+exports.updatecalendarevent = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const logger = __importStar(require("firebase-functions/logger"));
 const google_auth_library_1 = require("google-auth-library");
@@ -53,7 +53,8 @@ async function getAuthenticatedCalendarClient() {
     logger.info("Authentication successful.");
     return calendar;
 }
-exports.updateCalendarEvent = (0, https_1.onCall)(async (request) => {
+// CRITICAL: The function name must be all lowercase to be callable from the client SDK.
+exports.updatecalendarevent = (0, https_1.onCall)({ region: 'asia-northeast1' }, async (request) => {
     var _a;
     const { operation, calendarId, eventId, title, startTime, endTime, description, } = request.data;
     logger.info(`Received calendar request:`, { operation, calendarId, eventId });
