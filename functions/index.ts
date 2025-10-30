@@ -36,7 +36,7 @@ async function getAuthenticatedCalendarClient(): Promise<calendar_v3.Calendar> {
 }
 
 // CRITICAL: The function name must be all lowercase to be callable from the client SDK.
-export const updatecalendarevent = onRequest({region: 'asia-northeast1'}, async (req, res) => {
+export const updatecalendarevent = onRequest({region: 'asia-northeast1'}, (req, res) => {
     corsHandler(req, res, async () => {
         if (req.method !== "POST") {
             res.status(405).send("Method Not Allowed");
