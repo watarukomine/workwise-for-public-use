@@ -27,7 +27,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid } from 'date-fns';
+import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, getYear, getMonth, getDate, getHours, getMinutes } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -48,8 +48,9 @@ import { useOrder } from '@/contexts/order-context';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Textarea } from '../ui/textarea';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
-import { useFirebase } from '@/firebase';
-import { httpsCallable } from 'firebase/functions';
+import { Download } from 'lucide-react';
+import * as ics from 'ics';
+
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 8;
@@ -265,13 +266,6 @@ export function ScheduleView({
   const { allStaff } = useSelectedStaff();
   const { toast } = useToast();
   const { orderGasUrl } = useOrder();
-  const { functions } = useFirebase();
-
-  const updateCalendarEvent = React.useMemo(() => {
-    if (!functions) return null;
-    return httpsCallable(functions, 'updatecalendarevent');
-  }, [functions]);
-
 
   React.useEffect(() => {
     setIsClient(true);
@@ -302,16 +296,8 @@ export function ScheduleView({
   };
 
   const handleUnassignEvent = async (eventToUnassign: WithId<ScheduleEvent>) => {
-    if (!updateCalendarEvent) {
-      toast({ variant: 'destructive', title: 'エラー', description: 'カレンダー連携機能が初期化されていません。' });
-      return;
-    }
     const staff = getStaffById(eventToUnassign.staffId);
     if (!staff) return;
-     if (!staff.calendarId) {
-      toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
-      return;
-    }
 
     // --- Sheet Update Logic (using rawOrderId) ---
     if (eventToUnassign.rawOrderId) { // Only update sheet if it's a real order
@@ -328,27 +314,9 @@ export function ScheduleView({
       }
     }
 
-
-    // --- Calendar Deletion Logic ---
-    const eventsToDelete = eventToUnassign.tripId 
-        ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId)
-        : [eventToUnassign];
-    
-    for (const eventToDelete of eventsToDelete) {
-        if (staff.calendarId && eventToDelete.calendarEventId) {
-            try {
-                const result: any = await updateCalendarEvent({
-                    operation: 'delete',
-                    calendarId: staff.calendarId,
-                    eventId: eventToDelete.calendarEventId,
-                });
-                if (result.data.status === 'error') throw new Error(result.data.message);
-                toast({ title: "カレンダーから予定を削除しました" });
-            } catch (e: any) {
-                 toast({ variant: "destructive", title: "カレンダー削除エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
-            }
-        }
-    }
+    const eventsToDeleteIds = eventToUnassign.tripId 
+        ? scheduleData.filter(e => e.tripId === eventToUnassign.tripId).map(e => e.id)
+        : [eventToUnassign.id];
     
     // --- App State Update Logic ---
     if (eventToUnassign.orderId) {
@@ -368,7 +336,7 @@ export function ScheduleView({
         toast({ title: 'タスクを未割り当てに戻しました' });
     }
 
-    setScheduleData(prev => prev.filter(e => !eventsToDelete.some(del => del.id === e.id)));
+    setScheduleData(prev => prev.filter(e => !eventsToDeleteIds.includes(e.id)));
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
@@ -376,13 +344,6 @@ export function ScheduleView({
     const item = active.data.current as WithId<ScheduleEvent> | WithId<Order>;
     
     if (!item) {
-      setActiveItem(null);
-      setCurrentOverStaffId(null);
-      return;
-    }
-    
-    if (!updateCalendarEvent) {
-      toast({ variant: 'destructive', title: 'エラー', description: 'カレンダー連携機能が初期化されていません。' });
       setActiveItem(null);
       setCurrentOverStaffId(null);
       return;
@@ -411,12 +372,7 @@ export function ScheduleView({
       const finalStaffId = newStaffId || eventToUpdate.staffId;
       const staffMember = allStaff.find(s => s.id === finalStaffId);
 
-      if (!staffMember || !staffMember.calendarId) {
-        toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staffMember?.name}」にカレンダーIDが設定されていません。`});
-        setActiveItem(null);
-        setCurrentOverStaffId(null);
-        return;
-      }
+      if (!staffMember) return;
 
       const updatedEvent = {
         ...eventToUpdate,
@@ -443,26 +399,6 @@ export function ScheduleView({
       } else {
           toast({ title: 'タスクを更新しました', description: `時間を変更しました。` });
       }
-      
-      // --- Calendar Update Logic ---
-      if (staffMember?.calendarId && updatedEvent.calendarEventId) {
-        try {
-          const result: any = await updateCalendarEvent({
-            operation: 'update',
-            calendarId: staffMember.calendarId,
-            eventId: updatedEvent.calendarEventId,
-            title: updatedEvent.title,
-            description: updatedEvent.description,
-            startTime: newStart.toISOString(),
-            endTime: newEnd.toISOString(),
-          });
-          if (result.data.status === 'error') throw new Error(result.data.message);
-          toast({ title: "カレンダー更新成功" });
-        } catch (e: any) {
-          toast({ variant: "destructive", title: "カレンダー更新エラー", description: `Cloud Function呼び出しに失敗しました: ${e.message || 'internal'}` });
-        }
-      }
-
     }
     // This block handles ADDING a NEW event from the unassigned list
     else if ('estimatedDuration' in item && newStaffId && over?.rect) {
@@ -480,52 +416,10 @@ export function ScheduleView({
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
-         if (!staff.calendarId) {
-          toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
-          setActiveItem(null);
-          setCurrentOverStaffId(null);
-          return;
-        }
-
-        // --- Calendar Creation Logic (using the DEBUG function first) ---
-        const handleCalendarCreate = async (event: Omit<WithId<ScheduleEvent>, 'calendarEventId'>): Promise<string | undefined> => {
-            if (!staff.calendarId) {
-                toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
-                return;
-            };
-            
-            const payload = {
-                operation: 'create',
-                calendarId: staff.calendarId,
-                title: event.title,
-                description: event.description,
-                startTime: (event.start as Date).toISOString(),
-                endTime: (event.end as Date).toISOString(),
-            };
-
-            try {
-                const result: any = await updateCalendarEvent(payload);
-                if (result.data.status === 'success' && result.data.eventId) {
-                    toast({ title: 'カレンダー登録成功', description: 'Googleカレンダーに予定を登録しました。' });
-                    return result.data.eventId;
-                }
-                throw new Error(result.data.message || 'カレンダーに登録できませんでした。');
-            } catch (e: any) {
-                const errorDetails = (e as any).details ? JSON.stringify((e as any).details) : '追加情報なし';
-                toast({ 
-                    variant: "destructive", 
-                    title: `カレンダー登録エラー: ${e.message || 'internal'}`,
-                    description: `詳細: ${errorDetails}`,
-                    duration: 9000,
-                });
-                return undefined;
-            }
-        };
-        
         if (isGeneric) {
              const newStart = addMinutes(startOfDay, dropMinutes);
              const newEnd = addMinutes(newStart, order.estimatedDuration);
-             const newEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
+             const newEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}`,
                 title: order.taskDetails,
                 description: '',
@@ -534,9 +428,6 @@ export function ScheduleView({
                 start: newStart,
                 end: newEnd,
              };
-             const calendarEventId = await handleCalendarCreate(newEventData);
-             const newEvent: WithId<ScheduleEvent> = { ...newEventData, calendarEventId };
-
              setScheduleData(prev => [...prev, newEvent]);
         } else {
             const taskStart = addMinutes(startOfDay, dropMinutes);
@@ -544,8 +435,6 @@ export function ScheduleView({
             const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
             const customer = getCustomerByCode(order.customerCode);
             const tripId = `trip-${Date.now()}`;
-            const travelEventId = `event-${Date.now()}-travel`;
-            const taskEventId = `event-${Date.now()}-task`;
             
             const rawOrderId = order.raw?.['受注ID'] || order.id;
             
@@ -566,8 +455,8 @@ export function ScheduleView({
               return;
             }
 
-            const travelEventData: Omit<WithId<ScheduleEvent>, 'calendarEventId'> = {
-                id: travelEventId,
+            const travelEvent: WithId<ScheduleEvent> = {
+                id: `event-${Date.now()}-travel`,
                 tripId: tripId,
                 title: `移動: ${customer?.storeName || order.customerCode}`,
                 description: `目的地: ${customer?.address || 'N/A'}`,
@@ -577,8 +466,8 @@ export function ScheduleView({
                 end: taskStart,
             };
             
-            const taskEventData: WithId<ScheduleEvent> = {
-                id: taskEventId,
+            const taskEvent: WithId<ScheduleEvent> = {
+                id: `event-${Date.now()}-task`,
                 tripId: tripId,
                 orderId: order.id,
                 rawOrderId: rawOrderId,
@@ -589,15 +478,9 @@ export function ScheduleView({
                 start: taskStart,
                 end: taskEnd,
             };
-
-            const travelCalendarId = await handleCalendarCreate(travelEventData);
-            const taskCalendarId = await handleCalendarCreate(taskEventData);
-
-            const travelEvent: WithId<ScheduleEvent> = { ...travelEventData, calendarEventId: travelCalendarId };
-            const taskEventWithCalendar: WithId<ScheduleEvent> = { ...taskEventData, calendarEventId: taskCalendarId };
             
             setOrdersData(prev => prev.filter(o => o.id !== order.id));
-            setScheduleData(prev => [...prev, travelEvent, taskEventWithCalendar]);
+            setScheduleData(prev => [...prev, travelEvent, taskEvent]);
             toast({ title: 'タスクを割り当てました', description: `${staff.name}さんに「${order.taskDetails.split('\n')[0]}」を割り当てました。`});
         }
     }
@@ -631,7 +514,7 @@ export function ScheduleView({
   };
   
   const handleSaveEvent = async () => {
-    if (dialogState.mode === 'closed' || !updateCalendarEvent) return;
+    if (dialogState.mode === 'closed') return;
     
     const newStart = timeStringToDate(editedEventDetails.startTime);
     const newEnd = timeStringToDate(editedEventDetails.endTime);
@@ -646,39 +529,6 @@ export function ScheduleView({
     if (dialogState.mode === 'new') {
         const staff = getStaffById(dialogState.staffId);
         if (!staff) return;
-         if (!staff.calendarId) {
-            toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
-            return;
-        }
-
-
-        let calendarEventId: string | undefined;
-        if (staff.calendarId) {
-            try {
-                const result: any = await updateCalendarEvent({
-                    operation: 'create',
-                    calendarId: staff.calendarId,
-                    title,
-                    description,
-                    startTime: newStart.toISOString(),
-                    endTime: newEnd.toISOString(),
-                });
-                if (result.data.status === 'success' && result.data.eventId) {
-                    calendarEventId = result.data.eventId;
-                    toast({ title: 'カレンダー登録成功' });
-                } else {
-                    throw new Error(result.data.message);
-                }
-            } catch (e: any) {
-                const errorDetails = (e as any).details ? JSON.stringify((e as any).details) : '追加情報なし';
-                toast({ 
-                    variant: "destructive", 
-                    title: `カレンダー登録エラー: ${e.message || 'internal'}`,
-                    description: `詳細: ${errorDetails}`,
-                    duration: 9000,
-                });
-            }
-        }
 
         const newEvent: WithId<ScheduleEvent> = {
             id: `event-${Date.now()}`,
@@ -688,17 +538,12 @@ export function ScheduleView({
             locationId: '',
             start: newStart,
             end: newEnd,
-            calendarEventId,
         };
         setScheduleData(prev => [...prev, newEvent]);
 
     } else if (dialogState.mode === 'edit') {
         const staff = getStaffById(dialogState.event.staffId);
         if (!staff) return;
-        if (!staff.calendarId) {
-            toast({ variant: "destructive", title: "カレンダー未設定", description: `スタッフ「${staff.name}」にカレンダーIDが設定されていません。`});
-            return;
-        }
 
         const updatedEvent = {
             ...dialogState.event,
@@ -707,30 +552,6 @@ export function ScheduleView({
             start: newStart,
             end: newEnd,
         };
-
-        if (staff.calendarId && updatedEvent.calendarEventId) {
-             try {
-                const result: any = await updateCalendarEvent({
-                    operation: 'update',
-                    calendarId: staff.calendarId,
-                    eventId: updatedEvent.calendarEventId,
-                    title,
-                    description,
-                    startTime: newStart.toISOString(),
-                    endTime: newEnd.toISOString(),
-                });
-                if (result.data.status === 'error') throw new Error(result.data.message);
-                toast({ title: "カレンダー更新成功" });
-            } catch (e: any) {
-                const errorDetails = (e as any).details ? JSON.stringify((e as any).details) : '追加情報なし';
-                toast({ 
-                    variant: "destructive", 
-                    title: `カレンダー更新エラー: ${e.message || 'internal'}`,
-                    description: `詳細: ${errorDetails}`,
-                    duration: 9000,
-                });
-            }
-        }
 
         setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
     }
@@ -743,6 +564,57 @@ export function ScheduleView({
     handleUnassignEvent(dialogState.event);
     setDialogState({ mode: 'closed' });
   };
+
+  const handleExportToIcs = () => {
+    if (dialogState.mode !== 'edit') return;
+    
+    const { event } = dialogState;
+    const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+    const end = typeof event.end === 'string' ? parseISO(event.end) : event.end;
+    
+    if (!isValid(start) || !isValid(end)) {
+      toast({
+        variant: 'destructive',
+        title: 'エクスポート失敗',
+        description: 'イベントの日時が無効です。',
+      });
+      return;
+    }
+    
+    const eventToExport: ics.EventAttributes = {
+      title: event.title,
+      description: event.description,
+      start: [getYear(start), getMonth(start) + 1, getDate(start), getHours(start), getMinutes(start)],
+      end: [getYear(end), getMonth(end) + 1, getDate(end), getHours(end), getMinutes(end)],
+    };
+
+    ics.createEvent(eventToExport, (error, value) => {
+      if (error) {
+        console.error(error);
+        toast({
+          variant: 'destructive',
+          title: 'エクスポート失敗',
+          description: 'iCalファイルの生成中にエラーが発生しました。',
+        });
+        return;
+      }
+
+      if (value) {
+        const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'schedule.ics';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+         toast({
+          title: 'エクスポート成功',
+          description: 'カレンダーファイル（schedule.ics）がダウンロードされました。',
+        });
+      }
+    });
+  };
+
 
   const getDialogDetails = () => {
     if (dialogState.mode === 'edit') {
@@ -885,10 +757,16 @@ export function ScheduleView({
                 </div>
             </div>
 
-            <DialogFooter className="justify-between">
-                <div>
+            <DialogFooter className="justify-between sm:justify-between w-full">
+                <div className="flex gap-2">
                   {dialogState.mode === 'edit' && (
                       <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
+                  )}
+                   {dialogState.mode === 'edit' && (
+                    <Button variant="outline" onClick={handleExportToIcs}>
+                      <Download className="mr-2 h-4 w-4" />
+                      エクスポート (.ics)
+                    </Button>
                   )}
                 </div>
                 <div className="flex gap-2">
