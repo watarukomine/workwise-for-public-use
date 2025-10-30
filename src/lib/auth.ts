@@ -32,11 +32,11 @@ export const signInWithEmail = async (email: string, password: string): Promise<
       throw new Error('スタッフマスタにアクセスできません。スタッフ管理ページでURLが正しく設定されているか確認してください。');
   }
 
-  // This is the corrected logic. It correctly checks the `email` and `password` properties
-  // on the Staff objects that were mapped in `fetchStaffDataFromGAS`.
+  // ★★★ 修正箇所 ★★★
+  // 比較前に、入力値とデータソースの両方から空白文字を除去(.trim())します。
   const user = staffList.find(staff => 
-      staff.email?.toLowerCase() === email.toLowerCase() && 
-      staff.password === password
+      staff.email?.trim().toLowerCase() === email.trim().toLowerCase() && 
+      staff.password?.trim() === password.trim()
   );
 
   return new Promise((resolve, reject) => {
