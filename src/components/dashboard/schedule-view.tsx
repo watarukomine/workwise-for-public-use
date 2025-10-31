@@ -308,7 +308,7 @@ const TimeIndicator = () => {
 
     return (
         <div
-            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none"
+            className="absolute top-0 bottom-[-9999px] w-0.5 bg-red-500 z-30 pointer-events-none"
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -750,11 +750,11 @@ export function ScheduleView({
                                       </span>
                                   </div>
                               ))}
+                              {isToday(currentDate) && <TimeIndicator />}
                           </div>
                       </div>
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative mt-2 space-y-2">
-                            {isToday(currentDate) && <TimeIndicator />}
                             {staffData?.map((staff) => {
                                 const events = scheduleData.filter((e) => e.staffId === staff.id);
                                 return (
@@ -948,10 +948,18 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   }
   
   const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
-  const textColorClass = brightStaff.includes(staff.name) ? 'text-black' : 'text-primary-foreground';
+  let textColorClass = 'text-primary-foreground';
+  if (brightStaff.includes(staff.name)) {
+      textColorClass = 'text-black';
+  }
   
   if (event.id.startsWith('generic-travel')) {
     divStyle.backgroundColor = 'rgb(250 204 21)';
+    textColorClass = 'text-black';
+  } else if (event.id.startsWith('generic-work')) {
+    divStyle.backgroundColor = 'rgb(156 163 175)';
+  } else if (event.id.startsWith('generic-break')) {
+    divStyle.backgroundColor = 'rgb(34 197 94)';
   }
 
   const [line1, ...rest] = (event.title || '').split('\n');
