@@ -16,33 +16,21 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName, statusValue, timestamp } = args;
+    const { gasUrl, ...payload } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
     try {
-        const url = new URL(gasUrl);
-        const params = new URLSearchParams();
-
-        if (eventTitle) {
-            params.append('eventTitle', eventTitle);
-        }
-        if (staffName !== null && staffName !== undefined) {
-            params.append('staffName', staffName);
-        }
-        if (statusValue) {
-            params.append('statusValue', statusValue);
-        }
-        if (timestamp) {
-            params.append('timestamp', timestamp);
-        }
-        
-        const response = await fetch(`${url.origin}${url.pathname}?${params.toString()}`, {
+        const response = await fetch(gasUrl, {
             method: 'POST',
             cache: 'no-store',
             redirect: 'follow',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
         });
         
         if (response.redirected && response.url.includes('accounts.google.com')) {
