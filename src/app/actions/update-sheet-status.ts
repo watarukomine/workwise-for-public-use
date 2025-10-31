@@ -23,18 +23,15 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
     }
 
     try {
-        // POSTメソッドでJSONデータを送信するように変更
-        const response = await fetch(gasUrl, {
+        const url = new URL(gasUrl);
+        const params = new URLSearchParams();
+        if (eventTitle) params.append('eventTitle', eventTitle);
+        if (staffName !== null && staffName !== undefined) params.append('staffName', staffName);
+        if (statusValue) params.append('statusValue', statusValue);
+        if (timestamp) params.append('timestamp', timestamp);
+
+        const response = await fetch(`${url.origin}${url.pathname}?${params.toString()}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                eventTitle,
-                staffName,
-                statusValue,
-                timestamp
-            }),
             cache: 'no-store',
             redirect: 'follow',
         });
@@ -55,7 +52,7 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         
         if (result.status === 'error' || result.error) {
             const errorMessage = result.message || 'GASスクリプトでシート更新エラーが発生しました。';
-            if (errorMessage.includes('doPost Error')) {
+            if (errorMessage.includes('doPost Error') || errorMessage.includes('データ解析エラー')) {
                  throw new Error(errorMessage);
             }
             throw new Error(`GASスクリプトエラー: ${errorMessage}`);
