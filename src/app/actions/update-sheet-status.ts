@@ -8,6 +8,7 @@ interface UpdateSheetStatusArgs {
     eventTitle?: string | null;
     staffName?: string | null;
     statusValue?: StaffStatus['status'] | '';
+    timestamp?: string; // タイムスタンプを追加
 }
 
 interface GasResponse {
@@ -17,7 +18,7 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName, statusValue } = args;
+    const { gasUrl, eventTitle, staffName, statusValue, timestamp } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
@@ -36,6 +37,9 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         }
         if (statusValue) {
             params.append('statusValue', statusValue);
+        }
+        if (timestamp) { // タイムスタンプを追加
+            params.append('timestamp', timestamp);
         }
         
         // データはURLパラメータとして送信し、リクエスト自体はPOSTで行う
