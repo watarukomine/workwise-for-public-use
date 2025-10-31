@@ -112,7 +112,7 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
     const scheduledTime = findKey(rawOrder, ['予定時間']);
     
-    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
+    const line1 = `${findKey(rawOrder, ['お取引先名', '店舗', '取引先']) || ''}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
     
     const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? ` / ${findKey(rawOrder, ['本数'])}本` : ''}`;
 
@@ -285,14 +285,20 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
 }
 
 const TimeIndicator = () => {
-    const [now, setNow] = React.useState(new Date());
+    const [now, setNow] = React.useState<Date | null>(null);
 
     React.useEffect(() => {
+        // Set time on mount to ensure it's client-side
+        setNow(new Date());
+
         const timer = setInterval(() => {
             setNow(new Date());
         }, 60000); // Update every minute
+        
         return () => clearInterval(timer);
     }, []);
+
+    if (!now) return null;
 
     const startOfDay = new Date(now);
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
@@ -928,6 +934,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
+    opacity: isDragging ? 0.8 : 1,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
