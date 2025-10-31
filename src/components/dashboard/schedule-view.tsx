@@ -114,7 +114,7 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? ` / ${findKey(rawOrder, ['本数'])}本` : ''}`;
     let taskDetails = line1;
     if (line2.trim() !== '/') {
-        taskDetails += `\n${line2}`;
+        taskDetails += `\n${line2.trim()}`;
     }
     
     const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
@@ -174,9 +174,9 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
           </p>
-          <p className="text-xs opacity-80 truncate pointer-events-none">
+          {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
             {line2}
-          </p>
+          </p>}
         </div>
       </TooltipTrigger>
        <TooltipContent>
@@ -907,23 +907,21 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let color = 'hsl(var(--primary-foreground))';
 
   if (isTravelEvent) {
-    if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-       if (match) {
-         backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
-       } else {
-         backgroundColor = 'hsla(var(--primary-hsl), 0.5)';
-       }
+    const match = staff.color?.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+    if (match) {
+        const [_, h, s, l] = match;
+        backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
     } else {
-       backgroundColor = 'hsla(var(--primary-hsl), 0.5)';
+        backgroundColor = 'hsla(var(--primary-hsl), 0.5)';
     }
     color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
-     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-        const [h, s] = backgroundColor.match(/\d+/g) || ['0', '0'];
+      const match = staff.color?.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+      if (match) {
+        const [_, h, s] = match;
         backgroundColor = `hsl(${h}, ${s}%, 90%)`;
       } else {
-        backgroundColor = `hsl(120, 40%, 85%)`;
+        backgroundColor = 'hsl(0, 0%, 90%)';
       }
       color = 'hsl(var(--foreground))';
   }
