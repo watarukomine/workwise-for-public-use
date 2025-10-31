@@ -110,8 +110,14 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
-    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}`;
+    const scheduledTime = findKey(rawOrder, ['予定時間']);
+    
+    // Line 1: Store name and scheduled time
+    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
+    
+    // Line 2: Tire size and quantity
     const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? ` / ${findKey(rawOrder, ['本数'])}本` : ''}`;
+
     let taskDetails = line1;
     if (line2.trim() && line2.trim() !== '/') {
         taskDetails += `\n${line2.trim()}`;
@@ -551,7 +557,7 @@ export function ScheduleView({
                   tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
-                  title: order.taskDetails,
+                  title: order.taskDetails, // Use full details for the main task chip
                   description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
@@ -908,7 +914,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   if (isTravelEvent) {
     if (staff.color && staff.color.startsWith('hsl')) {
-       backgroundColor = staff.color.replace(')', ', 0.5)').replace('hsl', 'hsla');
+       // Replaces 'hsl(h, s, l)' with 'hsla(h, s, l, 0.5)'
+       backgroundColor = staff.color.replace('hsl', 'hsla').replace(')', ', 0.5)');
     } else {
        backgroundColor = 'hsla(var(--primary-hsl, 217 91% 60%), 0.5)';
     }
