@@ -344,8 +344,8 @@ export function ScheduleView({
         const result = await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
-            staffName: "", // Set staff name to empty to unassign
-            statusValue: "", // Also clear the status
+            staffName: "",
+            statusValue: "未割当",
             timestamp: new Date().toISOString(),
         });
 
