@@ -913,23 +913,22 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   if (typeof staff.color === 'string' && staff.color.startsWith('hsl')) {
     const match = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
     if (match) {
-      const [_, h, s, l] = match;
-      const lightness = parseInt(l, 10);
-      
-      if (lightness > 65) {
-        color = 'hsl(var(--foreground-hsl))'; // Use dark text for light backgrounds
-      }
-      
-      if (isTravelEvent) {
-        backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
-      } else if (isBreakEvent) {
-        backgroundColor = `hsl(${h}, ${s}%, 90%)`;
-        color = 'hsl(var(--foreground-hsl))'; // Always dark text for breaks
-      }
+        const [_, h, s, l] = match;
+        const lightness = parseInt(l, 10);
+        
+        if (isTravelEvent) {
+             backgroundColor = `hsl(${h}, ${s}%, 50%)`;
+        } else if (isBreakEvent) {
+            backgroundColor = `hsl(${h}, ${s}%, 90%)`;
+            color = 'hsl(var(--foreground-hsl))'; 
+        }
+
+        if (lightness > 65) {
+            color = 'hsl(var(--foreground-hsl))';
+        }
     }
   } else if (isTravelEvent) {
-     // Fallback for non-hsl colors
-    backgroundColor = 'hsla(var(--primary-hsl), 0.5)';
+    backgroundColor = 'hsl(var(--primary))'.replace(')', ', 0.5)').replace('hsl', 'hsla');
   }
 
   
