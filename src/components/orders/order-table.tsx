@@ -125,12 +125,29 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
   const handleNoResultsClick = () => {
     if (isAdmin && orderGasUrl) {
-      // Try to construct the spreadsheet URL from the GAS URL
-      // This is a heuristic and might not always work if the GAS project is standalone
-      // Typical GAS URL: https://script.google.com/macros/s/GIVEN_ID/exec
-      // We assume it's bound to a sheet.
-      const sheetUrl = orderGasUrl.replace('/macros/s/', '/spreadsheets/d/').replace('/exec', '/edit');
-       window.open(sheetUrl, '_blank', 'noopener,noreferrer');
+      // The GAS URL is in the format: https://script.google.com/macros/s/DEPLOYMENT_ID/exec
+      // We need to find the spreadsheet ID, which is not directly in this URL.
+      // This is a common pattern, but might fail if the script is standalone.
+      // A better approach would be to have the GAS return the Sheet URL or ID.
+      // For now, we provide a link to the Google Drive root as a fallback.
+      let sheetId = null;
+      try {
+        // Let's assume the GAS URL deployment ID is sometimes the same as sheet ID (not reliable)
+        const parts = orderGasUrl.split('/');
+        // URL is like .../macros/s/ID/exec
+        const idPartIndex = parts.indexOf('s') + 1;
+        if (idPartIndex > 0 && idPartIndex < parts.length) {
+            sheetId = parts[idPartIndex];
+        }
+      } catch {}
+
+      if (sheetId) {
+          const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+          window.open(sheetUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        // Fallback if we can't derive the ID
+        window.open('https://drive.google.com/drive/my-drive', '_blank', 'noopener,noreferrer');
+      }
     }
   }
 
@@ -191,7 +208,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                 })
               ) : (
                 <TableRow 
-                  onClick={handleNoResultsClick}
+                  onDoubleClick={handleNoResultsClick}
                   className={cn(isAdmin && "cursor-pointer hover:bg-muted/50")}
                 >
                   <TableCell colSpan={headers.length || 1} className="h-24 text-center">
