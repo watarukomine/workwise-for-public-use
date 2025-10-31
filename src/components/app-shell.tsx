@@ -1,4 +1,3 @@
-
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -46,7 +45,6 @@ import { signOut } from '@/lib/auth';
 
 const allNavItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'] },
-  { href: '/schedule', label: 'スケジュール', icon: CalendarDays, roles: ['admin', 'staff'] },
   { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'] },
   { href: '/orders', label: '受注管理', icon: ShoppingBag, roles: ['admin'] },
   { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -25,7 +24,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid } from 'date-fns';
+import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
 import { cn, findKey } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -56,15 +55,15 @@ const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
 const STAFF_COL_WIDTH = 144;
 
 
-const timeStringToDate = (timeStr: string) => {
+const timeStringToDate = (timeStr: string, baseDate: Date) => {
     if (!/^\d{2}:\d{2}$/.test(timeStr)) {
         console.error("Invalid time string format:", timeStr);
         return new Date(NaN);
     }
-    const today = new Date();
+    const date = new Date(baseDate);
     const [hours, minutes] = timeStr.split(':').map(Number);
-    today.setHours(hours, minutes, 0, 0);
-    return today;
+    date.setHours(hours, minutes, 0, 0);
+    return date;
 };
 
 const formatTime = (date: Date | string) => {
@@ -205,6 +204,7 @@ interface ScheduleViewProps {
     scheduleData: WithId<ScheduleEvent>[];
     rawOrdersData: any[]; 
     setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
+    currentDate: Date;
 }
 
 const genericTasks: WithId<Order>[] = [
@@ -284,6 +284,7 @@ export function ScheduleView({
     scheduleData, 
     rawOrdersData,
     setScheduleData,
+    currentDate,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
   React.useEffect(() => {
@@ -301,21 +302,42 @@ export function ScheduleView({
   React.useEffect(() => {
     if (!rawOrdersData) return;
     const allMappedOrders = rawOrdersData.map(mapRawToOrder);
-    const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
     
+    // Get all scheduled order IDs for the *entire* app, not just the current date
+    // This assumes `scheduleData` from props is the full dataset for the current date.
+    // To correctly check against all dates, we'd need all schedule data.
+    // For now, we get all scheduled IDs from localStorage across all dates.
+    const allScheduledRawOrderIds = new Set<string>();
+    if(typeof window !== 'undefined') {
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('scheduleData-')) {
+                try {
+                    const data = JSON.parse(localStorage.getItem(key)!);
+                    if (Array.isArray(data)) {
+                        data.forEach((event: WithId<ScheduleEvent>) => {
+                            if (event.rawOrderId) {
+                                allScheduledRawOrderIds.add(event.rawOrderId);
+                            }
+                        });
+                    }
+                } catch {}
+            }
+        });
+    }
+
     const newUnassignedOrders = allMappedOrders.filter(order => {
         if (!order.rawOrderId) return false;
         
-        if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
+        if (allScheduledRawOrderIds.has(order.rawOrderId)) return false;
         
         const scheduledDateKey = findKey(order.raw, ['作業予定日']);
         if (!scheduledDateKey) return false;
 
         const scheduledDate = parseISO(scheduledDateKey);
-        return isValid(scheduledDate) && isToday(scheduledDate);
+        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
     });
     setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, scheduleData]);
+  }, [rawOrdersData, currentDate, scheduleData]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -351,18 +373,26 @@ export function ScheduleView({
 
           if (result.status === 'error') throw new Error(result.message);
           
+          setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && (!e.tripId || e.tripId !== eventToUnassign.tripId)));
+          
+          // Re-add to unassigned list only if it belongs to the current view date
           const originalOrder = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
           if (originalOrder) {
-            const orderToAddBack = mapRawToOrder(originalOrder);
-             setUnassignedOrders(prev => {
-              if (!prev.some(o => o.id === orderToAddBack.id)) {
-                return [...prev, orderToAddBack];
+              const scheduledDateKey = findKey(originalOrder, ['作業予定日']);
+              if (scheduledDateKey) {
+                  const scheduledDate = parseISO(scheduledDateKey);
+                  if (isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate))) {
+                      const orderToAddBack = mapRawToOrder(originalOrder);
+                       setUnassignedOrders(prev => {
+                        if (!prev.some(o => o.id === orderToAddBack.id)) {
+                          return [...prev, orderToAddBack];
+                        }
+                        return prev;
+                      });
+                  }
               }
-              return prev;
-            });
           }
-      
-          setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
+
           toast({ title: 'タスクを未割り当てに戻しました' });
       } catch(e: any) {
           console.error("Unassignment failed:", e);
@@ -395,7 +425,7 @@ export function ScheduleView({
     if (!staffRowElement) return;
     
     const timelineRect = staffRowElement.getBoundingClientRect();
-    const startOfDay = new Date();
+    const startOfDay = new Date(currentDate);
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
     const getNewStartFromDrop = () => {
@@ -430,15 +460,19 @@ export function ScheduleView({
             const newStart = getNewStartFromDrop();
 
             setScheduleData(prev => {
-                const eventsToMove = prev.filter(e => e.tripId === draggedEvent.tripId);
+                const eventsToMove = prev.filter(e => e.tripId && e.tripId === draggedEvent.tripId);
                 if (eventsToMove.length > 0) {
                     const originalTask = eventsToMove.find(e => e.id.endsWith('-task')) || draggedEvent;
                     const originalTravel = eventsToMove.find(e => e.id.endsWith('-travel'));
+                    
                     const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
                     
                     let newTaskStart = newStart;
-                    if (originalTravel && draggedEvent.id === originalTravel.id) {
-                        newTaskStart = addMinutes(newStart, TRAVEL_TIME_MINUTES);
+                    if (originalTravel && draggedEvent.id.endsWith('-travel')) {
+                        const travelDuration = differenceInMinutes(parseISO(originalTravel.end as string), parseISO(originalTravel.start as string));
+                        newTaskStart = addMinutes(newStart, travelDuration);
+                    } else if (originalTravel && draggedEvent.id.endsWith('-task')) {
+                         newTaskStart = newStart;
                     }
                     
                     const newTaskEnd = addMinutes(newTaskStart, taskDuration);
@@ -557,8 +591,7 @@ export function ScheduleView({
     const clickX = e.clientX - timelineRect.left;
     const clickMinutes = pixelsToMinutes(clickX);
     
-    const today = new Date();
-    const startOfDay = new Date(today);
+    const startOfDay = new Date(currentDate);
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
     const newStart = addMinutes(startOfDay, clickMinutes);
 
@@ -569,8 +602,8 @@ export function ScheduleView({
   const handleSaveEvent = async () => {
     if (dialogState.mode === 'closed') return;
     
-    const newStart = timeStringToDate(editedEventDetails.startTime);
-    const newEnd = timeStringToDate(editedEventDetails.endTime);
+    const newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
+    const newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
 
     if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
         toast({ variant: 'destructive', title: 'エラー', description: '無効な時間形式です。' });
@@ -617,7 +650,7 @@ export function ScheduleView({
     if (eventToDelete.rawOrderId) {
         await unassignTask(eventToDelete);
     } else {
-        setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id && e.tripId !== eventToDelete.tripId));
+        setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id && (!e.tripId || e.tripId !== eventToDelete.tripId)));
         toast({ title: '予定を削除しました' });
     }
 
@@ -640,19 +673,11 @@ export function ScheduleView({
 
   const { event, staff, customer, title } = getDialogDetails();
 
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleData) return [];
-      return scheduleData.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isToday(eventDate);
-      });
-  }, [scheduleData]);
-
   if (!isClient) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>本日のスケジュール</CardTitle>
+          <CardTitle>スケジュール</CardTitle>
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
         </CardHeader>
         <CardContent>
@@ -696,7 +721,7 @@ export function ScheduleView({
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative mt-2 space-y-2">
                             {staffData?.map((staff) => {
-                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                const events = scheduleData.filter((e) => e.staffId === staff.id);
                                 return (
                                     <StaffRow
                                         key={staff.id}
