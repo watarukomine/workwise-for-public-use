@@ -16,6 +16,7 @@ export type Staff = {
   '母店'?: string;
   password?: string; 
   'ロール'?: 'admin' | 'staff';
+  department?: string; // from user's code
 };
 
 export type Customer = {
@@ -46,11 +47,16 @@ export type ScheduleEvent = {
   rawOrderId?: string; 
   title: string;
   description?: string;
-  locationId: string;
-  staffId: string;
+  locationId?: string;
+  staffId?: string;
   start: Date | string | Timestamp;
   end: Date | string | Timestamp;
-  calendarEventId?: string; 
+  calendarEventId?: string;
+  // For react-big-calendar
+  staffName?: string;
+  status?: string;
+  allDay?: boolean;
+  resource?: any;
 };
 
 export type StaffStatus = {
@@ -70,4 +76,11 @@ export type Order = {
   estimatedDuration: number; 
   raw?: any; 
   rawOrderId?: string;
+  customerName?: string; // from user's code
+  productName?: string; // from user's code
+  amount?: number; // from user's code
+  deliveryDate?: string; // from user's code
+  staff?: string; // from user's code
+  status?: string; // from user's code
+  calendarEventId?: string; // from user's code
 };

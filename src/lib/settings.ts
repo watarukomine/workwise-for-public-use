@@ -55,3 +55,4 @@ export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYF
  */
 export const STATUS_COLUMN_NAME = '受注ステータス';
 
+
