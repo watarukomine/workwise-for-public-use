@@ -110,10 +110,10 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
-    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : ''}`;
-    const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? `：${findKey(rawOrder, ['本数'])}本` : ''}`;
+    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}`;
+    const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? ` / ${findKey(rawOrder, ['本数'])}本` : ''}`;
     let taskDetails = line1;
-    if (line2.trim()) {
+    if (line2.trim() !== '/') {
         taskDetails += `\n${line2}`;
     }
     
@@ -241,9 +241,11 @@ function GenericTasks() {
     );
 }
 
-function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], customers: WithId<Customer>[] }) {
+function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date }) {
     const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
     const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
+    
+    const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
 
     return (
         <Card 
@@ -251,7 +253,7 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
             className={cn("transition-colors", isOver && "bg-primary/10 border-primary/50")}
         >
             <CardHeader>
-                <CardTitle className="text-lg">本日の受注タスク</CardTitle>
+                <CardTitle className="text-lg">{titleText}</CardTitle>
                 <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。タイムラインからここに戻すと未割り当てになります。</CardDescription>
             </CardHeader>
             <CardContent>
@@ -267,7 +269,7 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
                             ))}
                             {orders.length === 0 && (
                                 <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
-                                    <p>本日の未割り当てオーダーはありません。</p>
+                                    <p>未割り当てオーダーはありません。</p>
                                 </div>
                             )}
                         </div>
@@ -303,10 +305,6 @@ export function ScheduleView({
     if (!rawOrdersData) return;
     const allMappedOrders = rawOrdersData.map(mapRawToOrder);
     
-    // Get all scheduled order IDs for the *entire* app, not just the current date
-    // This assumes `scheduleData` from props is the full dataset for the current date.
-    // To correctly check against all dates, we'd need all schedule data.
-    // For now, we get all scheduled IDs from localStorage across all dates.
     const allScheduledRawOrderIds = new Set<string>();
     if(typeof window !== 'undefined') {
         Object.keys(localStorage).forEach(key => {
@@ -375,7 +373,6 @@ export function ScheduleView({
           
           setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && (!e.tripId || e.tripId !== eventToUnassign.tripId)));
           
-          // Re-add to unassigned list only if it belongs to the current view date
           const originalOrder = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
           if (originalOrder) {
               const scheduledDateKey = findKey(originalOrder, ['作業予定日']);
@@ -413,7 +410,7 @@ export function ScheduleView({
         if (item.rawOrderId) {
           await unassignTask(item);
         } else {
-           setScheduleData(prev => prev.filter(e => e.id !== item.id && e.tripId !== item.tripId));
+           setScheduleData(prev => prev.filter(e => e.id !== item.id && (!e.tripId || e.tripId !== item.tripId)));
            toast({ title: '汎用タスクを削除しました' });
         }
         return;
@@ -542,7 +539,7 @@ export function ScheduleView({
               const travelEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-travel`,
                   tripId: tripId,
-                  title: `移動: ${customer?.storeName || order.taskDetails}`,
+                  title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: travelStart.toISOString(),
@@ -554,8 +551,8 @@ export function ScheduleView({
                   tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
-                  title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
+                  title: order.taskDetails,
+                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: taskStart.toISOString(),
@@ -694,7 +691,7 @@ export function ScheduleView({
       <TooltipProvider>
         <div className="space-y-4">
             <GenericTasks />
-            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
+            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
 
             <Card>
                 <CardHeader>
@@ -914,6 +911,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
          backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+       } else {
+         backgroundColor = 'hsla(var(--primary-hsl), 0.5)';
        }
     } else {
        backgroundColor = 'hsla(var(--primary-hsl), 0.5)';
