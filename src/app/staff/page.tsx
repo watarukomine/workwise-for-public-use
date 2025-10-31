@@ -5,14 +5,14 @@ import React, { useState, useEffect } from 'react';
 import { StaffTable } from '@/components/staff/staff-table';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2, Save } from 'lucide-react';
+import { AlertCircle, Loader2, Save, ExternalLink } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { STAFF_GAS_URL } from '@/lib/settings';
+import { STAFF_GAS_URL, STAFF_SHEET_URL } from '@/lib/settings';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -108,10 +108,20 @@ export default function StaffPage() {
       {profile?.role === 'admin' && (
         <Card>
           <CardHeader>
-            <CardTitle>スタッフマスタ用 データソースURL設定</CardTitle>
-            <CardDescription>
-              スタッフ情報を取得しているGoogle Apps ScriptのURLです。恒久的な変更は `src/lib/settings.ts` ファイルで行ってください。
-            </CardDescription>
+             <div className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>スタッフマスタ用 データソースURL設定</CardTitle>
+                  <CardDescription>
+                    スタッフ情報を取得しているGoogle Apps ScriptのURLです。恒久的な変更は `src/lib/settings.ts` ファイルで行ってください。
+                  </CardDescription>
+                </div>
+                 <Button asChild variant="outline">
+                    <a href={STAFF_SHEET_URL} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      スタッフシートを開く
+                    </a>
+                  </Button>
+              </div>
           </CardHeader>
           <CardContent>
             <div className="flex w-full max-w-xl items-center space-x-2">

@@ -77,7 +77,6 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
   const { profile } = useUserProfile();
-  const { orderGasUrl } = useOrder();
   const isAdmin = profile?.role === 'admin';
 
   const filteredOrders = React.useMemo(() => {
@@ -172,7 +171,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                   return (
                     <TableRow 
                       key={index}
-                      onClick={() => handleRowClick(order)}
+                      onDoubleClick={() => handleRowClick(order)}
                       className={cn(isAdmin && hasUrl && "cursor-pointer hover:bg-muted/50")}
                     >
                       {headers.map(header => (
@@ -188,7 +187,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
               ) : (
                 <TableRow 
                   onDoubleClick={handleNoResultsClick}
-                  className={cn(isAdmin && "cursor-pointer hover:bg-muted/50")}
+                  className={cn(isAdmin && ORDER_SHEET_URL && !ORDER_SHEET_URL.includes('TODO') && "cursor-pointer hover:bg-muted/50")}
                 >
                   <TableCell colSpan={headers.length || 1} className="h-24 text-center">
                     {rawOrders.length === 0 && !searchTerm ? "表示対象の受注情報が見つかりません。" : "検索条件に合う受注が見つかりません。"}

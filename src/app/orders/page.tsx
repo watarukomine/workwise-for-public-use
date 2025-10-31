@@ -4,7 +4,7 @@
 import { OrderTable } from '@/components/orders/order-table';
 import React, { useState, useEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2, Save, ShoppingBag } from 'lucide-react';
+import { AlertCircle, Loader2, Save, ShoppingBag, ExternalLink } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { useOrder } from '@/contexts/order-context';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ORDER_GAS_URL } from '@/lib/settings';
+import { ORDER_GAS_URL, ORDER_SHEET_URL } from '@/lib/settings';
 
 export default function OrdersPage() {
   const { orders, isLoading: isLoadingOrders, error: orderError, orderGasUrl, setOrderGasUrl } = useOrder();
@@ -102,8 +102,14 @@ export default function OrdersPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>受注一覧</CardTitle>
+           <Button asChild variant="outline">
+              <a href={ORDER_SHEET_URL} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                受注シートを開く
+              </a>
+            </Button>
         </CardHeader>
         <CardContent>
           {orderError && !isLoadingOrders ? (

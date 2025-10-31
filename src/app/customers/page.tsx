@@ -4,7 +4,7 @@
 import { CustomerTable } from '@/components/customers/customer-table';
 import React, { useState, useEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2, Save } from 'lucide-react';
+import { AlertCircle, Loader2, Save, ExternalLink } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { CUSTOMER_GAS_URL } from '@/lib/settings';
+import { CUSTOMER_GAS_URL, CUSTOMER_SHEET_URL } from '@/lib/settings';
 
 export default function CustomersPage() {
   const { customers, isLoading: isLoadingCustomers, error: customerError, customerGasUrl, setCustomerGasUrl } = useCustomer();
@@ -93,11 +93,19 @@ export default function CustomersPage() {
   return (
     <div className="space-y-8">
       <Card>
-        <CardHeader>
-          <CardTitle>販売店情報</CardTitle>
-          <CardDescription>
-            スプレッドシートから自動取得された販売店の一覧です。
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>販売店情報</CardTitle>
+            <CardDescription>
+              スプレッドシートから自動取得された販売店の一覧です。
+            </CardDescription>
+          </div>
+          <Button asChild variant="outline">
+            <a href={CUSTOMER_SHEET_URL} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              販売店シートを開く
+            </a>
+          </Button>
         </CardHeader>
         <CardContent>
           {customerError && !isLoadingCustomers ? (
