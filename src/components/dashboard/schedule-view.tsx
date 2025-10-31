@@ -917,7 +917,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         const lightness = parseInt(l, 10);
         
         if (isTravelEvent) {
-             backgroundColor = `hsl(${h}, ${s}%, 50%)`;
+             backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
         } else if (isBreakEvent) {
             backgroundColor = `hsl(${h}, ${s}%, 90%)`;
             color = 'hsl(var(--foreground-hsl))'; 
@@ -928,7 +928,10 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         }
     }
   } else if (isTravelEvent) {
-    backgroundColor = 'hsl(var(--primary))'.replace(')', ', 0.5)').replace('hsl', 'hsla');
+    backgroundColor = 'hsla(var(--primary), 0.5)';
+  } else if (!staff.color) {
+      // Fallback for staff without a color
+      backgroundColor = isTravelEvent ? 'hsla(var(--primary), 0.5)' : 'hsl(var(--primary))';
   }
 
   
@@ -941,26 +944,21 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     <Tooltip>
       <TooltipTrigger
         ref={setNodeRef}
-        style={style}
+        style={{...style, backgroundColor, color}}
         {...listeners}
         {...attributes}
         onDoubleClick={handleDoubleClick}
-        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
+        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move p-1"
         data-event-chip="true"
       >
-        <div
-          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1")}
-          style={{ backgroundColor, color }}
-        >
-          <p className="text-xs font-semibold truncate pointer-events-none">
-            {line1}
+        <p className="text-xs font-semibold truncate pointer-events-none">
+          {line1}
+        </p>
+        {line2 && (
+          <p className="text-xs opacity-80 truncate pointer-events-none">
+              {line2}
           </p>
-          {line2 && (
-            <p className="text-xs opacity-80 truncate pointer-events-none">
-                {line2}
-            </p>
-          )}
-        </div>
+        )}
       </TooltipTrigger>
       <TooltipContent>
         <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
