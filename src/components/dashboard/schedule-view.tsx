@@ -908,10 +908,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   if (isTravelEvent) {
     if (staff.color && staff.color.startsWith('hsl')) {
-       // Replaces "hsl" with "hsla" and adds ", 0.5)" for opacity
-       backgroundColor = staff.color.replace('hsl', 'hsla').replace(')', ', 0.5)');
+       backgroundColor = staff.color.replace(')', ', 0.5)').replace('hsl', 'hsla');
     } else {
-       // Fallback for non-hsl colors, though less likely with current setup
        backgroundColor = 'hsla(var(--primary-hsl, 217 91% 60%), 0.5)';
     }
     color = 'hsl(var(--foreground))';
