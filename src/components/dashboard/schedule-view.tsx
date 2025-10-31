@@ -112,10 +112,8 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
     const scheduledTime = findKey(rawOrder, ['予定時間']);
     
-    // Line 1: Store name and scheduled time
     const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
     
-    // Line 2: Tire size and quantity
     const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? ` / ${findKey(rawOrder, ['本数'])}本` : ''}`;
 
     let taskDetails = line1;
@@ -910,20 +908,32 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isBreakEvent = event.title === '休憩';
 
   let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = 'hsl(var(--primary-foreground-hsl))';
+  let color = 'hsl(var(--primary-foreground-hsl))'; // Default to light text
   let customClasses = '';
 
-  if (isTravelEvent) {
-    customClasses = 'bg-yellow-500 text-black';
-  } else if (isBreakEvent) {
-      const match = staff.color?.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-      if (match) {
-        const [_, h, s] = match;
-        backgroundColor = `hsl(${h}, ${s}%, 90%)`;
-      } else {
-        backgroundColor = 'hsl(0, 0%, 90%)';
-      }
+  const match = staff.color?.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+  if (match) {
+    const [_, h, s, l] = match;
+    const lightness = parseInt(l, 10);
+    
+    // If lightness is high (a light color like yellow), use dark text
+    if (lightness > 65) {
       color = 'hsl(var(--foreground-hsl))';
+    }
+
+    if (isTravelEvent) {
+      backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.3)`;
+    } else if (isBreakEvent) {
+      backgroundColor = `hsl(${h}, ${s}%, 90%)`;
+      color = 'hsl(var(--foreground-hsl))';
+    }
+  } else if (isTravelEvent) {
+    // Fallback for non-hsl colors
+    backgroundColor = 'hsla(var(--primary), 0.3)';
+    color = 'hsl(var(--foreground-hsl))';
+  } else if (isBreakEvent) {
+    backgroundColor = 'hsl(0, 0%, 90%)';
+    color = 'hsl(var(--foreground-hsl))';
   }
   
   const [line1, ...rest] = (event.title || '').split('\n');
@@ -944,7 +954,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       >
         <div
           className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", customClasses)}
-          style={customClasses ? {} : { backgroundColor, color }}
+          style={{ backgroundColor, color }}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
