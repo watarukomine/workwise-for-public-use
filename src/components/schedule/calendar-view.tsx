@@ -229,14 +229,14 @@ export function ScheduleCalendar({
         <div className="space-y-2">
           <Label htmlFor="staff-filter">担当者フィルター</Label>
           <Select
-            value={filteredStaff || ''}
-            onValueChange={value => setFilteredStaff(value || null)}
+            value={filteredStaff || 'all-staff'}
+            onValueChange={value => setFilteredStaff(value === 'all-staff' ? null : value)}
           >
             <SelectTrigger id="staff-filter" className="w-[200px]">
               <SelectValue placeholder="すべての担当者" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">すべての担当者</SelectItem>
+              <SelectItem value="all-staff">すべての担当者</SelectItem>
               {staffList.map(staff => (
                 <SelectItem key={staff.id} value={staff.name}>
                   {staff.name}
