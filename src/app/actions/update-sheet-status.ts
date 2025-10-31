@@ -16,25 +16,33 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, ...payload } = args;
+    const { gasUrl, eventTitle, staffName, statusValue, timestamp } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
     try {
+        // フォームデータとしてPOSTする
+        const formData = new FormData();
+        
+        if (eventTitle) formData.append('eventTitle', eventTitle);
+        if (staffName !== null && staffName !== undefined) formData.append('staffName', staffName);
+        if (statusValue) formData.append('statusValue', statusValue);
+        if (timestamp) formData.append('timestamp', timestamp);
+        
+        // フォームデータをPOSTで送信
         const response = await fetch(gasUrl, {
             method: 'POST',
+            body: formData,
             cache: 'no-store',
             redirect: 'follow',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
         });
         
+        console.log("GAS response status:", response.status);
+        
         if (response.redirected && response.url.includes('accounts.google.com')) {
-             throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
+            throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
         
         if (!response.ok) {
@@ -43,13 +51,12 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         }
 
         const result = await response.json();
+        console.log("GAS response:", result);
         
-        // GAS側でエラーがcatchされ、{status: "error", ...} が返された場合を検知する
         if (result.status === 'error' || result.error) {
             const errorMessage = result.message || 'GASスクリプトでシート更新エラーが発生しました。';
-            // GASのcatchブロックからのエラーであることを特定し、より具体的なエラーをスローする
             if (errorMessage.includes('doPost Error')) {
-                 throw new Error(errorMessage);
+                throw new Error(errorMessage);
             }
             throw new Error(`GASスクリプトエラー: ${errorMessage}`);
         }
@@ -57,8 +64,6 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         return result;
     } catch (error: any) {
         console.error('Failed to call GAS for sheet update:', error);
-        // このアクションを呼び出すクライアント側でcatchされるように、エラーを再スローするか、
-        // エラー形式のレスポンスを返す。
         return {
             status: 'error',
             message: `シート更新用のGAS呼び出しに失敗しました: ${error.message}`,
