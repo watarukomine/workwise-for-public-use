@@ -44,7 +44,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { fetchGasData } from '@/app/actions/fetch-gas-data';
+import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -341,13 +341,13 @@ export function ScheduleView({
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
       if (!eventToUnassign.rawOrderId) return;
       try {
-          const params = new URLSearchParams({
+        const result = await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
-            staffName: "",
-            statusValue: "",
+            staffName: "", // Set staff name to empty to unassign
+            statusValue: "", // Also clear the status
             timestamp: new Date().toISOString(),
-          });
-          const result = await fetchGasData(`${ORDER_GAS_URL}?${params.toString()}`);
+        });
 
           if (result.status === 'error') throw new Error(result.message);
           
@@ -412,13 +412,13 @@ export function ScheduleView({
         try {
             if (draggedEvent.staffId !== newStaffId && draggedEvent.rawOrderId) {
                 const customer = getCustomerByCode(draggedEvent.locationId);
-                const params = new URLSearchParams({
-                  eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                  staffName: staffMember.name,
-                  statusValue: '作業待ち',
-                  timestamp: new Date().toISOString(),
+                const result = await updateSheetStatus({
+                    gasUrl: ORDER_GAS_URL,
+                    eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+                    staffName: staffMember.name,
+                    statusValue: '作業待ち',
+                    timestamp: new Date().toISOString(),
                 });
-                const result = await fetchGasData(`${ORDER_GAS_URL}?${params.toString()}`);
 
                 if (result.status === 'error') throw new Error(result.message);
                 
@@ -487,13 +487,13 @@ export function ScheduleView({
              setScheduleData(prev => [...prev, newEvent]);
         } else {
             try {
-              const params = new URLSearchParams({
+              const result = await updateSheetStatus({
+                  gasUrl: ORDER_GAS_URL,
                   eventTitle: `(ID: ${order.rawOrderId})`,
                   staffName: staff.name,
                   statusValue: '作業待ち',
                   timestamp: new Date().toISOString(),
               });
-              const result = await fetchGasData(`${ORDER_GAS_URL}?${params.toString()}`);
 
               if (result.status === 'error') throw new Error(result.message);
               

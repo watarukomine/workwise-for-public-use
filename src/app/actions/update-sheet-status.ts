@@ -23,6 +23,13 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
     }
 
     try {
+        console.log("Sending update request to GAS with body:", {
+            eventTitle,
+            staffName,
+            statusValue,
+            timestamp
+        });
+
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
