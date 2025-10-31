@@ -907,7 +907,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isBreakEvent = event.title === '休憩';
 
   let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = 'white';
+  let color = 'hsl(var(--primary-foreground))';
 
   if (isTravelEvent) {
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
@@ -916,7 +916,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
          backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
        }
     } else {
-       backgroundColor = 'hsla(var(--primary), 0.5)';
+       backgroundColor = 'hsla(var(--primary-hsl), 0.5)';
     }
     color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
