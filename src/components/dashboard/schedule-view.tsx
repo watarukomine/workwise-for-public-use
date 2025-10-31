@@ -345,7 +345,7 @@ export function ScheduleView({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUnassign.rawOrderId})`, 
             staffName: "",
-            statusValue: "未割当",
+            statusValue: "",
             timestamp: new Date().toISOString(),
           });
           if (result.status === 'error') throw new Error(result.message);
@@ -415,7 +415,7 @@ export function ScheduleView({
                   gasUrl: ORDER_GAS_URL,
                   eventTitle: `(ID: ${draggedEvent.rawOrderId})`, 
                   staffName: staffMember.name,
-                  statusValue: '作業待ち',
+                  statusValue: new Date().toISOString(),
                   timestamp: new Date().toISOString(),
                 });
                 if (result.status === 'error') throw new Error(result.message);
@@ -489,7 +489,7 @@ export function ScheduleView({
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: `(ID: ${order.rawOrderId})`, 
                 staffName: staff.name,
-                statusValue: '作業待ち',
+                statusValue: new Date().toISOString(),
                 timestamp: new Date().toISOString(),
               });
 
@@ -946,4 +946,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     
 
     
+
 
