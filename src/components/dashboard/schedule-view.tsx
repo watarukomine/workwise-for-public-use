@@ -913,7 +913,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       divStyle.opacity = 0.5;
   }
   
-  const isYellowish = (staff.name === '小峯' || staff.name === '加藤');
+  const isYellowish = (staff.name === '小峯' || staff.name === '加藤' || staff.name === '牛島' || staff.name === '門馬');
 
   const textColorClass = isYellowish ? 'text-black' : 'text-primary-foreground';
   
