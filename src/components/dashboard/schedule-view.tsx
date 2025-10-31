@@ -113,7 +113,7 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}`;
     const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? ` / ${findKey(rawOrder, ['本数'])}本` : ''}`;
     let taskDetails = line1;
-    if (line2.trim() !== '/') {
+    if (line2.trim() && line2.trim() !== '/') {
         taskDetails += `\n${line2.trim()}`;
     }
     
@@ -907,12 +907,12 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let color = 'hsl(var(--primary-foreground))';
 
   if (isTravelEvent) {
-    const match = staff.color?.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-    if (match) {
-        const [_, h, s, l] = match;
-        backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
+    if (staff.color && staff.color.startsWith('hsl')) {
+       // Replaces "hsl" with "hsla" and adds ", 0.5)" for opacity
+       backgroundColor = staff.color.replace('hsl', 'hsla').replace(')', ', 0.5)');
     } else {
-        backgroundColor = 'hsla(var(--primary-hsl), 0.5)';
+       // Fallback for non-hsl colors, though less likely with current setup
+       backgroundColor = 'hsla(var(--primary-hsl, 217 91% 60%), 0.5)';
     }
     color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
