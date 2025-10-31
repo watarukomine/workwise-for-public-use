@@ -19,8 +19,6 @@ import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, parseISO, isValid } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import { useOrder } from '@/contexts/order-context';
-import { ORDER_SHEET_URL } from '@/lib/settings';
 
 interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
@@ -123,12 +121,6 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     }
   };
 
-  const handleNoResultsClick = () => {
-    if (isAdmin && ORDER_SHEET_URL && !ORDER_SHEET_URL.includes('TODO')) {
-      window.open(ORDER_SHEET_URL, '_blank', 'noopener,noreferrer');
-    }
-  }
-
   const headersToFormat: Record<string, (value: string) => string> = {
     '作業予定日': formatDate,
     '受付日': formatDate, // Format reception date as well
@@ -185,10 +177,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                   )
                 })
               ) : (
-                <TableRow 
-                  onDoubleClick={handleNoResultsClick}
-                  className={cn(isAdmin && ORDER_SHEET_URL && !ORDER_SHEET_URL.includes('TODO') && "cursor-pointer hover:bg-muted/50")}
-                >
+                <TableRow>
                   <TableCell colSpan={headers.length || 1} className="h-24 text-center">
                     {rawOrders.length === 0 && !searchTerm ? "表示対象の受注情報が見つかりません。" : "検索条件に合う受注が見つかりません。"}
                   </TableCell>
