@@ -345,6 +345,8 @@ export function ScheduleView({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUnassign.rawOrderId})`, 
             staffName: "",
+            statusValue: "",
+            timestamp: new Date().toISOString(),
           });
           if (result.status === 'error') throw new Error(result.message);
           
@@ -413,6 +415,8 @@ export function ScheduleView({
                   gasUrl: ORDER_GAS_URL,
                   eventTitle: `(ID: ${draggedEvent.rawOrderId})`, 
                   staffName: staffMember.name,
+                  statusValue: '作業待ち',
+                  timestamp: new Date().toISOString(),
                 });
                 if (result.status === 'error') throw new Error(result.message);
                 
@@ -485,6 +489,8 @@ export function ScheduleView({
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: `(ID: ${order.rawOrderId})`, 
                 staffName: staff.name,
+                statusValue: '作業待ち',
+                timestamp: new Date().toISOString(),
               });
 
               if (result.status === 'error') throw new Error(result.message);

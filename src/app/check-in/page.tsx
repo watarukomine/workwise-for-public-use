@@ -117,14 +117,13 @@ export default function CheckInPage() {
         }
 
         try {
-            // For check-in, we might not have a specific order, so we use a mock or a convention.
-            // Here, we use a placeholder that the GAS script might need to identify the row.
-            // If the row is identified by staff name, eventTitle can be less specific.
             const eventTitleForUpdate = `(ID: ${MOCK_ORDER_ID})`;
             const result = await updateSheetStatus({
                 gasUrl: ORDER_GAS_URL,
-                eventTitle: eventTitleForUpdate, // The title GAS uses to find the row
-                staffName: profile.name, // The staff member performing the action
+                eventTitle: eventTitleForUpdate,
+                staffName: profile.name,
+                statusValue: statusValue,
+                timestamp: new Date().toISOString(),
             });
 
             if (result.status === 'error') {
