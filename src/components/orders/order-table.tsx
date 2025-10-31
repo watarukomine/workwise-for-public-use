@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -18,6 +19,7 @@ import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, isToday, parseISO, isValid } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
+import { useOrder } from '@/contexts/order-context';
 
 interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
@@ -74,6 +76,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [page, setPage] = React.useState(1);
   const rowsPerPage = 10;
   const { profile } = useUserProfile();
+  const { orderGasUrl } = useOrder();
   const isAdmin = profile?.role === 'admin';
 
   const filteredOrders = React.useMemo(() => {
@@ -119,6 +122,17 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
       window.open(order.Order_URL, '_blank', 'noopener,noreferrer');
     }
   };
+
+  const handleNoResultsClick = () => {
+    if (isAdmin && orderGasUrl) {
+      // Try to construct the spreadsheet URL from the GAS URL
+      // This is a heuristic and might not always work if the GAS project is standalone
+      // Typical GAS URL: https://script.google.com/macros/s/GIVEN_ID/exec
+      // We assume it's bound to a sheet.
+      const sheetUrl = orderGasUrl.replace('/macros/s/', '/spreadsheets/d/').replace('/exec', '/edit');
+       window.open(sheetUrl, '_blank', 'noopener,noreferrer');
+    }
+  }
 
   const headersToFormat: Record<string, (value: string) => string> = {
     '作業予定日': formatDate,
@@ -176,7 +190,10 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                   )
                 })
               ) : (
-                <TableRow>
+                <TableRow 
+                  onClick={handleNoResultsClick}
+                  className={cn(isAdmin && "cursor-pointer hover:bg-muted/50")}
+                >
                   <TableCell colSpan={headers.length || 1} className="h-24 text-center">
                     {rawOrders.length === 0 && !searchTerm ? "表示対象の受注情報が見つかりません。" : "検索条件に合う受注が見つかりません。"}
                   </TableCell>
