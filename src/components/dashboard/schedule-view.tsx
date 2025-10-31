@@ -904,16 +904,18 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
   
   const isTravelEvent = event.title?.startsWith('移動');
-  const isBreakEvent = event.title === '休憩';
-
+  
   const divStyle: React.CSSProperties = {
       backgroundColor: staff.color || 'hsl(var(--primary))',
   };
-  const divClasses = "w-full h-full rounded-md flex flex-col justify-center p-1";
   
   if (isTravelEvent) {
       divStyle.opacity = 0.5;
   }
+  
+  const isYellowish = (staff.name === '小峯' || staff.name === '加藤');
+
+  const textColorClass = isYellowish ? 'text-black' : 'text-primary-foreground';
   
   const [line1, ...rest] = (event.title || '').split('\n');
   const line2 = rest.join('\n');
@@ -932,7 +934,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         data-event-chip="true"
       >
         <div
-          className={cn(divClasses, "text-primary-foreground")}
+          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)}
           style={divStyle}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
