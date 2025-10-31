@@ -910,16 +910,17 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isBreakEvent = event.title === '休憩';
 
   let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = 'hsl(var(--primary-foreground))';
+  let color = 'hsl(var(--primary-foreground-hsl))';
 
   if (isTravelEvent) {
     if (staff.color && staff.color.startsWith('hsl')) {
        // Replaces 'hsl(h, s, l)' with 'hsla(h, s, l, 0.5)'
        backgroundColor = staff.color.replace('hsl', 'hsla').replace(')', ', 0.5)');
     } else {
-       backgroundColor = 'hsla(var(--primary-hsl, 217 91% 60%), 0.5)';
+       // Fallback for non-hsl colors, though unlikely with current setup
+       backgroundColor = 'hsla(217, 91%, 60%, 0.5)';
     }
-    color = 'hsl(var(--foreground))';
+    color = 'hsl(var(--foreground-hsl))';
   } else if (isBreakEvent) {
       const match = staff.color?.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
       if (match) {
@@ -928,7 +929,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       } else {
         backgroundColor = 'hsl(0, 0%, 90%)';
       }
-      color = 'hsl(var(--foreground))';
+      color = 'hsl(var(--foreground-hsl))';
   }
   
   const [line1, ...rest] = (event.title || '').split('\n');
