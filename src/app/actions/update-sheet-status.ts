@@ -44,8 +44,10 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
 
         const result = await response.json();
         
+        // GAS側でエラーがcatchされ、{status: "error", ...} が返された場合を検知する
         if (result.status === 'error' || result.error) {
             const errorMessage = result.message || 'GASスクリプトでシート更新エラーが発生しました。';
+            // GASのcatchブロックからのエラーであることを特定し、より具体的なエラーをスローする
             if (errorMessage.includes('doPost Error')) {
                  throw new Error(errorMessage);
             }
@@ -55,6 +57,8 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         return result;
     } catch (error: any) {
         console.error('Failed to call GAS for sheet update:', error);
+        // このアクションを呼び出すクライアント側でcatchされるように、エラーを再スローするか、
+        // エラー形式のレスポンスを返す。
         return {
             status: 'error',
             message: `シート更新用のGAS呼び出しに失敗しました: ${error.message}`,
