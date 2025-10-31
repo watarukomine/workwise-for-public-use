@@ -12,15 +12,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { STAFF_GAS_URL } from '@/lib/settings';
+import { STAFF_GAS_URL, STAFF_SHEET_URL } from '@/lib/settings';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, isLoading: isStaffLoading, error } = useSelectedStaff();
   
-  // The local URL state now reflects the hardcoded URL from settings.
-  // We keep the state management UI to allow temporary overrides for debugging,
-  // but it won't persist.
   const [localUrl, setLocalUrl] = useState(STAFF_GAS_URL);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
@@ -31,12 +28,15 @@ export default function StaffPage() {
         title: "URLを更新しました",
         description: "ページを再読み込みして、新しいURLからスタッフデータを取得します。",
       });
-    // This will effectively reload the page with the new URL for this session.
-    // However, on next load, it will revert to the URL from settings.ts
-    // For a permanent change, the user should be instructed to change settings.ts
     window.location.href = `${window.location.origin}${window.location.pathname}?gasUrl=${encodeURIComponent(localUrl)}`;
   };
 
+
+  const handleHeaderClick = () => {
+    if (STAFF_SHEET_URL && profile?.role === 'admin') {
+      window.open(STAFF_SHEET_URL, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   const isLoading = isProfileLoading || isStaffLoading;
 
@@ -52,7 +52,13 @@ export default function StaffPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">スタッフ管理</h1>
+        <h1 
+          onClick={handleHeaderClick}
+          className={profile?.role === 'admin' && STAFF_SHEET_URL ? "text-2xl font-semibold tracking-tight cursor-pointer hover:underline flex items-center gap-2" : "text-2xl font-semibold tracking-tight flex items-center gap-2"}
+        >
+          スタッフ管理
+          {profile?.role === 'admin' && STAFF_SHEET_URL && <ExternalLink className="h-5 w-5 text-muted-foreground" />}
+        </h1>
         <p className="text-muted-foreground">
           {profile?.role === 'admin'
             ? "スプレッドシートから取得したスタッフの一覧です。表示するスタッフを選択し、「選択を適用」ボタンで他ページに反映します。" 

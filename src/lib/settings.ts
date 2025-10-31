@@ -30,10 +30,22 @@ export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyDOr3PIri
 // --- スプレッドシート本体のURL ---
 
 /**
+ * スタッフ情報が記載されているスプレッドシートのURL。
+ * staff/page.tsx のヘッダークリックで開かれます。
+ */
+export const STAFF_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Staff sheet URL
+
+/**
  * 販売店情報が記載されているスプレッドシートのURL。
- * customer-table.tsx でテーブルの行をダブルクリックした際に開かれます。
+ * customers/page.tsx のヘッダークリックで開かれます。
  */
 export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing';
+
+/**
+ * 受注情報が記載されているスプレッドシートのURL。
+ * orders/page.tsx のヘッダークリックで開かれます。
+ */
+export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Order sheet URL
 
 
 // --- その他設定 ---

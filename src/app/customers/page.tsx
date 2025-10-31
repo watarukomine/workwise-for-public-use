@@ -12,7 +12,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { CUSTOMER_GAS_URL } from '@/lib/settings';
+import { CUSTOMER_GAS_URL, CUSTOMER_SHEET_URL } from '@/lib/settings';
 
 export default function CustomersPage() {
   const { customers, isLoading: isLoadingCustomers, error: customerError, customerGasUrl, setCustomerGasUrl } = useCustomer();
@@ -47,6 +47,12 @@ export default function CustomersPage() {
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleHeaderClick = () => {
+    if (CUSTOMER_SHEET_URL && isAdmin) {
+      window.open(CUSTOMER_SHEET_URL, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -94,7 +100,13 @@ export default function CustomersPage() {
     <div className="space-y-8">
       <Card>
         <CardHeader>
-          <CardTitle>販売店情報</CardTitle>
+          <CardTitle 
+            onClick={handleHeaderClick}
+            className={isAdmin && CUSTOMER_SHEET_URL ? "cursor-pointer hover:underline flex items-center gap-2" : "flex items-center gap-2"}
+          >
+            販売店情報
+            {isAdmin && CUSTOMER_SHEET_URL && <ExternalLink className="h-5 w-5 text-muted-foreground" />}
+          </CardTitle>
           <CardDescription>
             スプレッドシートから自動取得された販売店の一覧です。
           </CardDescription>

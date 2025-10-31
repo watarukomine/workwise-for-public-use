@@ -12,7 +12,7 @@ import { useOrder } from '@/contexts/order-context';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { ORDER_GAS_URL } from '@/lib/settings';
+import { ORDER_GAS_URL, ORDER_SHEET_URL } from '@/lib/settings';
 
 export default function OrdersPage() {
   const { orders, isLoading: isLoadingOrders, error: orderError, orderGasUrl, setOrderGasUrl } = useOrder();
@@ -46,6 +46,12 @@ export default function OrdersPage() {
       });
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleHeaderClick = () => {
+    if (ORDER_SHEET_URL && isAdmin) {
+      window.open(ORDER_SHEET_URL, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -92,7 +98,9 @@ export default function OrdersPage() {
   return (
     <div className="space-y-8">
        <div>
-        <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+        <h1 
+          className="text-2xl font-semibold tracking-tight flex items-center gap-2"
+        >
             <ShoppingBag className="h-6 w-6" />
             受注管理
         </h1>
@@ -103,7 +111,13 @@ export default function OrdersPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>受注一覧</CardTitle>
+          <CardTitle
+            onClick={handleHeaderClick}
+            className={isAdmin && ORDER_SHEET_URL ? "cursor-pointer hover:underline flex items-center gap-2" : "flex items-center gap-2"}
+          >
+            受注一覧
+            {isAdmin && ORDER_SHEET_URL && <ExternalLink className="h-5 w-5 text-muted-foreground" />}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {orderError && !isLoadingOrders ? (
