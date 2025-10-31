@@ -288,27 +288,24 @@ const TimeIndicator = () => {
     const [now, setNow] = React.useState<Date | null>(null);
 
     React.useEffect(() => {
-        // Set time on mount to ensure it's client-side
         setNow(new Date());
-
         const timer = setInterval(() => {
             setNow(new Date());
         }, 60000); // Update every minute
-        
         return () => clearInterval(timer);
     }, []);
 
     if (!now) return null;
-
-    const startOfDay = new Date(now);
-    startOfDay.setHours(timelineStartHour, 0, 0, 0);
-
-    const minutesFromStart = differenceInMinutes(now, startOfDay);
-    const leftPosition = minutesToPixels(minutesFromStart);
     
     const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
-
     if (!isVisible) return null;
+
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+
+    // Calculate minutes from the timeline's start hour directly to avoid timezone issues.
+    const minutesFromStart = (currentHour - timelineStartHour) * 60 + currentMinute;
+    const leftPosition = minutesToPixels(minutesFromStart);
 
     return (
         <div
@@ -943,18 +940,23 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
   
   const isTravelEvent = event.title?.startsWith('移動');
-  
+  const isGenericTravelEvent = isTravelEvent && event.id.startsWith('generic-');
+
   const divStyle: React.CSSProperties = {
       backgroundColor: staff.color || 'hsl(var(--primary))',
   };
   
-  if (isTravelEvent) {
+  if (isTravelEvent && !isGenericTravelEvent) {
       style.opacity = 0.5;
   }
   
   const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
   const textColorClass = brightStaff.includes(staff.name) ? 'text-black' : 'text-primary-foreground';
   
+  if (isGenericTravelEvent) {
+      divStyle.backgroundColor = 'rgb(250 204 21)'; // bg-yellow-400
+  }
+
   const [line1, ...rest] = (event.title || '').split('\n');
   const line2 = rest.join('\n');
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
