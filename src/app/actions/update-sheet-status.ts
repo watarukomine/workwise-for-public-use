@@ -23,15 +23,17 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
     }
 
     try {
-        const url = new URL(gasUrl);
-        const params = new URLSearchParams();
-        if (eventTitle) params.append('eventTitle', eventTitle);
-        if (staffName !== null && staffName !== undefined) params.append('staffName', staffName);
-        if (statusValue) params.append('statusValue', statusValue);
-        if (timestamp) params.append('timestamp', timestamp);
-
-        const response = await fetch(`${url.origin}${url.pathname}?${params.toString()}`, {
+        const response = await fetch(gasUrl, {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                eventTitle,
+                staffName,
+                statusValue,
+                timestamp,
+            }),
             cache: 'no-store',
             redirect: 'follow',
         });
