@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { format, isToday, parseISO, isValid } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useOrder } from '@/contexts/order-context';
+import { ORDER_SHEET_URL } from '@/lib/settings';
 
 interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
@@ -124,30 +125,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   };
 
   const handleNoResultsClick = () => {
-    if (isAdmin && orderGasUrl) {
-      // The GAS URL is in the format: https://script.google.com/macros/s/DEPLOYMENT_ID/exec
-      // We need to find the spreadsheet ID, which is not directly in this URL.
-      // This is a common pattern, but might fail if the script is standalone.
-      // A better approach would be to have the GAS return the Sheet URL or ID.
-      // For now, we provide a link to the Google Drive root as a fallback.
-      let sheetId = null;
-      try {
-        // Let's assume the GAS URL deployment ID is sometimes the same as sheet ID (not reliable)
-        const parts = orderGasUrl.split('/');
-        // URL is like .../macros/s/ID/exec
-        const idPartIndex = parts.indexOf('s') + 1;
-        if (idPartIndex > 0 && idPartIndex < parts.length) {
-            sheetId = parts[idPartIndex];
-        }
-      } catch {}
-
-      if (sheetId) {
-          const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
-          window.open(sheetUrl, '_blank', 'noopener,noreferrer');
-      } else {
-        // Fallback if we can't derive the ID
-        window.open('https://drive.google.com/drive/my-drive', '_blank', 'noopener,noreferrer');
-      }
+    if (isAdmin && ORDER_SHEET_URL && !ORDER_SHEET_URL.includes('TODO')) {
+      window.open(ORDER_SHEET_URL, '_blank', 'noopener,noreferrer');
     }
   }
 

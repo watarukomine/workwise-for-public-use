@@ -3,7 +3,9 @@
  * GASのURLなど、環境によって変更される可能性のある値を一元管理します。
  */
 
-// 注: これらのURLはサンプルです。実際のGASのデプロイURLに置き換えてください。
+// 注: これらのURLはサンプルです。実際のGASのデプロイURLやシートのURLに置き換えてください。
+
+// --- データソース (Google Apps Script) ---
 
 /**
  * スタッフマスターのデータを取得・更新するためのGoogle Apps ScriptのURL。
@@ -22,6 +24,30 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
 export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyDOr3PIri6AJEaFAcGVh7IMGme0Y6kiSj12vYfH5F6jAYcY2wf9sGdLI50bTSV4kwd/exec';
+
+
+// --- 直接リンク (Googleスプレッドシート) ---
+
+/**
+ * スタッフ情報が記載されているスプレッドシートのURL。
+ * スタッフ管理画面でデータがない場合に、このURLへのリンクが表示されます。
+ */
+export const STAFF_SHEET_URL = 'https://docs.google.com/spreadsheets/d/TODO_REPLACE_THIS_SPREADSHEET_ID/edit';
+
+/**
+ * 販売店情報が記載されているスプレッドシートのURL。
+ * 販売店情報画面でデータがない場合に、このURLへのリンクが表示されます。
+ */
+export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/TODO_REPLACE_THIS_SPREADSHEET_ID/edit';
+
+/**
+ * 受注情報が記載されているスプレッドシートのURL。
+ * 受注管理画面でデータがない場合に、このURLへのリンクが表示されます。
+ */
+export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/TODO_REPLACE_THIS_SPREADSHEET_ID/edit';
+
+
+// --- その他設定 ---
 
 /**
  * スプレッドシートでステータスを管理している列のヘッダー名。
