@@ -7,8 +7,6 @@ interface UpdateSheetStatusArgs {
     gasUrl: string;
     eventTitle?: string | null;
     staffName?: string | null;
-    statusValue?: StaffStatus['status'] | '';
-    timestamp?: string; // タイムスタンプを追加
 }
 
 interface GasResponse {
@@ -18,7 +16,7 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName, statusValue, timestamp } = args;
+    const { gasUrl, eventTitle, staffName } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
@@ -34,12 +32,6 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         // staffName は空文字列も許容するため、undefined/null のみチェック
         if (staffName !== null && staffName !== undefined) {
             params.append('staffName', staffName);
-        }
-        if (statusValue) {
-            params.append('statusValue', statusValue);
-        }
-        if (timestamp) { // タイムスタンプを追加
-            params.append('timestamp', timestamp);
         }
         
         // データはURLパラメータとして送信し、リクエスト自体はPOSTで行う

@@ -125,7 +125,6 @@ export default function CheckInPage() {
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: eventTitleForUpdate, // The title GAS uses to find the row
                 staffName: profile.name, // The staff member performing the action
-                statusValue: statusValue, // The new status to set
             });
 
             if (result.status === 'error') {
