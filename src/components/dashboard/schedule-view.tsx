@@ -284,6 +284,37 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     );
 }
 
+const TimeIndicator = () => {
+    const [now, setNow] = React.useState(new Date());
+
+    React.useEffect(() => {
+        const timer = setInterval(() => {
+            setNow(new Date());
+        }, 60000); // Update every minute
+        return () => clearInterval(timer);
+    }, []);
+
+    const startOfDay = new Date(now);
+    startOfDay.setHours(timelineStartHour, 0, 0, 0);
+
+    const minutesFromStart = differenceInMinutes(now, startOfDay);
+    const leftPosition = minutesToPixels(minutesFromStart);
+    
+    const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
+
+    if (!isVisible) return null;
+
+    return (
+        <div
+            className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none"
+            style={{ left: `${leftPosition}px` }}
+        >
+            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
+        </div>
+    );
+};
+
+
 export function ScheduleView({ 
     staffData, 
     customerData,
@@ -721,6 +752,7 @@ export function ScheduleView({
                       </div>
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative mt-2 space-y-2">
+                            {isToday(currentDate) && <TimeIndicator />}
                             {staffData?.map((staff) => {
                                 const events = scheduleData.filter((e) => e.staffId === staff.id);
                                 return (
@@ -860,7 +892,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
         <div className="h-full border-t border-b"></div>
-        <div className="absolute top-0 left-0 h-full">
+        <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
@@ -910,12 +942,11 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
   
   if (isTravelEvent) {
-      divStyle.opacity = 0.5;
+      style.opacity = 0.5;
   }
   
-  const isYellowish = (staff.name === '小峯' || staff.name === '加藤' || staff.name === '牛島' || staff.name === '門馬');
-
-  const textColorClass = isYellowish ? 'text-black' : 'text-primary-foreground';
+  const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
+  const textColorClass = brightStaff.includes(staff.name) ? 'text-black' : 'text-primary-foreground';
   
   const [line1, ...rest] = (event.title || '').split('\n');
   const line2 = rest.join('\n');
