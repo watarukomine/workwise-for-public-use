@@ -23,26 +23,26 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
     }
 
     try {
-        // フォームデータとしてPOSTする
-        const formData = new FormData();
-        
-        if (eventTitle) formData.append('eventTitle', eventTitle);
-        if (staffName !== null && staffName !== undefined) formData.append('staffName', staffName);
-        if (statusValue) formData.append('statusValue', statusValue);
-        if (timestamp) formData.append('timestamp', timestamp);
-        
-        // フォームデータをPOSTで送信
+        // POSTメソッドでJSONデータを送信するように変更
         const response = await fetch(gasUrl, {
             method: 'POST',
-            body: formData,
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                eventTitle,
+                staffName,
+                statusValue,
+                timestamp
+            }),
             cache: 'no-store',
             redirect: 'follow',
         });
         
         console.log("GAS response status:", response.status);
-        
+
         if (response.redirected && response.url.includes('accounts.google.com')) {
-            throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
+             throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
         
         if (!response.ok) {
@@ -56,7 +56,7 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         if (result.status === 'error' || result.error) {
             const errorMessage = result.message || 'GASスクリプトでシート更新エラーが発生しました。';
             if (errorMessage.includes('doPost Error')) {
-                throw new Error(errorMessage);
+                 throw new Error(errorMessage);
             }
             throw new Error(`GASスクリプトエラー: ${errorMessage}`);
         }
