@@ -299,11 +299,10 @@ const TimeIndicator = () => {
     
     const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
     if (!isVisible) return null;
-
+    
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
 
-    // Calculate minutes from the timeline's start hour directly to avoid timezone issues.
     const minutesFromStart = (currentHour - timelineStartHour) * 60 + currentMinute;
     const leftPosition = minutesToPixels(minutesFromStart);
 
@@ -931,7 +930,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
-    opacity: isDragging ? 0.8 : 1,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -940,21 +938,20 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
   
   const isTravelEvent = event.title?.startsWith('移動');
-  const isGenericTravelEvent = isTravelEvent && event.id.startsWith('generic-');
-
+  
   const divStyle: React.CSSProperties = {
       backgroundColor: staff.color || 'hsl(var(--primary))',
   };
-  
-  if (isTravelEvent && !isGenericTravelEvent) {
+
+  if (isTravelEvent) {
       style.opacity = 0.5;
   }
   
   const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
   const textColorClass = brightStaff.includes(staff.name) ? 'text-black' : 'text-primary-foreground';
   
-  if (isGenericTravelEvent) {
-      divStyle.backgroundColor = 'rgb(250 204 21)'; // bg-yellow-400
+  if (event.id.startsWith('generic-travel')) {
+    divStyle.backgroundColor = 'rgb(250 204 21)';
   }
 
   const [line1, ...rest] = (event.title || '').split('\n');
