@@ -12,7 +12,7 @@ import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay } from 'date-fns';
+import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay, isValid } from 'date-fns';
 
 const getStorageKey = (date: Date) => {
     return `scheduleData-${format(date, 'yyyy-MM-dd')}`;
