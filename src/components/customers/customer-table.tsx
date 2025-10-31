@@ -19,6 +19,7 @@ import { Search } from 'lucide-react';
 import type { Customer } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useUserProfile } from '@/hooks/use-user-profile';
+import { CUSTOMER_SHEET_URL } from '@/lib/settings';
 
 type CustomerWithUrl = Customer & { Order_URL?: string };
 interface CustomerTableProps {
@@ -79,9 +80,9 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
 
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
   
-  const handleRowDoubleClick = (customer: CustomerWithUrl) => {
-    if (isAdmin && customer && customer.Order_URL) {
-      window.open(customer.Order_URL, '_blank', 'noopener,noreferrer');
+  const handleRowDoubleClick = () => {
+    if (isAdmin && CUSTOMER_SHEET_URL) {
+      window.open(CUSTOMER_SHEET_URL, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -126,8 +127,8 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
                 paginatedCustomers.map((customer, index) => (
                   <TableRow 
                     key={customer.id || index}
-                    onDoubleClick={() => handleRowDoubleClick(customer)}
-                    className={cn(isAdmin && customer.Order_URL && "cursor-pointer")}
+                    onDoubleClick={handleRowDoubleClick}
+                    className={cn(isAdmin && CUSTOMER_SHEET_URL && "cursor-pointer")}
                   >
                     {headers.map(header => (
                       <TableCell key={header.key}>

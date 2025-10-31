@@ -1,3 +1,4 @@
+
 /**
  * アプリケーション全体で使用される設定値を管理します。
  * GASのURLなど、環境によって変更される可能性のある値を一元管理します。
@@ -24,6 +25,15 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
 export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyDOr3PIri6AJEaFAcGVh7IMGme0Y6kiSj12vYfH5F6jAYcY2wf9sGdLI50bTSV4kwd/exec';
+
+
+// --- スプレッドシート本体のURL ---
+
+/**
+ * 販売店情報が記載されているスプレッドシートのURL。
+ * customer-table.tsx でテーブルの行をダブルクリックした際に開かれます。
+ */
+export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing';
 
 
 // --- その他設定 ---
