@@ -23,16 +23,7 @@ export default function DashboardPage() {
   const [customers] = React.useState<WithId<Customer>[]>(customerData);
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
 
-  const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const savedData = localStorage.getItem(getStorageKey(currentDate));
-      return savedData ? JSON.parse(savedData) : [];
-    } catch (error) {
-      console.error("Failed to parse schedule data from localStorage", error);
-      return [];
-    }
-  });
+  const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
 
   const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
   
@@ -43,7 +34,8 @@ export default function DashboardPage() {
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
         try {
-            const savedData = localStorage.getItem(getStorageKey(currentDate));
+            const key = getStorageKey(currentDate);
+            const savedData = localStorage.getItem(key);
             setScheduleData(savedData ? JSON.parse(savedData) : []);
         } catch (error) {
             console.error("Failed to parse schedule data for new date", error);
@@ -56,7 +48,8 @@ export default function DashboardPage() {
   React.useEffect(() => {
       try {
           if (typeof window !== 'undefined') {
-              localStorage.setItem(getStorageKey(currentDate), JSON.stringify(scheduleData));
+              const key = getStorageKey(currentDate);
+              localStorage.setItem(key, JSON.stringify(scheduleData));
           }
       } catch (error) {
           console.error("Failed to save schedule data to localStorage", error);
