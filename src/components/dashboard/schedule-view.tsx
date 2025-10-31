@@ -891,49 +891,29 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   const { left, width } = getEventDimensions(event.start, event.end);
 
-  const style = {
+  const style: React.CSSProperties = {
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
-    opacity: isDragging ? 0.8 : 1,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation(); 
     onDoubleClick();
   };
-
+  
   const isTravelEvent = event.title?.startsWith('移動');
   const isBreakEvent = event.title === '休憩';
 
-  let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = 'hsl(var(--primary-foreground-hsl))';
-
-  if (typeof staff.color === 'string' && staff.color.startsWith('hsl')) {
-    const match = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-    if (match) {
-        const [_, h, s, l] = match;
-        const lightness = parseInt(l, 10);
-        
-        if (isTravelEvent) {
-             backgroundColor = `hsla(${h}, ${s}%, ${l}%, 0.5)`;
-        } else if (isBreakEvent) {
-            backgroundColor = `hsl(${h}, ${s}%, 90%)`;
-            color = 'hsl(var(--foreground-hsl))'; 
-        }
-
-        if (lightness > 65) {
-            color = 'hsl(var(--foreground-hsl))';
-        }
-    }
-  } else if (isTravelEvent) {
-    backgroundColor = 'hsla(var(--primary), 0.5)';
-  } else if (!staff.color) {
-      // Fallback for staff without a color
-      backgroundColor = isTravelEvent ? 'hsla(var(--primary), 0.5)' : 'hsl(var(--primary))';
+  const divStyle: React.CSSProperties = {
+      backgroundColor: staff.color || 'hsl(var(--primary))',
+  };
+  const divClasses = "w-full h-full rounded-md flex flex-col justify-center p-1";
+  
+  if (isTravelEvent) {
+      divStyle.opacity = 0.5;
   }
-
   
   const [line1, ...rest] = (event.title || '').split('\n');
   const line2 = rest.join('\n');
@@ -944,21 +924,26 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     <Tooltip>
       <TooltipTrigger
         ref={setNodeRef}
-        style={{...style, backgroundColor, color}}
+        style={style}
         {...listeners}
         {...attributes}
         onDoubleClick={handleDoubleClick}
-        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move p-1"
+        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
         data-event-chip="true"
       >
-        <p className="text-xs font-semibold truncate pointer-events-none">
-          {line1}
-        </p>
-        {line2 && (
-          <p className="text-xs opacity-80 truncate pointer-events-none">
-              {line2}
+        <div
+          className={cn(divClasses, "text-primary-foreground")}
+          style={divStyle}
+        >
+          <p className="text-xs font-semibold truncate pointer-events-none">
+            {line1}
           </p>
-        )}
+          {line2 && (
+            <p className="text-xs opacity-80 truncate pointer-events-none">
+                {line2}
+            </p>
+          )}
+        </div>
       </TooltipTrigger>
       <TooltipContent>
         <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
