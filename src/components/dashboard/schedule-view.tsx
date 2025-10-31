@@ -911,16 +911,10 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   let backgroundColor = staff.color || 'hsl(var(--primary))';
   let color = 'hsl(var(--primary-foreground-hsl))';
+  let customClasses = '';
 
   if (isTravelEvent) {
-    if (staff.color && staff.color.startsWith('hsl')) {
-       // Replaces 'hsl(h, s, l)' with 'hsla(h, s, l, 0.5)'
-       backgroundColor = staff.color.replace('hsl', 'hsla').replace(')', ', 0.5)');
-    } else {
-       // Fallback for non-hsl colors, though unlikely with current setup
-       backgroundColor = 'hsla(217, 91%, 60%, 0.5)';
-    }
-    color = 'hsl(var(--foreground-hsl))';
+    customClasses = 'bg-yellow-500 text-black';
   } else if (isBreakEvent) {
       const match = staff.color?.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
       if (match) {
@@ -949,8 +943,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         data-event-chip="true"
       >
         <div
-          className="w-full h-full rounded-md flex flex-col justify-center p-1"
-          style={{ backgroundColor, color }}
+          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", customClasses)}
+          style={customClasses ? {} : { backgroundColor, color }}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
