@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -24,8 +23,6 @@ export default function CheckInPage() {
   const [message, setMessage] = React.useState('');
   const { toast } = useToast();
   const { profile } = useUserProfile();
-
-  const MOCK_ORDER_ID = '1'; 
 
   const getJapaneseActionName = (action: ActionType) => {
     const map: Record<ActionType, string> = {
@@ -117,7 +114,9 @@ export default function CheckInPage() {
         }
 
         try {
-            const eventTitleForUpdate = `(ID: ${MOCK_ORDER_ID})`;
+            // TODO: Get the active order ID from localStorage or context
+            const activeOrderId = '1'; // Placeholder
+            const eventTitleForUpdate = `(ID: ${activeOrderId})`;
             const result = await updateSheetStatus({
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: eventTitleForUpdate,
