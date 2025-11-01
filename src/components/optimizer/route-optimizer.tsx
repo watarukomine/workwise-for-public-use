@@ -1,9 +1,9 @@
 
 'use client';
 import * as React from 'react';
-import { useActionState } from 'react';
+import { useFormState } from 'react-dom';
 
-import type { Customer, Staff, StaffStatus } from '@/lib/types';
+import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,9 +35,9 @@ type Location = {
 
 interface RouteOptimizerProps {
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
-  staff: Staff[];
+  staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
-  customers: Customer[];
+  customers: WithId<Customer>[];
 }
 
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
@@ -167,7 +167,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
   const [waypoints, setWaypoints] = React.useState<string[]>([]);
-  const [state, formActionWithState] = useActionState(formAction, { data: null, error: null, options: { avoidHighways: false } });
+  const [state, formActionWithState] = useFormState(formAction, { data: null, error: null, options: { avoidHighways: false } });
 
   React.useEffect(() => {
     onRouteOptimized(state.data, state.options);
@@ -177,10 +177,9 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
     if (!customers || !staff || !statuses) return [];
 
     const staffWithStatus = statuses.map(status => {
-        // Use the passed-in `staff` prop which is already filtered by the parent page
         const staffDetails = staff.find(s => s.id === status.staffId);
         return staffDetails ? { ...staffDetails, ...status } : null;
-    }).filter((s): s is (Staff & StaffStatus) => !!s && !!s.id);
+    }).filter((s): s is (Staff & StaffStatus) => !!s && !!s.id && !!s.latitude && !!s.longitude);
 
 
     const customerLocations: Location[] = customers
@@ -195,7 +194,6 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
       }));
 
     const staffLocations: Location[] = staffWithStatus
-      .filter(s => s.latitude && s.longitude)
       .map(s => ({
         id: s.id!,
         name: `${s.name} (現在地)`,
@@ -238,7 +236,9 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
                 <CardDescription>出発地、目的地、経由地、最適化の基準を選択してください。</CardDescription>
             </CardHeader>
             <CardContent>
-                <p>Loading locations...</p>
+                <div className="flex items-center justify-center p-10">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
             </CardContent>
         </Card>
     )
@@ -256,7 +256,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
              <input type="hidden" name="allLocations" value={JSON.stringify(allLocations)} />
              {startLocation && <input type="hidden" name="startLocation" value={startLocation} />}
              {endLocation && <input type="hidden" name="endLocation" value={endLocation} />}
-             {waypoints.map((id, index) => id && <input key={index} type="hidden" name="waypoints" value={id} />)}
+             {waypoints.filter(id => id).map((id, index) => id && <input key={index} type="hidden" name="waypoints" value={id} />)}
 
             <div className="space-y-2">
                 <Label>出発地</Label>
