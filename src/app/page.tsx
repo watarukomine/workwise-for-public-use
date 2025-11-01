@@ -13,6 +13,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
 import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay, isValid } from 'date-fns';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { VerticalScheduleView } from '@/components/dashboard/vertical-schedule-view';
 
 const getStorageKey = (date: Date) => {
     return `scheduleData-${format(date, 'yyyy-MM-dd')}`;
@@ -29,6 +31,7 @@ export default function DashboardPage() {
   
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
+  const isMobile = useIsMobile();
   
   // Update schedule data when date changes
   React.useEffect(() => {
@@ -116,7 +119,7 @@ export default function DashboardPage() {
     return scheduleData.filter(event => {
         const eventDate = typeof event.start === 'string' ? new Date(event.start) : event.start;
         return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-    });
+    }).sort((a,b) => new Date(a.start as string).getTime() - new Date(b.start as string).getTime());
   }, [scheduleData, currentDate]);
 
 
@@ -144,6 +147,8 @@ export default function DashboardPage() {
         </Alert>
       )
   }
+  
+  const showVerticalView = isMobile && profile.role === 'staff';
 
   return (
     <div className="space-y-8">
@@ -176,14 +181,21 @@ export default function DashboardPage() {
       )}
 
       <div className="flex flex-col gap-8">
-        <ScheduleView 
-            staffData={filteredStaff} 
-            customerData={customers} 
-            scheduleData={dailySchedule}
-            rawOrdersData={rawOrders}
-            setScheduleData={setScheduleData}
-            currentDate={currentDate}
-        />
+        {showVerticalView ? (
+            <VerticalScheduleView 
+                scheduleData={dailySchedule}
+                staffData={filteredStaff}
+            />
+        ) : (
+            <ScheduleView 
+                staffData={filteredStaff} 
+                customerData={customers} 
+                scheduleData={dailySchedule}
+                rawOrdersData={rawOrders}
+                setScheduleData={setScheduleData}
+                currentDate={currentDate}
+            />
+        )}
         {isToday(currentDate) && <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />}
       </div>
     </div>
