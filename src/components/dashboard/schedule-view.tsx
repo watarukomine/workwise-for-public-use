@@ -110,8 +110,14 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
-    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : ''}`;
-    const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? `：${findKey(rawOrder, ['本数'])}本` : ''}`;
+    const storeName = findKey(rawOrder, ['お取引先名', '取引先']) || '';
+    const scheduledTime = findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : '';
+    const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || '';
+    const quantity = findKey(rawOrder, ['本数']) ? `：${findKey(rawOrder, ['本数'])}本` : '';
+    
+    const line1 = `${storeName}${scheduledTime}`;
+    const line2 = `${tireSize}${quantity}`;
+
     let taskDetails = line1;
     if (line2.trim()) {
         taskDetails += `\n${line2}`;
@@ -504,10 +510,12 @@ export function ScheduleView({
               const taskEnd = addMinutes(taskStart, order.estimatedDuration);
               const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
 
+              const [storeName, scheduledTime] = order.taskDetails.split('\n')[0].split('：');
+
               const travelEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-travel`,
                   tripId: tripId,
-                  title: `移動: ${customer?.storeName || order.taskDetails}`,
+                  title: `移動: ${storeName}${scheduledTime ? `：${scheduledTime}` : ''}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: travelStart.toISOString(),
@@ -519,8 +527,8 @@ export function ScheduleView({
                   tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
-                  title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
+                  title: order.taskDetails, // Pass the full details
+                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: taskStart.toISOString(),
@@ -881,18 +889,25 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isBreakEvent = event.title === '休憩';
 
   const divStyle: React.CSSProperties = {
-    backgroundColor: staff.color || 'hsl(var(--primary))',
-    color: 'white'
+    backgroundColor: staff.color || 'hsl(var(--primary))'
   };
 
-  if (isTravelEvent) {
-    style.opacity = 0.5;
-  }
-  
   const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
   let textColorClass = 'text-primary-foreground';
   if (brightStaff.includes(staff.name)) {
       textColorClass = 'text-black';
+  }
+
+  if (isTravelEvent) {
+    style.opacity = 0.5;
+  } else if (isBreakEvent) {
+      if (typeof divStyle.backgroundColor === 'string' && divStyle.backgroundColor.startsWith('hsl')) {
+        const [h, s] = divStyle.backgroundColor.match(/\d+/g) || ['0', '0'];
+        divStyle.backgroundColor = `hsl(${h}, ${s}%, 90%)`;
+      } else {
+        divStyle.backgroundColor = `hsl(120, 40%, 85%)`;
+      }
+      textColorClass = 'text-foreground';
   }
   
   if (event.id.startsWith('generic-travel')) {
@@ -904,8 +919,15 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     divStyle.backgroundColor = 'rgb(34 197 94)';
   }
 
-  const [line1, ...rest] = (event.title || '').split('\n');
-  const line2 = rest.join('\n');
+  let line1 = '';
+  let line2 = '';
+
+  if (isTravelEvent) {
+      line1 = event.title;
+  } else if (event.title) {
+      [line1, line2] = event.title.split('\n');
+  }
+
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
