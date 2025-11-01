@@ -159,7 +159,7 @@ const LocationSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses, customers }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers }: RouteOptimizerProps) {
   
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
@@ -171,37 +171,33 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
   }, [state.data, state.options, onRouteOptimized]);
 
   const allLocations = React.useMemo(() => {
-    if (!customers || !staff || !statuses) return [];
+    const staffWithLocation = staff.map(s => {
+        const status = staffStatus.find(ss => ss.staffId === s.id);
+        return status && status.latitude && status.longitude ? { ...s, ...status } : null;
+    }).filter((s): s is (Staff & StaffStatus) => s !== null);
 
-    const staffWithStatus = statuses.map(status => {
-        const staffDetails = staff.find(s => s.id === status.staffId);
-        return staffDetails ? { ...staffDetails, ...status } : null;
-    }).filter((s): s is (Staff & StaffStatus) => !!s && !!s.id && !!s.latitude && !!s.longitude);
-
-
+    const staffLocations: Location[] = staffWithLocation.map(s => ({
+        id: s.id,
+        name: `${s.name} (現在地)`,
+        address: 'Current staff location',
+        latitude: s.latitude!,
+        longitude: s.longitude!,
+        type: 'staff',
+    }));
+    
     const customerLocations: Location[] = customers
-      .filter(c => c.latitude && c.longitude && (c['店舗'] || c.name))
+      .filter(c => c.latitude && c.longitude && c.userCode)
       .map(c => ({
-        id: c.userCode as string,
-        name: c['店舗'] || c.name!,
-        address: c.address as string,
+        id: c.userCode!,
+        name: c['店舗'] || c.storeName || '名称未設定',
+        address: c.address || '住所未設定',
         latitude: c.latitude!,
         longitude: c.longitude!,
         type: 'customer'
       }));
 
-    const staffLocations: Location[] = staffWithStatus
-      .map(s => ({
-        id: s.id!,
-        name: `${s.name} (現在地)`,
-        address: 'Current Location',
-        latitude: s.latitude!,
-        longitude: s.longitude!,
-        type: 'staff'
-      }));
-
-    return [...customerLocations, ...staffLocations];
-  }, [customers, staff, statuses]);
+    return [...staffLocations, ...customerLocations];
+  }, [staff, staffStatus, customers]);
   
   const availableWaypointLocations = allLocations.filter(
     loc => loc.id !== startLocation && loc.id !== endLocation
@@ -223,7 +219,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
   
-  const isLoading = !customers || !staff || !statuses;
+  const isLoading = !customers || !staff || !staffStatus;
 
   if (isLoading) {
     return (

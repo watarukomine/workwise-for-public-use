@@ -14,12 +14,12 @@ import {
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { User } from 'lucide-react';
 
-type StaffWithStatus = Staff & StaffStatus;
+type StaffWithLocation = Staff & Partial<StaffStatus>;
 type OptimizedRouteLocation = OptimizeRouteOutput['optimizedRoute'][0];
 
 
 interface RouteMapProps {
-  staff: StaffWithStatus[];
+  staff: StaffWithLocation[];
   customers: Customer[];
   optimizedRoute?: OptimizedRouteLocation[];
   avoidHighways?: boolean;

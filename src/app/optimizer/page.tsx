@@ -63,13 +63,6 @@ export default function OptimizerPage() {
     return allStaff.filter(s => selectedIds.has(s.id));
   }, [appliedSelectedStaffIds, allStaff, isStaffLoading]);
   
-  const staffWithStatus = React.useMemo(() => {
-    return filteredStaff.map(staffMember => {
-      const status = statuses.find(s => s.staffId === staffMember.id);
-      return status ? { ...staffMember, ...status } : null;
-    }).filter((s): s is (Staff & StaffStatus) => s !== null);
-  }, [filteredStaff, statuses]);
-  
   const scheduledCustomers = React.useMemo(() => {
     if (isLoadingCustomers || !allCustomers) return [];
     const locationIdSet = new Set(scheduledLocationIds);
@@ -134,7 +127,10 @@ export default function OptimizerPage() {
                   </div>
                ) : (
                 <RouteMap 
-                  staff={staffWithStatus} 
+                  staff={filteredStaff.map(staffMember => {
+                      const status = statuses.find(s => s.staffId === staffMember.id);
+                      return status ? { ...staffMember, ...status } : staffMember;
+                  })} 
                   customers={scheduledCustomers} 
                   optimizedRoute={optimizedRoute?.optimizedRoute}
                   avoidHighways={avoidHighways}
