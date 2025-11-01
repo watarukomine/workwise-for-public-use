@@ -58,7 +58,7 @@ function NavMenu() {
   const { profile, isLoading } = useUserProfile();
   const isMobile = useIsMobile();
   const userRole = profile?.role;
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = process.env.NEXT_PUBLIC_NODE_ENV === 'development';
 
   const navItems = React.useMemo(() => {
     if (isLoading || !profile) {
