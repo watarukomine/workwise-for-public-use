@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -8,13 +9,15 @@ import type { Customer, ScheduleEvent, StaffStatus, WithId, Staff } from '@/lib/
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Monitor, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
 import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay, isValid } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { VerticalScheduleView } from '@/components/dashboard/vertical-schedule-view';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 const getStorageKey = (date: Date) => {
     return `scheduleData-${format(date, 'yyyy-MM-dd')}`;
@@ -24,15 +27,13 @@ const getStorageKey = (date: Date) => {
 export default function DashboardPage() {
   const [customers] = React.useState<WithId<Customer>[]>(customerData);
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
-
   const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
-
   const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
-  
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
-  
+  const [forceMobileView, setForceMobileView] = React.useState(false);
+
   // Update schedule data when date changes
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -148,7 +149,7 @@ export default function DashboardPage() {
       )
   }
   
-  const showVerticalView = isMobile && profile.role === 'staff';
+  const showVerticalView = forceMobileView || (isMobile && profile.role === 'staff');
 
   return (
     <div className="space-y-8">
@@ -161,14 +162,25 @@ export default function DashboardPage() {
               スタッフのスケジュールと現在の状況を一覧で確認できます。
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}>
-                <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={() => handleDateChange('today')} disabled={isToday(currentDate)}>今日</Button>
-            <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}>
-                <ChevronRight className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}>
+                    <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" onClick={() => handleDateChange('today')} disabled={isToday(currentDate)}>今日</Button>
+                <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}>
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
+            </div>
+             <div className="flex items-center space-x-2">
+                <Smartphone className="h-5 w-5" />
+                <Switch
+                    id="mobile-view-switch"
+                    checked={forceMobileView}
+                    onCheckedChange={setForceMobileView}
+                />
+                <Label htmlFor="mobile-view-switch" className="hidden sm:inline">モバイル表示</Label>
+            </div>
           </div>
       </div>
       
