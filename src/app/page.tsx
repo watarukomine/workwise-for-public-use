@@ -18,14 +18,17 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { VerticalScheduleView } from '@/components/dashboard/vertical-schedule-view';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { AppShellContext } from '@/components/app-shell';
 
 const getStorageKey = (date: Date) => {
     return `scheduleData-${format(date, 'yyyy-MM-dd')}`;
 };
 
+interface DashboardPageProps {
+  forceMobileView?: boolean;
+  setForceMobileView?: React.Dispatch<React.SetStateAction<boolean>>;
+}
 
-export default function DashboardPage() {
+export default function DashboardPage({ forceMobileView, setForceMobileView }: DashboardPageProps) {
   const [customers] = React.useState<WithId<Customer>[]>(customerData);
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
   const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
@@ -34,14 +37,11 @@ export default function DashboardPage() {
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
   
-  const appContext = React.useContext(AppShellContext);
-  if (!appContext) {
-    // This can happen briefly on initial render, or if provider is missing.
-    // Returning null or a loader is a safe way to handle it.
+  if (typeof forceMobileView === 'undefined' || typeof setForceMobileView === 'undefined') {
+    // This can happen if the page is rendered without the props from AppShell.
+    // Returning a loader is a safe fallback.
     return <div className="flex items-center justify-center p-10"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
   }
-  const { forceMobileView, setForceMobileView } = appContext;
-
 
   // Update schedule data when date changes
   React.useEffect(() => {
