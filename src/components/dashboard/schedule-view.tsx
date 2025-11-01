@@ -113,14 +113,14 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const storeName = findKey(rawOrder, ['お取引先名', '取引先']) || '';
     const scheduledTime = findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : '';
     const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || '';
-    const quantity = findKey(rawOrder, ['本数']) ? `：${findKey(rawOrder, ['本数'])}本` : '';
+    const quantity = findKey(rawOrder, ['本数']) ? ` / ${findKey(rawOrder, ['本数'])}本` : '';
     
     const line1 = `${storeName}${scheduledTime}`;
     const line2 = `${tireSize}${quantity}`;
 
     let taskDetails = line1;
-    if (line2.trim()) {
-        taskDetails += `\n${line2}`;
+    if (line2.trim() && line2.trim() !== '/') {
+        taskDetails += `\n${line2.trim()}`;
     }
     
     const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
@@ -509,13 +509,13 @@ export function ScheduleView({
               const tripId = `trip-${Date.now()}`;
               const taskEnd = addMinutes(taskStart, order.estimatedDuration);
               const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-
-              const [storeName, scheduledTime] = order.taskDetails.split('\n')[0].split('：');
+              
+              const [storeName, ..._] = order.taskDetails.split('\n');
 
               const travelEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-travel`,
                   tripId: tripId,
-                  title: `移動: ${storeName}${scheduledTime ? `：${scheduledTime}` : ''}`,
+                  title: `移動: ${storeName.split('：')[0]}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: travelStart.toISOString(),
@@ -877,37 +877,27 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
-    opacity: isDragging ? 0.8 : 1,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation(); 
     onDoubleClick();
   };
-
+  
   const isTravelEvent = event.title?.startsWith('移動');
-  const isBreakEvent = event.title === '休憩';
-
+  
   const divStyle: React.CSSProperties = {
-    backgroundColor: staff.color || 'hsl(var(--primary))'
+      backgroundColor: staff.color || 'hsl(var(--primary))',
   };
 
+  if (isTravelEvent) {
+      style.opacity = 0.5;
+  }
+  
   const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
   let textColorClass = 'text-primary-foreground';
   if (brightStaff.includes(staff.name)) {
       textColorClass = 'text-black';
-  }
-
-  if (isTravelEvent) {
-    style.opacity = 0.5;
-  } else if (isBreakEvent) {
-      if (typeof divStyle.backgroundColor === 'string' && divStyle.backgroundColor.startsWith('hsl')) {
-        const [h, s] = divStyle.backgroundColor.match(/\d+/g) || ['0', '0'];
-        divStyle.backgroundColor = `hsl(${h}, ${s}%, 90%)`;
-      } else {
-        divStyle.backgroundColor = `hsl(120, 40%, 85%)`;
-      }
-      textColorClass = 'text-foreground';
   }
   
   if (event.id.startsWith('generic-travel')) {
@@ -919,17 +909,9 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     divStyle.backgroundColor = 'rgb(34 197 94)';
   }
 
-  let line1 = '';
-  let line2 = '';
-
-  if (isTravelEvent) {
-      line1 = event.title;
-  } else if (event.title) {
-      [line1, line2] = event.title.split('\n');
-  }
-
+  const [line1, line2] = (event.title || '').split('\n');
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
-  const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
+  const tooltipTitle = isTravelEvent ? event.title : line1;
 
   return (
     <Tooltip>
@@ -949,7 +931,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
           </p>
-          {line2 && (
+          {!isTravelEvent && line2 && (
             <p className="text-xs opacity-80 truncate pointer-events-none">
                 {line2}
             </p>
