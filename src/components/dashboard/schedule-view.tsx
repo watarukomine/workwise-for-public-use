@@ -343,8 +343,8 @@ export function ScheduleView({
         const result = await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
-            staffName: "", // 担当者名を空にする
-            statusValue: "未割当", // ステータスを「未割当」に更新
+            staffName: "",
+            statusValue: "未割当",
             timestamp: new Date().toISOString(),
         });
 
@@ -361,7 +361,6 @@ export function ScheduleView({
             });
           }
       
-          // スケジュールから関連イベント（移動とタスク本体）を削除
           setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
           toast({ title: 'タスクを未割り当てに戻しました' });
       } catch(e: any) {
@@ -379,11 +378,10 @@ export function ScheduleView({
     
     if (!item || !over) return;
     
-    // タイムライン上のイベントを「未割り当て」エリアに戻す処理
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
-        if (item.rawOrderId) { // 受注タスクの場合
+        if (item.rawOrderId) {
           await unassignTask(item);
-        } else { // 汎用タスクの場合
+        } else {
            setScheduleData(prev => prev.filter(e => e.id !== item.id && e.tripId !== item.tripId));
            toast({ title: '汎用タスクを削除しました' });
         }
@@ -866,7 +864,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   const { left, width } = getEventDimensions(event.start, event.end);
 
-  const style = {
+  const style: React.CSSProperties = {
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
@@ -882,29 +880,30 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isTravelEvent = event.title?.startsWith('移動');
   const isBreakEvent = event.title === '休憩';
 
-  let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = 'white';
+  const divStyle: React.CSSProperties = {
+    backgroundColor: staff.color || 'hsl(var(--primary))',
+    color: 'white'
+  };
 
   if (isTravelEvent) {
-    if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-       if (match) {
-         backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
-       }
-    } else {
-       backgroundColor = 'hsla(var(--primary), 0.5)';
-    }
-    color = 'hsl(var(--foreground))';
-  } else if (isBreakEvent) {
-     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-        const [h, s] = backgroundColor.match(/\d+/g) || ['0', '0'];
-        backgroundColor = `hsl(${h}, ${s}%, 90%)`;
-      } else {
-        backgroundColor = `hsl(120, 40%, 85%)`;
-      }
-      color = 'hsl(var(--foreground))';
+    style.opacity = 0.5;
   }
   
+  const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
+  let textColorClass = 'text-primary-foreground';
+  if (brightStaff.includes(staff.name)) {
+      textColorClass = 'text-black';
+  }
+  
+  if (event.id.startsWith('generic-travel')) {
+    divStyle.backgroundColor = 'rgb(250 204 21)';
+    textColorClass = 'text-black';
+  } else if (event.id.startsWith('generic-work')) {
+    divStyle.backgroundColor = 'rgb(156 163 175)';
+  } else if (event.id.startsWith('generic-break')) {
+    divStyle.backgroundColor = 'rgb(34 197 94)';
+  }
+
   const [line1, ...rest] = (event.title || '').split('\n');
   const line2 = rest.join('\n');
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
@@ -922,8 +921,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         data-event-chip="true"
       >
         <div
-          className="w-full h-full rounded-md flex flex-col justify-center p-1"
-          style={{ backgroundColor, color }}
+          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)}
+          style={divStyle}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
