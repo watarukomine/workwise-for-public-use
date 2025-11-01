@@ -1,7 +1,6 @@
 
 'use client';
 import * as React from 'react';
-import { useActionState } from 'react';
 
 import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
@@ -165,7 +164,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
   const [startLocation, setStartLocation] = React.useState<string | undefined>();
   const [endLocation, setEndLocation] = React.useState<string | undefined>();
   const [waypoints, setWaypoints] = React.useState<string[]>([]);
-  const [state, formActionWithState] = useActionState(formAction, { data: null, error: null, options: { avoidHighways: false } });
+  const [state, formActionWithState] = React.useActionState(formAction, { data: null, error: null, options: { avoidHighways: false } });
 
   React.useEffect(() => {
     onRouteOptimized(state.data, state.options);
