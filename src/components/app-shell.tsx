@@ -75,8 +75,11 @@ function NavMenu() {
     
     return allNavItems.filter(item => {
         const roleMatch = item.roles.includes(userRole || 'staff');
-        const isActuallyMobile = isMobile;
-        const deviceMatch = !item.mobileOnly || isActuallyMobile || forceMobileView;
+        
+        // Show if not mobile-only OR if it is mobile-only and we are on mobile/force view
+        const isActuallyMobile = isMobile || forceMobileView;
+        const deviceMatch = !item.mobileOnly || isActuallyMobile;
+
         return roleMatch && deviceMatch;
     });
 

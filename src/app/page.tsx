@@ -34,7 +34,14 @@ export default function DashboardPage() {
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
   
-  const { forceMobileView, setForceMobileView } = React.useContext(AppShellContext)!;
+  const appContext = React.useContext(AppShellContext);
+  if (!appContext) {
+    // This can happen briefly on initial render, or if provider is missing.
+    // Returning null or a loader is a safe way to handle it.
+    return <div className="flex items-center justify-center p-10"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  }
+  const { forceMobileView, setForceMobileView } = appContext;
+
 
   // Update schedule data when date changes
   React.useEffect(() => {
@@ -151,7 +158,7 @@ export default function DashboardPage() {
       )
   }
   
-  const showVerticalView = forceMobileView || (isMobile && profile.role === 'staff');
+  const showVerticalView = forceMobileView || (isMobile && profile.role !== 'admin');
 
   return (
     <div className="space-y-8">
