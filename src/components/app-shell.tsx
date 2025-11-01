@@ -1,3 +1,4 @@
+
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -57,22 +58,20 @@ function NavMenu() {
   const { profile, isLoading } = useUserProfile();
   const isMobile = useIsMobile();
   const userRole = profile?.role;
+  const isDev = process.env.NODE_ENV === 'development';
 
   const navItems = React.useMemo(() => {
     if (isLoading || !profile) {
       return [];
     }
     
-    if (userRole === 'admin') {
-      return allNavItems.filter(item => !item.mobileOnly || isMobile);
-    }
-
     return allNavItems.filter(item => {
         const roleMatch = item.roles.includes(userRole || 'staff');
-        const deviceMatch = !item.mobileOnly || isMobile;
+        const deviceMatch = !item.mobileOnly || isMobile || isDev; // Show on mobile OR if in dev mode
         return roleMatch && deviceMatch;
     });
-  }, [profile, isLoading, isMobile, userRole]);
+
+  }, [profile, isLoading, isMobile, userRole, isDev]);
 
   if (isLoading) {
       return (
