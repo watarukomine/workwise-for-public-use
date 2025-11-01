@@ -38,11 +38,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
-import React from 'react';
+import React, { useState, createContext, useContext } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { signOut } from '@/lib/auth';
+
+
+interface AppShellContextType {
+    forceMobileView: boolean;
+    setForceMobileView: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+export const AppShellContext = createContext<AppShellContextType | null>(null);
 
 const allNavItems = [
   { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'] },
@@ -58,7 +66,7 @@ function NavMenu() {
   const { profile, isLoading } = useUserProfile();
   const isMobile = useIsMobile();
   const userRole = profile?.role;
-  const isDev = process.env.NEXT_PUBLIC_NODE_ENV === 'development';
+  const { forceMobileView } = useContext(AppShellContext)!;
 
   const navItems = React.useMemo(() => {
     if (isLoading || !profile) {
@@ -67,11 +75,12 @@ function NavMenu() {
     
     return allNavItems.filter(item => {
         const roleMatch = item.roles.includes(userRole || 'staff');
-        const deviceMatch = !item.mobileOnly || isMobile || isDev; // Show on mobile OR if in dev mode
+        const isActuallyMobile = isMobile;
+        const deviceMatch = !item.mobileOnly || isActuallyMobile || forceMobileView;
         return roleMatch && deviceMatch;
     });
 
-  }, [profile, isLoading, isMobile, userRole, isDev]);
+  }, [profile, isLoading, isMobile, userRole, forceMobileView]);
 
   if (isLoading) {
       return (
@@ -109,6 +118,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { profile, isLoading: isUserLoading } = useUserProfile();
   const [isAuthLoading, setIsAuthLoading] = React.useState(false);
+  const [forceMobileView, setForceMobileView] = useState(false);
 
   const handleSignOut = () => {
     setIsAuthLoading(true);
@@ -136,69 +146,71 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isLoading = isUserLoading || isAuthLoading;
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <div className="flex items-center gap-2 p-2">
-            <Button variant="ghost" size="icon" className="shrink-0 text-primary hover:bg-primary/10 rounded-full">
-              <Briefcase className="size-5" />
-            </Button>
-            <h1 className="text-xl font-bold tracking-tight text-primary">WorkWise</h1>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          {profile && <NavMenu />}
-        </SidebarContent>
-        <SidebarFooter className="p-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center p-4">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : !profile ? (
-            <Button asChild className="w-full">
-              <Link href="/login">
-                <LogIn className="mr-2 h-4 w-4" />
-                ログイン / 新規登録
-              </Link>
-            </Button>
-          ) : null}
-        </SidebarFooter>
-      </Sidebar>
-      <SidebarInset>
-        <header className="flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-6 sticky top-0 z-30">
-          <SidebarTrigger className="md:hidden" />
-          <div className="flex-1"></div>
-          {isLoading ? (
-             <div className="flex items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : profile ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2 p-1 h-auto rounded-full">
-                   <Avatar className="h-9 w-9">
-                    <AvatarImage src={profile?.avatarUrl || ''} data-ai-hint="person" />
-                    <AvatarFallback>{displayName.charAt(0) ?? 'A'}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 -space-y-1 text-left hidden md:block">
-                    <p className="text-sm font-semibold">{displayName}</p>
-                    <p className="text-xs text-muted-foreground">{displayEmail}</p>
-                  </div>
+    <AppShellContext.Provider value={{ forceMobileView, setForceMobileView }}>
+        <SidebarProvider>
+        <Sidebar>
+            <SidebarHeader>
+            <div className="flex items-center gap-2 p-2">
+                <Button variant="ghost" size="icon" className="shrink-0 text-primary hover:bg-primary/10 rounded-full">
+                <Briefcase className="size-5" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/staff')}>Profile</DropdownMenuItem>
-                <DropdownMenuItem>Settings</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-        </header>
-        <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+                <h1 className="text-xl font-bold tracking-tight text-primary">WorkWise</h1>
+            </div>
+            </SidebarHeader>
+            <SidebarContent>
+            {profile && <NavMenu />}
+            </SidebarContent>
+            <SidebarFooter className="p-2">
+            {isLoading ? (
+                <div className="flex items-center justify-center p-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+            ) : !profile ? (
+                <Button asChild className="w-full">
+                <Link href="/login">
+                    <LogIn className="mr-2 h-4 w-4" />
+                    ログイン / 新規登録
+                </Link>
+                </Button>
+            ) : null}
+            </SidebarFooter>
+        </Sidebar>
+        <SidebarInset>
+            <header className="flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-6 sticky top-0 z-30">
+            <SidebarTrigger className="md:hidden" />
+            <div className="flex-1"></div>
+            {isLoading ? (
+                <div className="flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+            ) : profile ? (
+                <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center gap-2 p-1 h-auto rounded-full">
+                    <Avatar className="h-9 w-9">
+                        <AvatarImage src={profile?.avatarUrl || ''} data-ai-hint="person" />
+                        <AvatarFallback>{displayName.charAt(0) ?? 'A'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 -space-y-1 text-left hidden md:block">
+                        <p className="text-sm font-semibold">{displayName}</p>
+                        <p className="text-xs text-muted-foreground">{displayEmail}</p>
+                    </div>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => router.push('/staff')}>Profile</DropdownMenuItem>
+                    <DropdownMenuItem>Settings</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
+                </DropdownMenuContent>
+                </DropdownMenu>
+            ) : null}
+            </header>
+            <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+        </SidebarInset>
+        </SidebarProvider>
+    </AppShellContext.Provider>
   );
 }

@@ -18,6 +18,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { VerticalScheduleView } from '@/components/dashboard/vertical-schedule-view';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { AppShellContext } from '@/components/app-shell';
 
 const getStorageKey = (date: Date) => {
     return `scheduleData-${format(date, 'yyyy-MM-dd')}`;
@@ -32,7 +33,8 @@ export default function DashboardPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
-  const [forceMobileView, setForceMobileView] = React.useState(false);
+  
+  const { forceMobileView, setForceMobileView } = React.useContext(AppShellContext)!;
 
   // Update schedule data when date changes
   React.useEffect(() => {

@@ -29,7 +29,9 @@ export default function RootLayout({
           <SelectedStaffProvider>
             <CustomerProvider>
               <OrderProvider>
-                <AppShell>{children}</AppShell>
+                <AppShell>
+                    {children}
+                </AppShell>
               </OrderProvider>
             </CustomerProvider>
           </SelectedStaffProvider>
