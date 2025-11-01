@@ -73,7 +73,7 @@ export default function OptimizerPage() {
   const scheduledCustomers = React.useMemo(() => {
     if (isLoadingCustomers || !allCustomers) return [];
     const locationIdSet = new Set(scheduledLocationIds);
-    return allCustomers.filter(c => locationIdSet.has(c.id));
+    return allCustomers.filter(c => c.userCode && locationIdSet.has(c.userCode));
   }, [allCustomers, scheduledLocationIds, isLoadingCustomers]);
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {

@@ -48,7 +48,6 @@ function Directions({ route, avoidHighways }: { route: OptimizedRouteLocation[],
 
   React.useEffect(() => {
     if (!directionsService || !directionsRenderer || !route || route.length < 2) {
-        // Clear previous route if any
         if (directionsRenderer) {
             directionsRenderer.set('directions', null);
         }
@@ -76,7 +75,6 @@ function Directions({ route, avoidHighways }: { route: OptimizedRouteLocation[],
     });
 
     return () => {
-        // Clean up directions
        if (directionsRenderer) {
           directionsRenderer.set('directions', null);
        }
@@ -143,7 +141,7 @@ export function RouteMap({ staff, customers, optimizedRoute, avoidHighways }: Ro
             {customers.map((c) => 
                c.latitude && c.longitude ? (
                 <AdvancedMarker
-                  key={`customer-${c.id}`}
+                  key={`customer-${c.userCode}`}
                   position={{ 
                     lat: c.latitude, 
                     lng: c.longitude
@@ -154,7 +152,7 @@ export function RouteMap({ staff, customers, optimizedRoute, avoidHighways }: Ro
                       <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="font-bold">{c.storeName}</p>
+                      <p className="font-bold">{c['店舗'] || c.name}</p>
                       <p>{c.address}</p>
                     </TooltipContent>
                   </Tooltip>

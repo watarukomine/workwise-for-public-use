@@ -88,8 +88,6 @@ function SubmitButton() {
     };
 
     React.useEffect(() => {
-        // This effect is to reset the pending state after the action completes.
-        // It observes changes in a results container.
         const resultsContainer = document.getElementById('optimizer-results');
         if (!resultsContainer) return;
 
@@ -183,10 +181,10 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus: statuses,
 
 
     const customerLocations: Location[] = customers
-      .filter(c => c.latitude && c.longitude && (c.storeName || c.name))
+      .filter(c => c.latitude && c.longitude && (c['店舗'] || c.name))
       .map(c => ({
-        id: c.id,
-        name: c.storeName || c.name!,
+        id: c.userCode as string,
+        name: c['店舗'] || c.name!,
         address: c.address as string,
         latitude: c.latitude!,
         longitude: c.longitude!,
