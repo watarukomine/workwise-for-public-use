@@ -9,7 +9,6 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import type { Customer, Staff, StaffStatus, ScheduleEvent, WithId } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
-import { staffStatusData } from '@/lib/data'; // Use static data
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -26,8 +25,7 @@ export default function OptimizerPage() {
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
   const [avoidHighways, setAvoidHighways] = React.useState(false);
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
-  const [statuses, setStatuses] = React.useState<StaffStatus[]>(staffStatusData);
-
+  
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   
   const [scheduledLocationIds, setScheduledLocationIds] = React.useState<string[]>([]);
@@ -68,6 +66,17 @@ export default function OptimizerPage() {
     const locationIdSet = new Set(scheduledLocationIds);
     return allCustomers.filter(c => c.userCode && locationIdSet.has(c.userCode));
   }, [allCustomers, scheduledLocationIds, isLoadingCustomers]);
+
+  const statuses = React.useMemo(() => {
+    return filteredStaff.map((staff, index) => ({
+        staffId: staff.id,
+        status: '待機中' as const,
+        lastAction: '現在地で待機中',
+        latitude: 35.45 + (index * 0.01), // Demo latitude around Yokohama
+        longitude: 139.63 + (index * 0.01), // Demo longitude around Yokohama
+    }));
+  }, [filteredStaff]);
+
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
     setOptimizedRoute(data);
