@@ -2,7 +2,7 @@
 'use client';
 
 import './globals.css';
-import { AppShell } from '@/components/app-shell';
+import { AppShell, AppShellProvider } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import React from 'react';
 import { SelectedStaffProvider } from '@/contexts/selected-staff-context';
@@ -29,9 +29,11 @@ export default function RootLayout({
           <SelectedStaffProvider>
             <CustomerProvider>
               <OrderProvider>
-                <AppShell>
-                    {children}
-                </AppShell>
+                <AppShellProvider>
+                    <AppShell>
+                        {children}
+                    </AppShell>
+                </AppShellProvider>
               </OrderProvider>
             </CustomerProvider>
           </SelectedStaffProvider>

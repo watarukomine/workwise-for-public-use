@@ -54,12 +54,38 @@ const allNavItems = [
   { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'], mobileOnly: true },
 ];
 
+interface AppShellContextType {
+    forceMobileView: boolean;
+    setForceMobileView: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+const AppShellContext = createContext<AppShellContextType | undefined>(undefined);
+
+export function AppShellProvider({ children }: { children: React.ReactNode }) {
+    const [forceMobileView, setForceMobileView] = useState(false);
+
+    return (
+        <AppShellContext.Provider value={{ forceMobileView, setForceMobileView }}>
+            {children}
+        </AppShellContext.Provider>
+    );
+}
+
+export function useAppShell() {
+    const context = useContext(AppShellContext);
+    if (!context) {
+        throw new Error('useAppShell must be used within an AppShellProvider');
+    }
+    return context;
+}
+
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const router = useRouter();
   const { profile, isLoading: isUserLoading } = useUserProfile();
   const [isAuthLoading, setIsAuthLoading] = React.useState(false);
-  const [forceMobileView, setForceMobileView] = useState(false);
+  const { forceMobileView } = useAppShell();
   const isMobile = useIsMobile();
   const pathname = usePathname();
 
@@ -88,12 +114,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const displayEmail = profile?.email || '...';
   const isLoading = isUserLoading || isAuthLoading;
   
-  const clonedChildren = React.Children.map(children, child => {
-    if (React.isValidElement(child)) {
-      return React.cloneElement(child as React.ReactElement<any>, { forceMobileView, setForceMobileView });
-    }
-    return child;
-  });
 
   const NavMenu = () => {
     const { profile, isLoading } = useUserProfile();
@@ -207,7 +227,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </DropdownMenu>
         ) : null}
         </header>
-        <main className="flex-1 p-4 md:p-6 lg:p-8">{clonedChildren}</main>
+        <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
     </SidebarInset>
     </SidebarProvider>
   );
