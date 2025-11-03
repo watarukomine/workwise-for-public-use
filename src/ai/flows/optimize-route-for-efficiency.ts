@@ -18,7 +18,7 @@ const LocationSchema = z.object({
   address: z.string().describe('The street address of the location.'),
   latitude: z.number().describe('The latitude of the location.'),
   longitude: z.number().describe('The longitude of the location.'),
-  type: z.enum(['customer', 'staff']).describe('The type of location.'),
+  type: z.enum(['customer', 'staff', 'custom']).describe('The type of location.'),
 });
 
 const OptimizeRouteInputSchema = z.object({
@@ -42,7 +42,7 @@ const OptimizeRouteOutputSchema = z.object({
         address: z.string().describe('The street address of the location.'),
         latitude: z.number().describe('The latitude of the location.'),
         longitude: z.number().describe('The longitude of the location.'),
-        type: z.enum(['customer', 'staff']).optional().describe('The type of location.'),
+        type: z.enum(['customer', 'staff', 'custom']).optional().describe('The type of location.'),
       })
     )
     .describe('An array of work locations in the optimized order, starting with the start location and ending with the end location.'),
