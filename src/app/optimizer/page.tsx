@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
 import { findKey } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, isToday, parseISO, isValid } from 'date-fns';
 
 function OptimizerLayout() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -68,6 +68,11 @@ function OptimizerLayout() {
       }
 
       const routeIds = new Set(optimizedRoute.optimizedRoute.map(r => r.id));
+      
+      const routeCustomers = allCustomers.filter(c => {
+          const userCode = findKey(c, ['ユーザーコード']);
+          return userCode && routeIds.has(String(userCode));
+      });
 
       const routeStaff = filteredStaff
           .filter(s => routeIds.has(s.id))
@@ -76,11 +81,6 @@ function OptimizerLayout() {
               return status ? { ...staffMember, ...status } : staffMember;
           });
       
-      const routeCustomers = allCustomers.filter(c => {
-          const userCode = findKey(c, ['ユーザーコード']);
-          return userCode && routeIds.has(String(userCode));
-      });
-
       const customLocations: Location[] = optimizedRoute.optimizedRoute.filter(r => r.type === 'custom');
 
       return { staff: routeStaff, customers: routeCustomers, route: optimizedRoute.optimizedRoute, custom: customLocations };
@@ -126,7 +126,7 @@ function OptimizerLayout() {
               onRouteOptimized={handleRouteOptimized}
               staff={filteredStaff}
               staffStatus={statuses}
-              allCustomers={allCustomers}
+              customers={allCustomers}
               rawOrders={rawOrders}
           />
           </div>

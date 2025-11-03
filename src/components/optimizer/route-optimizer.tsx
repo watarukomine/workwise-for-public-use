@@ -17,7 +17,7 @@ import { cn, findKey } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
-import { format } from 'date-fns';
+import { format, isToday, parseISO, isValid } from 'date-fns';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -40,7 +40,7 @@ interface RouteOptimizerProps {
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
-  allCustomers: WithId<Customer>[];
+  customers: WithId<Customer>[];
   rawOrders: any[];
 }
 
@@ -231,7 +231,7 @@ const PlacesAutocompleteSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustomers, rawOrders }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers, rawOrders }: RouteOptimizerProps) {
   
   const [startLocation, setStartLocation] = React.useState<Location | null>(null);
   const [endLocation, setEndLocation] = React.useState<Location | null>(null);
@@ -243,7 +243,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
   }, [state.data, state.options, onRouteOptimized]);
   
   const scheduledCustomers = React.useMemo(() => {
-    if (!rawOrders || !allCustomers) {
+    if (!rawOrders || !customers) {
       return [];
     }
 
@@ -254,24 +254,25 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
       const scheduledDateValue = findKey(order, ['作業予定日']);
       if (scheduledDateValue) {
         try {
-          const scheduledDateString = format(new Date(scheduledDateValue), 'yyyy-MM-dd');
-          if (scheduledDateString === todayString) {
-            const userCode = findKey(order, ['ユーザーコード', 'usercode']);
-            if (userCode) {
-              todaysOrderCustomerCodes.add(String(userCode));
+            // Use format to avoid timezone issues
+            const scheduledDateString = format(new Date(scheduledDateValue), 'yyyy-MM-dd');
+            if (scheduledDateString === todayString) {
+                const userCode = findKey(order, ['ユーザーコード', 'usercode']);
+                if (userCode) {
+                    todaysOrderCustomerCodes.add(String(userCode));
+                }
             }
-          }
         } catch (e) {
-          console.warn("Invalid date format for order", order);
+            console.warn("Invalid date format for order", order, e);
         }
       }
     });
   
-    return allCustomers.filter(c => {
+    return customers.filter(c => {
       const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
       return customerUserCode && todaysOrderCustomerCodes.has(String(customerUserCode));
     });
-  }, [rawOrders, allCustomers]);
+  }, [rawOrders, customers]);
 
 
   const predefinedLocations = React.useMemo(() => {
