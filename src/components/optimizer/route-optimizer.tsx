@@ -198,12 +198,10 @@ const PlacesAutocompleteSelector: React.FC<{
                       key={location.id}
                       value={location.name}
                       onSelect={() => handlePredefinedSelect(location)}
+                      className="flex items-center"
                     >
                       {location.type === 'staff' ? <UserIcon className="mr-2 h-4 w-4" /> : <MapPinIcon className="mr-2 h-4 w-4" />}
-                       <div className="flex flex-col">
-                          <span>{location.name}</span>
-                          <span className="text-xs text-muted-foreground">{location.address}</span>
-                      </div>
+                      <span className="truncate">{location.name}</span>
                     </CommandItem>
                   ))}
                 </CommandGroup>
@@ -246,8 +244,8 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
 
     const staffLocs: Location[] = staffWithLocation.map(s => ({
         id: s.id,
-        name: `${s.name}`,
-        address: `現在地`,
+        name: `${s.name}（現在地）`,
+        address: ``,
         latitude: s.latitude!,
         longitude: s.longitude!,
         type: 'staff',
