@@ -1,7 +1,7 @@
 
 "use client";
 import * as React from 'react';
-import { RouteOptimizer } from "@/components/optimizer/route-optimizer";
+import { RouteOptimizer, type Location } from "@/components/optimizer/route-optimizer";
 import { RouteMap } from "@/components/optimizer/route-map";
 import { APIProvider } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
-import { isToday, parseISO, isValid } from 'date-fns';
+import { isToday, parseISO, isValid, startOfDay, isEqual } from 'date-fns';
 import { findKey } from '@/lib/utils';
 
 export default function OptimizerPage() {
@@ -31,28 +31,17 @@ export default function OptimizerPage() {
     if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) {
       return [];
     }
-  
-    // 1. Get all unique user codes for orders scheduled for today
-    const todaysOrderCustomerCodes = new Set(
+    
+    // Use all orders for route optimization, not just today's
+    const allOrderCustomerCodes = new Set(
       rawOrders
-        .filter(order => {
-          const scheduledDateKey = findKey(order, ['作業予定日']);
-          if (!scheduledDateKey) return false;
-          try {
-            const scheduledDate = parseISO(scheduledDateKey);
-            return isValid(scheduledDate) && isToday(scheduledDate);
-          } catch {
-            return false;
-          }
-        })
         .map(order => findKey(order, ['ユーザーコード']))
         .filter(Boolean)
     );
   
-    // 2. Filter the main customer list to include only those whose 'ユーザーコード' is in the set
     return allCustomers.filter(c => {
       const customerUserCode = findKey(c, ['ユーザーコード']);
-      return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
+      return customerUserCode && allOrderCustomerCodes.has(customerUserCode);
     });
   
   }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers]);
@@ -83,6 +72,38 @@ export default function OptimizerPage() {
   }
   
   const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
+  
+  const mapLocations = React.useMemo(() => {
+      if (!optimizedRoute?.optimizedRoute) {
+          const staffLocs = filteredStaff
+              .map(staffMember => {
+                  const status = statuses.find(s => s.staffId === staffMember.id);
+                  return status && status.latitude && status.longitude ? { ...staffMember, ...status } : null;
+              })
+              .filter((s): s is Staff & StaffStatus => s !== null);
+
+          return { staff: staffLocs, customers: scheduledCustomers, route: [] };
+      }
+
+      const routeIds = new Set(optimizedRoute.optimizedRoute.map(r => r.id));
+
+      const routeStaff = filteredStaff
+          .filter(s => routeIds.has(s.id))
+          .map(staffMember => {
+              const status = statuses.find(s => s.staffId === staffMember.id);
+              return status ? { ...staffMember, ...status } : staffMember;
+          });
+
+      const routeCustomers = scheduledCustomers.filter(c => {
+          const userCode = findKey(c, ['ユーザーコード']);
+          return userCode && routeIds.has(String(userCode));
+      });
+      
+      const customLocations: Location[] = optimizedRoute.optimizedRoute.filter(r => r.type === 'custom');
+
+      return { staff: routeStaff, customers: routeCustomers, route: optimizedRoute.optimizedRoute, custom: customLocations };
+
+  }, [filteredStaff, scheduledCustomers, statuses, optimizedRoute]);
 
   if (isLoading) {
     return (
@@ -135,12 +156,10 @@ export default function OptimizerPage() {
                   </div>
                ) : (
                 <RouteMap 
-                  staff={filteredStaff.map(staffMember => {
-                      const status = statuses.find(s => s.staffId === staffMember.id);
-                      return status ? { ...staffMember, ...status } : staffMember;
-                  })} 
-                  customers={scheduledCustomers} 
-                  optimizedRoute={optimizedRoute?.optimizedRoute}
+                  staff={mapLocations.staff} 
+                  customers={mapLocations.customers}
+                  customLocations={mapLocations.custom}
+                  optimizedRoute={mapLocations.route}
                   avoidHighways={avoidHighways}
                 />
                )}

@@ -22,7 +22,7 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "types": ["node", "@types/papaparse", "@types/react-big-calendar"]
+    "types": ["node", "@types/papaparse", "@types/react-big-calendar", "@types/google.maps"]
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]

@@ -11,21 +11,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
-import { User } from 'lucide-react';
+import type { Location } from './route-optimizer';
+import { User, Building2 } from 'lucide-react';
 
 type StaffWithLocation = Staff & Partial<StaffStatus>;
-type OptimizedRouteLocation = OptimizeRouteOutput['optimizedRoute'][0];
-
 
 interface RouteMapProps {
   staff: StaffWithLocation[];
   customers: Customer[];
-  optimizedRoute?: OptimizedRouteLocation[];
+  customLocations?: Location[];
+  optimizedRoute?: Location[];
   avoidHighways?: boolean;
 }
 
-function Directions({ route, avoidHighways }: { route: OptimizedRouteLocation[], avoidHighways?: boolean }) {
+function Directions({ route, avoidHighways }: { route: Location[], avoidHighways?: boolean }) {
   const map = useMap();
   const routesLibrary = useMapsLibrary('routes');
   const [directionsService, setDirectionsService] = React.useState<google.maps.DirectionsService>();
@@ -85,10 +84,11 @@ function Directions({ route, avoidHighways }: { route: OptimizedRouteLocation[],
 }
 
 
-export function RouteMap({ staff, customers, optimizedRoute, avoidHighways }: RouteMapProps) {
+export function RouteMap({ staff, customers, customLocations, optimizedRoute, avoidHighways }: RouteMapProps) {
   const allCoordinates = [
     ...staff.filter(s => s.latitude && s.longitude).map(s => ({ lat: s.latitude!, lng: s.longitude! })),
-    ...customers.filter(c => c.latitude && c.longitude).map(c => ({ lat: c.latitude!, lng: c.longitude! }))
+    ...customers.filter(c => c.latitude && c.longitude).map(c => ({ lat: c.latitude!, lng: c.longitude! })),
+    ...(customLocations || []).map(l => ({ lat: l.latitude, lng: l.longitude}))
   ];
 
   const center = React.useMemo(() => {
@@ -98,7 +98,7 @@ export function RouteMap({ staff, customers, optimizedRoute, avoidHighways }: Ro
         return { lat: latSum / optimizedRoute.length, lng: lngSum / optimizedRoute.length };
     }
     if (allCoordinates.length === 0) {
-      return { lat: 35.45, lng: 139.63 }; // Default to Yokohama
+      return { lat: 35.6895, lng: 139.6917 }; // Default to Tokyo
     }
     const latSum = allCoordinates.reduce((sum, coord) => sum + coord.lat, 0);
     const lngSum = allCoordinates.reduce((sum, coord) => sum + coord.lng, 0);
@@ -116,7 +116,7 @@ export function RouteMap({ staff, customers, optimizedRoute, avoidHighways }: Ro
             defaultZoom={11}
             gestureHandling={'greedy'}
             disableDefaultUI={true}
-            mapId="f85764b3939b85c8"
+            mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID"}
           >
             {staff.map((s) =>
               s.latitude && s.longitude ? (
@@ -149,11 +149,32 @@ export function RouteMap({ staff, customers, optimizedRoute, avoidHighways }: Ro
                 >
                   <Tooltip>
                     <TooltipTrigger>
-                      <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
+                      <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-md" />
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="font-bold">{c['店舗'] || c.name}</p>
                       <p>{c.address}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </AdvancedMarker>
+              ) : null
+            )}
+             {customLocations?.map((l) => 
+               l.latitude && l.longitude ? (
+                <AdvancedMarker
+                  key={`custom-${l.id}`}
+                  position={{ 
+                    lat: l.latitude, 
+                    lng: l.longitude
+                  }}
+                >
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <div className="w-4 h-4 rounded-full bg-purple-500 border-2 border-white shadow-md" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-bold">{l.name}</p>
+                      <p>{l.address}</p>
                     </TooltipContent>
                   </Tooltip>
                 </AdvancedMarker>

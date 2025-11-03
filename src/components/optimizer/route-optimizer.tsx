@@ -7,7 +7,7 @@ import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X } from 'lucide-react';
+import { Check, ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { cn, findKey } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
+import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -24,13 +25,13 @@ type State = {
   };
 };
 
-type Location = {
+export type Location = {
   id: string;
   name: string;
   address: string;
   latitude: number;
   longitude: number;
-  type: 'customer' | 'staff';
+  type: 'customer' | 'staff' | 'custom';
 };
 
 interface RouteOptimizerProps {
@@ -41,25 +42,31 @@ interface RouteOptimizerProps {
 }
 
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
-  const startLocationId = formData.get('startLocation') as string;
-  const endLocationId = formData.get('endLocation') as string;
-  const waypointIds = formData.getAll('waypoints') as string[];
+  const startLocationString = formData.get('startLocation') as string;
+  const endLocationString = formData.get('endLocation') as string;
+  const waypointStrings = formData.getAll('waypoints') as string[];
   const optimizeFor = formData.get('optimizeFor') as OptimizeRouteInput['optimizeFor'];
   const avoidHighways = formData.get('avoidHighways') === 'on';
-  const allLocations = JSON.parse(formData.get('allLocations') as string) as Location[];
 
-  if (!startLocationId || !endLocationId) {
-    return { data: null, error: '出発地と目的地を選択してください。', options: { avoidHighways } };
+  const parseLocation = (locString: string | null): Location | null => {
+      if (!locString) return null;
+      try {
+          return JSON.parse(locString);
+      } catch {
+          return null;
+      }
   }
 
-  const findLocation = (id: string) => allLocations.find(loc => loc.id === id);
-
-  const startLocation = findLocation(startLocationId);
-  const endLocation = findLocation(endLocationId);
-  const waypoints = waypointIds.map(findLocation).filter((loc): loc is Location => !!loc);
-
+  const startLocation = parseLocation(startLocationString);
+  const endLocation = parseLocation(endLocationString);
+  const waypoints = waypointStrings.map(parseLocation).filter((loc): loc is Location => !!loc);
+  
   if (!startLocation || !endLocation) {
-    return { data: null, error: '有効な出発地と目的地が見つかりません。', options: { avoidHighways } };
+    return { data: null, error: '出発地と目的地を選択または入力してください。', options: { avoidHighways } };
+  }
+  
+  if (!startLocation.latitude || !startLocation.longitude || !endLocation.latitude || !endLocation.longitude) {
+      return { data: null, error: '出発地または目的地の座標が取得できませんでした。', options: { avoidHighways } };
   }
 
   try {
@@ -108,60 +115,106 @@ function SubmitButton() {
     );
 }
 
-const LocationSelector: React.FC<{
-  allLocations: Location[];
-  selectedValue: string | undefined;
-  onSelect: (id: string | undefined) => void;
+const PlacesAutocompleteSelector: React.FC<{
+  predefinedLocations: Location[];
+  onSelect: (location: Location | null) => void;
   placeholder: string;
-}> = ({ allLocations, selectedValue, onSelect, placeholder }) => {
-  const [open, setOpen] = React.useState(false);
-  
-  const staffLocations = allLocations.filter(l => l.type === 'staff');
-  const customerLocations = allLocations.filter(l => l.type === 'customer');
+  value: Location | null;
+}> = ({ predefinedLocations, onSelect, placeholder, value }) => {
+  const {
+    ready,
+    value: inputValue,
+    suggestions: { status, data },
+    setValue,
+    clearSuggestions,
+  } = usePlacesAutocomplete({
+    requestOptions: {
+      componentRestrictions: { country: 'jp' },
+    },
+    debounce: 300,
+  });
 
-  const selectedLocationName = allLocations.find(l => l.id === selectedValue)?.name;
+  const [open, setOpen] = React.useState(false);
+
+  const handleSelect = async (address: string) => {
+    setValue(address, false);
+    clearSuggestions();
+    try {
+      const results = await getGeocode({ address });
+      const { lat, lng } = await getLatLng(results[0]);
+      onSelect({
+          id: results[0].place_id,
+          name: address.split(',')[0],
+          address: results[0].formatted_address,
+          latitude: lat,
+          longitude: lng,
+          type: 'custom',
+      });
+      setOpen(false);
+    } catch (error) {
+      console.log('Error: ', error);
+    }
+  };
+  
+  const handlePredefinedSelect = (location: Location) => {
+      setValue(location.name, false);
+      onSelect(location);
+      setOpen(false);
+  }
+
+  const filteredPredefined = inputValue
+    ? predefinedLocations.filter(
+        (loc) =>
+          loc.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+          loc.address.toLowerCase().includes(inputValue.toLowerCase())
+      )
+    : predefinedLocations;
+  
+  const displayName = value ? value.name : placeholder;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between">
-          <span className="truncate">{selectedLocationName || placeholder}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
+          <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal">
+              <span className="truncate">{displayName}</span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-        <Command>
-          <CommandInput placeholder="名前や住所で検索..." />
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="地名や住所を検索..."
+            disabled={!ready}
+            value={inputValue}
+            onValueChange={setValue}
+          />
           <CommandList>
-            <CommandEmpty>該当するロケーションが見つかりません。</CommandEmpty>
-            {staffLocations.length > 0 && (
-              <CommandGroup heading="スタッフ">
-                {staffLocations.map(location => (
-                  <CommandItem
-                    key={location.id}
-                    value={`${location.name} ${location.address}`}
-                    onSelect={() => { onSelect(location.id); setOpen(false); }}>
-                    <Check className={cn("mr-2 h-4 w-4", selectedValue === location.id ? "opacity-100" : "opacity-0")} />
-                    <div className="flex flex-col">
-                        <span>{location.name}</span>
-                        <span className="text-xs text-muted-foreground">{location.address}</span>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
+            <CommandEmpty>該当する場所が見つかりません。</CommandEmpty>
+            
+            {filteredPredefined.length > 0 && (
+                <CommandGroup heading="登録済み">
+                  {filteredPredefined.map((location) => (
+                    <CommandItem
+                      key={location.id}
+                      value={location.name}
+                      onSelect={() => handlePredefinedSelect(location)}
+                    >
+                      {location.type === 'staff' ? <UserIcon className="mr-2 h-4 w-4" /> : <MapPinIcon className="mr-2 h-4 w-4" />}
+                       <div className="flex flex-col">
+                          <span>{location.name}</span>
+                          <span className="text-xs text-muted-foreground">{location.address}</span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
             )}
-            {customerLocations.length > 0 && (
-              <CommandGroup heading="販売店">
-                {customerLocations.map(location => (
-                  <CommandItem
-                    key={location.id}
-                    value={`${location.name} ${location.address}`}
-                    onSelect={() => { onSelect(location.id); setOpen(false); }}>
-                    <Check className={cn("mr-2 h-4 w-4", selectedValue === location.id ? "opacity-100" : "opacity-0")} />
-                     <div className="flex flex-col">
-                        <span>{location.name}</span>
-                        <span className="text-xs text-muted-foreground">{location.address}</span>
-                    </div>
+
+            {status === 'OK' && (
+              <CommandGroup heading="Googleマップの検索結果">
+                {data.map(({ place_id, description }) => (
+                  <CommandItem key={place_id} value={description} onSelect={() => handleSelect(description)}>
+                    <MapPinIcon className="mr-2 h-4 w-4" />
+                    {description}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -176,16 +229,16 @@ const LocationSelector: React.FC<{
 
 export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers }: RouteOptimizerProps) {
   
-  const [startLocation, setStartLocation] = React.useState<string | undefined>();
-  const [endLocation, setEndLocation] = React.useState<string | undefined>();
-  const [waypoints, setWaypoints] = React.useState<string[]>([]);
+  const [startLocation, setStartLocation] = React.useState<Location | null>(null);
+  const [endLocation, setEndLocation] = React.useState<Location | null>(null);
+  const [waypoints, setWaypoints] = React.useState<(Location | null)[]>([]);
   const [state, formActionWithState] = useActionState(formAction, { data: null, error: null, options: { avoidHighways: false } });
 
   React.useEffect(() => {
     onRouteOptimized(state.data, state.options);
   }, [state.data, state.options, onRouteOptimized]);
 
-  const allLocations = React.useMemo(() => {
+  const predefinedLocations = React.useMemo(() => {
     const staffWithLocation = staff.map(s => {
         const status = staffStatus.find(ss => ss.staffId === s.id);
         return status && status.latitude && status.longitude ? { ...s, ...status } : null;
@@ -202,25 +255,14 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     
     const customerLocs: Location[] = customers
       .filter(c => {
-          let latitude: number | undefined;
-          let longitude: number | undefined;
-          const userCode = findKey(c, ['ユーザーコード']);
-
           const latVal = findKey(c, ['緯度']);
           const lonVal = findKey(c, ['経度']);
           const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-
-          if (latVal && lonVal && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
-              latitude = Number(latVal);
-              longitude = Number(lonVal);
-          } else if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
-              const parts = coordsVal.split(',').map(part => parseFloat(part.trim()));
-              if (!isNaN(parts[0]) && !isNaN(parts[1])) {
-                  latitude = parts[0];
-                  longitude = parts[1];
-              }
+          
+          if ((latVal && lonVal) || (typeof coordsVal === 'string' && coordsVal.includes(','))) {
+            return true;
           }
-          return userCode && latitude !== undefined && longitude !== undefined;
+          return false;
       })
       .map(c => {
           let latitude: number;
@@ -229,10 +271,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
           const latVal = findKey(c, ['緯度']);
           const lonVal = findKey(c, ['経度']);
           const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-          const address = String(findKey(c, ['住所', 'address']) || '住所未設定');
-          const name = String(findKey(c, ['店舗', 'storeName']) || '名称未設定');
-          const userCode = String(findKey(c, ['ユーザーコード']));
-
+          
           if (latVal && lonVal && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
               latitude = Number(latVal);
               longitude = Number(lonVal);
@@ -243,9 +282,9 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
           }
 
           return {
-              id: userCode,
-              name: name,
-              address: address,
+              id: String(findKey(c, ['ユーザーコード'])),
+              name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
+              address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
               latitude: latitude!,
               longitude: longitude!,
               type: 'customer' as 'customer'
@@ -256,13 +295,13 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
   }, [staff, staffStatus, customers]);
   
   const addWaypoint = () => {
-    setWaypoints(prev => [...prev, '']);
+    setWaypoints(prev => [...prev, null]);
   };
 
-  const updateWaypoint = (index: number, id: string) => {
+  const updateWaypoint = (index: number, location: Location | null) => {
     setWaypoints(prev => {
         const newWaypoints = [...prev];
-        newWaypoints[index] = id;
+        newWaypoints[index] = location;
         return newWaypoints;
     });
   };
@@ -298,36 +337,32 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
         </CardHeader>
         <form action={formActionWithState}>
           <CardContent className="space-y-6">
-             <input type="hidden" name="allLocations" value={JSON.stringify(allLocations)} />
-             {startLocation && <input type="hidden" name="startLocation" value={startLocation} />}
-             {endLocation && <input type="hidden" name="endLocation" value={endLocation} />}
-             {waypoints.filter(id => id).map((id, index) => id && <input key={index} type="hidden" name="waypoints" value={id} />)}
+             <input type="hidden" name="startLocation" value={startLocation ? JSON.stringify(startLocation) : ''} />
+             <input type="hidden" name="endLocation" value={endLocation ? JSON.stringify(endLocation) : ''} />
+             {waypoints.filter(loc => loc).map((loc, index) => <input key={index} type="hidden" name="waypoints" value={JSON.stringify(loc)} />)}
 
             <div className="space-y-2">
                 <Label>出発地</Label>
-                <LocationSelector
-                  allLocations={allLocations}
-                  selectedValue={startLocation}
+                <PlacesAutocompleteSelector
+                  predefinedLocations={predefinedLocations}
+                  value={startLocation}
                   onSelect={setStartLocation}
-                  placeholder="出発地を選択..."
+                  placeholder="出発地を選択または検索..."
                 />
             </div>
 
             <div className="space-y-2">
                 <Label>経由地</Label>
                  <div className="space-y-2">
-                    {waypoints.map((waypointId, index) => {
-                        const usedIds = new Set([startLocation, endLocation, ...waypoints.filter((_, i) => i !== index && waypoints[i])].filter(Boolean));
-                        const availableLocations = allLocations.filter(loc => !usedIds.has(loc.id));
-                        
+                    {waypoints.map((waypoint, index) => {
                         return (
                             <div key={index} className="flex items-center gap-2">
                                 <div className="flex-grow">
-                                    <LocationSelector 
-                                        allLocations={availableLocations}
-                                        selectedValue={waypointId} 
-                                        onSelect={(id) => updateWaypoint(index, id!)} 
-                                        placeholder="経由地を選択..."
+                                    <PlacesAutocompleteSelector
+                                        predefinedLocations={predefinedLocations}
+                                        value={waypoint} 
+                                        onSelect={(loc) => updateWaypoint(index, loc)} 
+                                        placeholder="経由地を選択または検索..."
                                     />
                                 </div>
                                 <Button type="button" variant="ghost" size="icon" onClick={() => removeWaypoint(index)} aria-label="経由地を削除">
@@ -345,11 +380,11 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
 
             <div className="space-y-2">
                 <Label>目的地</Label>
-                <LocationSelector 
-                  allLocations={allLocations}
-                  selectedValue={endLocation} 
+                <PlacesAutocompleteSelector 
+                  predefinedLocations={predefinedLocations}
+                  value={endLocation} 
                   onSelect={setEndLocation} 
-                  placeholder="目的地を選択..." 
+                  placeholder="目的地を選択または検索..." 
                 />
             </div>
 
@@ -444,5 +479,3 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     </div>
   );
 }
-
-    
