@@ -109,14 +109,14 @@ function SubmitButton() {
 }
 
 const LocationSelector: React.FC<{
+  allLocations: Location[];
   staffLocations: Location[];
   customerLocations: Location[];
   selectedValue: string | undefined;
   onSelect: (id: string | undefined) => void;
   placeholder: string;
-}> = ({ staffLocations, customerLocations, selectedValue, onSelect, placeholder }) => {
+}> = ({ allLocations, staffLocations, customerLocations, selectedValue, onSelect, placeholder }) => {
   const [open, setOpen] = React.useState(false);
-  const allLocations = [...staffLocations, ...customerLocations];
   const selectedLocationName = allLocations.find(l => l.id === selectedValue)?.name;
 
   return (
@@ -201,13 +201,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
   }, [staff, staffStatus, customers]);
   
   const allLocations = [...staffLocations, ...customerLocations];
-  const availableWaypointLocations = allLocations.filter(
-    loc => loc.id !== startLocation && loc.id !== endLocation
-  );
   
-  const availableWaypointStaffLocations = availableWaypointLocations.filter(loc => loc.type === 'staff');
-  const availableWaypointCustomerLocations = availableWaypointLocations.filter(loc => loc.type === 'customer');
-
   const addWaypoint = () => {
     setWaypoints(prev => [...prev, '']);
   };
@@ -259,6 +253,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
             <div className="space-y-2">
                 <Label>出発地</Label>
                 <LocationSelector 
+                  allLocations={allLocations}
                   staffLocations={staffLocations} 
                   customerLocations={customerLocations} 
                   selectedValue={startLocation} 
@@ -270,22 +265,30 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
             <div className="space-y-2">
                 <Label>経由地</Label>
                  <div className="space-y-2">
-                    {waypoints.map((waypointId, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                            <div className="flex-grow">
-                                <LocationSelector 
-                                    staffLocations={availableWaypointStaffLocations}
-                                    customerLocations={availableWaypointCustomerLocations}
-                                    selectedValue={waypointId} 
-                                    onSelect={(id) => updateWaypoint(index, id!)} 
-                                    placeholder="経由地を選択..."
-                                />
+                    {waypoints.map((waypointId, index) => {
+                        const usedIds = new Set([startLocation, endLocation, ...waypoints.filter((_, i) => i !== index)]);
+                        const availableLocations = allLocations.filter(loc => !usedIds.has(loc.id));
+                        const availableStaff = availableLocations.filter(l => l.type === 'staff');
+                        const availableCustomers = availableLocations.filter(l => l.type === 'customer');
+
+                        return (
+                            <div key={index} className="flex items-center gap-2">
+                                <div className="flex-grow">
+                                    <LocationSelector 
+                                        allLocations={availableLocations}
+                                        staffLocations={availableStaff}
+                                        customerLocations={availableCustomers}
+                                        selectedValue={waypointId} 
+                                        onSelect={(id) => updateWaypoint(index, id!)} 
+                                        placeholder="経由地を選択..."
+                                    />
+                                </div>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => removeWaypoint(index)} aria-label="経由地を削除">
+                                    <X className="h-4 w-4" />
+                                </Button>
                             </div>
-                            <Button type="button" variant="ghost" size="icon" onClick={() => removeWaypoint(index)} aria-label="経由地を削除">
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={addWaypoint} className="mt-2">
                     <PlusCircle className="mr-2 h-4 w-4" />
@@ -296,6 +299,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
             <div className="space-y-2">
                 <Label>目的地</Label>
                 <LocationSelector 
+                  allLocations={allLocations}
                   staffLocations={staffLocations} 
                   customerLocations={customerLocations} 
                   selectedValue={endLocation} 
