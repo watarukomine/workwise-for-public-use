@@ -41,12 +41,12 @@ function OptimizerLayout() {
           const scheduledDate = parseISO(scheduledDateKey);
           return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()));
         })
-        .map(order => findKey(order, ['ユーザーコード', 'usercode']))
+        .map(order => findKey(order, ['ユーザーコード']))
         .filter(Boolean)
     );
 
     return allCustomers.filter(c => {
-      const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
+      const customerUserCode = findKey(c, ['ユーザーコード']);
       return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
     });
   
@@ -101,7 +101,7 @@ function OptimizerLayout() {
           });
 
       const routeCustomers = scheduledCustomers.filter(c => {
-          const userCode = findKey(c, ['ユーザーコード', 'usercode']);
+          const userCode = findKey(c, ['ユーザーコード']);
           return userCode && routeIds.has(String(userCode));
       });
       
