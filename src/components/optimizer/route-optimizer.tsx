@@ -110,13 +110,15 @@ function SubmitButton() {
 
 const LocationSelector: React.FC<{
   allLocations: Location[];
-  staffLocations: Location[];
-  customerLocations: Location[];
   selectedValue: string | undefined;
   onSelect: (id: string | undefined) => void;
   placeholder: string;
-}> = ({ allLocations, staffLocations, customerLocations, selectedValue, onSelect, placeholder }) => {
+}> = ({ allLocations, selectedValue, onSelect, placeholder }) => {
   const [open, setOpen] = React.useState(false);
+  
+  const staffLocations = allLocations.filter(l => l.type === 'staff');
+  const customerLocations = allLocations.filter(l => l.type === 'customer');
+
   const selectedLocationName = allLocations.find(l => l.id === selectedValue)?.name;
 
   return (
@@ -129,15 +131,21 @@ const LocationSelector: React.FC<{
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
-          <CommandInput placeholder="ロケーションを検索..." />
+          <CommandInput placeholder="名前や住所で検索..." />
           <CommandList>
             <CommandEmpty>該当するロケーションが見つかりません。</CommandEmpty>
             {staffLocations.length > 0 && (
               <CommandGroup heading="スタッフ">
                 {staffLocations.map(location => (
-                  <CommandItem key={location.id} value={`${location.name} ${location.address}`} onSelect={() => { onSelect(location.id); setOpen(false); }}>
+                  <CommandItem
+                    key={location.id}
+                    value={`${location.name} ${location.address}`}
+                    onSelect={() => { onSelect(location.id); setOpen(false); }}>
                     <Check className={cn("mr-2 h-4 w-4", selectedValue === location.id ? "opacity-100" : "opacity-0")} />
-                    {location.name}
+                    <div className="flex flex-col">
+                        <span>{location.name}</span>
+                        <span className="text-xs text-muted-foreground">{location.address}</span>
+                    </div>
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -145,9 +153,15 @@ const LocationSelector: React.FC<{
             {customerLocations.length > 0 && (
               <CommandGroup heading="販売店">
                 {customerLocations.map(location => (
-                  <CommandItem key={location.id} value={`${location.name} ${location.address}`} onSelect={() => { onSelect(location.id); setOpen(false); }}>
+                  <CommandItem
+                    key={location.id}
+                    value={`${location.name} ${location.address}`}
+                    onSelect={() => { onSelect(location.id); setOpen(false); }}>
                     <Check className={cn("mr-2 h-4 w-4", selectedValue === location.id ? "opacity-100" : "opacity-0")} />
-                    {location.name}
+                     <div className="flex flex-col">
+                        <span>{location.name}</span>
+                        <span className="text-xs text-muted-foreground">{location.address}</span>
+                    </div>
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -171,7 +185,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     onRouteOptimized(state.data, state.options);
   }, [state.data, state.options, onRouteOptimized]);
 
-  const { staffLocations, customerLocations } = React.useMemo(() => {
+  const allLocations = React.useMemo(() => {
     const staffWithLocation = staff.map(s => {
         const status = staffStatus.find(ss => ss.staffId === s.id);
         return status && status.latitude && status.longitude ? { ...s, ...status } : null;
@@ -179,8 +193,8 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
 
     const staffLocs: Location[] = staffWithLocation.map(s => ({
         id: s.id,
-        name: `${s.name} (現在地)`,
-        address: 'Current staff location',
+        name: `${s.name}`,
+        address: `現在地`,
         latitude: s.latitude!,
         longitude: s.longitude!,
         type: 'staff',
@@ -215,6 +229,9 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
           const latVal = findKey(c, ['緯度']);
           const lonVal = findKey(c, ['経度']);
           const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+          const address = String(findKey(c, ['住所', 'address']) || '住所未設定');
+          const name = String(findKey(c, ['店舗', 'storeName']) || '名称未設定');
+          const userCode = String(findKey(c, ['ユーザーコード']));
 
           if (latVal && lonVal && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
               latitude = Number(latVal);
@@ -226,19 +243,17 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
           }
 
           return {
-              id: String(findKey(c, ['ユーザーコード'])),
-              name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
-              address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
+              id: userCode,
+              name: name,
+              address: address,
               latitude: latitude!,
               longitude: longitude!,
               type: 'customer' as 'customer'
           }
       });
 
-    return { staffLocations: staffLocs, customerLocations: customerLocs };
+    return [...staffLocs, ...customerLocs];
   }, [staff, staffStatus, customers]);
-  
-  const allLocations = [...staffLocations, ...customerLocations];
   
   const addWaypoint = () => {
     setWaypoints(prev => [...prev, '']);
@@ -292,8 +307,6 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
                 <Label>出発地</Label>
                 <LocationSelector
                   allLocations={allLocations}
-                  staffLocations={staffLocations}
-                  customerLocations={customerLocations}
                   selectedValue={startLocation}
                   onSelect={setStartLocation}
                   placeholder="出発地を選択..."
@@ -306,16 +319,12 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
                     {waypoints.map((waypointId, index) => {
                         const usedIds = new Set([startLocation, endLocation, ...waypoints.filter((_, i) => i !== index && waypoints[i])].filter(Boolean));
                         const availableLocations = allLocations.filter(loc => !usedIds.has(loc.id));
-                        const availableStaff = availableLocations.filter(l => l.type === 'staff');
-                        const availableCustomers = availableLocations.filter(l => l.type === 'customer');
-
+                        
                         return (
                             <div key={index} className="flex items-center gap-2">
                                 <div className="flex-grow">
                                     <LocationSelector 
                                         allLocations={availableLocations}
-                                        staffLocations={availableStaff}
-                                        customerLocations={availableCustomers}
                                         selectedValue={waypointId} 
                                         onSelect={(id) => updateWaypoint(index, id!)} 
                                         placeholder="経由地を選択..."
@@ -338,8 +347,6 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
                 <Label>目的地</Label>
                 <LocationSelector 
                   allLocations={allLocations}
-                  staffLocations={staffLocations} 
-                  customerLocations={customerLocations} 
                   selectedValue={endLocation} 
                   onSelect={setEndLocation} 
                   placeholder="目的地を選択..." 
@@ -437,3 +444,5 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     </div>
   );
 }
+
+    
