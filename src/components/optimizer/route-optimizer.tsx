@@ -251,21 +251,20 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     const todaysOrderCustomerCodes = new Set<string>();
 
     rawOrders.forEach(order => {
-        const scheduledDateValue = findKey(order, ['作業予定日']);
-        if (scheduledDateValue) {
-            try {
-                const scheduledDateString = format(new Date(scheduledDateValue), 'yyyy-MM-dd');
-                if (scheduledDateString === todayString) {
-                    const userCode = findKey(order, ['ユーザーコード', 'usercode']);
-                    if (userCode) {
-                        todaysOrderCustomerCodes.add(String(userCode));
-                    }
-                }
-            } catch (e) {
-                // Invalid date format, ignore this order
-                console.warn("Invalid date format for order", order);
+      const scheduledDateValue = findKey(order, ['作業予定日']);
+      if (scheduledDateValue) {
+        try {
+          const scheduledDateString = format(new Date(scheduledDateValue), 'yyyy-MM-dd');
+          if (scheduledDateString === todayString) {
+            const userCode = findKey(order, ['ユーザーコード', 'usercode']);
+            if (userCode) {
+              todaysOrderCustomerCodes.add(String(userCode));
             }
+          }
+        } catch (e) {
+          console.warn("Invalid date format for order", order);
         }
+      }
     });
   
     return allCustomers.filter(c => {
