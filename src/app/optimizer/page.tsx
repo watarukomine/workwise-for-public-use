@@ -35,7 +35,6 @@ function OptimizerLayout() {
   const [scheduledCustomers, setScheduledCustomers] = React.useState<WithId<Customer>[]>([]);
   const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
   
-  // scheduleDataをlocalStorageから読み込む
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
         try {
@@ -54,7 +53,6 @@ function OptimizerLayout() {
       return;
     }
 
-    const allMappedOrders = rawOrders.map(mapRawToOrder);
     const todaysScheduledRawOrderIds = new Set(
         scheduleData
             .filter(event => {
@@ -64,9 +62,10 @@ function OptimizerLayout() {
             .map(event => event.rawOrderId)
     );
 
+    const allMappedOrders = rawOrders.map(mapRawToOrder);
+    
     const newUnassignedOrders = allMappedOrders.filter(order => {
         if (!order.rawOrderId) return false;
-        
         if (todaysScheduledRawOrderIds.has(order.rawOrderId)) return false;
         
         const scheduledDateKey = findKey(order.raw, ['作業予定日']);
@@ -77,7 +76,7 @@ function OptimizerLayout() {
     });
     
     const todaysCustomerCodes = new Set(newUnassignedOrders.map(o => o.customerCode));
-
+    
     const filteredCustomers = allCustomers.filter(c => {
       const customerUserCode = findKey(c, ['ユーザーコード']);
       return customerUserCode && todaysCustomerCodes.has(String(customerUserCode));
@@ -85,7 +84,7 @@ function OptimizerLayout() {
 
     setScheduledCustomers(filteredCustomers);
 
-  }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers, scheduleData]);
+  }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers]);
   
   const filteredStaff = React.useMemo(() => {
     if (isStaffLoading || !allStaff) return [];
