@@ -14,12 +14,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
-import { findKey } from '@/lib/utils';
+import { findKey, mapRawToOrder } from '@/lib/utils';
 import { isToday, parseISO, isValid, isEqual, startOfDay, format } from 'date-fns';
-
-const getStorageKey = (date: Date) => {
-    return `scheduleData-${format(date, 'yyyy-MM-dd')}`;
-};
 
 function OptimizerLayout() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -38,9 +34,9 @@ function OptimizerLayout() {
     if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) {
       return;
     }
-
+  
     const todaysOrderCustomerCodes = new Set<string>();
-
+  
     rawOrders.forEach(order => {
         const scheduledDateValue = findKey(order, ['作業予定日']);
         if (scheduledDateValue) {
