@@ -45,7 +45,7 @@ export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHX
  * 受注情報が記載されているスプレッドシートのURL。
  * orders/page.tsx のヘッダークリックで開かれます。
  */
-export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Order sheet URL
+export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU/edit?usp=sharing';
 
 
 // --- その他設定 ---
@@ -54,6 +54,3 @@ export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYF
  * スプレッドシートでステータスを管理している列のヘッダー名。
  */
 export const STATUS_COLUMN_NAME = '受注ステータス';
-
-
-
