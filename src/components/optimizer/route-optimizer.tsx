@@ -310,7 +310,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
   
-  const isLoading = !staff || !staffStatus || !allCustomers || !placesLibraryReady;
+  const isLoading = !staff || !staffStatus || !allCustomers;
 
   if (isLoading) {
     return (
