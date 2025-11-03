@@ -7,28 +7,76 @@ import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
-import type { Customer, Staff, StaffStatus, WithId, Order } from '@/lib/types';
+import type { Customer, Staff, StaffStatus, WithId, Order, ScheduleEvent } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
-import { findKey } from '@/lib/utils';
+import { findKey, mapRawToOrder } from '@/lib/utils';
 import { isToday, parseISO, isValid, isEqual, startOfDay, format } from 'date-fns';
 
+const getStorageKey = (date: Date) => {
+    return `scheduleData-${format(date, 'yyyy-MM-dd')}`;
+};
+
 function OptimizerLayout() {
-  // CRITICAL: Load map libraries first as they can return null and disrupt other hooks.
   const placesLibrary = useMapsLibrary('places');
 
   const { profile, isLoading: isProfileLoading } = useUserProfile();
-  const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
-  const [avoidHighways, setAvoidHighways] = React.useState(false);
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
   const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
-  
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   
+  const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
+  const [avoidHighways, setAvoidHighways] = React.useState(false);
+  const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
+  const [currentDate, setCurrentDate] = React.useState(startOfDay(new Date()));
+
+   React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+        try {
+            const key = getStorageKey(currentDate);
+            const savedData = localStorage.getItem(key);
+            setScheduleData(savedData ? JSON.parse(savedData) : []);
+        } catch (error) {
+            console.error("Failed to parse schedule data for new date", error);
+            setScheduleData([]);
+        }
+    }
+  }, [currentDate]);
+
+  const todaysCustomers = React.useMemo(() => {
+    if (isLoadingOrders || !rawOrders || !allCustomers) {
+      return [];
+    }
+
+    const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
+    const allMappedOrders = rawOrders.map(mapRawToOrder);
+
+    const todaysUnassignedOrders = allMappedOrders.filter(order => {
+        if (!order.rawOrderId) return false;
+        
+        if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
+        
+        const scheduledDateKey = findKey(order.raw, ['作業予定日']);
+        if (!scheduledDateKey) return false;
+
+        const scheduledDate = parseISO(scheduledDateKey);
+        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), currentDate);
+    });
+
+    const todaysCustomerCodes = new Set(todaysUnassignedOrders.map(o => o.customerCode));
+
+    return allCustomers.filter(c => {
+        const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
+        return customerUserCode && todaysCustomerCodes.has(String(customerUserCode));
+    });
+
+  }, [rawOrders, allCustomers, isLoadingOrders, scheduleData, currentDate]);
+
+
   const filteredStaff = React.useMemo(() => {
     if (isStaffLoading || !allStaff) return [];
     if (appliedSelectedStaffIds.length === 0) {
@@ -127,6 +175,7 @@ function OptimizerLayout() {
                 staff={filteredStaff}
                 staffStatus={statuses}
                 customers={allCustomers}
+                todaysCustomers={todaysCustomers}
                 rawOrders={rawOrders}
             />
           </div>

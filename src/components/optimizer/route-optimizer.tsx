@@ -41,6 +41,7 @@ interface RouteOptimizerProps {
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
   customers: WithId<Customer>[];
+  todaysCustomers: WithId<Customer>[];
   rawOrders: any[];
 }
 
@@ -231,7 +232,7 @@ const PlacesAutocompleteSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers, rawOrders }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers, todaysCustomers, rawOrders }: RouteOptimizerProps) {
   
   const [startLocation, setStartLocation] = React.useState<Location | null>(null);
   const [endLocation, setEndLocation] = React.useState<Location | null>(null);
@@ -257,8 +258,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
         type: 'staff',
     }));
     
-    // Use all customers passed in props
-    const customerLocs: Location[] = customers.reduce((acc: Location[], c) => {
+    const customerLocs: Location[] = todaysCustomers.reduce((acc: Location[], c) => {
       const latVal = findKey(c, ['緯度']);
       const lonVal = findKey(c, ['経度']);
       const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
@@ -291,7 +291,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     }, []);
 
     return [...staffLocs, ...customerLocs];
-  }, [staff, staffStatus, customers]);
+  }, [staff, staffStatus, todaysCustomers]);
   
   const addWaypoint = () => {
     setWaypoints(prev => [...prev, null]);
