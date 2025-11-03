@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import type { Customer } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, findKey } from '@/lib/utils';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { CUSTOMER_SHEET_URL } from '@/lib/settings';
 
@@ -32,22 +32,40 @@ const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
   if (!Array.isArray(rawData)) {
     return [];
   }
-  return rawData.map(item => ({
-    id: item['ユーザーコード'] || item['id'] || String(item['No'] || Math.random()),
-    No: item['No'],
-    userCode: item['ユーザーコード'],
-    '旧 チャネル SEQ': item['旧 チャネル SEQ'],
-    storeName: item['店舗'],
-    '管理C': item['管理C'],
-    '機材有無': item['機材有無'],
-    address: item['住所'],
-    latitude: Number(item['緯度']),
-    longitude: Number(item['経度']),
-    '電話番号': item['電話番号'],
-    '営業時間': item['営業時間'],
-    // Keep original keys for compatibility if needed elsewhere
-    ...item
-  }));
+  return rawData.map(item => {
+    let latitude: number | undefined = Number(findKey(item, ['緯度']));
+    let longitude: number | undefined = Number(findKey(item, ['経度']));
+
+    if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
+        const coordsValue = findKey(item, ['緯度・経度', '座標', '緯度経度']);
+        if (typeof coordsValue === 'string' && coordsValue.includes(',')) {
+            const parts = coordsValue.split(',').map(part => part.trim());
+            const lat = parseFloat(parts[0]);
+            const lon = parseFloat(parts[1]);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                latitude = lat;
+                longitude = lon;
+            }
+        }
+    }
+
+    return {
+      id: item['ユーザーコード'] || item['id'] || String(item['No'] || Math.random()),
+      No: item['No'],
+      userCode: item['ユーザーコード'],
+      '旧 チャネル SEQ': item['旧 チャネル SEQ'],
+      storeName: item['店舗'],
+      '管理C': item['管理C'],
+      '機材有無': item['機材有無'],
+      address: item['住所'],
+      latitude: latitude,
+      longitude: longitude,
+      '電話番号': item['電話番号'],
+      '営業時間': item['営業時間'],
+      // Keep original keys for compatibility if needed elsewhere
+      ...item
+    }
+  });
 };
 
 

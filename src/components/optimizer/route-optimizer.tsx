@@ -12,7 +12,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
+import { cn, findKey } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -187,15 +187,46 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     }));
     
     const customerLocs: Location[] = customers
-      .filter(c => c.latitude && c.longitude && c.userCode)
-      .map(c => ({
-        id: c.userCode!,
-        name: c['店舗'] || c.storeName || '名称未設定',
-        address: c.address || '住所未設定',
-        latitude: c.latitude!,
-        longitude: c.longitude!,
-        type: 'customer'
-      }));
+      .filter(c => {
+          let latitude: number | undefined = Number(findKey(c, ['緯度']));
+          let longitude: number | undefined = Number(findKey(c, ['経度']));
+
+          if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
+              const coordsValue = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+              if (typeof coordsValue === 'string' && coordsValue.includes(',')) {
+                  const parts = coordsValue.split(',').map(part => part.trim());
+                  const lat = parseFloat(parts[0]);
+                  const lon = parseFloat(parts[1]);
+                  if (!isNaN(lat) && !isNaN(lon)) {
+                      latitude = lat;
+                      longitude = lon;
+                  }
+              }
+          }
+          return c.userCode && !isNaN(latitude) && !isNaN(longitude) && latitude && longitude;
+      })
+      .map(c => {
+          let latitude: number = Number(findKey(c, ['緯度']));
+          let longitude: number = Number(findKey(c, ['経度']));
+
+          if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
+              const coordsValue = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+              if (typeof coordsValue === 'string' && coordsValue.includes(',')) {
+                  const parts = coordsValue.split(',').map(part => part.trim());
+                  latitude = parseFloat(parts[0]);
+                  longitude = parseFloat(parts[1]);
+              }
+          }
+
+          return {
+              id: c.userCode!,
+              name: c['店舗'] || c.storeName || '名称未設定',
+              address: c.address || '住所未設定',
+              latitude: latitude!,
+              longitude: longitude!,
+              type: 'customer' as 'customer'
+          }
+      });
 
     return { staffLocations: staffLocs, customerLocations: customerLocs };
   }, [staff, staffStatus, customers]);
@@ -266,7 +297,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
                 <Label>経由地</Label>
                  <div className="space-y-2">
                     {waypoints.map((waypointId, index) => {
-                        const usedIds = new Set([startLocation, endLocation, ...waypoints.filter((_, i) => i !== index)]);
+                        const usedIds = new Set([startLocation, endLocation, ...waypoints.filter((_, i) => i !== index && waypoints[i])]);
                         const availableLocations = allLocations.filter(loc => !usedIds.has(loc.id));
                         const availableStaff = availableLocations.filter(l => l.type === 'staff');
                         const availableCustomers = availableLocations.filter(l => l.type === 'customer');
