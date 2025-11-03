@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useFormStatus } from 'react-dom';
 import { useActionState } from 'react';
 
-import type { Customer, Staff, StaffStatus, WithId, Order } from '@/lib/types';
+import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,6 @@ import { cn, findKey } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
-import { format } from 'date-fns';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -40,7 +39,7 @@ interface RouteOptimizerProps {
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
-  todaysCustomers: WithId<Customer>[];
+  customers: WithId<Customer>[];
 }
 
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
@@ -197,7 +196,7 @@ const PlacesAutocompleteSelector: React.FC<{
             )}
 
             {filteredCustomers.length > 0 && (
-                <CommandGroup heading="販売店（当日作業あり）">
+                <CommandGroup heading="販売店">
                   {filteredCustomers.map((location) => (
                     <CommandItem
                       key={location.id}
@@ -230,7 +229,7 @@ const PlacesAutocompleteSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, todaysCustomers }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers }: RouteOptimizerProps) {
   
   const [startLocation, setStartLocation] = React.useState<Location | null>(null);
   const [endLocation, setEndLocation] = React.useState<Location | null>(null);
@@ -256,7 +255,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, todaysCus
         type: 'staff',
     }));
     
-    const customerLocs: Location[] = todaysCustomers.reduce((acc: Location[], c) => {
+    const customerLocs: Location[] = customers.reduce((acc: Location[], c) => {
       const latVal = findKey(c, ['緯度']);
       const lonVal = findKey(c, ['経度']);
       const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
@@ -289,7 +288,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, todaysCus
     }, []);
 
     return [...staffLocs, ...customerLocs];
-  }, [staff, staffStatus, todaysCustomers]);
+  }, [staff, staffStatus, customers]);
   
   const addWaypoint = () => {
     setWaypoints(prev => [...prev, null]);
@@ -307,7 +306,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, todaysCus
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
   
-  const isLoading = !staff || !staffStatus;
+  const isLoading = !staff || !staffStatus || !customers;
 
   if (isLoading) {
     return (
