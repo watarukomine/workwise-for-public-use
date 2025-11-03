@@ -238,10 +238,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
           const lonVal = findKey(c, ['経度']);
           const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
           
-          if ((latVal && lonVal && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) || (typeof coordsVal === 'string' && coordsVal.includes(','))) {
-            return true;
-          }
-          return false;
+          return (latVal && lonVal && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) || (typeof coordsVal === 'string' && coordsVal.includes(','));
       })
       .map(c => {
           let latitude: number;
@@ -264,8 +261,8 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
               id: String(findKey(c, ['ユーザーコード'])),
               name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
               address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
-              latitude: latitude!,
-              longitude: longitude!,
+              latitude: latitude,
+              longitude: longitude,
               type: 'customer' as 'customer'
           }
       });
