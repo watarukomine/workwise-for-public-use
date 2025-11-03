@@ -255,38 +255,37 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
         type: 'staff',
     }));
     
-    const customerLocs: Location[] = customers
-      .map(c => {
-          let latitude: number | undefined;
-          let longitude: number | undefined;
+    const customerLocs = customers.reduce((acc: Location[], c) => {
+      const latVal = findKey(c, ['緯度']);
+      const lonVal = findKey(c, ['経度']);
+      const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
 
-          const latVal = findKey(c, ['緯度']);
-          const lonVal = findKey(c, ['経度']);
-          const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-          
-          if (latVal !== undefined && lonVal !== undefined && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
-              latitude = Number(latVal);
-              longitude = Number(lonVal);
-          } else if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
-              const parts = coordsVal.split(',').map(part => parseFloat(part.trim()));
-              if (!isNaN(parts[0]) && !isNaN(parts[1])) {
-                latitude = parts[0];
-                longitude = parts[1];
-              }
-          }
+      let latitude: number | undefined;
+      let longitude: number | undefined;
 
-          if (latitude !== undefined && longitude !== undefined) {
-            return {
-                id: String(findKey(c, ['ユーザーコード'])),
-                name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
-                address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
-                latitude: latitude,
-                longitude: longitude,
-                type: 'customer' as 'customer'
-            }
-          }
-          return null;
-      }).filter((l): l is Location => l !== null);
+      if (latVal !== undefined && lonVal !== undefined && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
+        latitude = Number(latVal);
+        longitude = Number(lonVal);
+      } else if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
+        const parts = coordsVal.split(',').map(part => parseFloat(part.trim()));
+        if (!isNaN(parts[0]) && !isNaN(parts[1])) {
+          latitude = parts[0];
+          longitude = parts[1];
+        }
+      }
+
+      if (latitude !== undefined && longitude !== undefined) {
+        acc.push({
+          id: String(findKey(c, ['ユーザーコード'])),
+          name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
+          address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
+          latitude: latitude,
+          longitude: longitude,
+          type: 'customer' as const,
+        });
+      }
+      return acc;
+    }, []);
 
     return [...staffLocs, ...customerLocs];
   }, [staff, staffStatus, customers]);
@@ -476,3 +475,5 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     </div>
   );
 }
+
+    
