@@ -188,40 +188,47 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     
     const customerLocs: Location[] = customers
       .filter(c => {
-          let latitude: number | undefined = Number(findKey(c, ['緯度']));
-          let longitude: number | undefined = Number(findKey(c, ['経度']));
+          let latitude: number | undefined;
+          let longitude: number | undefined;
+          const userCode = findKey(c, ['ユーザーコード']);
 
-          if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
-              const coordsValue = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-              if (typeof coordsValue === 'string' && coordsValue.includes(',')) {
-                  const parts = coordsValue.split(',').map(part => part.trim());
-                  const lat = parseFloat(parts[0]);
-                  const lon = parseFloat(parts[1]);
-                  if (!isNaN(lat) && !isNaN(lon)) {
-                      latitude = lat;
-                      longitude = lon;
-                  }
+          const latVal = findKey(c, ['緯度']);
+          const lonVal = findKey(c, ['経度']);
+          const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+
+          if (latVal && lonVal && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
+              latitude = Number(latVal);
+              longitude = Number(lonVal);
+          } else if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
+              const parts = coordsVal.split(',').map(part => parseFloat(part.trim()));
+              if (!isNaN(parts[0]) && !isNaN(parts[1])) {
+                  latitude = parts[0];
+                  longitude = parts[1];
               }
           }
-          return c.userCode && !isNaN(latitude) && !isNaN(longitude) && latitude && longitude;
+          return userCode && latitude !== undefined && longitude !== undefined;
       })
       .map(c => {
-          let latitude: number = Number(findKey(c, ['緯度']));
-          let longitude: number = Number(findKey(c, ['経度']));
+          let latitude: number;
+          let longitude: number;
 
-          if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
-              const coordsValue = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-              if (typeof coordsValue === 'string' && coordsValue.includes(',')) {
-                  const parts = coordsValue.split(',').map(part => part.trim());
-                  latitude = parseFloat(parts[0]);
-                  longitude = parseFloat(parts[1]);
-              }
+          const latVal = findKey(c, ['緯度']);
+          const lonVal = findKey(c, ['経度']);
+          const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+
+          if (latVal && lonVal && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
+              latitude = Number(latVal);
+              longitude = Number(lonVal);
+          } else {
+              const parts = (coordsVal as string).split(',').map(part => parseFloat(part.trim()));
+              latitude = parts[0];
+              longitude = parts[1];
           }
 
           return {
-              id: c.userCode!,
-              name: c['店舗'] || c.storeName || '名称未設定',
-              address: c.address || '住所未設定',
+              id: String(findKey(c, ['ユーザーコード'])),
+              name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
+              address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
               latitude: latitude!,
               longitude: longitude!,
               type: 'customer' as 'customer'
