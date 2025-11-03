@@ -14,8 +14,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
-import { findKey } from '@/lib/utils';
-import { format, isToday, parseISO, isValid } from 'date-fns';
+import { findKey, formatTime } from '@/lib/utils';
+import { isToday, parseISO, isValid, isEqual, startOfDay } from 'date-fns';
 
 function OptimizerLayout() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -46,7 +46,6 @@ function OptimizerLayout() {
         longitude: 139.63 + (index * 0.01), // Demo longitude around Yokohama
     }));
   }, [filteredStaff]);
-
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
     setOptimizedRoute(data);

@@ -242,39 +242,6 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     onRouteOptimized(state.data, state.options);
   }, [state.data, state.options, onRouteOptimized]);
   
-  const scheduledCustomers = React.useMemo(() => {
-    if (!rawOrders || !customers) {
-      return [];
-    }
-
-    const todayString = format(new Date(), 'yyyy-MM-dd');
-    const todaysOrderCustomerCodes = new Set<string>();
-
-    rawOrders.forEach(order => {
-      const scheduledDateValue = findKey(order, ['作業予定日']);
-      if (scheduledDateValue) {
-        try {
-            // Use format to avoid timezone issues
-            const scheduledDateString = format(new Date(scheduledDateValue), 'yyyy-MM-dd');
-            if (scheduledDateString === todayString) {
-                const userCode = findKey(order, ['ユーザーコード', 'usercode']);
-                if (userCode) {
-                    todaysOrderCustomerCodes.add(String(userCode));
-                }
-            }
-        } catch (e) {
-            console.warn("Invalid date format for order", order, e);
-        }
-      }
-    });
-  
-    return customers.filter(c => {
-      const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
-      return customerUserCode && todaysOrderCustomerCodes.has(String(customerUserCode));
-    });
-  }, [rawOrders, customers]);
-
-
   const predefinedLocations = React.useMemo(() => {
     const staffWithLocation = staff.map(s => {
         const status = staffStatus.find(ss => ss.staffId === s.id);
@@ -290,7 +257,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
         type: 'staff',
     }));
     
-    const customerLocs: Location[] = scheduledCustomers.reduce((acc: Location[], c) => {
+    const customerLocs: Location[] = customers.reduce((acc: Location[], c) => {
       const latVal = findKey(c, ['緯度']);
       const lonVal = findKey(c, ['経度']);
       const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
@@ -323,7 +290,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     }, []);
 
     return [...staffLocs, ...customerLocs];
-  }, [staff, staffStatus, scheduledCustomers]);
+  }, [staff, staffStatus, customers]);
   
   const addWaypoint = () => {
     setWaypoints(prev => [...prev, null]);
