@@ -17,7 +17,6 @@ import { useOrder } from '@/contexts/order-context';
 
 
 function OptimizerLayout() {
-  const placesLibrary = useMapsLibrary('places');
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
   const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
@@ -25,6 +24,8 @@ function OptimizerLayout() {
   
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
   const [avoidHighways, setAvoidHighways] = React.useState(false);
+  const placesLibrary = useMapsLibrary("places");
+
 
   const filteredStaff = React.useMemo(() => {
     if (isStaffLoading || !allStaff) return [];
@@ -50,8 +51,8 @@ function OptimizerLayout() {
     setAvoidHighways(options.avoidHighways);
   }
   
-  const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
-  
+  const baseIsLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
+
   const mapLocations = React.useMemo(() => {
       const staffLocs = filteredStaff
           .map(staffMember => {
@@ -84,7 +85,7 @@ function OptimizerLayout() {
 
   }, [filteredStaff, allCustomers, statuses, optimizedRoute]);
 
-  if (isLoading) {
+  if (baseIsLoading) {
     return (
       <div className="flex items-center justify-center p-10">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -119,13 +120,19 @@ function OptimizerLayout() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
-            <RouteOptimizer 
-                onRouteOptimized={handleRouteOptimized}
-                staff={filteredStaff}
-                staffStatus={statuses}
-                allCustomers={allCustomers || []}
-                placesLibraryReady={!!placesLibrary}
-            />
+            {!placesLibrary ? (
+              <div className="flex items-center justify-center p-10 rounded-lg border border-dashed">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+                <RouteOptimizer 
+                    onRouteOptimized={handleRouteOptimized}
+                    staff={filteredStaff}
+                    staffStatus={statuses}
+                    allCustomers={allCustomers || []}
+                    placesLibraryReady={!!placesLibrary}
+                />
+            )}
           </div>
           <div className="lg:col-span-2">
             <RouteMap 

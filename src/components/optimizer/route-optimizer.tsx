@@ -258,26 +258,26 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     }));
     
     const customerLocs: Location[] = (allCustomers || []).reduce((acc: Location[], c) => {
-        let latitude: number | undefined = c.latitude;
-        let longitude: number | undefined = c.longitude;
+      let latitude: number | undefined;
+      let longitude: number | undefined;
 
-        if (latitude === undefined || longitude === undefined) {
-            const latVal = findKey(c, ['緯度']);
-            const lonVal = findKey(c, ['経度']);
-            if (typeof latVal === 'number' && typeof lonVal === 'number') {
-                latitude = latVal;
-                longitude = lonVal;
-            } else {
-                 const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-                 if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
-                    const [lat, lon] = coordsVal.split(',').map(s => parseFloat(s.trim()));
-                    if (!isNaN(lat) && !isNaN(lon)) {
-                        latitude = lat;
-                        longitude = lon;
-                    }
-                }
-            }
-        }
+      const latVal = findKey(c, ['緯度']);
+      const lonVal = findKey(c, ['経度']);
+      const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+
+      if (c.latitude !== undefined && c.longitude !== undefined) {
+          latitude = c.latitude;
+          longitude = c.longitude;
+      } else if (typeof latVal === 'number' && typeof lonVal === 'number') {
+          latitude = latVal;
+          longitude = lonVal;
+      } else if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
+          const [lat, lon] = coordsVal.split(',').map(s => parseFloat(s.trim()));
+          if (!isNaN(lat) && !isNaN(lon)) {
+              latitude = lat;
+              longitude = lon;
+          }
+      }
       
       if (latitude !== undefined && longitude !== undefined) {
         acc.push({
@@ -311,24 +311,6 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
   
-  const isLoading = !staff || !staffStatus || !allCustomers;
-
-  if (isLoading) {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>ルート詳細</CardTitle>
-                <CardDescription>出発地、目的地、経由地、最適化の基準を選択してください。</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="flex items-center justify-center p-10">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-            </CardContent>
-        </Card>
-    )
-  }
-
   return (
     <div className="space-y-4">
       <Card>
