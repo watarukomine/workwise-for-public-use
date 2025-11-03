@@ -143,13 +143,20 @@ const PlacesAutocompleteSelector: React.FC<{
       setOpen(false);
   }
 
-  const filteredPredefined = inputValue
-    ? predefinedLocations.filter(
+  const staffLocations = predefinedLocations.filter(loc => loc.type === 'staff');
+  const customerLocations = predefinedLocations.filter(loc => loc.type === 'customer');
+
+  const filteredStaff = inputValue
+    ? staffLocations.filter(loc => loc.name.toLowerCase().includes(inputValue.toLowerCase()))
+    : staffLocations;
+
+  const filteredCustomers = inputValue
+    ? customerLocations.filter(
         (loc) =>
           loc.name.toLowerCase().includes(inputValue.toLowerCase()) ||
           loc.address.toLowerCase().includes(inputValue.toLowerCase())
       )
-    : predefinedLocations;
+    : customerLocations;
   
   const displayName = value ? value.name : placeholder;
 
@@ -172,16 +179,32 @@ const PlacesAutocompleteSelector: React.FC<{
           <CommandList>
             <CommandEmpty>該当する場所が見つかりません。</CommandEmpty>
             
-            {filteredPredefined.length > 0 && (
-                <CommandGroup heading="登録済み">
-                  {filteredPredefined.map((location) => (
+            {filteredStaff.length > 0 && (
+                <CommandGroup heading="スタッフ">
+                  {filteredStaff.map((location) => (
+                    <CommandItem
+                      key={location.id}
+                      value={`${location.name}`}
+                      onSelect={() => handlePredefinedSelect(location)}
+                      className="flex items-center"
+                    >
+                      <UserIcon className="mr-2 h-4 w-4" />
+                       <p className="truncate">{location.name}</p>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+            )}
+
+            {filteredCustomers.length > 0 && (
+                <CommandGroup heading="販売店">
+                  {filteredCustomers.map((location) => (
                     <CommandItem
                       key={location.id}
                       value={`${location.name} ${location.address}`}
                       onSelect={() => handlePredefinedSelect(location)}
                       className="flex items-center"
                     >
-                      {location.type === 'staff' ? <UserIcon className="mr-2 h-4 w-4" /> : <MapPinIcon className="mr-2 h-4 w-4" />}
+                      <MapPinIcon className="mr-2 h-4 w-4" />
                        <p className="truncate">{location.name}</p>
                     </CommandItem>
                   ))}
@@ -233,39 +256,37 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     }));
     
     const customerLocs: Location[] = customers
-      .filter(c => {
-          const latVal = findKey(c, ['緯度']);
-          const lonVal = findKey(c, ['経度']);
-          const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-          
-          return (latVal && lonVal && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) || (typeof coordsVal === 'string' && coordsVal.includes(','));
-      })
       .map(c => {
-          let latitude: number;
-          let longitude: number;
+          let latitude: number | undefined;
+          let longitude: number | undefined;
 
           const latVal = findKey(c, ['緯度']);
           const lonVal = findKey(c, ['経度']);
           const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
           
-          if (latVal && lonVal && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
+          if (latVal !== undefined && lonVal !== undefined && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
               latitude = Number(latVal);
               longitude = Number(lonVal);
-          } else {
-              const parts = (coordsVal as string).split(',').map(part => parseFloat(part.trim()));
-              latitude = parts[0];
-              longitude = parts[1];
+          } else if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
+              const parts = coordsVal.split(',').map(part => parseFloat(part.trim()));
+              if (!isNaN(parts[0]) && !isNaN(parts[1])) {
+                latitude = parts[0];
+                longitude = parts[1];
+              }
           }
 
-          return {
-              id: String(findKey(c, ['ユーザーコード'])),
-              name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
-              address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
-              latitude: latitude,
-              longitude: longitude,
-              type: 'customer' as 'customer'
+          if (latitude !== undefined && longitude !== undefined) {
+            return {
+                id: String(findKey(c, ['ユーザーコード'])),
+                name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
+                address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
+                latitude: latitude,
+                longitude: longitude,
+                type: 'customer' as 'customer'
+            }
           }
-      });
+          return null;
+      }).filter((l): l is Location => l !== null);
 
     return [...staffLocs, ...customerLocs];
   }, [staff, staffStatus, customers]);
