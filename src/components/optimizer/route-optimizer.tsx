@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { useFormStatus } from 'react-dom';
@@ -39,7 +40,7 @@ interface RouteOptimizerProps {
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
   allCustomers: WithId<Customer>[];
-  rawOrders: any[];
+  todaysCustomers: WithId<Customer>[];
   placesLibraryReady: boolean;
 }
 
@@ -147,19 +148,20 @@ const PlacesAutocompleteSelector: React.FC<{
   }
 
   const staffLocations = predefinedLocations.filter(loc => loc.type === 'staff');
-  const customerLocations = predefinedLocations.filter(loc => loc.type === 'customer');
+  const todaysCustomerLocations = predefinedLocations.filter(loc => loc.type === 'todays-customer');
+  const allCustomerLocations = predefinedLocations.filter(loc => loc.type === 'customer');
 
-  const filteredStaff = inputValue
-    ? staffLocations.filter(loc => loc.name.toLowerCase().includes(inputValue.toLowerCase()))
-    : staffLocations;
+  const filterLocations = (locations: Location[], input: string) => {
+    if (!input) return locations;
+    return locations.filter(loc => 
+      loc.name.toLowerCase().includes(input.toLowerCase()) ||
+      loc.address.toLowerCase().includes(input.toLowerCase())
+    );
+  }
 
-  const filteredCustomers = inputValue
-    ? customerLocations.filter(
-        (loc) =>
-          loc.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-          loc.address.toLowerCase().includes(inputValue.toLowerCase())
-      )
-    : customerLocations;
+  const filteredStaff = filterLocations(staffLocations, inputValue);
+  const filteredTodaysCustomers = filterLocations(todaysCustomerLocations, inputValue);
+  const filteredAllCustomers = filterLocations(allCustomerLocations, inputValue);
   
   const displayName = value ? value.name : placeholder;
 
@@ -198,9 +200,25 @@ const PlacesAutocompleteSelector: React.FC<{
                 </CommandGroup>
             )}
 
-            {filteredCustomers.length > 0 && (
-                <CommandGroup heading="販売店">
-                  {filteredCustomers.map((location) => (
+             {filteredTodaysCustomers.length > 0 && (
+                <CommandGroup heading="販売店（本日予約あり）">
+                  {filteredTodaysCustomers.map((location) => (
+                    <CommandItem
+                      key={location.id}
+                      value={`${location.name} ${location.address}`}
+                      onSelect={() => handlePredefinedSelect(location)}
+                      className="flex items-center"
+                    >
+                      <MapPinIcon className="mr-2 h-4 w-4 text-primary" />
+                       <p className="truncate">{location.name}</p>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+            )}
+
+            {filteredAllCustomers.length > 0 && (
+                <CommandGroup heading="販売店（すべて）">
+                  {filteredAllCustomers.map((location) => (
                     <CommandItem
                       key={location.id}
                       value={`${location.name} ${location.address}`}
@@ -232,7 +250,7 @@ const PlacesAutocompleteSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustomers, rawOrders, placesLibraryReady }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustomers, todaysCustomers, placesLibraryReady }: RouteOptimizerProps) {
   
   const [startLocation, setStartLocation] = React.useState<Location | null>(null);
   const [endLocation, setEndLocation] = React.useState<Location | null>(null);
@@ -244,36 +262,70 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
   }, [state.data, state.options, onRouteOptimized]);
   
   const predefinedLocations = React.useMemo(() => {
-    const staffLocs: Location[] = [{
-      id: 'staff-demo-1',
-      name: 'デモスタッフ（現在地）',
-      address: '東京都千代田区',
-      latitude: 35.6895,
-      longitude: 139.6917,
-      type: 'staff',
-    }];
+    const staffWithLocation = staff.map(s => {
+      const status = staffStatus.find(ss => ss.staffId === s.id);
+      return status ? { ...s, ...status } : s;
+    }).filter((s): s is (Staff & StaffStatus) => s !== null && s.latitude !== undefined && s.longitude !== undefined);
     
-    const customerLocs: Location[] = [
-        {
-          id: 'customer-demo-1',
-          name: '横浜店（デモ）',
-          address: '神奈川県横浜市',
-          latitude: 35.4437,
-          longitude: 139.6380,
-          type: 'customer',
-        },
-        {
-          id: 'customer-demo-2',
-          name: '川崎店（デモ）',
-          address: '神奈川県川崎市',
-          latitude: 35.5309,
-          longitude: 139.7032,
-          type: 'customer',
-        },
-    ];
+    const staffLocs: Location[] = staffWithLocation.map(s => ({
+      id: s.id,
+      name: s.name,
+      address: s.lastAction || '現在地',
+      latitude: s.latitude!,
+      longitude: s.longitude!,
+      type: 'staff',
+    }));
+    
+    const mapCustomerToLocation = (c: WithId<Customer>, type: 'customer' | 'todays-customer'): Location | null => {
+        let latitude: number | undefined;
+        let longitude: number | undefined;
 
-    return [...staffLocs, ...customerLocs];
-  }, []);
+        const latVal = findKey(c, ['緯度', 'latitude']);
+        const lonVal = findKey(c, ['経度', 'longitude']);
+        
+        if (typeof latVal === 'number' && typeof lonVal === 'number') {
+            latitude = latVal;
+            longitude = lonVal;
+        } else {
+            const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+            if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
+                const [lat, lon] = coordsVal.split(',').map(s => parseFloat(s.trim()));
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    latitude = lat;
+                    longitude = lon;
+                }
+            }
+        }
+        
+        if (latitude !== undefined && longitude !== undefined) {
+          return {
+            id: c.id,
+            name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
+            address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
+            latitude: latitude,
+            longitude: longitude,
+            type: type,
+          };
+        }
+        return null;
+    }
+
+    const todaysCustomerLocs: Location[] = (todaysCustomers || []).reduce((acc: Location[], c) => {
+        const loc = mapCustomerToLocation(c, 'todays-customer');
+        if (loc) acc.push(loc);
+        return acc;
+    }, []);
+
+    const allCustomerLocs: Location[] = (allCustomers || []).reduce((acc: Location[], c) => {
+        const loc = mapCustomerToLocation(c, 'customer');
+        if (loc && !todaysCustomerLocs.some(todayLoc => todayLoc.id === loc.id)) {
+            acc.push(loc);
+        }
+        return acc;
+    }, []);
+    
+    return [...staffLocs, ...todaysCustomerLocs, ...allCustomerLocs];
+  }, [staff, staffStatus, allCustomers, todaysCustomers]);
   
   const addWaypoint = () => {
     setWaypoints(prev => [...prev, null]);
