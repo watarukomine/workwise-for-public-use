@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { RouteOptimizer, type Location } from "@/components/optimizer/route-optimizer";
 import { RouteMap } from "@/components/optimizer/route-map";
-import { APIProvider } from "@vis.gl/react-google-maps";
+import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
@@ -14,12 +14,10 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
-import { isToday, parseISO, isValid, startOfDay, isEqual } from 'date-fns';
 import { findKey } from '@/lib/utils';
 
-export default function OptimizerPage() {
+function OptimizerLayout() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
-  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
   const [avoidHighways, setAvoidHighways] = React.useState(false);
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
@@ -27,22 +25,16 @@ export default function OptimizerPage() {
   
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   
+  const placesLibrary = useMapsLibrary('places');
+
   const scheduledCustomers = React.useMemo(() => {
     if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) {
       return [];
     }
     
-    // Use all orders for route optimization, not just today's
-    const allOrderCustomerCodes = new Set(
-      rawOrders
-        .map(order => findKey(order, ['ユーザーコード']))
-        .filter(Boolean)
-    );
-  
-    return allCustomers.filter(c => {
-      const customerUserCode = findKey(c, ['ユーザーコード']);
-      return customerUserCode && allOrderCustomerCodes.has(customerUserCode);
-    });
+    // For route optimization, we consider all customers present in the customer list,
+    // not just those with orders today. This allows for more flexible planning.
+    return allCustomers;
   
   }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers]);
   
@@ -71,7 +63,7 @@ export default function OptimizerPage() {
     setAvoidHighways(options.avoidHighways);
   }
   
-  const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
+  const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders || !placesLibrary;
   
   const mapLocations = React.useMemo(() => {
       if (!optimizedRoute?.optimizedRoute) {
@@ -130,6 +122,41 @@ export default function OptimizerPage() {
       )
   }
 
+  return (
+    <div className="space-y-8">
+      <div>
+          <h1 className="text-2xl font-semibold tracking-tight">ルート最適化</h1>
+          <p className="text-muted-foreground">
+          複数の作業場所間の最も効率的なルートを生成します。
+          </p>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1">
+          <RouteOptimizer 
+              onRouteOptimized={handleRouteOptimized}
+              staff={filteredStaff}
+              staffStatus={statuses}
+              customers={scheduledCustomers}
+          />
+          </div>
+          <div className="lg:col-span-2">
+            <RouteMap 
+                staff={mapLocations.staff} 
+                customers={mapLocations.customers}
+                customLocations={mapLocations.custom}
+                optimizedRoute={mapLocations.route}
+                avoidHighways={avoidHighways}
+            />
+          </div>
+      </div>
+    </div>
+  );
+}
+
+
+export default function OptimizerPage() {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
   if (!apiKey) {
     return (
         <div className="flex items-center justify-center h-full rounded-lg border border-dashed shadow-sm p-8">
@@ -146,41 +173,7 @@ export default function OptimizerPage() {
 
   return (
     <APIProvider apiKey={apiKey} libraries={['places']}>
-        <div className="space-y-8">
-        <div>
-            <h1 className="text-2xl font-semibold tracking-tight">ルート最適化</h1>
-            <p className="text-muted-foreground">
-            複数の作業場所間の最も効率的なルートを生成します。
-            </p>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1">
-            <RouteOptimizer 
-                onRouteOptimized={handleRouteOptimized}
-                staff={filteredStaff}
-                staffStatus={statuses}
-                customers={scheduledCustomers}
-            />
-            </div>
-            <div className="lg:col-span-2">
-            {isLoading ? (
-                <div className="flex items-center justify-center h-full rounded-lg border border-dashed shadow-sm">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-            ) : (
-                <RouteMap 
-                    staff={mapLocations.staff} 
-                    customers={mapLocations.customers}
-                    customLocations={mapLocations.custom}
-                    optimizedRoute={mapLocations.route}
-                    avoidHighways={avoidHighways}
-                />
-            )}
-            </div>
-        </div>
-        </div>
+      <OptimizerLayout />
     </APIProvider>
   );
 }
-
-    
