@@ -130,53 +130,57 @@ export default function OptimizerPage() {
       )
   }
 
+  if (!apiKey) {
+    return (
+        <div className="flex items-center justify-center h-full rounded-lg border border-dashed shadow-sm p-8">
+            <Alert variant="destructive" className="max-w-md">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Google Maps APIキーがありません</AlertTitle>
+                <AlertDescription>
+                    Google Maps APIキーが設定されていません。地図を表示するには、<code>.env.local</code>ファイルに<code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code>として追加してください。
+                </AlertDescription>
+            </Alert>
+        </div>
+    );
+  }
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">ルート最適化</h1>
-        <p className="text-muted-foreground">
-          複数の作業場所間の最も効率的なルートを生成します。
-        </p>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1">
-          <RouteOptimizer 
-            onRouteOptimized={handleRouteOptimized}
-            staff={filteredStaff}
-            staffStatus={statuses}
-            customers={scheduledCustomers}
-          />
+    <APIProvider apiKey={apiKey} libraries={['places']}>
+        <div className="space-y-8">
+        <div>
+            <h1 className="text-2xl font-semibold tracking-tight">ルート最適化</h1>
+            <p className="text-muted-foreground">
+            複数の作業場所間の最も効率的なルートを生成します。
+            </p>
         </div>
-        <div className="lg:col-span-2">
-          {apiKey ? (
-            <APIProvider apiKey={apiKey}>
-               {isLoading ? (
-                  <div className="flex items-center justify-center h-full rounded-lg border border-dashed shadow-sm">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
-               ) : (
-                <RouteMap 
-                  staff={mapLocations.staff} 
-                  customers={mapLocations.customers}
-                  customLocations={mapLocations.custom}
-                  optimizedRoute={mapLocations.route}
-                  avoidHighways={avoidHighways}
-                />
-               )}
-            </APIProvider>
-          ) : (
-            <div className="flex items-center justify-center h-full rounded-lg border border-dashed shadow-sm">
-                <Alert variant="destructive" className="max-w-md">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Google Maps APIキーがありません</AlertTitle>
-                    <AlertDescription>
-                        Google Maps APIキーが設定されていません。地図を表示するには、<code>.env.local</code>ファイルに<code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code>として追加してください。
-                    </AlertDescription>
-                </Alert>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-1">
+            <RouteOptimizer 
+                onRouteOptimized={handleRouteOptimized}
+                staff={filteredStaff}
+                staffStatus={statuses}
+                customers={scheduledCustomers}
+            />
             </div>
-          )}
+            <div className="lg:col-span-2">
+            {isLoading ? (
+                <div className="flex items-center justify-center h-full rounded-lg border border-dashed shadow-sm">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+            ) : (
+                <RouteMap 
+                    staff={mapLocations.staff} 
+                    customers={mapLocations.customers}
+                    customLocations={mapLocations.custom}
+                    optimizedRoute={mapLocations.route}
+                    avoidHighways={avoidHighways}
+                />
+            )}
+            </div>
         </div>
-      </div>
-    </div>
+        </div>
+    </APIProvider>
   );
 }
+
+    
