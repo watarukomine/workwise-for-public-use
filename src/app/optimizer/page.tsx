@@ -32,22 +32,26 @@ function OptimizerLayout() {
     if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) {
       return [];
     }
+  
+    // schedule-view.tsx のロジックをそのまま使用
+    const todaysOrderCustomerCodes = new Set<string>();
     
-    const todaysOrderCustomerCodes = new Set(
-      rawOrders
-        .filter(order => {
-          const scheduledDateKey = order['作業予定日'];
-          if (!scheduledDateKey) return false;
-          const scheduledDate = parseISO(scheduledDateKey);
-           return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()));
-        })
-        .map(order => order['ユーザーコード'])
-        .filter(Boolean)
-    );
+    rawOrders.forEach(order => {
+        const scheduledDateKey = findKey(order, ['作業予定日']);
+        if (scheduledDateKey) {
+            const scheduledDate = parseISO(scheduledDateKey);
+            if (isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()))) {
+                const userCode = findKey(order, ['ユーザーコード']);
+                if (userCode) {
+                    todaysOrderCustomerCodes.add(String(userCode));
+                }
+            }
+        }
+    });
   
     return allCustomers.filter(c => {
-      const customerUserCode = c['ユーザーコード'];
-      return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
+      const customerUserCode = findKey(c, ['ユーザーコード']);
+      return customerUserCode && todaysOrderCustomerCodes.has(String(customerUserCode));
     });
   
   }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers]);
@@ -101,7 +105,7 @@ function OptimizerLayout() {
           });
 
       const routeCustomers = scheduledCustomers.filter(c => {
-          const userCode = c['ユーザーコード'];
+          const userCode = findKey(c, ['ユーザーコード']);
           return userCode && routeIds.has(String(userCode));
       });
       
