@@ -280,7 +280,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
 
       if (latitude !== undefined && longitude !== undefined) {
         acc.push({
-          id: String(findKey(c, ['ユーザーコード', 'id', 'userCode'])),
+          id: c.id, // Use the unique ID from the customer object
           name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
           address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
           latitude: latitude,
@@ -482,3 +482,5 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     </div>
   );
 }
+
+    
