@@ -1,8 +1,8 @@
 
 'use client';
 import * as React from 'react';
-import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
 
 import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
@@ -146,7 +146,8 @@ const PlacesAutocompleteSelector: React.FC<{
   const filteredPredefined = inputValue
     ? predefinedLocations.filter(
         (loc) =>
-          loc.name.toLowerCase().includes(inputValue.toLowerCase())
+          loc.name.toLowerCase().includes(inputValue.toLowerCase()) ||
+          loc.address.toLowerCase().includes(inputValue.toLowerCase())
       )
     : predefinedLocations;
   
@@ -176,7 +177,7 @@ const PlacesAutocompleteSelector: React.FC<{
                   {filteredPredefined.map((location) => (
                     <CommandItem
                       key={location.id}
-                      value={location.name}
+                      value={`${location.name} ${location.address}`}
                       onSelect={() => handlePredefinedSelect(location)}
                       className="flex items-center"
                     >
@@ -237,7 +238,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
           const lonVal = findKey(c, ['経度']);
           const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
           
-          if ((latVal && lonVal) || (typeof coordsVal === 'string' && coordsVal.includes(','))) {
+          if ((latVal && lonVal && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) || (typeof coordsVal === 'string' && coordsVal.includes(','))) {
             return true;
           }
           return false;
