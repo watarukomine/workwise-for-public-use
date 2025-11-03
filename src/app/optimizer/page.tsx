@@ -27,40 +27,7 @@ function OptimizerLayout() {
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   
   const placesLibrary = useMapsLibrary('places');
-  
-  const scheduledCustomers = React.useMemo(() => {
-    if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) {
-      return [];
-    }
 
-    const todaysOrderCustomerCodes = new Set<string>();
-    const todayString = format(new Date(), 'yyyy-MM-dd');
-
-    rawOrders.forEach(order => {
-        const scheduledDateValue = findKey(order, ['作業予定日']);
-        if (scheduledDateValue) {
-            try {
-                const scheduledDateString = format(new Date(scheduledDateValue), 'yyyy-MM-dd');
-                if (scheduledDateString === todayString) {
-                    const userCode = findKey(order, ['ユーザーコード', 'usercode']);
-                    if (userCode) {
-                        todaysOrderCustomerCodes.add(String(userCode));
-                    }
-                }
-            } catch (e) {
-                // Invalid date format, ignore this order
-                console.warn("Invalid date format for order", order);
-            }
-        }
-    });
-  
-    return allCustomers.filter(c => {
-      const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
-      return customerUserCode && todaysOrderCustomerCodes.has(String(customerUserCode));
-    });
-
-  }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers]);
-  
   const filteredStaff = React.useMemo(() => {
     if (isStaffLoading || !allStaff) return [];
     if (appliedSelectedStaffIds.length === 0) {
@@ -89,15 +56,15 @@ function OptimizerLayout() {
   const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders || !placesLibrary;
   
   const mapLocations = React.useMemo(() => {
-      if (!optimizedRoute?.optimizedRoute) {
-          const staffLocs = filteredStaff
-              .map(staffMember => {
-                  const status = statuses.find(s => s.staffId === staffMember.id);
-                  return status && status.latitude && status.longitude ? { ...staffMember, ...status } : null;
-              })
-              .filter((s): s is Staff & StaffStatus => s !== null);
+      const staffLocs = filteredStaff
+          .map(staffMember => {
+              const status = statuses.find(s => s.staffId === staffMember.id);
+              return status && status.latitude && status.longitude ? { ...staffMember, ...status } : null;
+          })
+          .filter((s): s is Staff & StaffStatus => s !== null);
 
-          return { staff: staffLocs, customers: scheduledCustomers, route: [] };
+      if (!optimizedRoute?.optimizedRoute) {
+          return { staff: staffLocs, customers: [], route: [] };
       }
 
       const routeIds = new Set(optimizedRoute.optimizedRoute.map(r => r.id));
@@ -108,17 +75,17 @@ function OptimizerLayout() {
               const status = statuses.find(s => s.staffId === staffMember.id);
               return status ? { ...staffMember, ...status } : staffMember;
           });
-
-      const routeCustomers = scheduledCustomers.filter(c => {
+      
+      const routeCustomers = allCustomers.filter(c => {
           const userCode = findKey(c, ['ユーザーコード']);
           return userCode && routeIds.has(String(userCode));
       });
-      
+
       const customLocations: Location[] = optimizedRoute.optimizedRoute.filter(r => r.type === 'custom');
 
       return { staff: routeStaff, customers: routeCustomers, route: optimizedRoute.optimizedRoute, custom: customLocations };
 
-  }, [filteredStaff, scheduledCustomers, statuses, optimizedRoute]);
+  }, [filteredStaff, allCustomers, statuses, optimizedRoute]);
 
   if (isLoading) {
     return (
@@ -159,7 +126,8 @@ function OptimizerLayout() {
               onRouteOptimized={handleRouteOptimized}
               staff={filteredStaff}
               staffStatus={statuses}
-              customers={scheduledCustomers}
+              allCustomers={allCustomers}
+              rawOrders={rawOrders}
           />
           </div>
           <div className="lg:col-span-2">

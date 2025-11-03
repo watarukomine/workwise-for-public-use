@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useFormStatus } from 'react-dom';
 import { useActionState } from 'react';
 
-import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
+import type { Customer, Staff, StaffStatus, WithId, Order } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { cn, findKey } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
+import { format } from 'date-fns';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -39,7 +40,8 @@ interface RouteOptimizerProps {
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
-  customers: WithId<Customer>[];
+  allCustomers: WithId<Customer>[];
+  rawOrders: any[];
 }
 
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
@@ -229,7 +231,7 @@ const PlacesAutocompleteSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustomers, rawOrders }: RouteOptimizerProps) {
   
   const [startLocation, setStartLocation] = React.useState<Location | null>(null);
   const [endLocation, setEndLocation] = React.useState<Location | null>(null);
@@ -239,6 +241,39 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
   React.useEffect(() => {
     onRouteOptimized(state.data, state.options);
   }, [state.data, state.options, onRouteOptimized]);
+  
+  const scheduledCustomers = React.useMemo(() => {
+    if (!rawOrders || !allCustomers) {
+      return [];
+    }
+
+    const todayString = format(new Date(), 'yyyy-MM-dd');
+    const todaysOrderCustomerCodes = new Set<string>();
+
+    rawOrders.forEach(order => {
+        const scheduledDateValue = findKey(order, ['作業予定日']);
+        if (scheduledDateValue) {
+            try {
+                const scheduledDateString = format(new Date(scheduledDateValue), 'yyyy-MM-dd');
+                if (scheduledDateString === todayString) {
+                    const userCode = findKey(order, ['ユーザーコード', 'usercode']);
+                    if (userCode) {
+                        todaysOrderCustomerCodes.add(String(userCode));
+                    }
+                }
+            } catch (e) {
+                // Invalid date format, ignore this order
+                console.warn("Invalid date format for order", order);
+            }
+        }
+    });
+  
+    return allCustomers.filter(c => {
+      const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
+      return customerUserCode && todaysOrderCustomerCodes.has(String(customerUserCode));
+    });
+  }, [rawOrders, allCustomers]);
+
 
   const predefinedLocations = React.useMemo(() => {
     const staffWithLocation = staff.map(s => {
@@ -255,7 +290,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
         type: 'staff',
     }));
     
-    const customerLocs: Location[] = customers.reduce((acc: Location[], c) => {
+    const customerLocs: Location[] = scheduledCustomers.reduce((acc: Location[], c) => {
       const latVal = findKey(c, ['緯度']);
       const lonVal = findKey(c, ['経度']);
       const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
@@ -288,7 +323,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     }, []);
 
     return [...staffLocs, ...customerLocs];
-  }, [staff, staffStatus, customers]);
+  }, [staff, staffStatus, scheduledCustomers]);
   
   const addWaypoint = () => {
     setWaypoints(prev => [...prev, null]);
@@ -475,7 +510,3 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     </div>
   );
 }
-
-    
-
-    
