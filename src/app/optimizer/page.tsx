@@ -14,10 +14,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
-import { findKey, formatTime } from '@/lib/utils';
-import { isToday, parseISO, isValid, isEqual, startOfDay } from 'date-fns';
+import { findKey } from '@/lib/utils';
+import { isToday, parseISO, isValid, isEqual, startOfDay, format } from 'date-fns';
 
 function OptimizerLayout() {
+  // CRITICAL: Load map libraries first as they can return null and disrupt other hooks.
+  const placesLibrary = useMapsLibrary('places');
+
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
   const [avoidHighways, setAvoidHighways] = React.useState(false);
@@ -26,8 +29,6 @@ function OptimizerLayout() {
   
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   
-  const placesLibrary = useMapsLibrary('places');
-
   const filteredStaff = React.useMemo(() => {
     if (isStaffLoading || !allStaff) return [];
     if (appliedSelectedStaffIds.length === 0) {
@@ -121,13 +122,13 @@ function OptimizerLayout() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1">
-          <RouteOptimizer 
-              onRouteOptimized={handleRouteOptimized}
-              staff={filteredStaff}
-              staffStatus={statuses}
-              customers={allCustomers}
-              rawOrders={rawOrders}
-          />
+            <RouteOptimizer 
+                onRouteOptimized={handleRouteOptimized}
+                staff={filteredStaff}
+                staffStatus={statuses}
+                customers={allCustomers}
+                rawOrders={rawOrders}
+            />
           </div>
           <div className="lg:col-span-2">
             <RouteMap 

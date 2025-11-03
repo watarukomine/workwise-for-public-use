@@ -17,7 +17,7 @@ import { cn, findKey } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
-import { format, isToday, parseISO, isValid } from 'date-fns';
+import { format } from 'date-fns';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -257,6 +257,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
         type: 'staff',
     }));
     
+    // Use all customers passed in props
     const customerLocs: Location[] = customers.reduce((acc: Location[], c) => {
       const latVal = findKey(c, ['緯度']);
       const lonVal = findKey(c, ['経度']);
