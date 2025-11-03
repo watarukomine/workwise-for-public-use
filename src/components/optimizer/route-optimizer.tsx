@@ -261,8 +261,8 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
       let latitude: number | undefined;
       let longitude: number | undefined;
 
-      const latVal = findKey(c, ['緯度', 'latitude']);
-      const lonVal = findKey(c, ['経度', 'longitude']);
+      const latVal = c.latitude || findKey(c, ['緯度']);
+      const lonVal = c.longitude || findKey(c, ['経度']);
       
       if (typeof latVal === 'number' && typeof lonVal === 'number') {
           latitude = latVal;
@@ -281,7 +281,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
       if (latitude !== undefined && longitude !== undefined) {
         acc.push({
           id: c.id,
-          name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
+          name: String(findKey(c, ['店舗', 'storeName']) || c.name || '名称未設定'),
           address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
           latitude: latitude,
           longitude: longitude,

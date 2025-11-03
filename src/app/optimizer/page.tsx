@@ -13,11 +13,14 @@ import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
+import { useOrder } from '@/contexts/order-context';
+
 
 function OptimizerLayout() {
   const placesLibrary = useMapsLibrary('places');
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
+  const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
@@ -47,7 +50,7 @@ function OptimizerLayout() {
     setAvoidHighways(options.avoidHighways);
   }
   
-  const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers;
+  const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
   
   const mapLocations = React.useMemo(() => {
       const staffLocs = filteredStaff
@@ -58,7 +61,7 @@ function OptimizerLayout() {
           .filter((s): s is Staff & StaffStatus => s !== null);
 
       if (!optimizedRoute?.optimizedRoute) {
-          return { staff: staffLocs, customers: [], route: [] };
+          return { staff: staffLocs, customers: allCustomers, route: [] };
       }
 
       const routeIds = new Set(optimizedRoute.optimizedRoute.map(r => r.id));
