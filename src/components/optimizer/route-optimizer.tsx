@@ -39,7 +39,9 @@ interface RouteOptimizerProps {
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
-  customers: WithId<Customer>[]; // Changed from allCustomers to customers
+  allCustomers: WithId<Customer>[];
+  rawOrders: any[];
+  placesLibraryReady: boolean;
 }
 
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
@@ -101,7 +103,8 @@ const PlacesAutocompleteSelector: React.FC<{
   onSelect: (location: Location | null) => void;
   placeholder: string;
   value: Location | null;
-}> = ({ predefinedLocations, onSelect, placeholder, value }) => {
+  placesLibraryReady: boolean;
+}> = ({ predefinedLocations, onSelect, placeholder, value, placesLibraryReady }) => {
   const {
     ready,
     value: inputValue,
@@ -113,6 +116,7 @@ const PlacesAutocompleteSelector: React.FC<{
       componentRestrictions: { country: 'jp' },
     },
     debounce: 300,
+    disabled: !placesLibraryReady,
   });
 
   const [open, setOpen] = React.useState(false);
@@ -163,7 +167,7 @@ const PlacesAutocompleteSelector: React.FC<{
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-          <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal">
+          <Button variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between font-normal" disabled={!placesLibraryReady}>
               <span className="truncate">{displayName}</span>
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
@@ -229,7 +233,7 @@ const PlacesAutocompleteSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustomers, rawOrders, placesLibraryReady }: RouteOptimizerProps) {
   
   const [startLocation, setStartLocation] = React.useState<Location | null>(null);
   const [endLocation, setEndLocation] = React.useState<Location | null>(null);
@@ -255,7 +259,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
         type: 'staff',
     }));
     
-    const customerLocs: Location[] = (customers || []).reduce((acc: Location[], c) => {
+    const customerLocs: Location[] = (allCustomers || []).reduce((acc: Location[], c) => {
       let latitude: number | undefined;
       let longitude: number | undefined;
 
@@ -288,7 +292,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     }, []);
 
     return [...staffLocs, ...customerLocs];
-  }, [staff, staffStatus, customers]);
+  }, [staff, staffStatus, allCustomers]);
   
   const addWaypoint = () => {
     setWaypoints(prev => [...prev, null]);
@@ -306,7 +310,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
   
-  const isLoading = !staff || !staffStatus || !customers;
+  const isLoading = !staff || !staffStatus || !allCustomers || !placesLibraryReady;
 
   if (isLoading) {
     return (
@@ -344,6 +348,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
                   value={startLocation}
                   onSelect={setStartLocation}
                   placeholder="出発地を選択または検索..."
+                  placesLibraryReady={placesLibraryReady}
                 />
             </div>
 
@@ -359,6 +364,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
                                         value={waypoint} 
                                         onSelect={(loc) => updateWaypoint(index, loc)} 
                                         placeholder="経由地を選択または検索..."
+                                        placesLibraryReady={placesLibraryReady}
                                     />
                                 </div>
                                 <Button type="button" variant="ghost" size="icon" onClick={() => removeWaypoint(index)} aria-label="経由地を削除">
@@ -381,6 +387,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
                   value={endLocation} 
                   onSelect={setEndLocation} 
                   placeholder="目的地を選択または検索..." 
+                  placesLibraryReady={placesLibraryReady}
                 />
             </div>
 
@@ -475,5 +482,3 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     </div>
   );
 }
-
-    

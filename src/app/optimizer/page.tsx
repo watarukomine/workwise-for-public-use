@@ -50,7 +50,7 @@ function OptimizerLayout() {
     setAvoidHighways(options.avoidHighways);
   }
   
-  const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders || !placesLibrary;
+  const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
   
   const mapLocations = React.useMemo(() => {
       const staffLocs = filteredStaff
@@ -123,7 +123,9 @@ function OptimizerLayout() {
                 onRouteOptimized={handleRouteOptimized}
                 staff={filteredStaff}
                 staffStatus={statuses}
-                customers={allCustomers}
+                allCustomers={allCustomers}
+                rawOrders={rawOrders}
+                placesLibraryReady={!!placesLibrary}
             />
           </div>
           <div className="lg:col-span-2">
@@ -164,5 +166,3 @@ export default function OptimizerPage() {
     </APIProvider>
   );
 }
-
-    
