@@ -277,18 +277,11 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
         if (latitude === undefined || longitude === undefined) return null;
 
         return {
-          id: c.id,
-          userCode: c.userCode,
-          '旧 チャネル SEQ': c['旧 チャネル SEQ'],
-          storeName: findKey(c, ['店舗']),
-          '管理C': c['管理C'],
-          '機材有無': c['機材有無'],
-          address: findKey(c,['住所']),
+          id: String(c.userCode || c.id || `customer-${Math.random()}`),
+          name: String(findKey(c, ['店舗', 'storeName']) || c.name || '名称未設定'),
+          address: String(findKey(c,['住所', 'address']) || '住所未設定'),
           latitude: latitude,
           longitude: longitude,
-          '電話番号': c['電話番号'],
-          '営業時間': c['営業時間'],
-          name: String(findKey(c, ['店舗', 'storeName']) || c.name || '名称未設定'),
           type: 'customer' as const,
         };
     }).filter((l): l is Location => l !== null);
