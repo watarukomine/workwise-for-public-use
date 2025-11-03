@@ -39,13 +39,13 @@ export default function OptimizerPage() {
           const scheduledDate = parseISO(scheduledDateKey);
           return isValid(scheduledDate) && isToday(scheduledDate);
         })
-        .map(order => findKey(order, ['ユーザーコード', 'usercode']))
+        .map(order => findKey(order, ['ユーザーコード']))
         .filter(Boolean)
     );
 
     // Filter customers based on the extracted user codes
     return allCustomers.filter(c => {
-      const customerUserCode = findKey(c, ['ユーザーコード', 'userCode']);
+      const customerUserCode = findKey(c, ['ユーザーコード']);
       return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
     });
 
@@ -155,3 +155,4 @@ export default function OptimizerPage() {
     </div>
   );
 }
+
