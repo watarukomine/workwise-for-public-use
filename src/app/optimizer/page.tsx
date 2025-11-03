@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
 import { findKey } from '@/lib/utils';
+import { isToday, parseISO, isValid } from 'date-fns';
 
 function OptimizerLayout() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -32,9 +33,24 @@ function OptimizerLayout() {
       return [];
     }
     
-    // For route optimization, we consider all customers present in the customer list,
-    // not just those with orders today. This allows for more flexible planning.
-    return allCustomers;
+    // Get user codes for orders scheduled for today
+    const todaysOrderCustomerCodes = new Set(
+      rawOrders
+        .filter(order => {
+          const scheduledDateKey = findKey(order, ['作業予定日']);
+          if (!scheduledDateKey) return false;
+          const scheduledDate = parseISO(scheduledDateKey);
+          return isValid(scheduledDate) && isToday(scheduledDate);
+        })
+        .map(order => findKey(order, ['ユーザーコード']))
+        .filter(Boolean)
+    );
+
+    // Filter customers based on the extracted user codes
+    return allCustomers.filter(c => {
+      const customerUserCode = findKey(c, ['ユーザーコード']);
+      return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
+    });
   
   }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers]);
   
