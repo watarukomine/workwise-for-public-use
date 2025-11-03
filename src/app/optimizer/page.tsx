@@ -7,7 +7,7 @@ import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
-import type { Customer, Staff, StaffStatus, WithId, ScheduleEvent, Order } from '@/lib/types';
+import type { Customer, Staff, StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
@@ -37,38 +37,38 @@ function OptimizerLayout() {
     }
 
     const allMappedOrders = rawOrders.map(mapRawToOrder);
-
+    
     const allScheduledRawOrderIds = new Set<string>();
-    if (typeof window !== 'undefined') {
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('scheduleData-')) {
-          try {
-            const data = JSON.parse(localStorage.getItem(key)!);
-            if (Array.isArray(data)) {
-              data.forEach((event: WithId<ScheduleEvent>) => {
-                if (event.rawOrderId) {
-                  allScheduledRawOrderIds.add(event.rawOrderId);
-                }
-              });
+    if(typeof window !== 'undefined') {
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('scheduleData-')) {
+                try {
+                    const data = JSON.parse(localStorage.getItem(key)!);
+                    if (Array.isArray(data)) {
+                        data.forEach((event: WithId<ScheduleEvent>) => {
+                            if (event.rawOrderId) {
+                                allScheduledRawOrderIds.add(event.rawOrderId);
+                            }
+                        });
+                    }
+                } catch {}
             }
-          } catch {}
-        }
-      });
+        });
     }
 
-    const todaysUnassignedOrders = allMappedOrders.filter(order => {
-      if (!order.rawOrderId || allScheduledRawOrderIds.has(order.rawOrderId)) {
-        return false;
-      }
-      const scheduledDateKey = findKey(order.raw, ['作業予定日']);
-      if (!scheduledDateKey) {
-        return false;
-      }
-      const scheduledDate = parseISO(scheduledDateKey);
-      return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()));
+    const newUnassignedOrders = allMappedOrders.filter(order => {
+        if (!order.rawOrderId) return false;
+        
+        if (allScheduledRawOrderIds.has(order.rawOrderId)) return false;
+        
+        const scheduledDateKey = findKey(order.raw, ['作業予定日']);
+        if (!scheduledDateKey) return false;
+
+        const scheduledDate = parseISO(scheduledDateKey);
+        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()));
     });
-    
-    const todaysCustomerCodes = new Set(todaysUnassignedOrders.map(o => o.customerCode));
+
+    const todaysCustomerCodes = new Set(newUnassignedOrders.map(o => o.customerCode));
 
     const filteredCustomers = allCustomers.filter(c => {
       const customerUserCode = findKey(c, ['ユーザーコード']);
