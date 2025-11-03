@@ -40,9 +40,7 @@ interface RouteOptimizerProps {
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
-  customers: WithId<Customer>[];
   todaysCustomers: WithId<Customer>[];
-  rawOrders: any[];
 }
 
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
@@ -199,7 +197,7 @@ const PlacesAutocompleteSelector: React.FC<{
             )}
 
             {filteredCustomers.length > 0 && (
-                <CommandGroup heading="販売店">
+                <CommandGroup heading="販売店（当日作業あり）">
                   {filteredCustomers.map((location) => (
                     <CommandItem
                       key={location.id}
@@ -232,7 +230,7 @@ const PlacesAutocompleteSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers, todaysCustomers, rawOrders }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, todaysCustomers }: RouteOptimizerProps) {
   
   const [startLocation, setStartLocation] = React.useState<Location | null>(null);
   const [endLocation, setEndLocation] = React.useState<Location | null>(null);

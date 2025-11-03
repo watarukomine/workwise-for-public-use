@@ -33,6 +33,8 @@ function OptimizerLayout() {
   const [avoidHighways, setAvoidHighways] = React.useState(false);
   const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
   const [currentDate, setCurrentDate] = React.useState(startOfDay(new Date()));
+  const [todaysCustomers, setTodaysCustomers] = React.useState<WithId<Customer>[]>([]);
+
 
    React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -47,11 +49,11 @@ function OptimizerLayout() {
     }
   }, [currentDate]);
 
-  const todaysCustomers = React.useMemo(() => {
+  React.useEffect(() => {
     if (isLoadingOrders || !rawOrders || !allCustomers) {
-      return [];
+      return;
     }
-
+    
     const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
     const allMappedOrders = rawOrders.map(mapRawToOrder);
 
@@ -69,10 +71,12 @@ function OptimizerLayout() {
 
     const todaysCustomerCodes = new Set(todaysUnassignedOrders.map(o => o.customerCode));
 
-    return allCustomers.filter(c => {
+    const filteredCustomers = allCustomers.filter(c => {
         const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
         return customerUserCode && todaysCustomerCodes.has(String(customerUserCode));
     });
+    
+    setTodaysCustomers(filteredCustomers);
 
   }, [rawOrders, allCustomers, isLoadingOrders, scheduleData, currentDate]);
 
@@ -174,9 +178,7 @@ function OptimizerLayout() {
                 onRouteOptimized={handleRouteOptimized}
                 staff={filteredStaff}
                 staffStatus={statuses}
-                customers={allCustomers}
                 todaysCustomers={todaysCustomers}
-                rawOrders={rawOrders}
             />
           </div>
           <div className="lg:col-span-2">
