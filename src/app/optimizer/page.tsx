@@ -30,20 +30,22 @@ export default function OptimizerPage() {
   const scheduledCustomers = React.useMemo(() => {
     if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) return [];
 
-    // Get user codes from orders scheduled for today
     const todaysOrderCustomerCodes = new Set(
       rawOrders
         .filter(order => {
           const scheduledDateKey = findKey(order, ['作業予定日']);
           if (!scheduledDateKey) return false;
-          const scheduledDate = parseISO(scheduledDateKey);
-          return isValid(scheduledDate) && isToday(scheduledDate);
+          try {
+            const scheduledDate = parseISO(scheduledDateKey);
+            return isValid(scheduledDate) && isToday(scheduledDate);
+          } catch {
+            return false;
+          }
         })
         .map(order => findKey(order, ['ユーザーコード']))
         .filter(Boolean)
     );
 
-    // Filter customers based on the extracted user codes
     return allCustomers.filter(c => {
       const customerUserCode = findKey(c, ['ユーザーコード']);
       return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
@@ -155,4 +157,3 @@ export default function OptimizerPage() {
     </div>
   );
 }
-
