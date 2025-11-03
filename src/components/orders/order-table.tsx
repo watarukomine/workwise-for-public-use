@@ -80,22 +80,20 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const filteredOrders = React.useMemo(() => {
     if (!rawOrders) return [];
 
-    const todayFilteredOrders = rawOrders.filter(order => {
+    let ordersToDisplay = rawOrders.filter(order => {
         const scheduledDate = parseDate(order['作業予定日']);
-        const receptionDate = parseDate(order['受付日']); // Assuming '受付日' is the column for reception date
-
+        const receptionDate = parseDate(order['受付日']);
         const isScheduledForToday = scheduledDate ? isToday(scheduledDate) : false;
         const isReceivedToday = receptionDate ? isToday(receptionDate) : false;
-        
         return isScheduledForToday || isReceivedToday;
     });
 
     if (searchTerm.trim() === '') {
-      return todayFilteredOrders;
+      return ordersToDisplay;
     }
     
     // A simple search across all values of an order object
-    return todayFilteredOrders.filter(order =>
+    return ordersToDisplay.filter(order =>
         Object.values(order).some(value => 
             String(value).toLowerCase().includes(searchTerm.toLowerCase())
         )
