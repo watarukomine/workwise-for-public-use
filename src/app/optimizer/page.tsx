@@ -39,14 +39,12 @@ function OptimizerLayout() {
           const scheduledDateKey = findKey(order, ['作業予定日']);
           if (!scheduledDateKey) return false;
           const scheduledDate = parseISO(scheduledDateKey);
-          // Use isEqual(startOfDay(date1), startOfDay(date2)) for robust date comparison without time
           return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()));
         })
         .map(order => findKey(order, ['ユーザーコード', 'usercode']))
         .filter(Boolean)
     );
 
-    // Filter customers based on the extracted user codes
     return allCustomers.filter(c => {
       const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
       return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
