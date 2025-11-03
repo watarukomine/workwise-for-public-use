@@ -255,7 +255,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
         type: 'staff',
     }));
     
-    const customerLocs = customers.reduce((acc: Location[], c) => {
+    const customerLocs: Location[] = customers.reduce((acc: Location[], c) => {
       const latVal = findKey(c, ['緯度']);
       const lonVal = findKey(c, ['経度']);
       const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
@@ -281,7 +281,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
           address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
           latitude: latitude,
           longitude: longitude,
-          type: 'customer' as const,
+          type: 'customer',
         });
       }
       return acc;
@@ -475,5 +475,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     </div>
   );
 }
+
+    
 
     
