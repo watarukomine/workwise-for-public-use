@@ -258,31 +258,32 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     }));
     
     const customerLocs: Location[] = (allCustomers || []).reduce((acc: Location[], c) => {
-      let latitude: number | undefined;
-      let longitude: number | undefined;
+        let latitude: number | undefined = c.latitude;
+        let longitude: number | undefined = c.longitude;
 
-      const latVal = c.latitude || findKey(c, ['緯度']);
-      const lonVal = c.longitude || findKey(c, ['経度']);
-      
-      if (typeof latVal === 'number' && typeof lonVal === 'number') {
-          latitude = latVal;
-          longitude = lonVal;
-      } else {
-          const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-          if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
-              const [lat, lon] = coordsVal.split(',').map(s => parseFloat(s.trim()));
-              if (!isNaN(lat) && !isNaN(lon)) {
-                  latitude = lat;
-                  longitude = lon;
-              }
-          }
-      }
+        if (latitude === undefined || longitude === undefined) {
+            const latVal = findKey(c, ['緯度']);
+            const lonVal = findKey(c, ['経度']);
+            if (typeof latVal === 'number' && typeof lonVal === 'number') {
+                latitude = latVal;
+                longitude = lonVal;
+            } else {
+                 const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+                 if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
+                    const [lat, lon] = coordsVal.split(',').map(s => parseFloat(s.trim()));
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        latitude = lat;
+                        longitude = lon;
+                    }
+                }
+            }
+        }
       
       if (latitude !== undefined && longitude !== undefined) {
         acc.push({
           id: c.id,
-          name: String(findKey(c, ['店舗', 'storeName']) || c.name || '名称未設定'),
-          address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
+          name: String(c.storeName || findKey(c, ['店舗']) || '名称未設定'),
+          address: String(c.address || findKey(c, ['住所']) || '住所未設定'),
           latitude: latitude,
           longitude: longitude,
           type: 'customer',

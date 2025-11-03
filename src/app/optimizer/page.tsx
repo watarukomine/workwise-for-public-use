@@ -61,12 +61,12 @@ function OptimizerLayout() {
           .filter((s): s is Staff & StaffStatus => s !== null);
 
       if (!optimizedRoute?.optimizedRoute) {
-          return { staff: staffLocs, customers: allCustomers, route: [] };
+          return { staff: staffLocs, customers: allCustomers || [], route: [] };
       }
 
       const routeIds = new Set(optimizedRoute.optimizedRoute.map(r => r.id));
       
-      const routeCustomers = allCustomers.filter(c => {
+      const routeCustomers = (allCustomers || []).filter(c => {
           const userCode = c.id;
           return userCode && routeIds.has(String(userCode));
       });
@@ -123,7 +123,7 @@ function OptimizerLayout() {
                 onRouteOptimized={handleRouteOptimized}
                 staff={filteredStaff}
                 staffStatus={statuses}
-                allCustomers={allCustomers}
+                allCustomers={allCustomers || []}
                 placesLibraryReady={!!placesLibrary}
             />
           </div>
