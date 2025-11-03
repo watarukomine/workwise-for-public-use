@@ -109,14 +109,14 @@ function SubmitButton() {
 }
 
 const LocationSelector: React.FC<{
-  allLocations: Location[];
   staffLocations: Location[];
   customerLocations: Location[];
   selectedValue: string | undefined;
   onSelect: (id: string | undefined) => void;
   placeholder: string;
-}> = ({ allLocations, staffLocations, customerLocations, selectedValue, onSelect, placeholder }) => {
+}> = ({ staffLocations, customerLocations, selectedValue, onSelect, placeholder }) => {
   const [open, setOpen] = React.useState(false);
+  const allLocations = [...staffLocations, ...customerLocations];
   const selectedLocationName = allLocations.find(l => l.id === selectedValue)?.name;
 
   return (
@@ -284,7 +284,6 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
             <div className="space-y-2">
                 <Label>出発地</Label>
                 <LocationSelector 
-                  allLocations={allLocations}
                   staffLocations={staffLocations} 
                   customerLocations={customerLocations} 
                   selectedValue={startLocation} 
@@ -306,7 +305,6 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
                             <div key={index} className="flex items-center gap-2">
                                 <div className="flex-grow">
                                     <LocationSelector 
-                                        allLocations={availableLocations}
                                         staffLocations={availableStaff}
                                         customerLocations={availableCustomers}
                                         selectedValue={waypointId} 
@@ -330,7 +328,6 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
             <div className="space-y-2">
                 <Label>目的地</Label>
                 <LocationSelector 
-                  allLocations={allLocations}
                   staffLocations={staffLocations} 
                   customerLocations={customerLocations} 
                   selectedValue={endLocation} 
