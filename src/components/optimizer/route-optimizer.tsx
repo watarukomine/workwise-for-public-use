@@ -183,9 +183,9 @@ const PlacesAutocompleteSelector: React.FC<{
             
             {filteredStaff.length > 0 && (
                 <CommandGroup heading="スタッフ">
-                  {filteredStaff.map((location, index) => (
+                  {filteredStaff.map((location) => (
                     <CommandItem
-                      key={location.id || `staff-${index}`}
+                      key={location.id}
                       value={`${location.name}`}
                       onSelect={() => handlePredefinedSelect(location)}
                       className="flex items-center"
@@ -199,9 +199,9 @@ const PlacesAutocompleteSelector: React.FC<{
 
             {filteredCustomers.length > 0 && (
                 <CommandGroup heading="販売店">
-                  {filteredCustomers.map((location, index) => (
+                  {filteredCustomers.map((location) => (
                     <CommandItem
-                      key={location.id || `customer-${index}`}
+                      key={location.id}
                       value={`${location.name} ${location.address}`}
                       onSelect={() => handlePredefinedSelect(location)}
                       className="flex items-center"
@@ -262,7 +262,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
         let longitude: number | undefined = Number(findKey(c, ['経度']));
 
         if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
-            const coordsValue = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+            const coordsValue = findKey(c, ['緯度・経度', '座標', '緯度経度', '緯度,経度']);
             if (typeof coordsValue === 'string' && coordsValue.includes(',')) {
                 const parts = coordsValue.split(',').map(part => part.trim());
                 const lat = parseFloat(parts[0]);
