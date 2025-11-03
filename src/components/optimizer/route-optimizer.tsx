@@ -1,13 +1,13 @@
 
 'use client';
 import * as React from 'react';
-import { useActionState } from 'react';
+import { useActionState, useFormStatus } from 'react';
 
 import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon } from 'lucide-react';
+import { ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -85,30 +85,10 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
 }
 
 function SubmitButton() {
-    const [pending, setPending] = React.useState(false);
-
-    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-        const form = event.currentTarget.form;
-        if (form && form.checkValidity()) {
-            setPending(true);
-        }
-    };
-
-    React.useEffect(() => {
-        const resultsContainer = document.getElementById('optimizer-results');
-        if (!resultsContainer) return;
-
-        const observer = new MutationObserver(() => {
-            setPending(false);
-        });
-
-        observer.observe(resultsContainer, { childList: true, subtree: true });
-
-        return () => observer.disconnect();
-    }, []);
+    const { pending } = useFormStatus();
 
     return (
-        <Button id="optimizer-submit-button" type="submit" disabled={pending} onClick={handleClick} className="w-full sm:w-auto">
+        <Button id="optimizer-submit-button" type="submit" disabled={pending} className="w-full sm:w-auto">
             {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RouteIcon className="mr-2 h-4 w-4" />}
             ルートを最適化
         </Button>
@@ -165,8 +145,7 @@ const PlacesAutocompleteSelector: React.FC<{
   const filteredPredefined = inputValue
     ? predefinedLocations.filter(
         (loc) =>
-          loc.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-          loc.address.toLowerCase().includes(inputValue.toLowerCase())
+          loc.name.toLowerCase().includes(inputValue.toLowerCase())
       )
     : predefinedLocations;
   
@@ -201,7 +180,7 @@ const PlacesAutocompleteSelector: React.FC<{
                       className="flex items-center"
                     >
                       {location.type === 'staff' ? <UserIcon className="mr-2 h-4 w-4" /> : <MapPinIcon className="mr-2 h-4 w-4" />}
-                      <span className="truncate">{location.name}</span>
+                       <p className="truncate">{location.name}</p>
                     </CommandItem>
                   ))}
                 </CommandGroup>
