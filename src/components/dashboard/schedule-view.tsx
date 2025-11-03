@@ -93,7 +93,7 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
-    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : ''}`;
+    const line1 = `${findKey(rawOrder, ['お取引先名', '店舗', '取引先']) || ''}${findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : ''}`;
     const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? `：${findKey(rawOrder, ['本数'])}本` : ''}`;
     let taskDetails = line1;
     if (line2.trim()) {

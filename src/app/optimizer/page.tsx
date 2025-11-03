@@ -35,7 +35,7 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
 
     return {
         id: String(orderId || `ord-${Math.random()}`),
-        customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
+        customerCode: String(findKey(rawOrder, ['ユーザーコード']) || ''),
         taskDetails: taskDetails.trim(),
         estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
         raw: rawOrder,
