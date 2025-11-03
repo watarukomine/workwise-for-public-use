@@ -306,7 +306,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
   
-  const isLoading = !customers || !staff || !staffStatus;
+  const isLoading = !staff || !staffStatus;
 
   if (isLoading) {
     return (

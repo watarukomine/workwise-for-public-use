@@ -7,15 +7,15 @@ import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
-import type { Customer, Staff, StaffStatus, WithId, ScheduleEvent, Order } from '@/lib/types';
+import type { Customer, Staff, StaffStatus, WithId, Order } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
-import { findKey, mapRawToOrder } from '@/lib/utils';
-import { isToday, parseISO, isValid, isEqual, startOfDay, format } from 'date-fns';
+import { findKey } from '@/lib/utils';
+import { format } from 'date-fns';
 
 function OptimizerLayout() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -27,35 +27,37 @@ function OptimizerLayout() {
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   
   const placesLibrary = useMapsLibrary('places');
-
-  const [scheduledCustomers, setScheduledCustomers] = React.useState<WithId<Customer>[]>([]);
   
-  React.useEffect(() => {
+  const scheduledCustomers = React.useMemo(() => {
     if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) {
-      return;
+      return [];
     }
-  
+
     const todaysOrderCustomerCodes = new Set<string>();
-  
+    const todayString = format(new Date(), 'yyyy-MM-dd');
+
     rawOrders.forEach(order => {
         const scheduledDateValue = findKey(order, ['作業予定日']);
         if (scheduledDateValue) {
-            const scheduledDate = parseISO(scheduledDateValue);
-            if (isValid(scheduledDate) && isToday(scheduledDate)) {
-                const userCode = findKey(order, ['ユーザーコード']);
-                if (userCode) {
-                    todaysOrderCustomerCodes.add(String(userCode));
+            try {
+                const scheduledDateString = format(new Date(scheduledDateValue), 'yyyy-MM-dd');
+                if (scheduledDateString === todayString) {
+                    const userCode = findKey(order, ['ユーザーコード', 'usercode']);
+                    if (userCode) {
+                        todaysOrderCustomerCodes.add(String(userCode));
+                    }
                 }
+            } catch (e) {
+                // Invalid date format, ignore this order
+                console.warn("Invalid date format for order", order);
             }
         }
     });
   
-    const filteredCustomers = allCustomers.filter(c => {
-      const customerUserCode = findKey(c, ['ユーザーコード']);
+    return allCustomers.filter(c => {
+      const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
       return customerUserCode && todaysOrderCustomerCodes.has(String(customerUserCode));
     });
-
-    setScheduledCustomers(filteredCustomers);
 
   }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers]);
   
