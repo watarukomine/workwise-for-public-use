@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
 import { findKey } from '@/lib/utils';
-import { isToday, parseISO, isValid } from 'date-fns';
+import { isToday, parseISO, isValid, isEqual, startOfDay } from 'date-fns';
 
 function OptimizerLayout() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -33,22 +33,22 @@ function OptimizerLayout() {
       return [];
     }
     
-    // Get user codes for orders scheduled for today
     const todaysOrderCustomerCodes = new Set(
       rawOrders
         .filter(order => {
           const scheduledDateKey = findKey(order, ['作業予定日']);
           if (!scheduledDateKey) return false;
           const scheduledDate = parseISO(scheduledDateKey);
-          return isValid(scheduledDate) && isToday(scheduledDate);
+          // Use isEqual(startOfDay(date1), startOfDay(date2)) for robust date comparison without time
+          return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()));
         })
-        .map(order => findKey(order, ['ユーザーコード']))
+        .map(order => findKey(order, ['ユーザーコード', 'usercode']))
         .filter(Boolean)
     );
 
     // Filter customers based on the extracted user codes
     return allCustomers.filter(c => {
-      const customerUserCode = findKey(c, ['ユーザーコード']);
+      const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
       return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
     });
   
@@ -103,7 +103,7 @@ function OptimizerLayout() {
           });
 
       const routeCustomers = scheduledCustomers.filter(c => {
-          const userCode = findKey(c, ['ユーザーコード']);
+          const userCode = findKey(c, ['ユーザーコード', 'usercode']);
           return userCode && routeIds.has(String(userCode));
       });
       
