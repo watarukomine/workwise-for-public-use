@@ -1,6 +1,7 @@
 
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { isValid, format, parseISO } from 'date-fns';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -26,4 +27,22 @@ export const findKey = (item: any, possibleKeys: string[]) => {
         }
     }
     return undefined;
+};
+
+export const formatTime = (date: Date | string) => {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+   if (!d || !isValid(d) || isNaN(d.getTime())) {
+     if (typeof date === 'string') {
+        const today = new Date();
+        const [hours, minutes] = date.split(':');
+        if (hours && minutes) {
+            today.setHours(parseInt(hours, 10), parseInt(minutes, 10));
+            if (isValid(today)) {
+                return format(today, 'HH:mm');
+            }
+        }
+     }
+    return "Invalid time";
+  }
+  return format(d, 'HH:mm');
 };

@@ -97,7 +97,7 @@ function OptimizerLayout() {
     const todaysCustomerCodes = new Set(todaysUnassignedOrders.map(o => o.customerCode));
 
     const filteredCustomers = allCustomers.filter(c => {
-        const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
+        const customerUserCode = findKey(c, ['ユーザーコード']);
         return customerUserCode && todaysCustomerCodes.has(String(customerUserCode));
     });
 
@@ -154,7 +154,7 @@ function OptimizerLayout() {
           });
 
       const routeCustomers = scheduledCustomers.filter(c => {
-          const userCode = findKey(c, ['ユーザーコード', 'usercode']);
+          const userCode = findKey(c, ['ユーザーコード']);
           return userCode && routeIds.has(String(userCode));
       });
       
