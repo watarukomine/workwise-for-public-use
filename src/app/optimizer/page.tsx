@@ -7,17 +7,15 @@ import { APIProvider } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
-import type { Customer, Staff, StaffStatus, ScheduleEvent, WithId } from '@/lib/types';
+import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
-import { format, startOfToday, isEqual, startOfDay, isValid } from 'date-fns';
-
-const getStorageKey = (date: Date) => {
-    return `scheduleData-${format(date, 'yyyy-MM-dd')}`;
-};
+import { useOrder } from '@/contexts/order-context';
+import { isToday, parseISO, isValid } from 'date-fns';
+import { findKey } from '@/lib/utils';
 
 export default function OptimizerPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -25,32 +23,33 @@ export default function OptimizerPage() {
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
   const [avoidHighways, setAvoidHighways] = React.useState(false);
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
+  const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
   
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   
-  const [scheduledLocationIds, setScheduledLocationIds] = React.useState<string[]>([]);
-  const [isScheduleLoading, setIsScheduleLoading] = React.useState(true);
+  const scheduledCustomers = React.useMemo(() => {
+    if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) return [];
 
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-        try {
-            const key = getStorageKey(startOfToday());
-            const savedData = localStorage.getItem(key);
-            const todaysSchedule: WithId<ScheduleEvent>[] = savedData ? JSON.parse(savedData) : [];
-            
-            const locationIds = todaysSchedule
-              .filter(event => event.locationId)
-              .map(event => event.locationId as string);
+    // Get user codes from orders scheduled for today
+    const todaysOrderCustomerCodes = new Set(
+      rawOrders
+        .filter(order => {
+          const scheduledDateKey = findKey(order, ['作業予定日']);
+          if (!scheduledDateKey) return false;
+          const scheduledDate = parseISO(scheduledDateKey);
+          return isValid(scheduledDate) && isToday(scheduledDate);
+        })
+        .map(order => findKey(order, ['ユーザーコード', 'usercode']))
+        .filter(Boolean)
+    );
 
-            setScheduledLocationIds([...new Set(locationIds)]);
-        } catch (error) {
-            console.error("Failed to parse schedule data from localStorage", error);
-        } finally {
-          setIsScheduleLoading(false);
-        }
-    }
-  }, []);
+    // Filter customers based on the extracted user codes
+    return allCustomers.filter(c => {
+      const customerUserCode = findKey(c, ['ユーザーコード', 'userCode']);
+      return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
+    });
 
+  }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers]);
   
   const filteredStaff = React.useMemo(() => {
     if (isStaffLoading || !allStaff) return [];
@@ -61,12 +60,6 @@ export default function OptimizerPage() {
     return allStaff.filter(s => selectedIds.has(s.id));
   }, [appliedSelectedStaffIds, allStaff, isStaffLoading]);
   
-  const scheduledCustomers = React.useMemo(() => {
-    if (isLoadingCustomers || !allCustomers) return [];
-    const locationIdSet = new Set(scheduledLocationIds);
-    return allCustomers.filter(c => c.userCode && locationIdSet.has(c.userCode));
-  }, [allCustomers, scheduledLocationIds, isLoadingCustomers]);
-
   const statuses = React.useMemo(() => {
     return filteredStaff.map((staff, index) => ({
         staffId: staff.id,
@@ -83,7 +76,7 @@ export default function OptimizerPage() {
     setAvoidHighways(options.avoidHighways);
   }
   
-  const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isScheduleLoading;
+  const isLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
 
   if (isLoading) {
     return (
