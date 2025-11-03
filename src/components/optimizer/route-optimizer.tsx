@@ -39,7 +39,7 @@ interface RouteOptimizerProps {
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
-  customers: WithId<Customer>[];
+  customers: WithId<Customer>[]; // Changed from allCustomers to customers
 }
 
 async function formAction(_prevState: State, formData: FormData): Promise<State> {
@@ -255,13 +255,13 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
         type: 'staff',
     }));
     
-    const customerLocs: Location[] = customers.reduce((acc: Location[], c) => {
+    const customerLocs: Location[] = (customers || []).reduce((acc: Location[], c) => {
+      let latitude: number | undefined;
+      let longitude: number | undefined;
+
       const latVal = findKey(c, ['緯度']);
       const lonVal = findKey(c, ['経度']);
       const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-
-      let latitude: number | undefined;
-      let longitude: number | undefined;
 
       if (latVal !== undefined && lonVal !== undefined && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
         latitude = Number(latVal);
@@ -276,7 +276,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
 
       if (latitude !== undefined && longitude !== undefined) {
         acc.push({
-          id: String(findKey(c, ['ユーザーコード'])),
+          id: String(findKey(c, ['ユーザーコード', 'id', 'userCode'])),
           name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
           address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
           latitude: latitude,
@@ -475,3 +475,5 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     </div>
   );
 }
+
+    

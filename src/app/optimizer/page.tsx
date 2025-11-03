@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
+import { findKey } from '@/lib/utils';
 
 function OptimizerLayout() {
   const placesLibrary = useMapsLibrary('places');
@@ -66,7 +67,7 @@ function OptimizerLayout() {
       const routeIds = new Set(optimizedRoute.optimizedRoute.map(r => r.id));
       
       const routeCustomers = allCustomers.filter(c => {
-          const userCode = findKey(c, ['ユーザーコード']);
+          const userCode = findKey(c, ['ユーザーコード', 'userCode', 'id']);
           return userCode && routeIds.has(String(userCode));
       });
 
@@ -163,3 +164,5 @@ export default function OptimizerPage() {
     </APIProvider>
   );
 }
+
+    
