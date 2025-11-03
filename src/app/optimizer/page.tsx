@@ -16,7 +16,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
 
 
-function OptimizerLayout() {
+function OptimizerPageContent() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
   const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
@@ -25,7 +25,6 @@ function OptimizerLayout() {
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
   const [avoidHighways, setAvoidHighways] = React.useState(false);
   const placesLibrary = useMapsLibrary("places");
-
 
   const filteredStaff = React.useMemo(() => {
     if (isStaffLoading || !allStaff) return [];
@@ -168,7 +167,7 @@ export default function OptimizerPage() {
 
   return (
     <APIProvider apiKey={apiKey} libraries={['places']}>
-      <OptimizerLayout />
+      <OptimizerPageContent />
     </APIProvider>
   );
 }
