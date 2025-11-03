@@ -7,14 +7,14 @@ import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
-import type { Customer, Staff, StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
+import type { Customer, Staff, StaffStatus, WithId, ScheduleEvent, Order } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
-import { findKey, mapRawToOrder } from '@/lib/utils';
+import { findKey } from '@/lib/utils';
 import { isToday, parseISO, isValid, isEqual, startOfDay, format } from 'date-fns';
 
 const getStorageKey = (date: Date) => {
@@ -33,53 +33,30 @@ function OptimizerLayout() {
   const placesLibrary = useMapsLibrary('places');
 
   const [scheduledCustomers, setScheduledCustomers] = React.useState<WithId<Customer>[]>([]);
-  const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
   
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-        try {
-            const key = getStorageKey(new Date()); // Always today for optimizer
-            const savedData = localStorage.getItem(key);
-            setScheduleData(savedData ? JSON.parse(savedData) : []);
-        } catch (error) {
-            console.error("Failed to parse schedule data for optimizer", error);
-            setScheduleData([]);
-        }
-    }
-  }, []);
-
   React.useEffect(() => {
     if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) {
       return;
     }
 
-    const todaysScheduledRawOrderIds = new Set(
-        scheduleData
-            .filter(event => {
-                const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-                return isValid(eventDate) && isToday(eventDate) && event.rawOrderId;
-            })
-            .map(event => event.rawOrderId)
-    );
+    const todaysOrderCustomerCodes = new Set<string>();
 
-    const allMappedOrders = rawOrders.map(mapRawToOrder);
-    
-    const newUnassignedOrders = allMappedOrders.filter(order => {
-        if (!order.rawOrderId) return false;
-        if (todaysScheduledRawOrderIds.has(order.rawOrderId)) return false;
-        
-        const scheduledDateKey = findKey(order.raw, ['作業予定日']);
-        if (!scheduledDateKey) return false;
-
-        const scheduledDate = parseISO(scheduledDateKey);
-        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()));
+    rawOrders.forEach(order => {
+        const scheduledDateValue = findKey(order, ['作業予定日']);
+        if (scheduledDateValue) {
+            const scheduledDate = parseISO(scheduledDateValue);
+            if (isValid(scheduledDate) && isToday(scheduledDate)) {
+                const userCode = findKey(order, ['ユーザーコード']);
+                if (userCode) {
+                    todaysOrderCustomerCodes.add(String(userCode));
+                }
+            }
+        }
     });
-    
-    const todaysCustomerCodes = new Set(newUnassignedOrders.map(o => o.customerCode));
-    
+  
     const filteredCustomers = allCustomers.filter(c => {
       const customerUserCode = findKey(c, ['ユーザーコード']);
-      return customerUserCode && todaysCustomerCodes.has(String(customerUserCode));
+      return customerUserCode && todaysOrderCustomerCodes.has(String(customerUserCode));
     });
 
     setScheduledCustomers(filteredCustomers);
@@ -225,5 +202,3 @@ export default function OptimizerPage() {
     </APIProvider>
   );
 }
-
-    
