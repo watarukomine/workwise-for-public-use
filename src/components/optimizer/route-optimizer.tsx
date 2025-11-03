@@ -244,55 +244,36 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
   }, [state.data, state.options, onRouteOptimized]);
   
   const predefinedLocations = React.useMemo(() => {
-    const staffWithLocation = staff.map(s => {
-        const status = staffStatus.find(ss => ss.staffId === s.id);
-        return status && status.latitude && status.longitude ? { ...s, ...status } : null;
-    }).filter((s): s is (Staff & StaffStatus) => s !== null);
-
-    const staffLocs: Location[] = staffWithLocation.map(s => ({
-        id: s.id,
-        name: `${s.name}（現在地）`,
-        address: ``,
-        latitude: s.latitude!,
-        longitude: s.longitude!,
-        type: 'staff',
-    }));
+    const staffLocs: Location[] = [{
+      id: 'staff-demo-1',
+      name: 'デモスタッフ（現在地）',
+      address: '東京都千代田区',
+      latitude: 35.6895,
+      longitude: 139.6917,
+      type: 'staff',
+    }];
     
-    const customerLocs: Location[] = (allCustomers || []).reduce((acc: Location[], c) => {
-      let latitude: number | undefined;
-      let longitude: number | undefined;
-
-      // Try to find coordinates from multiple possible keys
-      const latVal = c.latitude ?? findKey(c, ['緯度']);
-      const lonVal = c.longitude ?? findKey(c, ['経度']);
-      const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-
-      if (latVal !== undefined && lonVal !== undefined && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
-        latitude = Number(latVal);
-        longitude = Number(lonVal);
-      } else if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
-        const parts = coordsVal.split(',').map(part => parseFloat(part.trim()));
-        if (!isNaN(parts[0]) && !isNaN(parts[1])) {
-          latitude = parts[0];
-          longitude = parts[1];
-        }
-      }
-
-      if (latitude !== undefined && longitude !== undefined) {
-        acc.push({
-          id: c.id,
-          name: String(findKey(c, ['店舗', 'storeName']) || c.name ||'名称未設定'),
-          address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
-          latitude: latitude,
-          longitude: longitude,
+    const customerLocs: Location[] = [
+        {
+          id: 'customer-demo-1',
+          name: '横浜店（デモ）',
+          address: '神奈川県横浜市',
+          latitude: 35.4437,
+          longitude: 139.6380,
           type: 'customer',
-        });
-      }
-      return acc;
-    }, []);
+        },
+        {
+          id: 'customer-demo-2',
+          name: '川崎店（デモ）',
+          address: '神奈川県川崎市',
+          latitude: 35.5309,
+          longitude: 139.7032,
+          type: 'customer',
+        },
+    ];
 
     return [...staffLocs, ...customerLocs];
-  }, [staff, staffStatus, allCustomers]);
+  }, []);
   
   const addWaypoint = () => {
     setWaypoints(prev => [...prev, null]);
