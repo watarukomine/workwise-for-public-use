@@ -17,6 +17,7 @@ import { cn, findKey } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
+import { useCustomer } from '@/contexts/customer-context';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -39,7 +40,7 @@ interface RouteOptimizerProps {
   onRouteOptimized: (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => void;
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
-  allCustomers: WithId<Customer>[];
+  allCustomers: WithId<Customer>[]; // This is now a fallback
   placesLibraryReady: boolean;
 }
 
@@ -231,8 +232,10 @@ const PlacesAutocompleteSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustomers, placesLibraryReady }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, placesLibraryReady }: RouteOptimizerProps) {
   
+  const { customers: allCustomers } = useCustomer();
+
   const [startLocation, setStartLocation] = React.useState<Location | null>(null);
   const [endLocation, setEndLocation] = React.useState<Location | null>(null);
   const [waypoints, setWaypoints] = React.useState<(Location | null)[]>([]);
@@ -257,40 +260,44 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
       type: 'staff',
     }));
     
-    const customerLocs: Location[] = (allCustomers || []).reduce((acc: Location[], c) => {
-      let latitude: number | undefined;
-      let longitude: number | undefined;
+    const customerLocs: Location[] = (allCustomers || []).map(c => {
+        let latitude: number | undefined;
+        let longitude: number | undefined;
 
-      const latVal = findKey(c, ['緯度']);
-      const lonVal = findKey(c, ['経度']);
-      const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+        // Try direct keys first
+        if (typeof c.latitude === 'number' && typeof c.longitude === 'number') {
+            latitude = c.latitude;
+            longitude = c.longitude;
+        } else {
+            // Fallback to findKey for various possible key names
+            const latVal = findKey(c, ['緯度', 'latitude']);
+            const lonVal = findKey(c, ['経度', 'longitude']);
+            const coordsVal = findKey(c, ['緯度・経度', '座標', 'coords']);
 
-      if (c.latitude !== undefined && c.longitude !== undefined) {
-          latitude = c.latitude;
-          longitude = c.longitude;
-      } else if (typeof latVal === 'number' && typeof lonVal === 'number') {
-          latitude = latVal;
-          longitude = lonVal;
-      } else if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
-          const [lat, lon] = coordsVal.split(',').map(s => parseFloat(s.trim()));
-          if (!isNaN(lat) && !isNaN(lon)) {
-              latitude = lat;
-              longitude = lon;
-          }
-      }
-      
-      if (latitude !== undefined && longitude !== undefined) {
-        acc.push({
-          id: c.id,
-          name: String(c.storeName || findKey(c, ['店舗']) || '名称未設定'),
-          address: String(c.address || findKey(c, ['住所']) || '住所未設定'),
-          latitude: latitude,
-          longitude: longitude,
-          type: 'customer',
-        });
-      }
-      return acc;
-    }, []);
+            if (typeof latVal === 'number' && typeof lonVal === 'number') {
+                latitude = latVal;
+                longitude = lonVal;
+            } else if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
+                const [lat, lon] = coordsVal.split(',').map(s => parseFloat(s.trim()));
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    latitude = lat;
+                    longitude = lon;
+                }
+            }
+        }
+
+        if (latitude !== undefined && longitude !== undefined) {
+            return {
+                id: c.id, // Use the stable ID from useCustomer
+                name: String(findKey(c, ['店舗', 'storeName']) || c.name || '名称未設定'),
+                address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
+                latitude: latitude,
+                longitude: longitude,
+                type: 'customer' as const,
+            };
+        }
+        return null;
+    }).filter((l): l is Location => l !== null);
     
     return [...staffLocs, ...customerLocs];
   }, [staff, staffStatus, allCustomers]);
@@ -465,3 +472,5 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     </div>
   );
 }
+
+    
