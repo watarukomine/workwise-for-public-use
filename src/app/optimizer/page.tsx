@@ -28,8 +28,11 @@ export default function OptimizerPage() {
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   
   const scheduledCustomers = React.useMemo(() => {
-    if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) return [];
-
+    if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) {
+      return [];
+    }
+  
+    // 1. Get all unique user codes for orders scheduled for today
     const todaysOrderCustomerCodes = new Set(
       rawOrders
         .filter(order => {
@@ -45,12 +48,13 @@ export default function OptimizerPage() {
         .map(order => findKey(order, ['ユーザーコード']))
         .filter(Boolean)
     );
-
+  
+    // 2. Filter the main customer list to include only those whose 'ユーザーコード' is in the set
     return allCustomers.filter(c => {
       const customerUserCode = findKey(c, ['ユーザーコード']);
       return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
     });
-
+  
   }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers]);
   
   const filteredStaff = React.useMemo(() => {
