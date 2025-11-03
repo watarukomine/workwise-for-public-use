@@ -283,12 +283,12 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
 
             <div className="space-y-2">
                 <Label>出発地</Label>
-                <LocationSelector 
-                  staffLocations={staffLocations} 
-                  customerLocations={customerLocations} 
-                  selectedValue={startLocation} 
-                  onSelect={setStartLocation} 
-                  placeholder="出発地を選択..." 
+                <LocationSelector
+                  staffLocations={staffLocations}
+                  customerLocations={customerLocations}
+                  selectedValue={startLocation}
+                  onSelect={setStartLocation}
+                  placeholder="出発地を選択..."
                 />
             </div>
 
@@ -296,7 +296,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
                 <Label>経由地</Label>
                  <div className="space-y-2">
                     {waypoints.map((waypointId, index) => {
-                        const usedIds = new Set([startLocation, endLocation, ...waypoints.filter((_, i) => i !== index && waypoints[i])]);
+                        const usedIds = new Set([startLocation, endLocation, ...waypoints.filter((_, i) => i !== index && waypoints[i])].filter(Boolean));
                         const availableLocations = allLocations.filter(loc => !usedIds.has(loc.id));
                         const availableStaff = availableLocations.filter(l => l.type === 'staff');
                         const availableCustomers = availableLocations.filter(l => l.type === 'customer');
@@ -427,3 +427,5 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, customers
     </div>
   );
 }
+
+    
