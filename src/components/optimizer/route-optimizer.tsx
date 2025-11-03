@@ -183,9 +183,9 @@ const PlacesAutocompleteSelector: React.FC<{
             
             {filteredStaff.length > 0 && (
                 <CommandGroup heading="スタッフ">
-                  {filteredStaff.map((location) => (
+                  {filteredStaff.map((location, index) => (
                     <CommandItem
-                      key={location.id}
+                      key={location.id || `staff-${index}`}
                       value={`${location.name}`}
                       onSelect={() => handlePredefinedSelect(location)}
                       className="flex items-center"
@@ -199,9 +199,9 @@ const PlacesAutocompleteSelector: React.FC<{
 
             {filteredCustomers.length > 0 && (
                 <CommandGroup heading="販売店">
-                  {filteredCustomers.map((location) => (
+                  {filteredCustomers.map((location, index) => (
                     <CommandItem
-                      key={location.id}
+                      key={location.id || `customer-${index}`}
                       value={`${location.name} ${location.address}`}
                       onSelect={() => handlePredefinedSelect(location)}
                       className="flex items-center"
