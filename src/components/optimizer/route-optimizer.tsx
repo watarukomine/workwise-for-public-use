@@ -40,7 +40,6 @@ interface RouteOptimizerProps {
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
   allCustomers: WithId<Customer>[];
-  todaysCustomers: WithId<Customer>[];
   placesLibraryReady: boolean;
 }
 
@@ -148,8 +147,7 @@ const PlacesAutocompleteSelector: React.FC<{
   }
 
   const staffLocations = predefinedLocations.filter(loc => loc.type === 'staff');
-  const todaysCustomerLocations = predefinedLocations.filter(loc => loc.type === 'todays-customer');
-  const allCustomerLocations = predefinedLocations.filter(loc => loc.type === 'customer');
+  const customerLocations = predefinedLocations.filter(loc => loc.type === 'customer');
 
   const filterLocations = (locations: Location[], input: string) => {
     if (!input) return locations;
@@ -160,8 +158,7 @@ const PlacesAutocompleteSelector: React.FC<{
   }
 
   const filteredStaff = filterLocations(staffLocations, inputValue);
-  const filteredTodaysCustomers = filterLocations(todaysCustomerLocations, inputValue);
-  const filteredAllCustomers = filterLocations(allCustomerLocations, inputValue);
+  const filteredCustomers = filterLocations(customerLocations, inputValue);
   
   const displayName = value ? value.name : placeholder;
 
@@ -200,25 +197,9 @@ const PlacesAutocompleteSelector: React.FC<{
                 </CommandGroup>
             )}
 
-             {filteredTodaysCustomers.length > 0 && (
-                <CommandGroup heading="販売店（本日予約あり）">
-                  {filteredTodaysCustomers.map((location) => (
-                    <CommandItem
-                      key={location.id}
-                      value={`${location.name} ${location.address}`}
-                      onSelect={() => handlePredefinedSelect(location)}
-                      className="flex items-center"
-                    >
-                      <MapPinIcon className="mr-2 h-4 w-4 text-primary" />
-                       <p className="truncate">{location.name}</p>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-            )}
-
-            {filteredAllCustomers.length > 0 && (
-                <CommandGroup heading="販売店（すべて）">
-                  {filteredAllCustomers.map((location) => (
+            {filteredCustomers.length > 0 && (
+                <CommandGroup heading="販売店">
+                  {filteredCustomers.map((location) => (
                     <CommandItem
                       key={location.id}
                       value={`${location.name} ${location.address}`}
@@ -250,7 +231,7 @@ const PlacesAutocompleteSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustomers, todaysCustomers, placesLibraryReady }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustomers, placesLibraryReady }: RouteOptimizerProps) {
   
   const [startLocation, setStartLocation] = React.useState<Location | null>(null);
   const [endLocation, setEndLocation] = React.useState<Location | null>(null);
@@ -276,56 +257,42 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
       type: 'staff',
     }));
     
-    const mapCustomerToLocation = (c: WithId<Customer>, type: 'customer' | 'todays-customer'): Location | null => {
-        let latitude: number | undefined;
-        let longitude: number | undefined;
+    const customerLocs: Location[] = (allCustomers || []).reduce((acc: Location[], c) => {
+      let latitude: number | undefined;
+      let longitude: number | undefined;
 
-        const latVal = findKey(c, ['緯度', 'latitude']);
-        const lonVal = findKey(c, ['経度', 'longitude']);
-        
-        if (typeof latVal === 'number' && typeof lonVal === 'number') {
-            latitude = latVal;
-            longitude = lonVal;
-        } else {
-            const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
-            if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
-                const [lat, lon] = coordsVal.split(',').map(s => parseFloat(s.trim()));
-                if (!isNaN(lat) && !isNaN(lon)) {
-                    latitude = lat;
-                    longitude = lon;
-                }
-            }
-        }
-        
-        if (latitude !== undefined && longitude !== undefined) {
-          return {
-            id: c.id,
-            name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
-            address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
-            latitude: latitude,
-            longitude: longitude,
-            type: type,
-          };
-        }
-        return null;
-    }
-
-    const todaysCustomerLocs: Location[] = (todaysCustomers || []).reduce((acc: Location[], c) => {
-        const loc = mapCustomerToLocation(c, 'todays-customer');
-        if (loc) acc.push(loc);
-        return acc;
-    }, []);
-
-    const allCustomerLocs: Location[] = (allCustomers || []).reduce((acc: Location[], c) => {
-        const loc = mapCustomerToLocation(c, 'customer');
-        if (loc && !todaysCustomerLocs.some(todayLoc => todayLoc.id === loc.id)) {
-            acc.push(loc);
-        }
-        return acc;
+      const latVal = findKey(c, ['緯度', 'latitude']);
+      const lonVal = findKey(c, ['経度', 'longitude']);
+      
+      if (typeof latVal === 'number' && typeof lonVal === 'number') {
+          latitude = latVal;
+          longitude = lonVal;
+      } else {
+          const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
+          if (typeof coordsVal === 'string' && coordsVal.includes(',')) {
+              const [lat, lon] = coordsVal.split(',').map(s => parseFloat(s.trim()));
+              if (!isNaN(lat) && !isNaN(lon)) {
+                  latitude = lat;
+                  longitude = lon;
+              }
+          }
+      }
+      
+      if (latitude !== undefined && longitude !== undefined) {
+        acc.push({
+          id: c.id,
+          name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
+          address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
+          latitude: latitude,
+          longitude: longitude,
+          type: 'customer',
+        });
+      }
+      return acc;
     }, []);
     
-    return [...staffLocs, ...todaysCustomerLocs, ...allCustomerLocs];
-  }, [staff, staffStatus, allCustomers, todaysCustomers]);
+    return [...staffLocs, ...customerLocs];
+  }, [staff, staffStatus, allCustomers]);
   
   const addWaypoint = () => {
     setWaypoints(prev => [...prev, null]);
