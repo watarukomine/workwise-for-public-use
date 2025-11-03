@@ -36,17 +36,17 @@ function OptimizerLayout() {
     const todaysOrderCustomerCodes = new Set(
       rawOrders
         .filter(order => {
-          const scheduledDateKey = findKey(order, ['作業予定日']);
+          const scheduledDateKey = order['作業予定日'];
           if (!scheduledDateKey) return false;
           const scheduledDate = parseISO(scheduledDateKey);
-          return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()));
+           return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()));
         })
-        .map(order => findKey(order, ['ユーザーコード']))
+        .map(order => order['ユーザーコード'])
         .filter(Boolean)
     );
-
+  
     return allCustomers.filter(c => {
-      const customerUserCode = findKey(c, ['ユーザーコード']);
+      const customerUserCode = c['ユーザーコード'];
       return customerUserCode && todaysOrderCustomerCodes.has(customerUserCode);
     });
   
@@ -101,7 +101,7 @@ function OptimizerLayout() {
           });
 
       const routeCustomers = scheduledCustomers.filter(c => {
-          const userCode = findKey(c, ['ユーザーコード']);
+          const userCode = c['ユーザーコード'];
           return userCode && routeIds.has(String(userCode));
       });
       
