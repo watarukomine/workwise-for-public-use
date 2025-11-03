@@ -28,18 +28,18 @@ function OptimizerLayout() {
   
   const placesLibrary = useMapsLibrary('places');
 
-  const scheduledCustomers = React.useMemo(() => {
+  const [scheduledCustomers, setScheduledCustomers] = React.useState<WithId<Customer>[]>([]);
+
+  React.useEffect(() => {
     if (isLoadingOrders || isLoadingCustomers || !rawOrders || !allCustomers) {
-      return [];
+      return;
     }
   
-    // schedule-view.tsx のロジックをそのまま使用
     const todaysOrderCustomerCodes = new Set<string>();
-    
     rawOrders.forEach(order => {
-        const scheduledDateKey = findKey(order, ['作業予定日']);
-        if (scheduledDateKey) {
-            const scheduledDate = parseISO(scheduledDateKey);
+        const scheduledDateValue = findKey(order, ['作業予定日']);
+        if (scheduledDateValue) {
+            const scheduledDate = parseISO(scheduledDateValue);
             if (isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()))) {
                 const userCode = findKey(order, ['ユーザーコード']);
                 if (userCode) {
@@ -49,11 +49,13 @@ function OptimizerLayout() {
         }
     });
   
-    return allCustomers.filter(c => {
+    const filteredCustomers = allCustomers.filter(c => {
       const customerUserCode = findKey(c, ['ユーザーコード']);
       return customerUserCode && todaysOrderCustomerCodes.has(String(customerUserCode));
     });
-  
+
+    setScheduledCustomers(filteredCustomers);
+
   }, [rawOrders, allCustomers, isLoadingOrders, isLoadingCustomers]);
   
   const filteredStaff = React.useMemo(() => {
