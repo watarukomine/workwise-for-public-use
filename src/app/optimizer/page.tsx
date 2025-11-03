@@ -7,15 +7,42 @@ import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
-import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
+import type { Customer, Staff, StaffStatus, WithId, ScheduleEvent, Order } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
-import { findKey } from '@/lib/utils';
+import { findKey, formatTime } from '@/lib/utils';
 import { isToday, parseISO, isValid, isEqual, startOfDay } from 'date-fns';
+
+const mapRawToOrder = (rawOrder: any): WithId<Order> => {
+    const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
+    const scheduledTime = findKey(rawOrder, ['予定時間']);
+    
+    const line1 = `${findKey(rawOrder, ['お取引先名', '店舗', '取引先']) || ''}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
+    
+    const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? ` / ${findKey(rawOrder, ['本数'])}本` : ''}`;
+
+    let taskDetails = line1;
+    if (line2.trim() && line2.trim() !== '/') {
+        taskDetails += `\n${line2.trim()}`;
+    }
+    
+    const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
+    const orderId = findKey(rawOrder, idKeys);
+
+    return {
+        id: String(orderId || `ord-${Math.random()}`),
+        customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
+        taskDetails: taskDetails.trim(),
+        estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
+        raw: rawOrder,
+        rawOrderId: String(orderId || '')
+    };
+};
+
 
 function OptimizerLayout() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -35,24 +62,43 @@ function OptimizerLayout() {
       return;
     }
 
-    const todaysOrderCustomerCodes = new Set<string>();
-
-    rawOrders.forEach(order => {
-        const scheduledDateValue = findKey(order, ['作業予定日']);
-        if (scheduledDateValue) {
-            const scheduledDate = parseISO(scheduledDateValue);
-            if (isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()))) {
-                const userCode = findKey(order, ['ユーザーコード', 'usercode']);
-                if (userCode) {
-                    todaysOrderCustomerCodes.add(String(userCode));
-                }
+    const allMappedOrders = rawOrders.map(mapRawToOrder);
+    
+    const allScheduledRawOrderIds = new Set<string>();
+    if(typeof window !== 'undefined') {
+        Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('scheduleData-')) {
+                try {
+                    const data = JSON.parse(localStorage.getItem(key)!);
+                    if (Array.isArray(data)) {
+                        data.forEach((event: WithId<ScheduleEvent>) => {
+                            if (event.rawOrderId) {
+                                allScheduledRawOrderIds.add(event.rawOrderId);
+                            }
+                        });
+                    }
+                } catch {}
             }
-        }
+        });
+    }
+
+    const todaysUnassignedOrders = allMappedOrders.filter(order => {
+        if (!order.rawOrderId) return false;
+        
+        if (allScheduledRawOrderIds.has(order.rawOrderId)) return false;
+        
+        const scheduledDateKey = findKey(order.raw, ['作業予定日']);
+        if (!scheduledDateKey) return false;
+
+        const scheduledDate = parseISO(scheduledDateKey);
+        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(new Date()));
     });
-  
+    
+    const todaysCustomerCodes = new Set(todaysUnassignedOrders.map(o => o.customerCode));
+
     const filteredCustomers = allCustomers.filter(c => {
-      const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
-      return customerUserCode && todaysOrderCustomerCodes.has(String(customerUserCode));
+        const customerUserCode = findKey(c, ['ユーザーコード', 'usercode']);
+        return customerUserCode && todaysCustomerCodes.has(String(customerUserCode));
     });
 
     setScheduledCustomers(filteredCustomers);
