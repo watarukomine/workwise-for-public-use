@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { useFormStatus } from 'react-dom';
@@ -263,8 +262,9 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
       let latitude: number | undefined;
       let longitude: number | undefined;
 
-      const latVal = findKey(c, ['緯度']);
-      const lonVal = findKey(c, ['経度']);
+      // Try to find coordinates from multiple possible keys
+      const latVal = c.latitude ?? findKey(c, ['緯度']);
+      const lonVal = c.longitude ?? findKey(c, ['経度']);
       const coordsVal = findKey(c, ['緯度・経度', '座標', '緯度経度']);
 
       if (latVal !== undefined && lonVal !== undefined && !isNaN(Number(latVal)) && !isNaN(Number(lonVal))) {
@@ -280,8 +280,8 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
 
       if (latitude !== undefined && longitude !== undefined) {
         acc.push({
-          id: c.id, // Use the unique ID from the customer object
-          name: String(findKey(c, ['店舗', 'storeName']) || '名称未設定'),
+          id: c.id,
+          name: String(findKey(c, ['店舗', 'storeName']) || c.name ||'名称未設定'),
           address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
           latitude: latitude,
           longitude: longitude,
@@ -482,5 +482,3 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     </div>
   );
 }
-
-    
