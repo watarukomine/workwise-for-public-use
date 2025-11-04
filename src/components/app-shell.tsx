@@ -51,7 +51,7 @@ const allNavItems = [
   { href: '/orders', label: '受注管理', icon: ShoppingBag, roles: ['admin'] },
   { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
   { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'] },
-  { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['staff'], mobileOnly: true },
+  { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['admin', 'staff'], mobileOnly: true },
 ];
 
 interface AppShellContextType {
