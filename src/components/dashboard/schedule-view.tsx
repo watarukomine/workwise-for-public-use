@@ -727,9 +727,6 @@ export function ScheduleView({
                                     />
                                 );
                             })}
-                            <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-                              {isToday(currentDate) && <TimeIndicator className="h-full" />}
-                            </div>
                         </div>
                       </ScrollArea>
                     </div>
