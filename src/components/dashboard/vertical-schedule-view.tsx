@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns';
 import { Clock, MapPin, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCustomer } from '@/contexts/customer-context';
+import Link from 'next/link';
 
 interface VerticalScheduleViewProps {
   scheduleData: WithId<ScheduleEvent>[];
@@ -54,9 +55,8 @@ export function VerticalScheduleView({ scheduleData, staffData }: VerticalSchedu
         const customer = getCustomerById(event.locationId);
         const isTravel = event.title.includes('移動');
         const nextEvent = relevantEvents[index + 1];
-
-        return (
-          <React.Fragment key={event.id}>
+        
+        const eventCard = (
             <Card className={cn("cursor-pointer hover:bg-muted/50", isTravel && "bg-secondary/50 border-dashed")}>
               <CardHeader className="p-4">
                 <div className="flex items-center justify-between">
@@ -79,6 +79,17 @@ export function VerticalScheduleView({ scheduleData, staffData }: VerticalSchedu
                 </div>}
               </CardContent>
             </Card>
+        );
+
+        return (
+          <React.Fragment key={event.id}>
+            {event.rawOrderId && !isTravel ? (
+              <Link href={`/check-in?orderId=${event.rawOrderId}`}>
+                {eventCard}
+              </Link>
+            ) : (
+              eventCard
+            )}
             
             {/* Show travel time between tasks */}
             {nextEvent && !isTravel && !nextEvent.title.includes('移動') && (
