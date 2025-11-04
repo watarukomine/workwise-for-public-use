@@ -20,46 +20,24 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
 
-const getStorageKey = (date: Date) => {
-    return `scheduleData-${format(date, 'yyyy-MM-dd')}`;
-};
 
 export default function DashboardPage() {
   const [customers] = React.useState<WithId<Customer>[]>(customerData);
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
-  const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
-  const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
+  
+  const { 
+    orders: rawOrders, 
+    scheduleEvents, 
+    setScheduleEvents,
+    isLoading: isLoadingOrders,
+    refetchScheduleEvents,
+  } = useOrder();
+  
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
   const { forceMobileView, setForceMobileView } = useAppShell();
   
-  // Update schedule data when date changes
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-        try {
-            const key = getStorageKey(currentDate);
-            const savedData = localStorage.getItem(key);
-            setScheduleData(savedData ? JSON.parse(savedData) : []);
-        } catch (error) {
-            console.error("Failed to parse schedule data for new date", error);
-            setScheduleData([]);
-        }
-    }
-  }, [currentDate]);
-
-
-  React.useEffect(() => {
-      try {
-          if (typeof window !== 'undefined') {
-              const key = getStorageKey(currentDate);
-              localStorage.setItem(key, JSON.stringify(scheduleData));
-          }
-      } catch (error) {
-          console.error("Failed to save schedule data to localStorage", error);
-      }
-  }, [scheduleData, currentDate]);
-
   const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || isStaffLoading || !profile) return [];
 
@@ -116,12 +94,12 @@ export default function DashboardPage() {
   };
   
   const dailySchedule = React.useMemo(() => {
-    if (!scheduleData) return [];
-    return scheduleData.filter(event => {
+    if (!scheduleEvents) return [];
+    return scheduleEvents.filter(event => {
         const eventDate = typeof event.start === 'string' ? new Date(event.start) : event.start;
         return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
     }).sort((a,b) => new Date(a.start as string).getTime() - new Date(b.start as string).getTime());
-  }, [scheduleData, currentDate]);
+  }, [scheduleEvents, currentDate]);
 
 
   if (isLoading) {
@@ -204,7 +182,7 @@ export default function DashboardPage() {
                 customerData={customers} 
                 scheduleData={dailySchedule}
                 rawOrdersData={rawOrders}
-                setScheduleData={setScheduleData}
+                setScheduleData={setScheduleEvents}
                 currentDate={currentDate}
             />
         )}
