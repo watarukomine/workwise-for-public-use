@@ -59,6 +59,15 @@ const formatTime = (timeString: string) => {
     }
 };
 
+const formatDateTime = (dateTimeString: string) => {
+    if (!dateTimeString || !isValid(parseISO(dateTimeString))) return dateTimeString;
+    try {
+        return format(new Date(dateTimeString), 'MM-dd HH:mm');
+    } catch {
+        return dateTimeString;
+    }
+};
+
 // Helper to parse dates which might be in various formats
 const parseDate = (dateString: any): Date | null => {
   if (!dateString || typeof dateString !== 'string') return null;
@@ -121,8 +130,13 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
   const headersToFormat: Record<string, (value: string) => string> = {
     '作業予定日': formatDate,
-    '受付日': formatDate, // Format reception date as well
+    '受付日': formatDate,
     '予定時間': formatTime,
+    '移動開始': formatTime,
+    '現場到着': formatTime,
+    '作業開始': formatTime,
+    '作業終了': formatTime,
+    '最終更新日時': formatDateTime,
   };
 
   return (
