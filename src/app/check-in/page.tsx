@@ -4,13 +4,14 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, Hourglass } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
 type StatusValue = StaffStatus['status'];
@@ -32,7 +33,7 @@ export default function CheckInPage() {
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
         'Finish Task': '作業終了',
-        'Wait': '待機中',
+        'Wait': '位置情報更新',
         'Send Message': 'メッセージ送信'
     };
     return map[action];
@@ -182,7 +183,7 @@ export default function CheckInPage() {
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },
     { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
-    { action: 'Wait', label: '待機中', icon: Hourglass },
+    { action: 'Wait', label: '位置情報更新', icon: RefreshCw },
   ];
 
   return (
@@ -198,7 +199,10 @@ export default function CheckInPage() {
               <Button
                 key={action}
                 size="lg"
-                className="h-20 text-base flex-col"
+                className={cn(
+                  "h-20 text-base flex-col",
+                  action === 'Wait' && "col-span-2"
+                )}
                 onClick={() => handleAction(action)}
                 disabled={!!isLoading}
               >
