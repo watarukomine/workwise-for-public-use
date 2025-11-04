@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -12,6 +13,7 @@ import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useSearchParams } from 'next/navigation';
 
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
 type StatusValue = StaffStatus['status'];
@@ -24,6 +26,9 @@ export default function CheckInPage() {
   const [message, setMessage] = React.useState('');
   const { toast } = useToast();
   const { profile } = useUserProfile();
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get('orderId');
+
 
   const getJapaneseActionName = (action: ActionType) => {
     const map: Record<ActionType, string> = {
@@ -42,12 +47,13 @@ export default function CheckInPage() {
   const handleAction = async (action: ActionType) => {
     setIsLoading(action);
     setError(null);
+    const now = new Date();
     
     // Actions that don't require location or sheet updates
     if (action === 'Clock In' || action === 'Clock Out') {
         console.log(`Action: ${action}`);
         setTimeout(() => {
-          const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           setLastAction({ action, time: currentTime });
           toast({
             title: 'アクションを記録しました',
@@ -70,7 +76,7 @@ export default function CheckInPage() {
             title: 'メッセージを送信しました',
             description: '管理者にメッセージが送信されました。',
           });
-          const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           setLastAction({ action: 'Send Message', time: currentTime });
           setMessage('');
           setIsLoading(null);
@@ -82,7 +88,7 @@ export default function CheckInPage() {
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '待機中', // As per user request, Finish Task sets status to "待機中"
+      'Finish Task': '待機中',
       'Wait': '待機中',
       'Arrive': '作業待ち',
     };
@@ -115,15 +121,16 @@ export default function CheckInPage() {
         }
 
         try {
-            // TODO: Get the active order ID from localStorage or context
-            const activeOrderId = '1'; // Placeholder
-            const eventTitleForUpdate = `(ID: ${activeOrderId})`;
+            const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
             const result = await updateSheetStatus({
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: eventTitleForUpdate,
                 staffName: profile.name,
                 statusValue: statusValue,
-                timestamp: new Date().toISOString(),
+                timestamp: now.toISOString(),
+                latitude: latitude,
+                longitude: longitude,
+                ...(action === 'Start Travel' && { startTimestamp: now.toISOString() }),
             });
 
             if (result.status === 'error') {
@@ -135,7 +142,7 @@ export default function CheckInPage() {
                 description: result.message,
             });
 
-            const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
             setLastAction({ action, time: currentTime });
 
         } catch (e: any) {
@@ -191,7 +198,7 @@ export default function CheckInPage() {
       <Card>
         <CardHeader>
           <CardTitle>勤怠・作業記録</CardTitle>
-          <CardDescription>現在地情報と共に、作業状況を記録します。</CardDescription>
+          <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -204,7 +211,7 @@ export default function CheckInPage() {
                   action === 'Wait' && "col-span-2"
                 )}
                 onClick={() => handleAction(action)}
-                disabled={!!isLoading}
+                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Send Message', 'Wait'].includes(action))}
               >
                 {isLoading === action ? (
                   <Loader2 className="h-6 w-6 animate-spin" />
@@ -223,6 +230,16 @@ export default function CheckInPage() {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>エラー</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {!orderId && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>オーダーが選択されていません</AlertTitle>
+              <AlertDescription>
+                勤怠以外の記録を行うには、スケジュール画面からタスクを選択してください。
+              </AlertDescription>
             </Alert>
           )}
 

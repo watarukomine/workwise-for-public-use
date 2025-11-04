@@ -7,6 +7,9 @@ interface UpdateSheetStatusArgs {
     staffName?: string | null;
     statusValue?: string | null;
     timestamp?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    startTimestamp?: string | null;
 }
 
 interface GasResponse {
@@ -16,31 +19,31 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName, statusValue, timestamp } = args;
+    const { gasUrl, eventTitle, staffName, statusValue, timestamp, latitude, longitude, startTimestamp } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
     try {
-        console.log("Sending update request to GAS with body:", {
+        const bodyPayload = {
             eventTitle,
             staffName,
             statusValue,
-            timestamp
-        });
+            timestamp,
+            latitude,
+            longitude,
+            startTimestamp,
+        };
+
+        console.log("Sending update request to GAS with body:", bodyPayload);
 
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                eventTitle,
-                staffName,
-                statusValue,
-                timestamp,
-            }),
+            body: JSON.stringify(bodyPayload),
             cache: 'no-store',
             redirect: 'follow',
         });
