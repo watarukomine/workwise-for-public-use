@@ -1,4 +1,3 @@
-
 # WorkWise Project Snapshot
 
 This file contains a snapshot of the key files in the WorkWise project. You can use this as a reference or a backup of the current state.
@@ -1699,5 +1698,3 @@ function handleCalendarEvent(params) {
   }
 }
 ```
-
-    
