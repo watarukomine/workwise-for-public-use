@@ -241,7 +241,7 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     );
 }
 
-const TimeIndicator = () => {
+const TimeIndicator = ({className}: {className?: string}) => {
     const [now, setNow] = React.useState<Date | null>(null);
 
     React.useEffect(() => {
@@ -266,7 +266,7 @@ const TimeIndicator = () => {
 
     return (
         <div
-            className="absolute top-0 bottom-[-9999px] w-0.5 bg-red-500 z-30 pointer-events-none"
+            className={cn("absolute top-0 w-0.5 bg-red-500 z-30 pointer-events-none", className)}
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -708,7 +708,7 @@ export function ScheduleView({
                                       </span>
                                   </div>
                               ))}
-                              {isToday(currentDate) && <TimeIndicator />}
+                              {isToday(currentDate) && <TimeIndicator className="h-full"/>}
                           </div>
                       </div>
                       <ScrollArea className="w-full whitespace-nowrap">
@@ -727,6 +727,9 @@ export function ScheduleView({
                                     />
                                 );
                             })}
+                            <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                              {isToday(currentDate) && <TimeIndicator className="h-full" />}
+                            </div>
                         </div>
                       </ScrollArea>
                     </div>
