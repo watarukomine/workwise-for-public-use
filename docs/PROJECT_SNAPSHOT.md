@@ -1453,12 +1453,9 @@ function doGet(e) {
  */
 function doPost(e) {
   try {
-    // リクエストの情報をログに出力
     console.log("doPost Request received:", JSON.stringify(e));
     
     let params;
-    
-    // POSTボディがJSONの場合
     if (e.postData && e.postData.type === "application/json") {
       try {
         params = JSON.parse(e.postData.contents);
@@ -1470,31 +1467,19 @@ function doPost(e) {
           message: "JSONデータの解析に失敗しました: " + parseError.message
         })).setMimeType(ContentService.MimeType.JSON);
       }
-    } 
-    // URLパラメータまたはフォームデータの場合
-    else if (e.parameter && Object.keys(e.parameter).length > 0) {
-      params = e.parameter;
-      console.log("URL parameters:", JSON.stringify(params));
-    } 
-    // データがない場合
-    else {
-      console.error("No data received in request");
+    } else {
+      console.error("No JSON data received in request");
       return ContentService.createTextOutput(JSON.stringify({
         status: "error",
-        message: "リクエストにデータがありません"
+        message: "リクエストにJSONデータがありません"
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
-    // カレンダー操作の場合
     if (params.operation) {
       return handleCalendarEvent(params);
-    }
-    // シート更新処理の場合
-    else if (params.eventTitle) {
+    } else if (params.eventTitle) {
       return updateSheetWithOrderInfo(params);
-    } 
-    // 必要なパラメータがない場合
-    else {
+    } else {
       return ContentService.createTextOutput(JSON.stringify({
         status: "error",
         message: "必要なパラメータ (operation または eventTitle) がありません"
@@ -1517,10 +1502,8 @@ function updateSheetWithOrderInfo(params) {
   try {
     console.log("Updating sheet with:", JSON.stringify(params));
     
-    // タイトルから受注IDを正規表現で抽出する (例: "(ID: 123)")
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
     if (!match || !match[1]) {
-      // IDがタイトルに含まれていない場合は、何もしないで成功を返す（汎用タスクなどの場合）
       return ContentService.createTextOutput(JSON.stringify({ 
         status: "success", 
         message: "汎用タスクのためシート更新はスキップされました。" 
@@ -1531,48 +1514,44 @@ function updateSheetWithOrderInfo(params) {
     console.log("Extracted order ID:", orderId);
 
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    if (!sheet) {
-      throw new Error(`シート「${SHEET_NAME}」が見つかりません。`);
-    }
+    if (!sheet) throw new Error(`シート「${SHEET_NAME}」が見つかりません。`);
 
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
     
     // 更新対象の列インデックスを取得
-    const orderIdColIndex = headers.indexOf("受注ID");
-    const staffNameColIndex = headers.indexOf("担当");
-    const statusColIndex = headers.indexOf("受注ステータス");
-    const timestampColIndex = headers.indexOf("最終更新日時");
-    const lastLocationColIndex = headers.indexOf("最終位置情報（緯度,経度）");
-    const startTravelColIndex = headers.indexOf("移動開始");
-    const arriveColIndex = headers.indexOf("現場到着");
-    const startWorkColIndex = headers.indexOf("作業開始");
-    const finishWorkColIndex = headers.indexOf("作業終了");
+    const colIdx = {
+      orderId: headers.indexOf("受注ID"),
+      staffName: headers.indexOf("担当"),
+      status: headers.indexOf("受注ステータス"),
+      lastUpdate: headers.indexOf("最終更新日時"),
+      lastLocation: headers.indexOf("最終位置情報（緯度,経度）"),
+      startTravel: headers.indexOf("移動開始"),
+      arrive: headers.indexOf("現場到着"),
+      startWork: headers.indexOf("作業開始"),
+      finishWork: headers.indexOf("作業終了")
+    };
 
-    if (orderIdColIndex === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
+    if (colIdx.orderId === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
     
     // 対象の行を検索
-    let found = false;
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][orderIdColIndex]) === String(orderId)) {
+      if (String(data[i][colIdx.orderId]) === String(orderId)) {
         const rowNum = i + 1;
-        found = true;
-        
         console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
         
-        // 担当者名を更新
-        if (staffNameColIndex !== -1 && staffName !== undefined) {
-          sheet.getRange(rowNum, staffNameColIndex + 1).setValue(staffName || "");
+        // 各列の更新
+        if (colIdx.staffName !== -1 && staffName !== undefined) {
+          sheet.getRange(rowNum, colIdx.staffName + 1).setValue(staffName || "");
         }
-        
-        // 受注ステータスを更新
-        if (statusColIndex !== -1 && statusValue !== undefined) {
-          sheet.getRange(rowNum, statusColIndex + 1).setValue(statusValue || "");
+        if (colIdx.status !== -1 && statusValue !== undefined) {
+          sheet.getRange(rowNum, colIdx.status + 1).setValue(statusValue || "");
         }
-        
-        // 最終更新日時を更新
-        if (timestampColIndex !== -1 && timestamp) {
-          sheet.getRange(rowNum, timestampColIndex + 1).setValue(new Date(timestamp));
+        if (colIdx.lastUpdate !== -1 && timestamp) {
+          sheet.getRange(rowNum, colIdx.lastUpdate + 1).setValue(new Date(timestamp));
+        }
+        if (colIdx.lastLocation !== -1 && latitude !== undefined && longitude !== undefined) {
+          sheet.getRange(rowNum, colIdx.lastLocation + 1).setValue(`${latitude}, ${longitude}`);
         }
 
         // アクション別のタイムスタンプを更新
@@ -1580,33 +1559,22 @@ function updateSheetWithOrderInfo(params) {
             const dateValue = new Date(actionTimestamp);
             switch (actionType) {
                 case 'Start Travel':
-                    if (startTravelColIndex !== -1) {
-                        sheet.getRange(rowNum, startTravelColIndex + 1).setValue(dateValue);
-                    }
+                    if (colIdx.startTravel !== -1) sheet.getRange(rowNum, colIdx.startTravel + 1).setValue(dateValue);
                     break;
                 case 'Arrive':
-                    if (arriveColIndex !== -1) {
-                        sheet.getRange(rowNum, arriveColIndex + 1).setValue(dateValue);
-                    }
+                    if (colIdx.arrive !== -1) sheet.getRange(rowNum, colIdx.arrive + 1).setValue(dateValue);
                     break;
                 case 'Begin Task':
-                    if (startWorkColIndex !== -1) {
-                        sheet.getRange(rowNum, startWorkColIndex + 1).setValue(dateValue);
-                    }
+                    if (colIdx.startWork !== -1) sheet.getRange(rowNum, colIdx.startWork + 1).setValue(dateValue);
                     break;
                 case 'Finish Task':
-                    if (finishWorkColIndex !== -1) {
-                        sheet.getRange(rowNum, finishWorkColIndex + 1).setValue(dateValue);
-                    }
+                    if (colIdx.finishWork !== -1) sheet.getRange(rowNum, colIdx.finishWork + 1).setValue(dateValue);
+                    break;
+                case 'Update Location':
+                    // This action might just update location and lastUpdate, handled above.
+                    // No specific column for this action type.
                     break;
             }
-        }
-
-
-        // 最終位置情報列を更新 (latitudeとlongitudeがある場合)
-        if (lastLocationColIndex !== -1 && latitude !== undefined && longitude !== undefined) {
-          const locationInfo = `${latitude}, ${longitude}`;
-          sheet.getRange(rowNum, lastLocationColIndex + 1).setValue(locationInfo);
         }
         
         return ContentService.createTextOutput(JSON.stringify({
@@ -1616,9 +1584,7 @@ function updateSheetWithOrderInfo(params) {
       }
     }
     
-    if (!found) {
-      throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
-    }
+    throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
     
   } catch (error) {
     console.error("Error in updateSheetWithOrderInfo:", error.message, error.stack);
@@ -1639,77 +1605,38 @@ function handleCalendarEvent(params) {
     
     const { operation, calendarId, eventId, title, description, startTime, endTime } = params;
     
-    if (!operation) {
-      throw new Error("必須パラメータ 'operation' がありません");
-    }
-    
-    if (!calendarId) {
-      throw new Error("必須パラメータ 'calendarId' がありません");
+    if (!operation || !calendarId) {
+      throw new Error("必須パラメータ 'operation' または 'calendarId' がありません");
     }
     
     const calendar = CalendarApp.getCalendarById(calendarId);
-    if (!calendar) {
-      throw new Error(`カレンダーID「${calendarId}」が見つからないか、アクセス権がありません。`);
-    }
+    if (!calendar) throw new Error(`カレンダーID「${calendarId}」が見つからないか、アクセス権がありません。`);
 
     let result = {};
     
     switch (operation) {
       case 'create':
-        if (!title || !startTime || !endTime) {
-          throw new Error("予定の作成には title, startTime, endTime が必要です。");
-        }
-        
-        const newEvent = calendar.createEvent(
-          title, 
-          new Date(startTime), 
-          new Date(endTime), 
-          { description: description || '' }
-        );
-        
-        result = { 
-          status: "success", 
-          message: "カレンダーに予定を作成しました。", 
-          eventId: newEvent.getId() 
-        };
+        if (!title || !startTime || !endTime) throw new Error("予定の作成には title, startTime, endTime が必要です。");
+        const newEvent = calendar.createEvent(title, new Date(startTime), new Date(endTime), { description: description || '' });
+        result = { status: "success", message: "カレンダーに予定を作成しました。", eventId: newEvent.getId() };
         break;
         
       case 'update':
-        if (!eventId) {
-          throw new Error("予定の更新には eventId が必要です。");
-        }
-        
+        if (!eventId) throw new Error("予定の更新には eventId が必要です。");
         const eventToUpdate = calendar.getEventById(eventId);
-        if (!eventToUpdate) {
-          throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        }
-        
+        if (!eventToUpdate) throw new Error(`イベントID「${eventId}」が見つかりません。`);
         if (title) eventToUpdate.setTitle(title);
         if (startTime && endTime) eventToUpdate.setTime(new Date(startTime), new Date(endTime));
         if (description !== undefined) eventToUpdate.setDescription(description || "");
-        
-        result = { 
-          status: "success", 
-          message: "カレンダーの予定を更新しました。", 
-          eventId: eventId 
-        };
+        result = { status: "success", message: "カレンダーの予定を更新しました。", eventId: eventId };
         break;
         
       case 'delete':
-        if (!eventId) {
-          throw new Error("予定の削除には eventId が必要です。");
-        }
-        
+        if (!eventId) throw new Error("予定の削除には eventId が必要です。");
         const eventToDelete = calendar.getEventById(eventId);
-        if (!eventToDelete) {
-          throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        }
-        
+        if (!eventToDelete) throw new Error(`イベントID「${eventId}」が見つかりません。`);
         eventToDelete.deleteEvent();
-        result = { 
-          status: "success", 
-          message: "カレンダーから予定を削除しました。" 
-        };
+        result = { status: "success", message: "カレンダーから予定を削除しました。" };
         break;
         
       default:
@@ -1719,10 +1646,7 @@ function handleCalendarEvent(params) {
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     console.error("Error in handleCalendarEvent:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: error.message
-    })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 ```
@@ -1738,7 +1662,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, Hourglass } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -1748,7 +1672,7 @@ import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Update Location' | 'Send Message';
 type StatusValue = StaffStatus['status'];
 
 export default function CheckInPage() {
@@ -1771,7 +1695,7 @@ export default function CheckInPage() {
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
         'Finish Task': '作業終了',
-        'Wait': '待機中',
+        'Update Location': '位置情報更新',
         'Send Message': 'メッセージ送信'
     };
     return map[action];
@@ -1821,8 +1745,8 @@ export default function CheckInPage() {
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '待機中', // As per user request, Finish Task sets status to "待機中"
-      'Wait': '待機中',
+      'Finish Task': '待機中',
+      'Update Location': '待機中',
       'Arrive': '作業待ち',
     };
 
@@ -1860,7 +1784,7 @@ export default function CheckInPage() {
                 eventTitle: eventTitleForUpdate,
                 staffName: profile.name,
                 statusValue: statusValue,
-                timestamp: new Date().toISOString(),
+                timestamp: now.toISOString(),
                 latitude: latitude,
                 longitude: longitude,
                 actionType: action,
@@ -1876,7 +1800,7 @@ export default function CheckInPage() {
                 description: result.message,
             });
 
-            const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
             setLastAction({ action, time: currentTime });
 
         } catch (e: any) {
@@ -1924,7 +1848,7 @@ export default function CheckInPage() {
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },
     { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
-    { action: 'Wait', label: '待機中', icon: Hourglass },
+    { action: 'Update Location', label: '位置情報更新', icon: RefreshCw },
   ];
 
   return (
@@ -1932,7 +1856,7 @@ export default function CheckInPage() {
       <Card>
         <CardHeader>
           <CardTitle>勤怠・作業記録</CardTitle>
-          <CardDescription>現在地情報と共に、作業状況を記録します。</CardDescription>
+          <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -1940,9 +1864,12 @@ export default function CheckInPage() {
               <Button
                 key={action}
                 size="lg"
-                className="h-20 text-base flex-col"
+                className={cn(
+                  "h-20 text-base flex-col",
+                  action === 'Update Location' && "col-span-2"
+                )}
                 onClick={() => handleAction(action)}
-                disabled={!!isLoading}
+                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Send Message', 'Update Location'].includes(action))}
               >
                 {isLoading === action ? (
                   <Loader2 className="h-6 w-6 animate-spin" />
@@ -1961,6 +1888,16 @@ export default function CheckInPage() {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>エラー</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {!orderId && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>オーダーが選択されていません</AlertTitle>
+              <AlertDescription>
+                勤怠以外の記録を行うには、スケジュール画面からタスクを選択してください。
+              </AlertDescription>
             </Alert>
           )}
 
@@ -2009,433 +1946,121 @@ export default function CheckInPage() {
     </div>
   );
 }
-```
-
----
-
-## Google Apps Script (GAS) - `受注管理`
-
-```javascript
-// ↓↓↓↓【要設定】↓↓↓↓
-// スプレッドシートのID（URLの .../d/【この部分】/edit...）を貼り付けてください
-const SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
-// データを読み書きするシート名を正確に入力してください
-const SHEET_NAME = "受注管理"; 
-// ↓↓↓↓【設定はここまで】↓↓↓↓
-
-/**
- * GET リクエストを処理し、スプレッドシートのデータを JSON で返します
- */
-function doGet(e) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    if (!sheet) throw new Error(`シート '${SHEET_NAME}' が見つかりません。`);
-    
-    const dataRange = sheet.getDataRange();
-    const values = dataRange.getValues();
-    
-    if (values.length < 1) {
-       return ContentService.createTextOutput(JSON.stringify({ data: [] })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    const headers = values.shift();
-    const sheetId = sheet.getSheetId();
-    const spreadsheetId = sheet.getParent().getId();
-
-    const data = values.map((row, rowIndex) => {
-      const obj = {};
-      headers.forEach((header, index) => {
-        obj[header] = (row[index] instanceof Date) ? row[index].toISOString() : row[index];
-      });
-      obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowIndex + 2}`;
-      return obj;
-    });
-
-    return ContentService.createTextOutput(JSON.stringify({ data: data })).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * POST リクエストを処理し、スプレッドシートを更新します
- */
-function doPost(e) {
-  try {
-    // リクエストの情報をログに出力
-    console.log("doPost Request received:", JSON.stringify(e));
-    
-    let params;
-    
-    // POSTボディがJSONの場合
-    if (e.postData && e.postData.type === "application/json") {
-      try {
-        params = JSON.parse(e.postData.contents);
-        console.log("JSON data parsed:", JSON.stringify(params));
-      } catch (parseError) {
-        console.error("JSON parse error:", parseError.message);
-        return ContentService.createTextOutput(JSON.stringify({
-          status: "error",
-          message: "JSONデータの解析に失敗しました: " + parseError.message
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-    } 
-    // URLパラメータまたはフォームデータの場合
-    else if (e.parameter && Object.keys(e.parameter).length > 0) {
-      params = e.parameter;
-      console.log("URL parameters:", JSON.stringify(params));
-    } 
-    // データがない場合
-    else {
-      console.error("No data received in request");
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "error",
-        message: "リクエストにデータがありません"
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    // カレンダー操作の場合
-    if (params.operation) {
-      return handleCalendarEvent(params);
-    }
-    // シート更新処理の場合
-    else if (params.eventTitle) {
-      return updateSheetWithOrderInfo(params);
-    } 
-    // 必要なパラメータがない場合
-    else {
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "error",
-        message: "必要なパラメータ (operation または eventTitle) がありません"
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-  } catch (error) {
-    console.error("Error in doPost:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: "エラーが発生しました: " + error.message
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * 受注IDでシートを検索し、指定された情報で更新する
- */
-function updateSheetWithOrderInfo(params) {
-  const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp } = params;
-  try {
-    console.log("Updating sheet with:", JSON.stringify(params));
-    
-    // タイトルから受注IDを正規表現で抽出する (例: "(ID: 123)")
-    const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
-    if (!match || !match[1]) {
-      // IDがタイトルに含まれていない場合は、何もしないで成功を返す（汎用タスクなどの場合）
-      return ContentService.createTextOutput(JSON.stringify({ 
-        status: "success", 
-        message: "汎用タスクのためシート更新はスキップされました。" 
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    const orderId = match[1];
-    console.log("Extracted order ID:", orderId);
-
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    if (!sheet) {
-      throw new Error(`シート「${SHEET_NAME}」が見つかりません。`);
-    }
-
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    
-    // 更新対象の列インデックスを取得
-    const orderIdColIndex = headers.indexOf("受注ID");
-    const staffNameColIndex = headers.indexOf("担当");
-    const statusColIndex = headers.indexOf("受注ステータス");
-    const timestampColIndex = headers.indexOf("最終更新日時");
-    const lastLocationColIndex = headers.indexOf("最終位置情報（緯度,経度）");
-    const startTravelColIndex = headers.indexOf("移動開始");
-    const arriveColIndex = headers.indexOf("現場到着");
-    const startWorkColIndex = headers.indexOf("作業開始");
-    const finishWorkColIndex = headers.indexOf("作業終了");
-
-    if (orderIdColIndex === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
-    
-    // 対象の行を検索
-    let found = false;
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][orderIdColIndex]) === String(orderId)) {
-        const rowNum = i + 1;
-        found = true;
-        
-        console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
-        
-        // 担当者名を更新
-        if (staffNameColIndex !== -1 && staffName !== undefined) {
-          sheet.getRange(rowNum, staffNameColIndex + 1).setValue(staffName || "");
-        }
-        
-        // 受注ステータスを更新
-        if (statusColIndex !== -1 && statusValue !== undefined) {
-          sheet.getRange(rowNum, statusColIndex + 1).setValue(statusValue || "");
-        }
-        
-        // 最終更新日時を更新
-        if (timestampColIndex !== -1 && timestamp) {
-          sheet.getRange(rowNum, timestampColIndex + 1).setValue(new Date(timestamp));
-        }
-
-        // アクション別のタイムスタンプを更新
-        if (actionType && actionTimestamp) {
-            const dateValue = new Date(actionTimestamp);
-            switch (actionType) {
-                case 'Start Travel':
-                    if (startTravelColIndex !== -1) {
-                        sheet.getRange(rowNum, startTravelColIndex + 1).setValue(dateValue);
-                    }
-                    break;
-                case 'Arrive':
-                    if (arriveColIndex !== -1) {
-                        sheet.getRange(rowNum, arriveColIndex + 1).setValue(dateValue);
-                    }
-                    break;
-                case 'Begin Task':
-                    if (startWorkColIndex !== -1) {
-                        sheet.getRange(rowNum, startWorkColIndex + 1).setValue(dateValue);
-                    }
-                    break;
-                case 'Finish Task':
-                    if (finishWorkColIndex !== -1) {
-                        sheet.getRange(rowNum, finishWorkColIndex + 1).setValue(dateValue);
-                    }
-                    break;
-            }
-        }
-
-
-        // 最終位置情報列を更新 (latitudeとlongitudeがある場合)
-        if (lastLocationColIndex !== -1 && latitude !== undefined && longitude !== undefined) {
-          const locationInfo = `${latitude}, ${longitude}`;
-          sheet.getRange(rowNum, lastLocationColIndex + 1).setValue(locationInfo);
-        }
-        
-        return ContentService.createTextOutput(JSON.stringify({
-          status: "success",
-          message: `受注ID: ${orderId} を更新しました。`,
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-    }
-    
-    if (!found) {
-      throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
-    }
-    
-  } catch (error) {
-    console.error("Error in updateSheetWithOrderInfo:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: error.message
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-
-/**
- * カレンダーイベントを作成・更新・削除する
- */
-function handleCalendarEvent(params) {
-  try {
-    console.log("handleCalendarEvent called with:", JSON.stringify(params));
-    
-    const { operation, calendarId, eventId, title, description, startTime, endTime } = params;
-    
-    if (!operation) {
-      throw new Error("必須パラメータ 'operation' がありません");
-    }
-    
-    if (!calendarId) {
-      throw new Error("必須パラメータ 'calendarId' がありません");
-    }
-    
-    const calendar = CalendarApp.getCalendarById(calendarId);
-    if (!calendar) {
-      throw new Error(`カレンダーID「${calendarId}」が見つからないか、アクセス権がありません。`);
-    }
-
-    let result = {};
-    
-    switch (operation) {
-      case 'create':
-        if (!title || !startTime || !endTime) {
-          throw new Error("予定の作成には title, startTime, endTime が必要です。");
-        }
-        
-        const newEvent = calendar.createEvent(
-          title, 
-          new Date(startTime), 
-          new Date(endTime), 
-          { description: description || '' }
-        );
-        
-        result = { 
-          status: "success", 
-          message: "カレンダーに予定を作成しました。", 
-          eventId: newEvent.getId() 
-        };
-        break;
-        
-      case 'update':
-        if (!eventId) {
-          throw new Error("予定の更新には eventId が必要です。");
-        }
-        
-        const eventToUpdate = calendar.getEventById(eventId);
-        if (!eventToUpdate) {
-          throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        }
-        
-        if (title) eventToUpdate.setTitle(title);
-        if (startTime && endTime) eventToUpdate.setTime(new Date(startTime), new Date(endTime));
-        if (description !== undefined) eventToUpdate.setDescription(description || "");
-        
-        result = { 
-          status: "success", 
-          message: "カレンダーの予定を更新しました。", 
-          eventId: eventId 
-        };
-        break;
-        
-      case 'delete':
-        if (!eventId) {
-          throw new Error("予定の削除には eventId が必要です。");
-        }
-        
-        const eventToDelete = calendar.getEventById(eventId);
-        if (!eventToDelete) {
-          throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        }
-        
-        eventToDelete.deleteEvent();
-        result = { 
-          status: "success", 
-          message: "カレンダーから予定を削除しました。" 
-        };
-        break;
-        
-      default:
-        throw new Error(`不明な操作です: ${operation}`);
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    console.error("Error in handleCalendarEvent:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: error.message
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-```
-
----
-
-## Google Apps Script (GAS) - `スタッフマスタ`
-
-```javascript
-// ↓↓↓↓【要設定】↓↓↓↓
-const SPREADSHEET_ID_STAFF = "1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60";
-const SHEET_NAME_STAFF = "スタッフマスタ";
-// ↓↓↓↓【設定はここまで】↓↓↓↓
-
-/**
- * GET リクエストを処理し、スタッフマスタのデータを JSON で返します
- */
-function doGet(e) {
-  try {
-    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID_STAFF).getSheetByName(SHEET_NAME_STAFF);
-    if (!sheet) throw new Error(`シート '${SHEET_NAME_STAFF}' が見つかりません。`);
-    
-    const dataRange = sheet.getDataRange();
-    const values = dataRange.getValues();
-    
-    if (values.length < 1) {
-       return ContentService.createTextOutput(JSON.stringify({ data: [] })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    const headers = values.shift();
-    const data = values.map(row => {
-      const obj = {};
-      headers.forEach((header, index) => {
-        obj[header] = (row[index] instanceof Date) ? row[index].toISOString() : row[index];
-      });
-      return obj;
-    });
-
-    return ContentService.createTextOutput(JSON.stringify({ data: data }))
-           .setMimeType(ContentService.MimeType.JSON);
-           
-  } catch (error) {
-    console.error("GAS doGet Error (Staff):", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` }))
-           .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-// POSTの処理は現時点では不要なため、最低限の実装にしています。
-function doPost(e) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "POSTリクエストを受け取りましたが、処理は実装されていません。" }))
-           .setMimeType(ContentService.MimeType.JSON);
-}
-```
-
----
-
-## Google Apps Script (GAS) - `販売店情報`
-
-```javascript
-// ↓↓↓↓【要設定】↓↓↓↓
-const SPREADSHEET_ID_CUSTOMER = "1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60";
-const SHEET_NAME_CUSTOMER = "販売店情報";
-// ↓↓↓↓【設定はここまで】↓↓↓↓
-
-/**
- * GET リクエストを処理し、販売店情報を JSON で返します
- */
-function doGet(e) {
-  try {
-    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID_CUSTOMER).getSheetByName(SHEET_NAME_CUSTOMER);
-    if (!sheet) throw new Error(`シート '${SHEET_NAME_CUSTOMER}' が見つかりません。`);
-    
-    const dataRange = sheet.getDataRange();
-    const values = dataRange.getValues();
-    
-    if (values.length < 1) {
-       return ContentService.createTextOutput(JSON.stringify({ data: [] })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    const headers = values.shift();
-    const data = values.map(row => {
-      const obj = {};
-      headers.forEach((header, index) => {
-        obj[header] = (row[index] instanceof Date) ? row[index].toISOString() : row[index];
-      });
-      return obj;
-    });
-
-    return ContentService.createTextOutput(JSON.stringify({ data: data }))
-           .setMimeType(ContentService.MimeType.JSON);
-           
-  } catch (error) {
-    console.error("GAS doGet Error (Customer):", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` }))
-           .setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-// POSTの処理は現時点では不要なため、最低限の実装にしています。
-function doPost(e) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "POSTリクエストを受け取りましたが、処理は実装されていません。" }))
-           .setMimeType(ContentService.MimeType.JSON);
-}
 
 ```
     
+```
+- `README.md`
+- `apphosting.yaml`
+- `components.json`
+- `docs/PROJECT_SNAPSHOT.md`
+- `docs/backend.json`
+- `firebase.json`
+- `firestore.rules`
+- `next.config.ts`
+- `package.json`
+- `src/PROJECT_SNAPSHOT.md`
+- `src/ai/dev.ts`
+- `src/ai/flows/optimize-route-for-efficiency.ts`
+- `src/ai/genkit.ts`
+- `src/app/actions/fetch-gas-data.ts`
+- `src/app/actions/update-sheet-status.ts`
+- `src/app/api/gas-proxy/route.ts`
+- `src/app/customers/page.tsx`
+- `src/app/globals.css`
+- `src/app/import/page.tsx`
+- `src/app/layout.tsx`
+- `src/app/login/page.tsx`
+- `src/app/optimizer/page.tsx`
+- `src/app/orders/page.tsx`
+- `src/app/page.tsx`
+- `src/app/staff/page.tsx`
+- `src/components/FirebaseErrorListener.tsx`
+- `src/components/app-shell.tsx`
+- `src/components/customers/customer-table.tsx`
+- `src/components/dashboard/status-updates.tsx`
+- `src/components/dashboard/unassigned-orders.tsx`
+- `src/components/dashboard/vertical-schedule-view.tsx`
+- `src/components/import/customer-importer.tsx`
+- `src/components/import/data-importer.tsx`
+- `src/components/import/gas-importer.tsx`
+- `src/components/import/shift-importer.tsx`
+- `src/components/import/staff-importer.tsx`
+- `src/components/optimizer/route-map.tsx`
+- `src/components/optimizer/route-optimizer.tsx`
+- `src/components/orders/order-table.tsx`
+- `src/components/staff/staff-table.tsx`
+- `src/components/ui/accordion.tsx`
+- `src/components/ui/alert-dialog.tsx`
+- `src/components/ui/alert.tsx`
+- `src/components/ui/avatar.tsx`
+- `src/components/ui/badge.tsx`
+- `src/components/ui/button.tsx`
+- `src/components/ui/calendar.tsx`
+- `src/components/ui/card.tsx`
+- `src/components/ui/carousel.tsx`
+- `src/components/ui/chart.tsx`
+- `src/components/ui/checkbox.tsx`
+- `src/components/ui/collapsible.tsx`
+- `src/components/ui/command.tsx`
+- `src/components/ui/dialog.tsx`
+- `src/components/ui/dropdown-menu.tsx`
+- `src/components/ui/form.tsx`
+- `src/components/ui/input.tsx`
+- `src/components/ui/label.tsx`
+- `src/components/ui/loading-spinner.tsx`
+- `src/components/ui/menubar.tsx`
+- `src/components/ui/popover.tsx`
+- `src/components/ui/progress.tsx`
+- `src/components/ui/radio-group.tsx`
+- `src/components/ui/scroll-area.tsx`
+- `src/components/ui/select.tsx`
+- `src/components/ui/separator.tsx`
+- `src/components/ui/sheet.tsx`
+- `src/components/ui/sidebar.tsx`
+- `src/components/ui/skeleton.tsx`
+- `src/components/ui/slider.tsx`
+- `src/components/ui/switch.tsx`
+- `src/components/ui/table.tsx`
+- `src/components/ui/tabs.tsx`
+- `src/components/ui/textarea.tsx`
+- `src/components/ui/toast.tsx`
+- `src/components/ui/toaster.tsx`
+- `src/components/ui/tooltip.tsx`
+- `src/contexts/customer-context.tsx`
+- `src/contexts/order-context.tsx`
+- `src/contexts/selected-staff-context.tsx`
+- `src/contexts/user-profile-provider.tsx`
+- `src/firebase/auth/use-user.tsx`
+- `src/firebase/client-provider.tsx`
+- `src/firebase/config.ts`
+- `src/firebase/error-emitter.ts`
+- `src/firebase/errors.ts`
+- `src/firebase/firestore/use-collection.tsx`
+- `src/firebase/firestore/use-doc.tsx`
+- `src/firebase/index.ts`
+- `src/firebase/non-blocking-login.tsx`
+- `src/firebase/non-blocking-updates.tsx`
+- `src/firebase/provider.tsx`
+- `src/firebase/seed.ts`
+- `src/firebase/server-init.ts`
+- `src/hooks/use-mobile.tsx`
+- `src/hooks/use-toast.ts`
+- `src/hooks/use-user-profile.ts`
+- `src/lib/auth.ts`
+- `src/lib/data.ts`
+- `src/lib/mutations.ts`
+- `src/lib/placeholder-images.json`
+- `src/lib/placeholder-images.ts`
+- `src/lib/settings.ts`
+- `src/lib/types.ts`
+- `src/lib/utils.ts`
+- `tailwind.config.ts`
+- `tsconfig.json`
+- `.env`
+- `.env.local`
+- `next-env.d.ts`
+- `postcss.config.js`
+- `middleware.ts`
+- `src/app/check-in/page.tsx`
+- `src/components/dashboard/schedule-view.tsx`
