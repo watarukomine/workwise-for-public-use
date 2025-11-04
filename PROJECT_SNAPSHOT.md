@@ -78,6 +78,9 @@ interface UpdateSheetStatusArgs {
     staffName?: string | null;
     statusValue?: string | null;
     timestamp?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    startTimestamp?: string | null;
 }
 
 interface GasResponse {
@@ -87,31 +90,31 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName, statusValue, timestamp } = args;
+    const { gasUrl, eventTitle, staffName, statusValue, timestamp, latitude, longitude, startTimestamp } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
     try {
-        console.log("Sending update request to GAS with body:", {
+        const bodyPayload = {
             eventTitle,
             staffName,
             statusValue,
-            timestamp
-        });
+            timestamp,
+            latitude,
+            longitude,
+            startTimestamp,
+        };
+
+        console.log("Sending update request to GAS with body:", bodyPayload);
 
         const response = await fetch(gasUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-                eventTitle,
-                staffName,
-                statusValue,
-                timestamp,
-            }),
+            body: JSON.stringify(bodyPayload),
             cache: 'no-store',
             redirect: 'follow',
         });
@@ -1103,7 +1106,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
 ---
 
-## `src/components/check-in/page.tsx`
+## `src/app/check-in/page.tsx`
 
 ```typescript
 'use client';
@@ -1112,13 +1115,15 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, Hourglass } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { useSearchParams } from 'next/navigation';
 
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
 type StatusValue = StaffStatus['status'];
@@ -1131,8 +1136,9 @@ export default function CheckInPage() {
   const [message, setMessage] = React.useState('');
   const { toast } = useToast();
   const { profile } = useUserProfile();
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get('orderId');
 
-  const MOCK_ORDER_ID = '1'; 
 
   const getJapaneseActionName = (action: ActionType) => {
     const map: Record<ActionType, string> = {
@@ -1142,7 +1148,7 @@ export default function CheckInPage() {
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
         'Finish Task': '作業終了',
-        'Wait': '待機中',
+        'Wait': '位置情報更新',
         'Send Message': 'メッセージ送信'
     };
     return map[action];
@@ -1151,12 +1157,13 @@ export default function CheckInPage() {
   const handleAction = async (action: ActionType) => {
     setIsLoading(action);
     setError(null);
+    const now = new Date();
     
     // Actions that don't require location or sheet updates
     if (action === 'Clock In' || action === 'Clock Out') {
         console.log(`Action: ${action}`);
         setTimeout(() => {
-          const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           setLastAction({ action, time: currentTime });
           toast({
             title: 'アクションを記録しました',
@@ -1179,7 +1186,7 @@ export default function CheckInPage() {
             title: 'メッセージを送信しました',
             description: '管理者にメッセージが送信されました。',
           });
-          const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           setLastAction({ action: 'Send Message', time: currentTime });
           setMessage('');
           setIsLoading(null);
@@ -1191,7 +1198,7 @@ export default function CheckInPage() {
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '待機中', // As per user request, Finish Task sets status to "待機中"
+      'Finish Task': '待機中',
       'Wait': '待機中',
       'Arrive': '作業待ち',
     };
@@ -1224,13 +1231,16 @@ export default function CheckInPage() {
         }
 
         try {
-            const eventTitleForUpdate = `(ID: ${MOCK_ORDER_ID})`;
+            const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
             const result = await updateSheetStatus({
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: eventTitleForUpdate,
                 staffName: profile.name,
                 statusValue: statusValue,
-                timestamp: new Date().toISOString(),
+                timestamp: now.toISOString(),
+                latitude: latitude,
+                longitude: longitude,
+                ...(action === 'Start Travel' && { startTimestamp: now.toISOString() }),
             });
 
             if (result.status === 'error') {
@@ -1242,7 +1252,7 @@ export default function CheckInPage() {
                 description: result.message,
             });
 
-            const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
             setLastAction({ action, time: currentTime });
 
         } catch (e: any) {
@@ -1290,7 +1300,7 @@ export default function CheckInPage() {
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },
     { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
-    { action: 'Wait', label: '待機中', icon: Hourglass },
+    { action: 'Wait', label: '位置情報更新', icon: RefreshCw },
   ];
 
   return (
@@ -1298,7 +1308,7 @@ export default function CheckInPage() {
       <Card>
         <CardHeader>
           <CardTitle>勤怠・作業記録</CardTitle>
-          <CardDescription>現在地情報と共に、作業状況を記録します。</CardDescription>
+          <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -1306,9 +1316,12 @@ export default function CheckInPage() {
               <Button
                 key={action}
                 size="lg"
-                className="h-20 text-base flex-col"
+                className={cn(
+                  "h-20 text-base flex-col",
+                  action === 'Wait' && "col-span-2"
+                )}
                 onClick={() => handleAction(action)}
-                disabled={!!isLoading}
+                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Send Message', 'Wait'].includes(action))}
               >
                 {isLoading === action ? (
                   <Loader2 className="h-6 w-6 animate-spin" />
@@ -1327,6 +1340,16 @@ export default function CheckInPage() {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>エラー</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {!orderId && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>オーダーが選択されていません</AlertTitle>
+              <AlertDescription>
+                勤怠以外の記録を行うには、スケジュール画面からタスクを選択してください。
+              </AlertDescription>
             </Alert>
           )}
 
@@ -1466,12 +1489,7 @@ function doPost(e) {
     }
     // シート更新処理の場合
     else if (params.eventTitle) {
-      return updateSheetWithOrderInfo(
-        params.eventTitle, 
-        params.staffName, 
-        params.statusValue, 
-        params.timestamp
-      );
+      return updateSheetWithOrderInfo(params);
     } 
     // 必要なパラメータがない場合
     else {
@@ -1492,17 +1510,13 @@ function doPost(e) {
 /**
  * 受注IDでシートを検索し、指定された情報で更新する
  */
-function updateSheetWithOrderInfo(eventTitle, staffName, statusValue, timestamp) {
+function updateSheetWithOrderInfo(params) {
+  const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, startTimestamp } = params;
   try {
-    console.log("Updating sheet with:", {
-      eventTitle: eventTitle,
-      staffName: staffName,
-      statusValue: statusValue,
-      timestamp: timestamp
-    });
+    console.log("Updating sheet with:", JSON.stringify(params));
     
     // タイトルから受注IDを正規表現で抽出する (例: "(ID: 123)")
-    const match = eventTitle.match(/\(ID:\s*(\w+)\)/);
+    const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
     if (!match || !match[1]) {
       // IDがタイトルに含まれていない場合は、何もしないで成功を返す（汎用タスクなどの場合）
       return ContentService.createTextOutput(JSON.stringify({ 
@@ -1527,15 +1541,11 @@ function updateSheetWithOrderInfo(eventTitle, staffName, statusValue, timestamp)
     const staffNameColIndex = headers.indexOf("担当");
     const statusColIndex = headers.indexOf("受注ステータス");
     const timestampColIndex = headers.indexOf("最終更新日時");
+    const startTravelColIndex = headers.indexOf("移動開始");
+    const lastLocationColIndex = headers.indexOf("最終位置情報（緯度,経度）"); // 新しい列
 
-    if (orderIdColIndex === -1) {
-      throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
-    }
+    if (orderIdColIndex === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
     
-    if (staffNameColIndex === -1) {
-      throw new Error("スプレッドシートに「担当」列が見つかりません。");
-    }
-
     // 対象の行を検索
     let found = false;
     for (let i = 1; i < data.length; i++) {
@@ -1543,42 +1553,42 @@ function updateSheetWithOrderInfo(eventTitle, staffName, statusValue, timestamp)
         const rowNum = i + 1;
         found = true;
         
-        // 更新内容をログ出力
-        console.log(`更新対象行: ${rowNum}, ID: ${orderId}`);
-        console.log(`担当者: ${staffName || "未設定"}`);
-        console.log(`ステータス: ${statusValue || "未設定"}`);
-        console.log(`タイムスタンプ: ${timestamp || "未設定"}`);
+        console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
         
-        // 担当者名を更新 (nullの場合は空文字で更新)
-        sheet.getRange(rowNum, staffNameColIndex + 1).setValue(staffName || "");
+        // 担当者名を更新
+        if (staffNameColIndex !== -1 && staffName !== undefined) {
+          sheet.getRange(rowNum, staffNameColIndex + 1).setValue(staffName || "");
+        }
         
-        // 受注ステータスを更新 (列が存在する場合のみ)
+        // 受注ステータスを更新
         if (statusColIndex !== -1 && statusValue !== undefined) {
-          // ★★★★★★★★★★ ここを修正 ★★★★★★★★★★
-          // 担当者名が空でも、送られてきたステータスの値をそのままセットする
           sheet.getRange(rowNum, statusColIndex + 1).setValue(statusValue || "");
         }
         
-        // 最終更新日時を更新 (列が存在する場合のみ)
+        // 最終更新日時を更新
         if (timestampColIndex !== -1 && timestamp) {
-          const dateValue = new Date(timestamp);
-          sheet.getRange(rowNum, timestampColIndex + 1).setValue(dateValue);
+          sheet.getRange(rowNum, timestampColIndex + 1).setValue(new Date(timestamp));
+        }
+
+        // 移動開始列を更新 (startTimestampがある場合のみ)
+        if (startTravelColIndex !== -1 && latitude !== undefined && longitude !== undefined && startTimestamp !== undefined) {
+          const travelInfo = `${new Date(startTimestamp).toLocaleString('ja-JP')}, ${latitude}, ${longitude}`;
+          sheet.getRange(rowNum, startTravelColIndex + 1).setValue(travelInfo);
+        }
+
+        // 最終位置情報列を更新 (latitudeとlongitudeがある場合)
+        if (lastLocationColIndex !== -1 && latitude !== undefined && longitude !== undefined) {
+          const locationInfo = `${latitude}, ${longitude}`;
+          sheet.getRange(rowNum, lastLocationColIndex + 1).setValue(locationInfo);
         }
         
-        // 成功レスポンスを返す
         return ContentService.createTextOutput(JSON.stringify({
           status: "success",
           message: `受注ID: ${orderId} を更新しました。`,
-          updatedFields: {
-            staffName: staffName,
-            statusValue: (statusColIndex !== -1) ? statusValue : "列なし",
-            timestamp: (timestampColIndex !== -1 && timestamp) ? new Date(timestamp).toString() : "更新なし"
-          }
         })).setMimeType(ContentService.MimeType.JSON);
       }
     }
     
-    // 対象が見つからなかった場合
     if (!found) {
       throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
     }
@@ -1591,6 +1601,7 @@ function updateSheetWithOrderInfo(eventTitle, staffName, statusValue, timestamp)
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
+
 
 /**
  * カレンダーイベントを作成・更新・削除する
@@ -1688,3 +1699,5 @@ function handleCalendarEvent(params) {
   }
 }
 ```
+
+    
