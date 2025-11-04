@@ -130,7 +130,8 @@ export default function CheckInPage() {
                 timestamp: now.toISOString(),
                 latitude: latitude,
                 longitude: longitude,
-                ...(action === 'Start Travel' && { startTimestamp: now.toISOString() }),
+                actionType: action,
+                actionTimestamp: now.toISOString()
             });
 
             if (result.status === 'error') {

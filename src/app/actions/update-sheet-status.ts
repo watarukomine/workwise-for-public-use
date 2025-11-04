@@ -9,7 +9,8 @@ interface UpdateSheetStatusArgs {
     timestamp?: string | null;
     latitude?: number | null;
     longitude?: number | null;
-    startTimestamp?: string | null;
+    actionType?: string | null; // e.g., 'Start Travel', 'Arrive'
+    actionTimestamp?: string | null; // The timestamp for the specific action
 }
 
 interface GasResponse {
@@ -19,7 +20,7 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName, statusValue, timestamp, latitude, longitude, startTimestamp } = args;
+    const { gasUrl, eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
@@ -33,7 +34,8 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
             timestamp,
             latitude,
             longitude,
-            startTimestamp,
+            actionType,
+            actionTimestamp
         };
 
         console.log("Sending update request to GAS with body:", bodyPayload);

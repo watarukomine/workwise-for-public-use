@@ -66,199 +66,90 @@ export const STATUS_COLUMN_NAME = '受注ステータス';
 
 ---
 
-## `src/app/page.tsx`
+## `src/app/actions/update-sheet-status.ts`
 
 ```typescript
-'use client';
+'use server';
 
-import * as React from 'react';
-import { ScheduleView } from '@/components/dashboard/schedule-view';
-import { StatusUpdates } from '@/components/dashboard/status-updates';
-import { customerData, staffStatusData } from '@/lib/data';
-import type { Customer, ScheduleEvent, StaffStatus, WithId, Staff } from '@/lib/types';
-import { useSelectedStaff } from '@/contexts/selected-staff-context';
-import { useUserProfile } from '@/hooks/use-user-profile';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { useOrder } from '@/contexts/order-context';
-import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay, isValid } from 'date-fns';
+interface UpdateSheetStatusArgs {
+    gasUrl: string;
+    eventTitle?: string | null;
+    staffName?: string | null;
+    statusValue?: string | null;
+    timestamp?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    actionType?: string | null; // e.g., 'Start Travel', 'Arrive'
+    actionTimestamp?: string | null; // The timestamp for the specific action
+}
 
-const getStorageKey = (date: Date) => {
-    return `scheduleData-${format(date, 'yyyy-MM-dd')}`;
-};
+interface GasResponse {
+    status: 'success' | 'error';
+    message: string;
+    data?: any;
+}
 
+export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
+    const { gasUrl, eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp } = args;
 
-export default function DashboardPage() {
-  const [customers] = React.useState<WithId<Customer>[]>(customerData);
-  const [currentDate, setCurrentDate] = React.useState(startOfToday());
+    if (!gasUrl) {
+        return { status: 'error', message: 'GAS URLが設定されていません。' };
+    }
 
-  const [scheduleData, setScheduleData] = React.useState<WithId<ScheduleEvent>[]>([]);
+    try {
+        const bodyPayload = {
+            eventTitle,
+            staffName,
+            statusValue,
+            timestamp,
+            latitude,
+            longitude,
+            actionType,
+            actionTimestamp
+        };
 
-  const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
-  
-  const { profile, isLoading: isProfileLoading } = useUserProfile();
-  const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
-  
-  // Update schedule data when date changes
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-        try {
-            const key = getStorageKey(currentDate);
-            const savedData = localStorage.getItem(key);
-            setScheduleData(savedData ? JSON.parse(savedData) : []);
-        } catch (error) {
-            console.error("Failed to parse schedule data for new date", error);
-            setScheduleData([]);
+        console.log("Sending update request to GAS with body:", bodyPayload);
+
+        const response = await fetch(gasUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(bodyPayload),
+            cache: 'no-store',
+            redirect: 'follow',
+        });
+        
+        console.log("GAS response status:", response.status);
+
+        if (response.redirected && response.url.includes('accounts.google.com')) {
+             throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`GASへのリクエストに失敗しました。 Status: ${response.status}. Response: ${errorText}`);
+        }
+
+        const result = await response.json();
+        console.log("GAS response:", result);
+        
+        if (result.status === 'error' || result.error) {
+            const errorMessage = result.message || 'GASスクリプトでシート更新エラーが発生しました。';
+            if (errorMessage.includes('doPost Error') || errorMessage.includes('データ解析エラー')) {
+                 throw new Error(errorMessage);
+            }
+            throw new Error(`GASスクリプトエラー: ${errorMessage}`);
+        }
+
+        return result;
+    } catch (error: any) {
+        console.error('Failed to call GAS for sheet update:', error);
+        return {
+            status: 'error',
+            message: `シート更新用のGAS呼び出しに失敗しました: ${error.message}`,
+        };
     }
-  }, [currentDate]);
-
-
-  React.useEffect(() => {
-      try {
-          if (typeof window !== 'undefined') {
-              const key = getStorageKey(currentDate);
-              localStorage.setItem(key, JSON.stringify(scheduleData));
-          }
-      } catch (error) {
-          console.error("Failed to save schedule data to localStorage", error);
-      }
-  }, [scheduleData, currentDate]);
-
-  const filteredStaff = React.useMemo(() => {
-    if (isProfileLoading || isStaffLoading || !profile) return [];
-
-    const staffToUse = allStaff;
-
-    let selectedStaff: WithId<Staff>[];
-
-    if (profile.role !== 'admin') {
-      selectedStaff = staffToUse.filter(staff => staff.id === profile.id);
-    } else {
-      if (appliedSelectedStaffIds.length === 0) {
-        selectedStaff = staffToUse;
-      } else {
-        selectedStaff = staffToUse.filter(staff => appliedSelectedStaffIds.includes(staff.id));
-      }
-    }
-
-    const areaOrder: { [key: string]: number } = { '横浜店': 1, '東名川崎店': 2, '綾瀬店': 3 };
-    return selectedStaff.sort((a, b) => {
-      const areaA = a['母店'] || '';
-      const areaB = b['母店'] || '';
-      const orderA = areaOrder[areaA] || 99;
-      const orderB = areaOrder[areaB] || 99;
-      return orderA - orderB;
-    });
-
-  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
-  
-  const filteredStatuses = React.useMemo(() => {
-    if (!staffStatusData || !filteredStaff) return [];
-    const selectedIds = new Set(filteredStaff.map(s => s.id));
-    return staffStatusData.filter(status => selectedIds.has(status.staffId));
-  }, [filteredStaff]);
-
-  const selectedStaffNames = React.useMemo(() => {
-    if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
-      return null;
-    }
-    const staffToUse = allStaff;
-    if (appliedSelectedStaffIds.length === staffToUse.length) {
-      return "全スタッフ";
-    }
-    const selectedStaff = staffToUse.filter(s => appliedSelectedStaffIds.includes(s.id));
-    return selectedStaff.map(s => s.name).join('、');
-  }, [allStaff, appliedSelectedStaffIds, profile]);
-
-  const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading;
-
-  const handleDateChange = (direction: 'next' | 'prev' | 'today') => {
-      setCurrentDate(current => {
-          if (direction === 'today') return startOfToday();
-          return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
-      });
-  };
-  
-  const dailySchedule = React.useMemo(() => {
-    if (!scheduleData) return [];
-    return scheduleData.filter(event => {
-        const eventDate = typeof event.start === 'string' ? new Date(event.start) : event.start;
-        return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-    });
-  }, [scheduleData, currentDate]);
-
-
-  if (isLoading) {
-      return (
-        <div className="flex items-center justify-center p-10">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      );
-  }
-
-  if (!profile) {
-      return (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>ようこそ WorkWiseへ</AlertTitle>
-          <AlertDescription>
-            <p>機能を利用するにはログインが必要です。</p>
-             <Button asChild className="mt-4">
-              <Link href="/login">
-                 ログインページへ
-              </Link>
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )
-  }
-
-  return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight">
-                {isToday(currentDate) ? "本日の予定" : format(currentDate, "M月d日 (E)")}
-            </h1>
-            <p className="text-muted-foreground">
-              スタッフのスケジュールと現在の状況を一覧で確認できます。
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}>
-                <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={() => handleDateChange('today')} disabled={isToday(currentDate)}>今日</Button>
-            <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}>
-                <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-      </div>
-      
-       {selectedStaffNames && (
-        <div className="rounded-lg bg-muted p-3">
-            <p className="text-sm font-medium text-muted-foreground">
-              <span className="font-semibold text-foreground">表示中のスタッフ:</span> {selectedStaffNames}
-            </p>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-8">
-        <ScheduleView 
-            staffData={filteredStaff} 
-            customerData={customers} 
-            scheduleData={dailySchedule}
-            rawOrdersData={rawOrders}
-            setScheduleData={setScheduleData}
-            currentDate={currentDate}
-        />
-        {isToday(currentDate) && <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />}
-      </div>
-    </div>
-  );
 }
 ```
 
@@ -293,7 +184,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
+import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid } from 'date-fns';
 import { cn, findKey } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -324,15 +215,15 @@ const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
 const STAFF_COL_WIDTH = 144;
 
 
-const timeStringToDate = (timeStr: string, baseDate: Date) => {
+const timeStringToDate = (timeStr: string) => {
     if (!/^\d{2}:\d{2}$/.test(timeStr)) {
         console.error("Invalid time string format:", timeStr);
         return new Date(NaN);
     }
-    const date = new Date(baseDate);
+    const today = new Date();
     const [hours, minutes] = timeStr.split(':').map(Number);
-    date.setHours(hours, minutes, 0, 0);
-    return date;
+    today.setHours(hours, minutes, 0, 0);
+    return today;
 };
 
 const formatTime = (date: Date | string) => {
@@ -379,15 +270,11 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
-    const scheduledTime = findKey(rawOrder, ['予定時間']);
-    
-    const line1 = `${findKey(rawOrder, ['お取引先名', '店舗', '取引先']) || ''}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
-    
-    const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? ` / ${findKey(rawOrder, ['本数'])}本` : ''}`;
-
+    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : ''}`;
+    const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? `：${findKey(rawOrder, ['本数'])}本` : ''}`;
     let taskDetails = line1;
-    if (line2.trim() && line2.trim() !== '/') {
-        taskDetails += `\n${line2.trim()}`;
+    if (line2.trim()) {
+        taskDetails += `\n${line2}`;
     }
     
     const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
@@ -447,9 +334,9 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
           </p>
-          {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
+          <p className="text-xs opacity-80 truncate pointer-events-none">
             {line2}
-          </p>}
+          </p>
         </div>
       </TooltipTrigger>
        <TooltipContent>
@@ -477,7 +364,6 @@ interface ScheduleViewProps {
     scheduleData: WithId<ScheduleEvent>[];
     rawOrdersData: any[]; 
     setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
-    currentDate: Date;
 }
 
 const genericTasks: WithId<Order>[] = [
@@ -514,11 +400,9 @@ function GenericTasks() {
     );
 }
 
-function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date }) {
+function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], customers: WithId<Customer>[] }) {
     const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
     const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
-    
-    const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
 
     return (
         <Card 
@@ -526,7 +410,7 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
             className={cn("transition-colors", isOver && "bg-primary/10 border-primary/50")}
         >
             <CardHeader>
-                <CardTitle className="text-lg">{titleText}</CardTitle>
+                <CardTitle className="text-lg">本日の受注タスク</CardTitle>
                 <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。タイムラインからここに戻すと未割り当てになります。</CardDescription>
             </CardHeader>
             <CardContent>
@@ -542,7 +426,7 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
                             ))}
                             {orders.length === 0 && (
                                 <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
-                                    <p>未割り当てオーダーはありません。</p>
+                                    <p>本日の未割り当てオーダーはありません。</p>
                                 </div>
                             )}
                         </div>
@@ -553,47 +437,12 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     );
 }
 
-const TimeIndicator = () => {
-    const [now, setNow] = React.useState<Date | null>(null);
-
-    React.useEffect(() => {
-        // This effect runs only on the client
-        setNow(new Date());
-        const timer = setInterval(() => {
-            setNow(new Date());
-        }, 60000); // Update every minute
-        return () => clearInterval(timer);
-    }, []);
-
-    if (!now) return null; // Don't render on the server or before client-side mount
-    
-    const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
-    if (!isVisible) return null;
-    
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-
-    const minutesFromStart = (currentHour - timelineStartHour) * 60 + currentMinute;
-    const leftPosition = minutesToPixels(minutesFromStart);
-
-    return (
-        <div
-            className="absolute top-0 bottom-[-9999px] w-0.5 bg-red-500 z-30 pointer-events-none"
-            style={{ left: `${leftPosition}px` }}
-        >
-            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
-        </div>
-    );
-};
-
-
 export function ScheduleView({ 
     staffData, 
     customerData,
     scheduleData, 
     rawOrdersData,
     setScheduleData,
-    currentDate,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
   React.useEffect(() => {
@@ -611,38 +460,21 @@ export function ScheduleView({
   React.useEffect(() => {
     if (!rawOrdersData) return;
     const allMappedOrders = rawOrdersData.map(mapRawToOrder);
+    const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
     
-    const allScheduledRawOrderIds = new Set<string>();
-    if(typeof window !== 'undefined') {
-        Object.keys(localStorage).forEach(key => {
-            if (key.startsWith('scheduleData-')) {
-                try {
-                    const data = JSON.parse(localStorage.getItem(key)!);
-                    if (Array.isArray(data)) {
-                        data.forEach((event: WithId<ScheduleEvent>) => {
-                            if (event.rawOrderId) {
-                                allScheduledRawOrderIds.add(event.rawOrderId);
-                            }
-                        });
-                    }
-                } catch {}
-            }
-        });
-    }
-
     const newUnassignedOrders = allMappedOrders.filter(order => {
         if (!order.rawOrderId) return false;
         
-        if (allScheduledRawOrderIds.has(order.rawOrderId)) return false;
+        if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
         
         const scheduledDateKey = findKey(order.raw, ['作業予定日']);
         if (!scheduledDateKey) return false;
 
         const scheduledDate = parseISO(scheduledDateKey);
-        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
+        return isValid(scheduledDate) && isToday(scheduledDate);
     });
     setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, currentDate, scheduleData]);
+  }, [rawOrdersData, scheduleData]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -678,25 +510,18 @@ export function ScheduleView({
 
           if (result.status === 'error') throw new Error(result.message);
           
-          setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && (!e.tripId || e.tripId !== eventToUnassign.tripId)));
-          
           const originalOrder = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
           if (originalOrder) {
-              const scheduledDateKey = findKey(originalOrder, ['作業予定日']);
-              if (scheduledDateKey) {
-                  const scheduledDate = parseISO(scheduledDateKey);
-                  if (isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate))) {
-                      const orderToAddBack = mapRawToOrder(originalOrder);
-                       setUnassignedOrders(prev => {
-                        if (!prev.some(o => o.id === orderToAddBack.id)) {
-                          return [...prev, orderToAddBack];
-                        }
-                        return prev;
-                      });
-                  }
+            const orderToAddBack = mapRawToOrder(originalOrder);
+             setUnassignedOrders(prev => {
+              if (!prev.some(o => o.id === orderToAddBack.id)) {
+                return [...prev, orderToAddBack];
               }
+              return prev;
+            });
           }
-
+      
+          setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
           toast({ title: 'タスクを未割り当てに戻しました' });
       } catch(e: any) {
           console.error("Unassignment failed:", e);
@@ -717,7 +542,7 @@ export function ScheduleView({
         if (item.rawOrderId) {
           await unassignTask(item);
         } else {
-           setScheduleData(prev => prev.filter(e => e.id !== item.id && (!e.tripId || e.tripId !== item.tripId)));
+           setScheduleData(prev => prev.filter(e => e.id !== item.id && e.tripId !== item.tripId));
            toast({ title: '汎用タスクを削除しました' });
         }
         return;
@@ -729,7 +554,7 @@ export function ScheduleView({
     if (!staffRowElement) return;
     
     const timelineRect = staffRowElement.getBoundingClientRect();
-    const startOfDay = new Date(currentDate);
+    const startOfDay = new Date();
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
     const getNewStartFromDrop = () => {
@@ -764,19 +589,15 @@ export function ScheduleView({
             const newStart = getNewStartFromDrop();
 
             setScheduleData(prev => {
-                const eventsToMove = prev.filter(e => e.tripId && e.tripId === draggedEvent.tripId);
+                const eventsToMove = prev.filter(e => e.tripId === draggedEvent.tripId);
                 if (eventsToMove.length > 0) {
                     const originalTask = eventsToMove.find(e => e.id.endsWith('-task')) || draggedEvent;
                     const originalTravel = eventsToMove.find(e => e.id.endsWith('-travel'));
-                    
                     const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
                     
                     let newTaskStart = newStart;
-                    if (originalTravel && draggedEvent.id.endsWith('-travel')) {
-                        const travelDuration = differenceInMinutes(parseISO(originalTravel.end as string), parseISO(originalTravel.start as string));
-                        newTaskStart = addMinutes(newStart, travelDuration);
-                    } else if (originalTravel && draggedEvent.id.endsWith('-task')) {
-                         newTaskStart = newStart;
+                    if (originalTravel && draggedEvent.id === originalTravel.id) {
+                        newTaskStart = addMinutes(newStart, TRAVEL_TIME_MINUTES);
                     }
                     
                     const newTaskEnd = addMinutes(newTaskStart, taskDuration);
@@ -846,7 +667,7 @@ export function ScheduleView({
               const travelEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-travel`,
                   tripId: tripId,
-                  title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
+                  title: `移動: ${customer?.storeName || order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: travelStart.toISOString(),
@@ -858,8 +679,8 @@ export function ScheduleView({
                   tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
-                  title: order.taskDetails, // Use full details for the main task chip
-                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`,
+                  title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`,
+                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: taskStart.toISOString(),
@@ -895,7 +716,8 @@ export function ScheduleView({
     const clickX = e.clientX - timelineRect.left;
     const clickMinutes = pixelsToMinutes(clickX);
     
-    const startOfDay = new Date(currentDate);
+    const today = new Date();
+    const startOfDay = new Date(today);
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
     const newStart = addMinutes(startOfDay, clickMinutes);
 
@@ -906,8 +728,8 @@ export function ScheduleView({
   const handleSaveEvent = async () => {
     if (dialogState.mode === 'closed') return;
     
-    const newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
-    const newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
+    const newStart = timeStringToDate(editedEventDetails.startTime);
+    const newEnd = timeStringToDate(editedEventDetails.endTime);
 
     if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
         toast({ variant: 'destructive', title: 'エラー', description: '無効な時間形式です。' });
@@ -954,7 +776,7 @@ export function ScheduleView({
     if (eventToDelete.rawOrderId) {
         await unassignTask(eventToDelete);
     } else {
-        setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id && (!e.tripId || e.tripId !== eventToDelete.tripId)));
+        setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id && e.tripId !== eventToDelete.tripId));
         toast({ title: '予定を削除しました' });
     }
 
@@ -977,11 +799,19 @@ export function ScheduleView({
 
   const { event, staff, customer, title } = getDialogDetails();
 
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleData) return [];
+      return scheduleData.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isToday(eventDate);
+      });
+  }, [scheduleData]);
+
   if (!isClient) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>スケジュール</CardTitle>
+          <CardTitle>本日のスケジュール</CardTitle>
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
         </CardHeader>
         <CardContent>
@@ -998,7 +828,7 @@ export function ScheduleView({
       <TooltipProvider>
         <div className="space-y-4">
             <GenericTasks />
-            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
 
             <Card>
                 <CardHeader>
@@ -1020,13 +850,12 @@ export function ScheduleView({
                                       </span>
                                   </div>
                               ))}
-                              {isToday(currentDate) && <TimeIndicator />}
                           </div>
                       </div>
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative mt-2 space-y-2">
                             {staffData?.map((staff) => {
-                                const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
                                 return (
                                     <StaffRow
                                         key={staff.id}
@@ -1164,7 +993,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
         <div className="h-full border-t border-b"></div>
-        <div className="absolute top-0 left-0 h-full w-full">
+        <div className="absolute top-0 left-0 h-full">
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
@@ -1195,43 +1024,45 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   const { left, width } = getEventDimensions(event.start, event.end);
 
-  const style: React.CSSProperties = {
+  const style = {
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
+    opacity: isDragging ? 0.8 : 1,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation(); 
     onDoubleClick();
   };
-  
+
   const isTravelEvent = event.title?.startsWith('移動');
-  
-  const divStyle: React.CSSProperties = {
-      backgroundColor: staff.color || 'hsl(var(--primary))',
-  };
+  const isBreakEvent = event.title === '休憩';
+
+  let backgroundColor = staff.color || 'hsl(var(--primary))';
+  let color = 'white';
 
   if (isTravelEvent) {
-      style.opacity = 0.5;
+    if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
+       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+       if (match) {
+         backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+       }
+    } else {
+       backgroundColor = 'hsla(var(--primary), 0.5)';
+    }
+    color = 'hsl(var(--foreground))';
+  } else if (isBreakEvent) {
+     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
+        const [h, s] = backgroundColor.match(/\d+/g) || ['0', '0'];
+        backgroundColor = `hsl(${h}, ${s}%, 90%)`;
+      } else {
+        backgroundColor = `hsl(120, 40%, 85%)`;
+      }
+      color = 'hsl(var(--foreground))';
   }
   
-  const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
-  let textColorClass = 'text-primary-foreground';
-  if (brightStaff.includes(staff.name)) {
-      textColorClass = 'text-black';
-  }
-  
-  if (event.id.startsWith('generic-travel')) {
-    divStyle.backgroundColor = 'rgb(250 204 21)';
-    textColorClass = 'text-black';
-  } else if (event.id.startsWith('generic-work')) {
-    divStyle.backgroundColor = 'rgb(156 163 175)';
-  } else if (event.id.startsWith('generic-break')) {
-    divStyle.backgroundColor = 'rgb(34 197 94)';
-  }
-
   const [line1, ...rest] = (event.title || '').split('\n');
   const line2 = rest.join('\n');
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
@@ -1249,8 +1080,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         data-event-chip="true"
       >
         <div
-          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)}
-          style={divStyle}
+          className="w-full h-full rounded-md flex flex-col justify-center p-1"
+          style={{ backgroundColor, color }}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
@@ -1285,13 +1116,15 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, Hourglass } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { useSearchParams } from 'next/navigation';
 
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
 type StatusValue = StaffStatus['status'];
@@ -1304,8 +1137,9 @@ export default function CheckInPage() {
   const [message, setMessage] = React.useState('');
   const { toast } = useToast();
   const { profile } = useUserProfile();
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get('orderId');
 
-  const MOCK_ORDER_ID = '1'; 
 
   const getJapaneseActionName = (action: ActionType) => {
     const map: Record<ActionType, string> = {
@@ -1315,7 +1149,7 @@ export default function CheckInPage() {
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
         'Finish Task': '作業終了',
-        'Wait': '待機中',
+        'Wait': '位置情報更新',
         'Send Message': 'メッセージ送信'
     };
     return map[action];
@@ -1324,12 +1158,13 @@ export default function CheckInPage() {
   const handleAction = async (action: ActionType) => {
     setIsLoading(action);
     setError(null);
+    const now = new Date();
     
     // Actions that don't require location or sheet updates
     if (action === 'Clock In' || action === 'Clock Out') {
         console.log(`Action: ${action}`);
         setTimeout(() => {
-          const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           setLastAction({ action, time: currentTime });
           toast({
             title: 'アクションを記録しました',
@@ -1352,7 +1187,629 @@ export default function CheckInPage() {
             title: 'メッセージを送信しました',
             description: '管理者にメッセージが送信されました。',
           });
-          const currentTime = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          setLastAction({ action: 'Send Message', time: currentTime });
+          setMessage('');
+          setIsLoading(null);
+        }, 1000);
+        return;
+    }
+
+    // Map actions to their corresponding status values for the sheet update
+    const statusMap: Partial<Record<ActionType, StatusValue>> = {
+      'Start Travel': '移動中',
+      'Begin Task': '作業中',
+      'Finish Task': '待機中',
+      'Wait': '待機中',
+      'Arrive': '作業待ち',
+    };
+
+    const statusValue = statusMap[action];
+    
+    if (!statusValue) {
+        console.error("No status defined for this action:", action);
+        setIsLoading(null);
+        return;
+    }
+
+    if (!navigator.geolocation) {
+      setError('お使いのブラウザは位置情報取得に対応していません。');
+      setIsLoading(null);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setLocation({ latitude, longitude });
+        
+        console.log(`Action: ${action}`, { latitude, longitude });
+        
+        if (!profile?.name) {
+            setError('ユーザー情報が取得できません。ログインしているか確認してください。');
+            setIsLoading(null);
+            return;
+        }
+
+        try {
+            const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
+            const result = await updateSheetStatus({
+                gasUrl: ORDER_GAS_URL,
+                eventTitle: eventTitleForUpdate,
+                staffName: profile.name,
+                statusValue: statusValue,
+                timestamp: now.toISOString(),
+                latitude: latitude,
+                longitude: longitude,
+                actionType: action,
+                actionTimestamp: now.toISOString()
+            });
+
+            if (result.status === 'error') {
+                throw new Error(result.message);
+            }
+
+            toast({
+                title: 'ステータスを更新しました',
+                description: result.message,
+            });
+
+            const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            setLastAction({ action, time: currentTime });
+
+        } catch (e: any) {
+            setError(e.message || 'スプレッドシートの更新に失敗しました。');
+            toast({
+                variant: 'destructive',
+                title: '更新エラー',
+                description: e.message || 'スプレッドシートの更新に失敗しました。'
+            });
+        }
+        
+        setIsLoading(null);
+      },
+      (err) => {
+        let message = '';
+        switch (err.code) {
+          case err.PERMISSION_DENIED:
+            message = '位置情報の利用が許可されていません。ブラウザの設定を確認してください。';
+            break;
+          case err.POSITION_UNAVAILABLE:
+            message = '現在地の取得に失敗しました。';
+            break;
+          case err.TIMEOUT:
+            message = '位置情報の取得がタイムアウトしました。';
+            break;
+          default:
+            message = '不明なエラーが発生しました。';
+            break;
+        }
+        setError(message);
+        setIsLoading(null);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
+
+  const actionButtons: { action: ActionType; label: string; icon: React.ElementType }[] = [
+    { action: 'Clock In', label: '出勤', icon: LogIn },
+    { action: 'Clock Out', label: '退勤', icon: LogOut },
+    { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
+    { action: 'Arrive', label: '現場到着', icon: MapPin },
+    { action: 'Begin Task', label: '作業開始', icon: Clock },
+    { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
+    { action: 'Wait', label: '位置情報更新', icon: RefreshCw },
+  ];
+
+  return (
+    <div className="max-w-md mx-auto space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>勤怠・作業記録</CardTitle>
+          <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {actionButtons.map(({ action, label, icon: Icon }) => (
+              <Button
+                key={action}
+                size="lg"
+                className={cn(
+                  "h-20 text-base flex-col",
+                  action === 'Wait' && "col-span-2"
+                )}
+                onClick={() => handleAction(action)}
+                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Send Message', 'Wait'].includes(action))}
+              >
+                {isLoading === action ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <>
+                    <Icon className="h-6 w-6 mb-1" />
+                    {label}
+                  </>
+                )}
+              </Button>
+            ))}
+          </div>
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>エラー</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {!orderId && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>オーダーが選択されていません</AlertTitle>
+              <AlertDescription>
+                勤怠以外の記録を行うには、スケジュール画面からタスクを選択してください。
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {lastAction && (
+             <Alert>
+              <MapPin className="h-4 w-4" />
+              <AlertTitle>最後の記録</AlertTitle>
+              <AlertDescription>
+                {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
+                {location && !['Clock In', 'Clock Out', 'Send Message'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
+              </AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+       <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            管理者へ連絡
+          </CardTitle>
+          <CardDescription>緊急の連絡や報告がある場合に使用してください。</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            placeholder="メッセージを入力..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            disabled={isLoading === 'Send Message'}
+          />
+          <Button
+            className="w-full"
+            onClick={() => handleAction('Send Message')}
+            disabled={!!isLoading}
+          >
+            {isLoading === 'Send Message' ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-2" />
+            )}
+            メッセージ送信
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+```
+
+---
+
+## Google Apps Script (GAS)
+
+```javascript
+// ↓↓↓↓【要設定】↓↓↓↓
+// スプレッドシートのID（URLの .../d/【この部分】/edit...）を貼り付けてください
+const SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
+// データを読み書きするシート名を正確に入力してください
+const SHEET_NAME = "受注管理"; 
+// ↓↓↓↓【設定はここまで】↓↓↓↓
+
+/**
+ * GET リクエストを処理し、スプレッドシートのデータを JSON で返します
+ */
+function doGet(e) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    if (!sheet) throw new Error(`シート '${SHEET_NAME}' が見つかりません。`);
+    
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    
+    if (values.length < 1) {
+       return ContentService.createTextOutput(JSON.stringify({ data: [] })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    const headers = values.shift();
+    const sheetId = sheet.getSheetId();
+    const spreadsheetId = sheet.getParent().getId();
+
+    const data = values.map((row, rowIndex) => {
+      const obj = {};
+      headers.forEach((header, index) => {
+        obj[header] = (row[index] instanceof Date) ? row[index].toISOString() : row[index];
+      });
+      obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowIndex + 2}`;
+      return obj;
+    });
+
+    return ContentService.createTextOutput(JSON.stringify({ data: data })).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * POST リクエストを処理し、スプレッドシートを更新します
+ */
+function doPost(e) {
+  try {
+    // リクエストの情報をログに出力
+    console.log("doPost Request received:", JSON.stringify(e));
+    
+    let params;
+    
+    // POSTボディがJSONの場合
+    if (e.postData && e.postData.type === "application/json") {
+      try {
+        params = JSON.parse(e.postData.contents);
+        console.log("JSON data parsed:", JSON.stringify(params));
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError.message);
+        return ContentService.createTextOutput(JSON.stringify({
+          status: "error",
+          message: "JSONデータの解析に失敗しました: " + parseError.message
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+    } 
+    // URLパラメータまたはフォームデータの場合
+    else if (e.parameter && Object.keys(e.parameter).length > 0) {
+      params = e.parameter;
+      console.log("URL parameters:", JSON.stringify(params));
+    } 
+    // データがない場合
+    else {
+      console.error("No data received in request");
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "error",
+        message: "リクエストにデータがありません"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // カレンダー操作の場合
+    if (params.operation) {
+      return handleCalendarEvent(params);
+    }
+    // シート更新処理の場合
+    else if (params.eventTitle) {
+      return updateSheetWithOrderInfo(params);
+    } 
+    // 必要なパラメータがない場合
+    else {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "error",
+        message: "必要なパラメータ (operation または eventTitle) がありません"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch (error) {
+    console.error("Error in doPost:", error.message, error.stack);
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: "エラーが発生しました: " + error.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * 受注IDでシートを検索し、指定された情報で更新する
+ */
+function updateSheetWithOrderInfo(params) {
+  const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp } = params;
+  try {
+    console.log("Updating sheet with:", JSON.stringify(params));
+    
+    // タイトルから受注IDを正規表現で抽出する (例: "(ID: 123)")
+    const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
+    if (!match || !match[1]) {
+      // IDがタイトルに含まれていない場合は、何もしないで成功を返す（汎用タスクなどの場合）
+      return ContentService.createTextOutput(JSON.stringify({ 
+        status: "success", 
+        message: "汎用タスクのためシート更新はスキップされました。" 
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    const orderId = match[1];
+    console.log("Extracted order ID:", orderId);
+
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+    if (!sheet) {
+      throw new Error(`シート「${SHEET_NAME}」が見つかりません。`);
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    
+    // 更新対象の列インデックスを取得
+    const orderIdColIndex = headers.indexOf("受注ID");
+    const staffNameColIndex = headers.indexOf("担当");
+    const statusColIndex = headers.indexOf("受注ステータス");
+    const timestampColIndex = headers.indexOf("最終更新日時");
+    const lastLocationColIndex = headers.indexOf("最終位置情報（緯度,経度）");
+    const startTravelColIndex = headers.indexOf("移動開始");
+    const arriveColIndex = headers.indexOf("現場到着");
+    const startWorkColIndex = headers.indexOf("作業開始");
+    const finishWorkColIndex = headers.indexOf("作業終了");
+
+    if (orderIdColIndex === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
+    
+    // 対象の行を検索
+    let found = false;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][orderIdColIndex]) === String(orderId)) {
+        const rowNum = i + 1;
+        found = true;
+        
+        console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
+        
+        // 担当者名を更新
+        if (staffNameColIndex !== -1 && staffName !== undefined) {
+          sheet.getRange(rowNum, staffNameColIndex + 1).setValue(staffName || "");
+        }
+        
+        // 受注ステータスを更新
+        if (statusColIndex !== -1 && statusValue !== undefined) {
+          sheet.getRange(rowNum, statusColIndex + 1).setValue(statusValue || "");
+        }
+        
+        // 最終更新日時を更新
+        if (timestampColIndex !== -1 && timestamp) {
+          sheet.getRange(rowNum, timestampColIndex + 1).setValue(new Date(timestamp));
+        }
+
+        // アクション別のタイムスタンプを更新
+        if (actionType && actionTimestamp) {
+            const dateValue = new Date(actionTimestamp);
+            switch (actionType) {
+                case 'Start Travel':
+                    if (startTravelColIndex !== -1) {
+                        sheet.getRange(rowNum, startTravelColIndex + 1).setValue(dateValue);
+                    }
+                    break;
+                case 'Arrive':
+                    if (arriveColIndex !== -1) {
+                        sheet.getRange(rowNum, arriveColIndex + 1).setValue(dateValue);
+                    }
+                    break;
+                case 'Begin Task':
+                    if (startWorkColIndex !== -1) {
+                        sheet.getRange(rowNum, startWorkColIndex + 1).setValue(dateValue);
+                    }
+                    break;
+                case 'Finish Task':
+                    if (finishWorkColIndex !== -1) {
+                        sheet.getRange(rowNum, finishWorkColIndex + 1).setValue(dateValue);
+                    }
+                    break;
+            }
+        }
+
+
+        // 最終位置情報列を更新 (latitudeとlongitudeがある場合)
+        if (lastLocationColIndex !== -1 && latitude !== undefined && longitude !== undefined) {
+          const locationInfo = `${latitude}, ${longitude}`;
+          sheet.getRange(rowNum, lastLocationColIndex + 1).setValue(locationInfo);
+        }
+        
+        return ContentService.createTextOutput(JSON.stringify({
+          status: "success",
+          message: `受注ID: ${orderId} を更新しました。`,
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    
+    if (!found) {
+      throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
+    }
+    
+  } catch (error) {
+    console.error("Error in updateSheetWithOrderInfo:", error.message, error.stack);
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: error.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+
+/**
+ * カレンダーイベントを作成・更新・削除する
+ */
+function handleCalendarEvent(params) {
+  try {
+    console.log("handleCalendarEvent called with:", JSON.stringify(params));
+    
+    const { operation, calendarId, eventId, title, description, startTime, endTime } = params;
+    
+    if (!operation) {
+      throw new Error("必須パラメータ 'operation' がありません");
+    }
+    
+    if (!calendarId) {
+      throw new Error("必須パラメータ 'calendarId' がありません");
+    }
+    
+    const calendar = CalendarApp.getCalendarById(calendarId);
+    if (!calendar) {
+      throw new Error(`カレンダーID「${calendarId}」が見つからないか、アクセス権がありません。`);
+    }
+
+    let result = {};
+    
+    switch (operation) {
+      case 'create':
+        if (!title || !startTime || !endTime) {
+          throw new Error("予定の作成には title, startTime, endTime が必要です。");
+        }
+        
+        const newEvent = calendar.createEvent(
+          title, 
+          new Date(startTime), 
+          new Date(endTime), 
+          { description: description || '' }
+        );
+        
+        result = { 
+          status: "success", 
+          message: "カレンダーに予定を作成しました。", 
+          eventId: newEvent.getId() 
+        };
+        break;
+        
+      case 'update':
+        if (!eventId) {
+          throw new Error("予定の更新には eventId が必要です。");
+        }
+        
+        const eventToUpdate = calendar.getEventById(eventId);
+        if (!eventToUpdate) {
+          throw new Error(`イベントID「${eventId}」が見つかりません。`);
+        }
+        
+        if (title) eventToUpdate.setTitle(title);
+        if (startTime && endTime) eventToUpdate.setTime(new Date(startTime), new Date(endTime));
+        if (description !== undefined) eventToUpdate.setDescription(description || "");
+        
+        result = { 
+          status: "success", 
+          message: "カレンダーの予定を更新しました。", 
+          eventId: eventId 
+        };
+        break;
+        
+      case 'delete':
+        if (!eventId) {
+          throw new Error("予定の削除には eventId が必要です。");
+        }
+        
+        const eventToDelete = calendar.getEventById(eventId);
+        if (!eventToDelete) {
+          throw new Error(`イベントID「${eventId}」が見つかりません。`);
+        }
+        
+        eventToDelete.deleteEvent();
+        result = { 
+          status: "success", 
+          message: "カレンダーから予定を削除しました。" 
+        };
+        break;
+        
+      default:
+        throw new Error(`不明な操作です: ${operation}`);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    console.error("Error in handleCalendarEvent:", error.message, error.stack);
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: error.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+```
+
+---
+
+## `src/app/check-in/page.tsx`
+
+```typescript
+'use client';
+
+import * as React from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, Hourglass } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
+import { useUserProfile } from '@/hooks/use-user-profile';
+import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
+import type { StaffStatus } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { useSearchParams } from 'next/navigation';
+
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
+type StatusValue = StaffStatus['status'];
+
+export default function CheckInPage() {
+  const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
+  const [location, setLocation] = React.useState<{ latitude: number; longitude: number } | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [lastAction, setLastAction] = React.useState<{ action: ActionType; time: string } | null>(null);
+  const [message, setMessage] = React.useState('');
+  const { toast } = useToast();
+  const { profile } = useUserProfile();
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get('orderId');
+
+
+  const getJapaneseActionName = (action: ActionType) => {
+    const map: Record<ActionType, string> = {
+        'Clock In': '出勤',
+        'Clock Out': '退勤',
+        'Start Travel': '移動開始',
+        'Arrive': '現場到着',
+        'Begin Task': '作業開始',
+        'Finish Task': '作業終了',
+        'Wait': '待機中',
+        'Send Message': 'メッセージ送信'
+    };
+    return map[action];
+  };
+
+  const handleAction = async (action: ActionType) => {
+    setIsLoading(action);
+    setError(null);
+    const now = new Date();
+    
+    // Actions that don't require location or sheet updates
+    if (action === 'Clock In' || action === 'Clock Out') {
+        console.log(`Action: ${action}`);
+        setTimeout(() => {
+          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          setLastAction({ action, time: currentTime });
+          toast({
+            title: 'アクションを記録しました',
+            description: `${getJapaneseActionName(action)} at ${currentTime}`,
+          });
+          setIsLoading(null);
+        }, 1000);
+        return;
+    }
+    
+    if (action === 'Send Message') {
+        if (!message.trim()) {
+            setError('メッセージを入力してください。');
+            setIsLoading(null);
+            return;
+        }
+        console.log(`Message to admin: ${message}`);
+        setTimeout(() => {
+          toast({
+            title: 'メッセージを送信しました',
+            description: '管理者にメッセージが送信されました。',
+          });
+          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           setLastAction({ action: 'Send Message', time: currentTime });
           setMessage('');
           setIsLoading(null);
@@ -1397,13 +1854,17 @@ export default function CheckInPage() {
         }
 
         try {
-            const eventTitleForUpdate = `(ID: ${MOCK_ORDER_ID})`;
+            const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
             const result = await updateSheetStatus({
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: eventTitleForUpdate,
                 staffName: profile.name,
                 statusValue: statusValue,
                 timestamp: new Date().toISOString(),
+                latitude: latitude,
+                longitude: longitude,
+                actionType: action,
+                actionTimestamp: now.toISOString()
             });
 
             if (result.status === 'error') {
@@ -1639,12 +2100,7 @@ function doPost(e) {
     }
     // シート更新処理の場合
     else if (params.eventTitle) {
-      return updateSheetWithOrderInfo(
-        params.eventTitle, 
-        params.staffName, 
-        params.statusValue, 
-        params.timestamp
-      );
+      return updateSheetWithOrderInfo(params);
     } 
     // 必要なパラメータがない場合
     else {
@@ -1665,14 +2121,10 @@ function doPost(e) {
 /**
  * 受注IDでシートを検索し、指定された情報で更新する
  */
-function updateSheetWithOrderInfo(eventTitle, staffName, statusValue, timestamp) {
+function updateSheetWithOrderInfo(params) {
+  const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp } = params;
   try {
-    console.log("Updating sheet with:", {
-      eventTitle: eventTitle,
-      staffName: staffName,
-      statusValue: statusValue,
-      timestamp: timestamp
-    });
+    console.log("Updating sheet with:", JSON.stringify(params));
     
     // タイトルから受注IDを正規表現で抽出する (例: "(ID: 123)")
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
@@ -1700,15 +2152,14 @@ function updateSheetWithOrderInfo(eventTitle, staffName, statusValue, timestamp)
     const staffNameColIndex = headers.indexOf("担当");
     const statusColIndex = headers.indexOf("受注ステータス");
     const timestampColIndex = headers.indexOf("最終更新日時");
+    const lastLocationColIndex = headers.indexOf("最終位置情報（緯度,経度）");
+    const startTravelColIndex = headers.indexOf("移動開始");
+    const arriveColIndex = headers.indexOf("現場到着");
+    const startWorkColIndex = headers.indexOf("作業開始");
+    const finishWorkColIndex = headers.indexOf("作業終了");
 
-    if (orderIdColIndex === -1) {
-      throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
-    }
+    if (orderIdColIndex === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
     
-    if (staffNameColIndex === -1) {
-      throw new Error("スプレッドシートに「担当」列が見つかりません。");
-    }
-
     // 対象の行を検索
     let found = false;
     for (let i = 1; i < data.length; i++) {
@@ -1716,40 +2167,64 @@ function updateSheetWithOrderInfo(eventTitle, staffName, statusValue, timestamp)
         const rowNum = i + 1;
         found = true;
         
-        // 更新内容をログ出力
-        console.log(`更新対象行: ${rowNum}, ID: ${orderId}`);
-        console.log(`担当者: ${staffName || "未設定"}`);
-        console.log(`ステータス: ${statusValue || "未設定"}`);
-        console.log(`タイムスタンプ: ${timestamp || "未設定"}`);
+        console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
         
-        // 担当者名を更新 (nullの場合は空文字で更新)
-        sheet.getRange(rowNum, staffNameColIndex + 1).setValue(staffName || "");
+        // 担当者名を更新
+        if (staffNameColIndex !== -1 && staffName !== undefined) {
+          sheet.getRange(rowNum, staffNameColIndex + 1).setValue(staffName || "");
+        }
         
-        // 受注ステータスを更新 (列が存在する場合のみ)
+        // 受注ステータスを更新
         if (statusColIndex !== -1 && statusValue !== undefined) {
           sheet.getRange(rowNum, statusColIndex + 1).setValue(statusValue || "");
         }
         
-        // 最終更新日時を更新 (列が存在する場合のみ)
+        // 最終更新日時を更新
         if (timestampColIndex !== -1 && timestamp) {
-          const dateValue = new Date(timestamp);
-          sheet.getRange(rowNum, timestampColIndex + 1).setValue(dateValue);
+          sheet.getRange(rowNum, timestampColIndex + 1).setValue(new Date(timestamp));
+        }
+
+        // アクション別のタイムスタンプを更新
+        if (actionType && actionTimestamp) {
+            const dateValue = new Date(actionTimestamp);
+            switch (actionType) {
+                case 'Start Travel':
+                    if (startTravelColIndex !== -1) {
+                        sheet.getRange(rowNum, startTravelColIndex + 1).setValue(dateValue);
+                    }
+                    break;
+                case 'Arrive':
+                    if (arriveColIndex !== -1) {
+                        sheet.getRange(rowNum, arriveColIndex + 1).setValue(dateValue);
+                    }
+                    break;
+                case 'Begin Task':
+                    if (startWorkColIndex !== -1) {
+                        sheet.getRange(rowNum, startWorkColIndex + 1).setValue(dateValue);
+                    }
+                    break;
+                case 'Finish Task':
+                    if (finishWorkColIndex !== -1) {
+                        sheet.getRange(rowNum, finishWorkColIndex + 1).setValue(dateValue);
+                    }
+                    break;
+            }
+        }
+
+
+        // 最終位置情報列を更新 (latitudeとlongitudeがある場合)
+        if (lastLocationColIndex !== -1 && latitude !== undefined && longitude !== undefined) {
+          const locationInfo = `${latitude}, ${longitude}`;
+          sheet.getRange(rowNum, lastLocationColIndex + 1).setValue(locationInfo);
         }
         
-        // 成功レスポンスを返す
         return ContentService.createTextOutput(JSON.stringify({
           status: "success",
           message: `受注ID: ${orderId} を更新しました。`,
-          updatedFields: {
-            staffName: staffName,
-            statusValue: (statusColIndex !== -1) ? statusValue : "列なし",
-            timestamp: (timestampColIndex !== -1 && timestamp) ? new Date(timestamp).toString() : "更新なし"
-          }
         })).setMimeType(ContentService.MimeType.JSON);
       }
     }
     
-    // 対象が見つからなかった場合
     if (!found) {
       throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
     }
@@ -1762,6 +2237,7 @@ function updateSheetWithOrderInfo(eventTitle, staffName, statusValue, timestamp)
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
+
 
 /**
  * カレンダーイベントを作成・更新・削除する
