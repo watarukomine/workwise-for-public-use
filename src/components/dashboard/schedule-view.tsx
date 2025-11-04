@@ -266,7 +266,7 @@ const TimeIndicator = ({className}: {className?: string}) => {
 
     return (
         <div
-            className={cn("absolute top-0 w-0.5 bg-red-500 z-30 pointer-events-none", className)}
+            className={cn("absolute top-0 w-0.5 bg-red-500 pointer-events-none", className)}
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -694,6 +694,7 @@ export function ScheduleView({
                 </CardHeader>
                 <CardContent className="pt-6">
                     <div className="relative">
+                      {isToday(currentDate) && <TimeIndicator className="z-30 h-full"/>}
                       <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
                           <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
                           <div className="relative h-8 flex-1">
@@ -708,7 +709,6 @@ export function ScheduleView({
                                       </span>
                                   </div>
                               ))}
-                              {isToday(currentDate) && <TimeIndicator className="h-full"/>}
                           </div>
                       </div>
                       <ScrollArea className="w-full whitespace-nowrap">
