@@ -79,7 +79,8 @@ interface UpdateSheetStatusArgs {
     timestamp?: string | null;
     latitude?: number | null;
     longitude?: number | null;
-    startTimestamp?: string | null;
+    actionType?: string | null; // e.g., 'Start Travel', 'Arrive'
+    actionTimestamp?: string | null; // The timestamp for the specific action
 }
 
 interface GasResponse {
@@ -89,7 +90,7 @@ interface GasResponse {
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName, statusValue, timestamp, latitude, longitude, startTimestamp } = args;
+    const { gasUrl, eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
@@ -103,7 +104,8 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
             timestamp,
             latitude,
             longitude,
-            startTimestamp,
+            actionType,
+            actionTimestamp
         };
 
         console.log("Sending update request to GAS with body:", bodyPayload);
@@ -1239,7 +1241,8 @@ export default function CheckInPage() {
                 timestamp: now.toISOString(),
                 latitude: latitude,
                 longitude: longitude,
-                ...(action === 'Start Travel' && { startTimestamp: now.toISOString() }),
+                actionType: action,
+                actionTimestamp: now.toISOString()
             });
 
             if (result.status === 'error') {
@@ -1450,12 +1453,9 @@ function doGet(e) {
  */
 function doPost(e) {
   try {
-    // リクエストの情報をログに出力
     console.log("doPost Request received:", JSON.stringify(e));
     
     let params;
-    
-    // POSTボディがJSONの場合
     if (e.postData && e.postData.type === "application/json") {
       try {
         params = JSON.parse(e.postData.contents);
@@ -1467,31 +1467,19 @@ function doPost(e) {
           message: "JSONデータの解析に失敗しました: " + parseError.message
         })).setMimeType(ContentService.MimeType.JSON);
       }
-    } 
-    // URLパラメータまたはフォームデータの場合
-    else if (e.parameter && Object.keys(e.parameter).length > 0) {
-      params = e.parameter;
-      console.log("URL parameters:", JSON.stringify(params));
-    } 
-    // データがない場合
-    else {
-      console.error("No data received in request");
+    } else {
+      console.error("No JSON data received in request");
       return ContentService.createTextOutput(JSON.stringify({
         status: "error",
-        message: "リクエストにデータがありません"
+        message: "リクエストにJSONデータがありません"
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
-    // カレンダー操作の場合
     if (params.operation) {
       return handleCalendarEvent(params);
-    }
-    // シート更新処理の場合
-    else if (params.eventTitle) {
+    } else if (params.eventTitle) {
       return updateSheetWithOrderInfo(params);
-    } 
-    // 必要なパラメータがない場合
-    else {
+    } else {
       return ContentService.createTextOutput(JSON.stringify({
         status: "error",
         message: "必要なパラメータ (operation または eventTitle) がありません"
@@ -1510,14 +1498,12 @@ function doPost(e) {
  * 受注IDでシートを検索し、指定された情報で更新する
  */
 function updateSheetWithOrderInfo(params) {
-  const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, startTimestamp } = params;
+  const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp } = params;
   try {
     console.log("Updating sheet with:", JSON.stringify(params));
     
-    // タイトルから受注IDを正規表現で抽出する (例: "(ID: 123)")
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
     if (!match || !match[1]) {
-      // IDがタイトルに含まれていない場合は、何もしないで成功を返す（汎用タスクなどの場合）
       return ContentService.createTextOutput(JSON.stringify({ 
         status: "success", 
         message: "汎用タスクのためシート更新はスキップされました。" 
@@ -1528,57 +1514,63 @@ function updateSheetWithOrderInfo(params) {
     console.log("Extracted order ID:", orderId);
 
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    if (!sheet) {
-      throw new Error(`シート「${SHEET_NAME}」が見つかりません。`);
-    }
+    if (!sheet) throw new Error(`シート「${SHEET_NAME}」が見つかりません。`);
 
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
     
     // 更新対象の列インデックスを取得
-    const orderIdColIndex = headers.indexOf("受注ID");
-    const staffNameColIndex = headers.indexOf("担当");
-    const statusColIndex = headers.indexOf("受注ステータス");
-    const timestampColIndex = headers.indexOf("最終更新日時");
-    const startTravelColIndex = headers.indexOf("移動開始");
-    const lastLocationColIndex = headers.indexOf("最終位置情報（緯度,経度）");
+    const colIdx = {
+      orderId: headers.indexOf("受注ID"),
+      staffName: headers.indexOf("担当"),
+      status: headers.indexOf("受注ステータス"),
+      lastUpdate: headers.indexOf("最終更新日時"),
+      lastLocation: headers.indexOf("最終位置情報（緯度,経度）"),
+      startTravel: headers.indexOf("移動開始"),
+      arrive: headers.indexOf("現場到着"),
+      startWork: headers.indexOf("作業開始"),
+      finishWork: headers.indexOf("作業終了")
+    };
 
-    if (orderIdColIndex === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
+    if (colIdx.orderId === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
     
     // 対象の行を検索
-    let found = false;
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][orderIdColIndex]) === String(orderId)) {
+      if (String(data[i][colIdx.orderId]) === String(orderId)) {
         const rowNum = i + 1;
-        found = true;
-        
         console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
         
-        // 担当者名を更新
-        if (staffNameColIndex !== -1 && staffName !== undefined) {
-          sheet.getRange(rowNum, staffNameColIndex + 1).setValue(staffName || "");
+        // 各列の更新
+        if (colIdx.staffName !== -1 && staffName !== undefined) {
+          sheet.getRange(rowNum, colIdx.staffName + 1).setValue(staffName || "");
         }
-        
-        // 受注ステータスを更新
-        if (statusColIndex !== -1 && statusValue !== undefined) {
-          sheet.getRange(rowNum, statusColIndex + 1).setValue(statusValue || "");
+        if (colIdx.status !== -1 && statusValue !== undefined) {
+          sheet.getRange(rowNum, colIdx.status + 1).setValue(statusValue || "");
         }
-        
-        // 最終更新日時を更新
-        if (timestampColIndex !== -1 && timestamp) {
-          sheet.getRange(rowNum, timestampColIndex + 1).setValue(new Date(timestamp));
+        if (colIdx.lastUpdate !== -1 && timestamp) {
+          sheet.getRange(rowNum, colIdx.lastUpdate + 1).setValue(new Date(timestamp));
         }
-
-        // 移動開始列を更新 (startTimestampがある場合のみ)
-        if (startTravelColIndex !== -1 && startTimestamp !== undefined) {
-          const travelInfo = `${new Date(startTimestamp).toLocaleString('ja-JP')}`;
-          sheet.getRange(rowNum, startTravelColIndex + 1).setValue(travelInfo);
+        if (colIdx.lastLocation !== -1 && latitude !== undefined && longitude !== undefined) {
+          sheet.getRange(rowNum, colIdx.lastLocation + 1).setValue(`${latitude}, ${longitude}`);
         }
 
-        // 最終位置情報列を更新 (latitudeとlongitudeがある場合)
-        if (lastLocationColIndex !== -1 && latitude !== undefined && longitude !== undefined) {
-          const locationInfo = `${latitude}, ${longitude}`;
-          sheet.getRange(rowNum, lastLocationColIndex + 1).setValue(locationInfo);
+        // アクション別のタイムスタンプを更新
+        if (actionType && actionTimestamp) {
+            const dateValue = new Date(actionTimestamp);
+            switch (actionType) {
+                case 'Start Travel':
+                    if (colIdx.startTravel !== -1) sheet.getRange(rowNum, colIdx.startTravel + 1).setValue(dateValue);
+                    break;
+                case 'Arrive':
+                    if (colIdx.arrive !== -1) sheet.getRange(rowNum, colIdx.arrive + 1).setValue(dateValue);
+                    break;
+                case 'Begin Task':
+                    if (colIdx.startWork !== -1) sheet.getRange(rowNum, colIdx.startWork + 1).setValue(dateValue);
+                    break;
+                case 'Finish Task':
+                    if (colIdx.finishWork !== -1) sheet.getRange(rowNum, colIdx.finishWork + 1).setValue(dateValue);
+                    break;
+            }
         }
         
         return ContentService.createTextOutput(JSON.stringify({
@@ -1588,9 +1580,7 @@ function updateSheetWithOrderInfo(params) {
       }
     }
     
-    if (!found) {
-      throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
-    }
+    throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
     
   } catch (error) {
     console.error("Error in updateSheetWithOrderInfo:", error.message, error.stack);
@@ -1611,77 +1601,38 @@ function handleCalendarEvent(params) {
     
     const { operation, calendarId, eventId, title, description, startTime, endTime } = params;
     
-    if (!operation) {
-      throw new Error("必須パラメータ 'operation' がありません");
-    }
-    
-    if (!calendarId) {
-      throw new Error("必須パラメータ 'calendarId' がありません");
+    if (!operation || !calendarId) {
+      throw new Error("必須パラメータ 'operation' または 'calendarId' がありません");
     }
     
     const calendar = CalendarApp.getCalendarById(calendarId);
-    if (!calendar) {
-      throw new Error(`カレンダーID「${calendarId}」が見つからないか、アクセス権がありません。`);
-    }
+    if (!calendar) throw new Error(`カレンダーID「${calendarId}」が見つからないか、アクセス権がありません。`);
 
     let result = {};
     
     switch (operation) {
       case 'create':
-        if (!title || !startTime || !endTime) {
-          throw new Error("予定の作成には title, startTime, endTime が必要です。");
-        }
-        
-        const newEvent = calendar.createEvent(
-          title, 
-          new Date(startTime), 
-          new Date(endTime), 
-          { description: description || '' }
-        );
-        
-        result = { 
-          status: "success", 
-          message: "カレンダーに予定を作成しました。", 
-          eventId: newEvent.getId() 
-        };
+        if (!title || !startTime || !endTime) throw new Error("予定の作成には title, startTime, endTime が必要です。");
+        const newEvent = calendar.createEvent(title, new Date(startTime), new Date(endTime), { description: description || '' });
+        result = { status: "success", message: "カレンダーに予定を作成しました。", eventId: newEvent.getId() };
         break;
         
       case 'update':
-        if (!eventId) {
-          throw new Error("予定の更新には eventId が必要です。");
-        }
-        
+        if (!eventId) throw new Error("予定の更新には eventId が必要です。");
         const eventToUpdate = calendar.getEventById(eventId);
-        if (!eventToUpdate) {
-          throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        }
-        
+        if (!eventToUpdate) throw new Error(`イベントID「${eventId}」が見つかりません。`);
         if (title) eventToUpdate.setTitle(title);
         if (startTime && endTime) eventToUpdate.setTime(new Date(startTime), new Date(endTime));
         if (description !== undefined) eventToUpdate.setDescription(description || "");
-        
-        result = { 
-          status: "success", 
-          message: "カレンダーの予定を更新しました。", 
-          eventId: eventId 
-        };
+        result = { status: "success", message: "カレンダーの予定を更新しました。", eventId: eventId };
         break;
         
       case 'delete':
-        if (!eventId) {
-          throw new Error("予定の削除には eventId が必要です。");
-        }
-        
+        if (!eventId) throw new Error("予定の削除には eventId が必要です。");
         const eventToDelete = calendar.getEventById(eventId);
-        if (!eventToDelete) {
-          throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        }
-        
+        if (!eventToDelete) throw new Error(`イベントID「${eventId}」が見つかりません。`);
         eventToDelete.deleteEvent();
-        result = { 
-          status: "success", 
-          message: "カレンダーから予定を削除しました。" 
-        };
+        result = { status: "success", message: "カレンダーから予定を削除しました。" };
         break;
         
       default:
@@ -1691,10 +1642,7 @@ function handleCalendarEvent(params) {
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     console.error("Error in handleCalendarEvent:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: error.message
-    })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 ```
@@ -1835,7 +1783,8 @@ export default function CheckInPage() {
                 timestamp: now.toISOString(),
                 latitude: latitude,
                 longitude: longitude,
-                ...(action === 'Start Travel' && { startTimestamp: now.toISOString() }),
+                actionType: action,
+                actionTimestamp: now.toISOString()
             });
 
             if (result.status === 'error') {
@@ -1994,3 +1943,4 @@ export default function CheckInPage() {
   );
 }
 ```
+    
