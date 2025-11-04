@@ -32,7 +32,7 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b
  * 受注情報を取得・更新し、カレンダー連携も行うGoogle Apps ScriptのURL。
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
-export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwsmrzKKzQ6U_0FNYcuszEm9LtHdWqet2lljc5NkH91KC1tldLt_lLOMENNPAoXNJQ/exec';
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbxquWYjMBOVACYRdxvGde-_oaxG2r964XD3OmA8CZ_qp0LA0-dx-qRrUyn9iUgDmyB2/exec';
 
 
 // --- スプレッドシート本体のURL ---
@@ -53,7 +53,7 @@ export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHX
  * 受注情報が記載されているスプレッドシートのURL。
  * orders/page.tsx のヘッダークリックで開かれます。
  */
-export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Order sheet URL
+export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU/edit?usp=sharing';
 
 
 // --- その他設定 ---
@@ -1503,10 +1503,10 @@ function updateSheetWithOrderInfo(params) {
     console.log("Updating sheet with:", JSON.stringify(params));
     
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
-    if (!match || !match[1]) {
+    if (!match || !match[1] || match[1] === 'N/A') {
       return ContentService.createTextOutput(JSON.stringify({ 
         status: "success", 
-        message: "汎用タスクのためシート更新はスキップされました。" 
+        message: "汎用タスクまたはIDなしタスクのためシート更新はスキップされました。" 
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
@@ -1571,8 +1571,9 @@ function updateSheetWithOrderInfo(params) {
                     if (colIdx.finishWork !== -1) sheet.getRange(rowNum, colIdx.finishWork + 1).setValue(dateValue);
                     break;
                 case 'Update Location':
-                    // This action might just update location and lastUpdate, handled above.
-                    // No specific column for this action type.
+                case 'Wait':
+                    // These actions just update location and lastUpdate, handled above.
+                    // No specific column for these action types.
                     break;
             }
         }
@@ -1946,121 +1947,4 @@ export default function CheckInPage() {
     </div>
   );
 }
-
 ```
-    
-```
-- `README.md`
-- `apphosting.yaml`
-- `components.json`
-- `docs/PROJECT_SNAPSHOT.md`
-- `docs/backend.json`
-- `firebase.json`
-- `firestore.rules`
-- `next.config.ts`
-- `package.json`
-- `src/PROJECT_SNAPSHOT.md`
-- `src/ai/dev.ts`
-- `src/ai/flows/optimize-route-for-efficiency.ts`
-- `src/ai/genkit.ts`
-- `src/app/actions/fetch-gas-data.ts`
-- `src/app/actions/update-sheet-status.ts`
-- `src/app/api/gas-proxy/route.ts`
-- `src/app/customers/page.tsx`
-- `src/app/globals.css`
-- `src/app/import/page.tsx`
-- `src/app/layout.tsx`
-- `src/app/login/page.tsx`
-- `src/app/optimizer/page.tsx`
-- `src/app/orders/page.tsx`
-- `src/app/page.tsx`
-- `src/app/staff/page.tsx`
-- `src/components/FirebaseErrorListener.tsx`
-- `src/components/app-shell.tsx`
-- `src/components/customers/customer-table.tsx`
-- `src/components/dashboard/status-updates.tsx`
-- `src/components/dashboard/unassigned-orders.tsx`
-- `src/components/dashboard/vertical-schedule-view.tsx`
-- `src/components/import/customer-importer.tsx`
-- `src/components/import/data-importer.tsx`
-- `src/components/import/gas-importer.tsx`
-- `src/components/import/shift-importer.tsx`
-- `src/components/import/staff-importer.tsx`
-- `src/components/optimizer/route-map.tsx`
-- `src/components/optimizer/route-optimizer.tsx`
-- `src/components/orders/order-table.tsx`
-- `src/components/staff/staff-table.tsx`
-- `src/components/ui/accordion.tsx`
-- `src/components/ui/alert-dialog.tsx`
-- `src/components/ui/alert.tsx`
-- `src/components/ui/avatar.tsx`
-- `src/components/ui/badge.tsx`
-- `src/components/ui/button.tsx`
-- `src/components/ui/calendar.tsx`
-- `src/components/ui/card.tsx`
-- `src/components/ui/carousel.tsx`
-- `src/components/ui/chart.tsx`
-- `src/components/ui/checkbox.tsx`
-- `src/components/ui/collapsible.tsx`
-- `src/components/ui/command.tsx`
-- `src/components/ui/dialog.tsx`
-- `src/components/ui/dropdown-menu.tsx`
-- `src/components/ui/form.tsx`
-- `src/components/ui/input.tsx`
-- `src/components/ui/label.tsx`
-- `src/components/ui/loading-spinner.tsx`
-- `src/components/ui/menubar.tsx`
-- `src/components/ui/popover.tsx`
-- `src/components/ui/progress.tsx`
-- `src/components/ui/radio-group.tsx`
-- `src/components/ui/scroll-area.tsx`
-- `src/components/ui/select.tsx`
-- `src/components/ui/separator.tsx`
-- `src/components/ui/sheet.tsx`
-- `src/components/ui/sidebar.tsx`
-- `src/components/ui/skeleton.tsx`
-- `src/components/ui/slider.tsx`
-- `src/components/ui/switch.tsx`
-- `src/components/ui/table.tsx`
-- `src/components/ui/tabs.tsx`
-- `src/components/ui/textarea.tsx`
-- `src/components/ui/toast.tsx`
-- `src/components/ui/toaster.tsx`
-- `src/components/ui/tooltip.tsx`
-- `src/contexts/customer-context.tsx`
-- `src/contexts/order-context.tsx`
-- `src/contexts/selected-staff-context.tsx`
-- `src/contexts/user-profile-provider.tsx`
-- `src/firebase/auth/use-user.tsx`
-- `src/firebase/client-provider.tsx`
-- `src/firebase/config.ts`
-- `src/firebase/error-emitter.ts`
-- `src/firebase/errors.ts`
-- `src/firebase/firestore/use-collection.tsx`
-- `src/firebase/firestore/use-doc.tsx`
-- `src/firebase/index.ts`
-- `src/firebase/non-blocking-login.tsx`
-- `src/firebase/non-blocking-updates.tsx`
-- `src/firebase/provider.tsx`
-- `src/firebase/seed.ts`
-- `src/firebase/server-init.ts`
-- `src/hooks/use-mobile.tsx`
-- `src/hooks/use-toast.ts`
-- `src/hooks/use-user-profile.ts`
-- `src/lib/auth.ts`
-- `src/lib/data.ts`
-- `src/lib/mutations.ts`
-- `src/lib/placeholder-images.json`
-- `src/lib/placeholder-images.ts`
-- `src/lib/settings.ts`
-- `src/lib/types.ts`
-- `src/lib/utils.ts`
-- `tailwind.config.ts`
-- `tsconfig.json`
-- `.env`
-- `.env.local`
-- `next-env.d.ts`
-- `postcss.config.js`
-- `middleware.ts`
-- `src/app/check-in/page.tsx`
-- `src/components/dashboard/schedule-view.tsx`
