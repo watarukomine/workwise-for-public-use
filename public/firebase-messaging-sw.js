@@ -1,10 +1,10 @@
-// This file must be in the public directory.
+// This file must be in the public folder.
 
-// Scripts for Firebase v9+
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
-// Your web app's Firebase configuration
+// Initialize the Firebase app in the service worker by passing in the messagingSenderId.
+// Get this from your project's serverless console.
 const firebaseConfig = {
   apiKey: "AIzaSyCl1WOEKb9hTh1cXh9TmmuKFzE0gR0hBxU",
   authDomain: "studio-9545980025-bf83e.firebaseapp.com",
@@ -15,11 +15,10 @@ const firebaseConfig = {
   measurementId: "G-4191E301S8"
 };
 
-// Initialize Firebase
+
 firebase.initializeApp(firebaseConfig);
 
-// Retrieve an instance of Firebase Messaging so that it can handle background
-// messages.
+// Retrieve an instance of Firebase Messaging so that it can handle background messages.
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
@@ -28,7 +27,7 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: '/firebase-logo.png'
+    icon: payload.notification.image
   };
 
   self.registration.showNotification(notificationTitle,
