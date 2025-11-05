@@ -113,8 +113,12 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-    if (!isStaffLoading) {
+    if (!isStaffLoading && allStaff.length > 0) {
       fetchAndProcessData();
+    } else if (!isStaffLoading && allStaff.length === 0) {
+      // If there are no staff, there's no point in trying to process orders.
+      // This can happen if the staff sheet fails to load.
+      setIsLoading(false);
     }
   }, [isStaffLoading, orderGasUrl, allStaff.length]); // Use allStaff.length to prevent re-fetching on every render
 

@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
@@ -93,7 +93,12 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const LOCAL_STORAGE_KEY = 'appliedStaffIds';
   
+  const initialLoadDone = useRef(false);
+
   useEffect(() => {
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+
     const loadStaff = async () => {
         setIsLoading(true);
         setError(null);
