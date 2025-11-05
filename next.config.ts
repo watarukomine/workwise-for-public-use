@@ -35,14 +35,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-   webpack: (config, { isServer }) => {
-    // Exclude firebase-messaging-sw.js from being processed by webpack on the client.
-    // This is necessary because it's a service worker and needs to be served as a static file.
-    if (!isServer) {
-        config.resolve.alias['./firebase-messaging-sw.js'] = path.join(__dirname, 'public', 'firebase-messaging-sw.js');
-    }
-    return config;
-  },
 };
 
 export default nextConfig;
