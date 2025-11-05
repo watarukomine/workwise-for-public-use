@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -475,7 +474,11 @@ export function ScheduleView({
                 if (draggedEvent.calendarEventId) {
                     if(isStaffChange) {
                         if(oldStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: draggedEvent.calendarEventId });
-                        if(newStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: draggedEvent.title, startTime: newStart.toISOString(), endTime: newEnd.toISOString(), description: draggedEvent.description });
+                        if(newStaff.calendarId) {
+                            const createResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: draggedEvent.title, startTime: newStart.toISOString(), endTime: newEnd.toISOString(), description: draggedEvent.description });
+                            // For generic events, we don't have a sheet row to update the new calendar ID to.
+                            // The new event will get a new calendarEventId on refetch.
+                        }
                     } else {
                         if(newStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId!, eventId: draggedEvent.calendarEventId, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
                     }
@@ -960,5 +963,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-    
