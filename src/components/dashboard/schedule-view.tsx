@@ -290,7 +290,6 @@ export function ScheduleView({
   React.useEffect(() => {
     if (!rawOrdersData) return;
     
-    // Filter orders from raw data that are unassigned for the current date
     const dailySchedule = scheduleEvents.filter(event => {
         const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
         return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
@@ -357,7 +356,6 @@ export function ScheduleView({
             }
         }
         
-        // Optimistic UI update
         const originalOrderRaw = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
         if (originalOrderRaw) {
             const orderToAddBack = mapRawToOrder(originalOrderRaw);
@@ -452,6 +450,7 @@ export function ScheduleView({
                     timestamp: new Date().toISOString(),
                     taskCalendarEventId: originalTask.calendarEventId,
                     travelCalendarEventId: originalTravel?.calendarEventId,
+                    calendarId: newStaff.calendarId,
                 });
                 
                 let finalTaskEventId = originalTask.calendarEventId;
@@ -468,11 +467,6 @@ export function ScheduleView({
                         const newTaskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: originalTask.title, description: originalTask.description, startTime: newTaskStart.toISOString(), endTime: newTaskEnd.toISOString() });
                         finalTaskEventId = newTaskResult.eventId;
                         finalTravelEventId = newTravelResult.eventId;
-                    }
-                } else { // Just time change
-                    if (newStaff.calendarId) {
-                        if(finalTaskEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: finalTaskEventId, startTime: newTaskStart.toISOString(), endTime: newTaskEnd.toISOString() });
-                        if(finalTravelEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: finalTravelEventId, startTime: newTravelStart.toISOString(), endTime: newTaskStart.toISOString() });
                     }
                 }
 
@@ -578,9 +572,9 @@ export function ScheduleView({
                   timestamp: new Date().toISOString(),
                   taskCalendarEventId: taskResult.eventId,
                   travelCalendarEventId: travelResult.eventId,
+                  calendarId: staff.calendarId,
               });
               
-              // Optimistic UI update
               const tripId = `trip-${order.rawOrderId}`;
               const travelEvent: WithId<ScheduleEvent> = { id: `${tripId}-travel`, tripId, title: travelTitle, staffId: newStaffId, start: travelStart.toISOString(), end: taskStart.toISOString(), rawOrderId: order.rawOrderId, calendarEventId: travelResult.eventId };
               const taskEvent: WithId<ScheduleEvent> = { id: `${tripId}-task`, tripId, orderId: order.id, rawOrderId: order.rawOrderId, title: taskTitle, staffId: newStaffId, locationId: order.customerCode, start: taskStart.toISOString(), end: taskEnd.toISOString(), calendarEventId: taskResult.eventId, description: taskDescription };
@@ -659,9 +653,6 @@ export function ScheduleView({
             if (!staff || !staff.calendarId) throw new Error("担当スタッフにカレンダーIDが設定されていません。");
             
             if (dialogState.event.rawOrderId) { // Sheet-based event
-                const duration = differenceInMinutes(parseISO(dialogState.event.end as string), parseISO(dialogState.event.start as string));
-                const newEnd = addMinutes(newStart, duration);
-
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
@@ -669,7 +660,7 @@ export function ScheduleView({
                     timestamp: new Date().toISOString(),
                     taskCalendarEventId: dialogState.event.calendarEventId
                 });
-                
+
                 // Optimistic UI Update
                 setScheduleEvents(prev => prev.map(e => {
                     if (e.tripId === dialogState.event.tripId) {
@@ -732,6 +723,14 @@ export function ScheduleView({
   };
 
   const { event, staff, customer, title } = getDialogDetails();
+  
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleEvents) return [];
+      return scheduleEvents.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+      });
+  }, [scheduleEvents, currentDate]);
 
   if (!isClient) {
     return (
@@ -748,14 +747,6 @@ export function ScheduleView({
       </Card>
     );
   }
-
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-      });
-  }, [scheduleEvents, currentDate]);
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
