@@ -9,7 +9,6 @@ import { SelectedStaffProvider } from '@/contexts/selected-staff-context';
 import { CustomerProvider } from '@/contexts/customer-context';
 import { OrderProvider } from '@/contexts/order-context';
 import { FirebaseClientProvider } from '@/firebase';
-import { NotificationPermissionManager } from '@/components/NotificationPermissionManager';
 
 export default function RootLayout({
   children,
@@ -35,7 +34,6 @@ export default function RootLayout({
                     <AppShell>
                         {children}
                     </AppShell>
-                    <NotificationPermissionManager />
                 </AppShellProvider>
               </OrderProvider>
             </CustomerProvider>
