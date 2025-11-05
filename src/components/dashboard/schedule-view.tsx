@@ -260,7 +260,7 @@ const TimeIndicator = () => {
 
     return (
         <div
-            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none z-40"
+            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -345,7 +345,7 @@ export function ScheduleView({
             eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
             staffName: "",
             statusValue: "未割当",
-            scheduledTime: "", // Clear the scheduled time
+            scheduledTime: "",
         });
         
         const eventsToDelete = scheduleData.filter(e => e.tripId === eventToUnassign.tripId);
@@ -433,6 +433,7 @@ export function ScheduleView({
                         eventTitle: `(ID: ${originalTask.rawOrderId})`,
                         scheduledTime: newTaskStart.toISOString(),
                         staffName: newStaff.name,
+                        timestamp: new Date().toISOString(),
                      });
                 }
                 
@@ -450,6 +451,9 @@ export function ScheduleView({
                          if (isStaffChange) {
                             if(oldStaff.calendarId) await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: event.calendarEventId });
                             const createResult = await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: event.title, startTime: updatedEvent.start, endTime: updatedEvent.end, description: event.description });
+                            if (createResult.eventId && originalTask.rawOrderId) {
+                                await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${originalTask.rawOrderId})`, calendarEventId: createResult.eventId });
+                            }
                         } else {
                             await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: event.calendarEventId, startTime: updatedEvent.start, endTime: updatedEvent.end });
                         }
@@ -504,23 +508,25 @@ export function ScheduleView({
                     endTime: newEventEnd.toISOString() 
                 });
             } else {
+              const taskEnd = addMinutes(taskStart, order.estimatedDuration);
+              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+              
+              const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
+              const travelResult = await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
+              
+              const taskTitle = order.taskDetails;
+              const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
+              const taskResult = await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
+
               await updateSheetStatus({
                   gasUrl: ORDER_GAS_URL,
                   eventTitle: `(ID: ${order.rawOrderId})`,
                   staffName: staff.name,
                   statusValue: '作業待ち',
-                  scheduledTime: taskStart.toISOString(), // Write back the actual scheduled time
+                  scheduledTime: taskStart.toISOString(),
+                  timestamp: new Date().toISOString(),
+                  calendarEventId: taskResult.eventId, // Save main task event ID
               });
-              
-              const taskEnd = addMinutes(taskStart, order.estimatedDuration);
-              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-              
-              const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
-              await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
-              
-              const taskTitle = order.taskDetails;
-              const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
-              await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
               
               toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
             }
@@ -587,6 +593,7 @@ export function ScheduleView({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
                     scheduledTime: newStart.toISOString(),
+                    timestamp: new Date().toISOString(),
                 });
             }
 
@@ -682,29 +689,36 @@ export function ScheduleView({
                                       </span>
                                   </div>
                               ))}
-                               {isToday(currentDate) && <TimeIndicator />}
                           </div>
                       </div>
-                      <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
-                            <div className="relative space-y-2">
-                                {staffData?.map((staff) => {
-                                    const events = scheduleData.filter((e) => e.staffId === staff.id);
-                                    return (
-                                        <StaffRow
-                                            key={staff.id}
-                                            staff={staff}
-                                            events={events}
-                                            getCustomerByCode={getCustomerByCode}
-                                            isOver={currentOverStaffId === staff.id}
-                                            onDoubleClickEvent={handleDoubleClickEvent}
-                                            onDoubleClickTimeline={handleDoubleClickTimeline}
-                                        />
-                                    );
-                                })}
-                            </div>
+                      <div className="relative">
+                        <div 
+                          className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                          style={{ left: `${STAFF_COL_WIDTH}px`, width: `calc(100% - ${STAFF_COL_WIDTH}px)`}}
+                        >
+                          {isToday(currentDate) && <TimeIndicator />}
                         </div>
-                      </ScrollArea>
+                        <ScrollArea className="w-full whitespace-nowrap">
+                          <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
+                              <div className="relative space-y-2">
+                                  {staffData?.map((staff) => {
+                                      const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                      return (
+                                          <StaffRow
+                                              key={staff.id}
+                                              staff={staff}
+                                              events={events}
+                                              getCustomerByCode={getCustomerByCode}
+                                              isOver={currentOverStaffId === staff.id}
+                                              onDoubleClickEvent={handleDoubleClickEvent}
+                                              onDoubleClickTimeline={handleDoubleClickTimeline}
+                                          />
+                                      );
+                                  })}
+                              </div>
+                          </div>
+                        </ScrollArea>
+                      </div>
                     </div>
                 </CardContent>
             </Card>
@@ -825,7 +839,6 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
         ref={setNodeRef} 
         className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
-        style={{ width: `100%`}}
       >
         <div className="h-full border-t border-b"></div>
         <div className="absolute top-0 left-0 h-full w-full">
