@@ -83,12 +83,18 @@ export default function CheckInPage() {
         }, 1000);
         return;
     }
+    
+    if (!orderId && !['Wait'].includes(action)) {
+        setError('このアクションにはオーダーIDが必要です。スケジュール画面からタスクを選択してください。');
+        setIsLoading(null);
+        return;
+    }
 
     // Map actions to their corresponding status values for the sheet update
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '待機中',
+      'Finish Task': '待機中', // Status becomes '待機中' after finishing a task.
       'Wait': '待機中',
       'Arrive': '作業待ち',
     };
@@ -212,7 +218,7 @@ export default function CheckInPage() {
                   action === 'Wait' && "col-span-2"
                 )}
                 onClick={() => handleAction(action)}
-                disabled={isLoading || (requiresOrderId && !orderId)}
+                disabled={!!isLoading || (requiresOrderId && !orderId)}
               >
                 {isLoading === action ? (
                   <Loader2 className="h-6 w-6 animate-spin" />
@@ -239,7 +245,7 @@ export default function CheckInPage() {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>オーダーが選択されていません</AlertTitle>
               <AlertDescription>
-                勤怠以外の記録を行うには、スケジュール画面からタスクを選択してください。
+                「移動開始」「現場到着」「作業開始」「作業終了」を記録するには、スケジュール画面からタスクを選択してください。
               </AlertDescription>
             </Alert>
           )}
@@ -288,5 +294,4 @@ export default function CheckInPage() {
       </Card>
     </div>
   );
-
-    
+}

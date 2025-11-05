@@ -163,7 +163,6 @@ interface ScheduleViewProps {
     customerData: WithId<Customer>[];
     scheduleData: WithId<ScheduleEvent>[];
     rawOrdersData: any[]; 
-    setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
     currentDate: Date;
 }
 
@@ -240,7 +239,7 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     );
 }
 
-const TimeIndicator = ({className}: {className?: string}) => {
+const TimeIndicator = () => {
     const [now, setNow] = React.useState<Date | null>(null);
 
     React.useEffect(() => {
@@ -261,7 +260,7 @@ const TimeIndicator = ({className}: {className?: string}) => {
 
     return (
         <div
-            className={cn("absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none z-30", className)}
+            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none z-40"
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -274,7 +273,6 @@ export function ScheduleView({
     customerData,
     scheduleData, 
     rawOrdersData,
-    setScheduleData,
     currentDate,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
@@ -301,13 +299,11 @@ export function ScheduleView({
 
         if (isAssigned) return false;
 
-        const receptionDate = findKey(order, ['受付日']);
         const workDate = findKey(order, ['作業予定日']);
         
-        const targetDate = workDate || receptionDate;
-        if (!targetDate) return false;
+        if (!workDate) return false;
 
-        const scheduledDate = parseISO(targetDate);
+        const scheduledDate = parseISO(workDate);
         return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
     }).map(mapRawToOrder);
 
@@ -349,7 +345,6 @@ export function ScheduleView({
             eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
             staffName: "",
             statusValue: "未割当",
-            timestamp: new Date().toISOString(),
             scheduledTime: "", // Clear the scheduled time
         });
         
@@ -514,7 +509,6 @@ export function ScheduleView({
                   eventTitle: `(ID: ${order.rawOrderId})`,
                   staffName: staff.name,
                   statusValue: '作業待ち',
-                  timestamp: new Date().toISOString(),
                   scheduledTime: taskStart.toISOString(), // Write back the actual scheduled time
               });
               
@@ -688,7 +682,7 @@ export function ScheduleView({
                                       </span>
                                   </div>
                               ))}
-                              {isToday(currentDate) && <TimeIndicator className="top-8" />}
+                               {isToday(currentDate) && <TimeIndicator />}
                           </div>
                       </div>
                       <ScrollArea className="w-full whitespace-nowrap">
