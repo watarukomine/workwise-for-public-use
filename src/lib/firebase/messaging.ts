@@ -18,9 +18,13 @@ export const requestNotificationPermission = async () => {
   if (permission === 'granted') {
     console.log('Notification permission granted.');
     try {
+      if (!firebaseConfig.vapidKey || firebaseConfig.vapidKey.includes('YOUR_VAPID_KEY')) {
+        throw new Error('VAPID key is not configured in firebase/config.ts');
+      }
+      
       // Use the VAPID key from the project's configuration
       const fcmToken = await getToken(messaging, {
-        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+        vapidKey: firebaseConfig.vapidKey,
       });
       if (fcmToken) {
         console.log('FCM Token:', fcmToken);
