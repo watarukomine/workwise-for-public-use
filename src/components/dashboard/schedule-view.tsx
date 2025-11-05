@@ -464,7 +464,9 @@ export function ScheduleView({
                            }
                         }
                     } else {
-                        if(newStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: event.calendarEventId, startTime: eventStartTime, endTime: eventEndTime });
+                        if(newStaff.calendarId && event.calendarEventId) {
+                           await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: event.calendarEventId, startTime: eventStartTime, endTime: eventEndTime });
+                        }
                     }
                 }
             } else { // Generic event without tripId
@@ -475,9 +477,7 @@ export function ScheduleView({
                     if(isStaffChange) {
                         if(oldStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: draggedEvent.calendarEventId });
                         if(newStaff.calendarId) {
-                            const createResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: draggedEvent.title, startTime: newStart.toISOString(), endTime: newEnd.toISOString(), description: draggedEvent.description });
-                            // For generic events, we don't have a sheet row to update the new calendar ID to.
-                            // The new event will get a new calendarEventId on refetch.
+                           await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: draggedEvent.title, startTime: newStart.toISOString(), endTime: newEnd.toISOString(), description: draggedEvent.description });
                         }
                     } else {
                         if(newStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId!, eventId: draggedEvent.calendarEventId, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
