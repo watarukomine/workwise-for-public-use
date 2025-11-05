@@ -1,4 +1,5 @@
 import type {NextConfig} from 'next';
+import path from 'path';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -32,6 +33,13 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+        // Exclude firebase-messaging-sw.js from being processed by webpack
+        const swDest = path.join(__dirname, 'public', 'firebase-messaging-sw.js');
+    }
+    return config;
   },
 };
 
