@@ -92,5 +92,3 @@ export async function handleCalendarEvent(args: {
 }): Promise<GasResponse> {
     return callGasApi({ ...args });
 }
-
-    
