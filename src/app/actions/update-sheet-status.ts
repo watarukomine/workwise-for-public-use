@@ -3,43 +3,41 @@
 
 interface UpdateSheetStatusArgs {
     gasUrl: string;
+    // For sheet update
     eventTitle?: string | null;
     staffName?: string | null;
     statusValue?: string | null;
     timestamp?: string | null;
     latitude?: number | null;
     longitude?: number | null;
-    actionType?: string | null; // e.g., 'Start Travel', 'Arrive'
-    actionTimestamp?: string | null; // The timestamp for the specific action
-    scheduledTime?: string | null; // The actual scheduled time set by the admin
+    actionType?: string | null;
+    actionTimestamp?: string | null;
+    scheduledTime?: string | null;
+    // For calendar update
+    operation?: 'create' | 'update' | 'delete';
+    calendarId?: string;
+    eventId?: string;
+    title?: string;
+    description?: string;
+    startTime?: string;
+    endTime?: string;
 }
 
 interface GasResponse {
     status: 'success' | 'error';
     message: string;
     data?: any;
+    eventId?: string;
 }
 
 export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp, scheduledTime } = args;
+    const { gasUrl, ...bodyPayload } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
     try {
-        const bodyPayload = {
-            eventTitle,
-            staffName,
-            statusValue,
-            timestamp,
-            latitude,
-            longitude,
-            actionType,
-            actionTimestamp,
-            scheduledTime,
-        };
-
         console.log("Sending update request to GAS with body:", bodyPayload);
 
         const response = await fetch(gasUrl, {
@@ -67,7 +65,7 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         console.log("GAS response:", result);
         
         if (result.status === 'error' || result.error) {
-            const errorMessage = result.message || 'GASスクリプトでシート更新エラーが発生しました。';
+            const errorMessage = result.message || 'GASスクリプトでエラーが発生しました。';
             if (errorMessage.includes('doPost Error') || errorMessage.includes('データ解析エラー')) {
                  throw new Error(errorMessage);
             }
@@ -76,10 +74,10 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
 
         return result;
     } catch (error: any) {
-        console.error('Failed to call GAS for sheet update:', error);
+        console.error('Failed to call GAS for sheet/calendar update:', error);
         return {
             status: 'error',
-            message: `シート更新用のGAS呼び出しに失敗しました: ${error.message}`,
+            message: `GAS呼び出しに失敗しました: ${error.message}`,
         };
     }
 }
