@@ -2,16 +2,15 @@
 
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { initializeFirebase } from '@/firebase';
-import { firebaseConfig } from '@/firebase/config';
 
-// Function to register the service worker
+// This is the VAPID key from your Firebase project settings.
+// It's safe to expose this public key.
+const VAPID_KEY = 'BPLgqf_y_6m-uQzB3-rQfT_8-L8X_oP7q3y5t6Yh8U4wX_2iZzJm5n3V_1oR9c_7kS6g4B2wE1';
+
 const registerServiceWorker = async () => {
     if ('serviceWorker' in navigator) {
         try {
-            // The service worker is now self-contained and does not need config passed via URL
-            const serviceWorkerUrl = '/firebase-messaging-sw.js';
-            
-            const registration = await navigator.serviceWorker.register(serviceWorkerUrl, {
+            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
                 scope: '/'
             });
             console.log('Service Worker registration successful, scope is:', registration.scope);
@@ -23,7 +22,6 @@ const registerServiceWorker = async () => {
     }
     return null;
 };
-
 
 export const requestNotificationPermission = async () => {
   const supported = await isSupported();
@@ -45,13 +43,12 @@ export const requestNotificationPermission = async () => {
   if (permission === 'granted') {
     console.log('Notification permission granted.');
     try {
-      const vapidKeyFromConfig = firebaseConfig.vapidKey;
-      if (!vapidKeyFromConfig || vapidKeyFromConfig.includes('YOUR_VAPID_KEY')) {
-        throw new Error('VAPID key is not configured in firebase/config.ts');
+      if (!VAPID_KEY) {
+        throw new Error('VAPID key is not configured.');
       }
       
       const fcmToken = await getToken(messaging, {
-        vapidKey: vapidKeyFromConfig,
+        vapidKey: VAPID_KEY,
         serviceWorkerRegistration: registration,
       });
 
