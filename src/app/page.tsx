@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -12,7 +13,7 @@ import { AlertCircle, ChevronLeft, ChevronRight, Monitor, Smartphone } from 'luc
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay } from 'date-fns';
+import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay, parseISO, isValid } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { VerticalScheduleView } from '@/components/dashboard/vertical-schedule-view';
 import { Switch } from '@/components/ui/switch';
