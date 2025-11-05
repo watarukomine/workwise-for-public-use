@@ -57,47 +57,44 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       if (allStaff.length > 0) {
         orderData.forEach((order: any) => {
           const staffName = findKey(order, ['担当']);
+          const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
           const scheduledTimeStr = findKey(order, ['チップ配置作業予定']);
           
-          // Only create an event if both staff and time are assigned.
-          if (staffName && scheduledTimeStr) {
-            const staffMember = allStaff.find(s => s.name === staffName);
-            if (staffMember) {
-              const scheduledTime = parseISO(scheduledTimeStr);
-              if (isValid(scheduledTime)) {
-                const mappedOrder = mapRawToOrder(order);
-                const duration = mappedOrder.estimatedDuration;
-                const tripId = `trip-${mappedOrder.rawOrderId}`;
-                const taskStart = scheduledTime;
-                const taskEnd = addMinutes(taskStart, duration);
-                const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-                
-                const travelEvent: WithId<ScheduleEvent> = {
-                  id: `${tripId}-travel`,
-                  tripId,
-                  title: `移動: ${mappedOrder.taskDetails.split('\n')[0]}`,
-                  staffId: staffMember.id,
-                  start: travelStart.toISOString(),
-                  end: taskStart.toISOString(),
-                  rawOrderId: mappedOrder.rawOrderId,
-                  calendarEventId: findKey(order, ['travelCalendarEventId']), 
-                };
-    
-                const taskEvent: WithId<ScheduleEvent> = {
-                  id: `${tripId}-task`,
-                  tripId,
-                  orderId: mappedOrder.id,
-                  rawOrderId: mappedOrder.rawOrderId,
-                  title: mappedOrder.taskDetails,
-                  staffId: staffMember.id,
-                  locationId: mappedOrder.customerCode,
-                  start: taskStart.toISOString(),
-                  end: taskEnd.toISOString(),
-                  calendarEventId: findKey(order, ['taskCalendarEventId']),
-                };
-    
-                events.push(travelEvent, taskEvent);
-              }
+          if (staffMember && scheduledTimeStr) {
+            const scheduledTime = parseISO(scheduledTimeStr);
+            if (isValid(scheduledTime)) {
+              const mappedOrder = mapRawToOrder(order);
+              const duration = mappedOrder.estimatedDuration;
+              const tripId = `trip-${mappedOrder.rawOrderId}`;
+              const taskStart = scheduledTime;
+              const taskEnd = addMinutes(taskStart, duration);
+              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+              
+              const travelEvent: WithId<ScheduleEvent> = {
+                id: `${tripId}-travel`,
+                tripId,
+                title: `移動: ${mappedOrder.taskDetails.split('\n')[0]}`,
+                staffId: staffMember.id, // Use staff ID
+                start: travelStart.toISOString(),
+                end: taskStart.toISOString(),
+                rawOrderId: mappedOrder.rawOrderId,
+                calendarEventId: findKey(order, ['travelCalendarEventId']), 
+              };
+  
+              const taskEvent: WithId<ScheduleEvent> = {
+                id: `${tripId}-task`,
+                tripId,
+                orderId: mappedOrder.id,
+                rawOrderId: mappedOrder.rawOrderId,
+                title: mappedOrder.taskDetails,
+                staffId: staffMember.id, // Use staff ID
+                locationId: mappedOrder.customerCode,
+                start: taskStart.toISOString(),
+                end: taskEnd.toISOString(),
+                calendarEventId: findKey(order, ['taskCalendarEventId']),
+              };
+  
+              events.push(travelEvent, taskEvent);
             }
           }
         });
@@ -116,11 +113,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-    // We depend on isStaffLoading to ensure allStaff is populated before the first fetch.
     if (!isStaffLoading) {
       fetchAndProcessData();
     }
-  }, [isStaffLoading, fetchAndProcessData]);
+  }, [isStaffLoading, orderGasUrl, allStaff.length]); // Use allStaff.length to prevent re-fetching on every render
 
   const value = {
     orders,
