@@ -2,6 +2,7 @@
 
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { initializeFirebase } from '@/firebase';
+import { firebaseConfig } from '@/firebase/config';
 
 export const requestNotificationPermission = async () => {
   const supported = await isSupported();
@@ -17,8 +18,9 @@ export const requestNotificationPermission = async () => {
   if (permission === 'granted') {
     console.log('Notification permission granted.');
     try {
+      // Use the VAPID key from the project's configuration
       const fcmToken = await getToken(messaging, {
-        vapidKey: 'YOUR_VAPID_KEY_HERE', // This will be replaced by the build process
+        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
       });
       if (fcmToken) {
         console.log('FCM Token:', fcmToken);
