@@ -43,7 +43,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { updateSheetStatus, handleCalendarEvent } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -346,12 +346,13 @@ export function ScheduleView({
             staffName: "",
             statusValue: "未割当",
             scheduledTime: "",
+            timestamp: new Date().toISOString(),
         });
         
         const eventsToDelete = scheduleData.filter(e => e.tripId === eventToUnassign.tripId);
         for (const event of eventsToDelete) {
             if (event.calendarEventId) {
-                await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: event.calendarEventId });
+                await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: event.calendarEventId });
             }
         }
           
@@ -378,7 +379,7 @@ export function ScheduleView({
         } else {
            const staff = getStaffById(item.staffId);
            if(item.calendarEventId && staff?.calendarId) {
-              await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: item.calendarEventId });
+              await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: item.calendarEventId });
            }
            await refetchOrders();
            toast({ title: '汎用タスクを削除しました' });
@@ -392,13 +393,13 @@ export function ScheduleView({
     if (!staffRowElement) return;
     
     const timelineRect = staffRowElement.getBoundingClientRect();
-    const startOfDay = new Date(currentDate);
-    startOfDay.setHours(timelineStartHour, 0, 0, 0);
+    const startOfTimelineDay = new Date(currentDate);
+    startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
 
     const getNewStartFromDrop = () => {
       const dropX = (active.rect.current.translated?.left ?? 0) - timelineRect.left;
       const newStartMinutes = pixelsToMinutes(dropX);
-      return addMinutes(startOfDay, newStartMinutes);
+      return addMinutes(startOfTimelineDay, newStartMinutes);
     };
 
     if ('staffId' in item) { // Moving an existing event
@@ -439,37 +440,43 @@ export function ScheduleView({
                 
                 for (const event of originalTripEvents) {
                     let updatedEvent = { ...event, staffId: newStaffId };
+                    let eventStartTime: string;
+                    let eventEndTime: string;
+
                     if (event.id.endsWith('-task')) {
-                        updatedEvent.start = newTaskStart.toISOString();
-                        updatedEvent.end = newTaskEnd.toISOString();
+                        eventStartTime = newTaskStart.toISOString();
+                        eventEndTime = newTaskEnd.toISOString();
                     } else if (event.id.endsWith('-travel')) {
-                        updatedEvent.start = newTravelStart.toISOString();
-                        updatedEvent.end = newTaskStart.toISOString();
+                        eventStartTime = newTravelStart.toISOString();
+                        eventEndTime = newTaskStart.toISOString();
+                    } else { // Generic event
+                        const duration = differenceInMinutes(parseISO(event.end as string), parseISO(event.start as string));
+                        eventStartTime = newStart.toISOString();
+                        eventEndTime = addMinutes(newStart, duration).toISOString();
                     }
                     
                     if (event.calendarEventId) {
                          if (isStaffChange) {
-                            if(oldStaff.calendarId) await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: event.calendarEventId });
-                            const createResult = await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: event.title, startTime: updatedEvent.start, endTime: updatedEvent.end, description: event.description });
+                            if(oldStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: event.calendarEventId });
+                            const createResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId!, title: event.title, startTime: eventStartTime, endTime: eventEndTime, description: event.description });
                             if (createResult.eventId && originalTask.rawOrderId) {
                                 await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${originalTask.rawOrderId})`, calendarEventId: createResult.eventId });
                             }
                         } else {
-                            await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: event.calendarEventId, startTime: updatedEvent.start, endTime: updatedEvent.end });
+                            await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId!, eventId: event.calendarEventId, startTime: eventStartTime, endTime: eventEndTime });
                         }
                     }
                 }
             } else { // Generic event without tripId
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                 const newEnd = addMinutes(newStart, duration);
-                let updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
-
-                if (updatedEvent.calendarEventId) {
+                
+                if (draggedEvent.calendarEventId) {
                     if(isStaffChange) {
-                        if(oldStaff.calendarId) await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: updatedEvent.calendarEventId });
-                        await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: updatedEvent.title, startTime: updatedEvent.start, endTime: updatedEvent.end, description: updatedEvent.description });
+                        if(oldStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: draggedEvent.calendarEventId });
+                        await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId!, title: draggedEvent.title, startTime: newStart.toISOString(), endTime: newEnd.toISOString(), description: draggedEvent.description });
                     } else {
-                        await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: updatedEvent.calendarEventId, startTime: updatedEvent.start, endTime: updatedEvent.end });
+                        await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId!, eventId: draggedEvent.calendarEventId, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
                     }
                 }
             }
@@ -499,7 +506,7 @@ export function ScheduleView({
         try {
             if (isGeneric) {
                 const newEventEnd = addMinutes(taskStart, order.estimatedDuration);
-                await updateSheetStatus({ 
+                await handleCalendarEvent({ 
                     gasUrl: ORDER_GAS_URL,
                     operation: 'create', 
                     calendarId: staff.calendarId, 
@@ -512,11 +519,11 @@ export function ScheduleView({
               const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
               
               const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
-              const travelResult = await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
+              await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
               
               const taskTitle = order.taskDetails;
               const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
-              const taskResult = await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
+              const taskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
 
               await updateSheetStatus({
                   gasUrl: ORDER_GAS_URL,
@@ -525,7 +532,7 @@ export function ScheduleView({
                   statusValue: '作業待ち',
                   scheduledTime: taskStart.toISOString(),
                   timestamp: new Date().toISOString(),
-                  calendarEventId: taskResult.eventId, // Save main task event ID
+                  calendarEventId: taskResult.eventId,
               });
               
               toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
@@ -582,7 +589,7 @@ export function ScheduleView({
             const staff = getStaffById(dialogState.staffId);
             if (!staff || !staff.calendarId) throw new Error("担当スタッフにカレンダーIDが設定されていません。");
 
-            await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
+            await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
             
         } else if (dialogState.mode === 'edit') {
             const staff = getStaffById(dialogState.event.staffId);
@@ -598,7 +605,7 @@ export function ScheduleView({
             }
 
             if(dialogState.event.calendarEventId) {
-                await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: staff.calendarId, eventId: dialogState.event.calendarEventId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
+                await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: staff.calendarId, eventId: dialogState.event.calendarEventId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
             }
         }
         setDialogState({ mode: 'closed' });
@@ -618,7 +625,7 @@ export function ScheduleView({
         const staff = getStaffById(eventToDelete.staffId);
         if(eventToDelete.calendarEventId && staff?.calendarId) {
             try {
-                await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: eventToDelete.calendarEventId });
+                await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: eventToDelete.calendarEventId });
                 await refetchOrders();
                 toast({ title: '予定を削除しました' });
             } catch (e: any) {
@@ -689,15 +696,17 @@ export function ScheduleView({
                                       </span>
                                   </div>
                               ))}
+                               {isToday(currentDate) && (
+                                <div 
+                                    className="absolute top-0 h-full pointer-events-none z-40"
+                                    style={{ left: `0px`, width: `100%`}}
+                                >
+                                    <TimeIndicator />
+                                </div>
+                               )}
                           </div>
                       </div>
                       <div className="relative">
-                        <div 
-                          className="absolute top-0 left-0 w-full h-full pointer-events-none"
-                          style={{ left: `${STAFF_COL_WIDTH}px`, width: `calc(100% - ${STAFF_COL_WIDTH}px)`}}
-                        >
-                          {isToday(currentDate) && <TimeIndicator />}
-                        </div>
                         <ScrollArea className="w-full whitespace-nowrap">
                           <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
                               <div className="relative space-y-2">

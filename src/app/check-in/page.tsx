@@ -9,7 +9,7 @@ import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCi
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -94,7 +94,7 @@ export default function CheckInPage() {
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '待機中', // Status becomes '待機中' after finishing a task.
+      'Finish Task': '待機中',
       'Wait': '待機中',
       'Arrive': '作業待ち',
     };
@@ -295,3 +295,5 @@ export default function CheckInPage() {
     </div>
   );
 }
+
+    
