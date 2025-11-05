@@ -1,4 +1,3 @@
-
 // ↓↓↓↓【要設定】↓↓↓↓
 // スプレッドシートのID（URLの .../d/【この部分】/edit...）を貼り付けてください
 const SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
@@ -162,7 +161,7 @@ function updateSheetWithOrderInfo(params) {
     
     // Also update calendar if scheduledTime and calendar IDs are present
     const staffCalendarId = sheet.getRange(rowNum, headers.indexOf("calendarId") + 1).getValue();
-    if (scheduledTime && (taskCalendarEventId || travelCalendarEventId) && staffCalendarId) {
+    if (scheduledTime && staffCalendarId) {
       console.log(`Updating linked calendar events on calendar ${staffCalendarId}`);
       const calendar = CalendarApp.getCalendarById(staffCalendarId);
       if(calendar) {
@@ -170,18 +169,21 @@ function updateSheetWithOrderInfo(params) {
           const workDuration = sheet.getRange(rowNum, headers.indexOf("作業時間（分）") + 1).getValue() || 60;
           const taskEnd = new Date(taskStart.getTime() + workDuration * 60000);
           const travelStart = new Date(taskStart.getTime() - 30 * 60000);
+
+          const currentTaskEventId = sheet.getRange(rowNum, headers.indexOf("taskCalendarEventId") + 1).getValue();
+          const currentTravelEventId = sheet.getRange(rowNum, headers.indexOf("travelCalendarEventId") + 1).getValue();
           
-          if(taskCalendarEventId) {
+          if(currentTaskEventId) {
             try {
-              const event = calendar.getEventById(taskCalendarEventId);
+              const event = calendar.getEventById(currentTaskEventId);
               if (event) event.setTime(taskStart, taskEnd);
-            } catch(e) { console.error(`Failed to update task event ${taskCalendarEventId}: ${e.message}`);}
+            } catch(e) { console.error(`Failed to update task event ${currentTaskEventId}: ${e.message}`);}
           }
-          if(travelCalendarEventId) {
+          if(currentTravelEventId) {
             try {
-              const event = calendar.getEventById(travelCalendarEventId);
+              const event = calendar.getEventById(currentTravelEventId);
               if(event) event.setTime(travelStart, taskStart);
-            } catch(e) { console.error(`Failed to update travel event ${travelCalendarEventId}: ${e.message}`);}
+            } catch(e) { console.error(`Failed to update travel event ${currentTravelEventId}: ${e.message}`);}
           }
       }
     }
