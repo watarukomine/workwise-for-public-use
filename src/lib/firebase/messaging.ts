@@ -4,11 +4,33 @@ import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { initializeFirebase } from '@/firebase';
 import { firebaseConfig } from '@/firebase/config';
 
+// Function to register the service worker
+const registerServiceWorker = async () => {
+    if ('serviceWorker' in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+            console.log('Service Worker registration successful, scope is:', registration.scope);
+            return registration;
+        } catch (err) {
+            console.error('Service Worker registration failed:', err);
+            return null;
+        }
+    }
+    return null;
+};
+
+
 export const requestNotificationPermission = async () => {
   const supported = await isSupported();
   if (!supported) {
     console.log('This browser does not support Firebase Messaging.');
     return null;
+  }
+  
+  const registration = await registerServiceWorker();
+  if (!registration) {
+      console.log("Could not register service worker.");
+      return null;
   }
   
   const { firebaseApp } = initializeFirebase();
@@ -22,13 +44,13 @@ export const requestNotificationPermission = async () => {
         throw new Error('VAPID key is not configured in firebase/config.ts');
       }
       
-      // Use the VAPID key from the project's configuration
       const fcmToken = await getToken(messaging, {
         vapidKey: firebaseConfig.vapidKey,
+        serviceWorkerRegistration: registration,
       });
+
       if (fcmToken) {
         console.log('FCM Token:', fcmToken);
-        // TODO: Send this token to your server and associate it with the current user.
         return fcmToken;
       } else {
         console.log('No registration token available. Request permission to generate one.');
