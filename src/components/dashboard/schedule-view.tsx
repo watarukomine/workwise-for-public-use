@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -597,7 +596,9 @@ export function ScheduleView({
                 });
             }
 
-            await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: staff.calendarId, eventId: dialogState.event.calendarEventId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
+            if(dialogState.event.calendarEventId) {
+                await updateSheetStatus({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: staff.calendarId, eventId: dialogState.event.calendarEventId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
+            }
         }
         setDialogState({ mode: 'closed' });
         await refetchOrders();
@@ -687,11 +688,11 @@ export function ScheduleView({
                                       </span>
                                   </div>
                               ))}
+                              {isToday(currentDate) && <TimeIndicator className="top-8" />}
                           </div>
                       </div>
-                      <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
-                          {isToday(currentDate) && <TimeIndicator />}
-                          <ScrollArea className="w-full whitespace-nowrap">
+                      <ScrollArea className="w-full whitespace-nowrap">
+                        <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
                             <div className="relative space-y-2">
                                 {staffData?.map((staff) => {
                                     const events = scheduleData.filter((e) => e.staffId === staff.id);
@@ -708,8 +709,8 @@ export function ScheduleView({
                                     );
                                 })}
                             </div>
-                          </ScrollArea>
-                      </div>
+                        </div>
+                      </ScrollArea>
                     </div>
                 </CardContent>
             </Card>
@@ -830,7 +831,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
         ref={setNodeRef} 
         className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
-        style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+        style={{ width: `100%`}}
       >
         <div className="h-full border-t border-b"></div>
         <div className="absolute top-0 left-0 h-full w-full">
