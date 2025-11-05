@@ -50,7 +50,7 @@ export const formatTime = (date: Date | string) => {
 
 export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
-    const scheduledTime = findKey(rawOrder, ['予定時間']);
+    const scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定']);
     
     const line1 = `${findKey(rawOrder, ['お取引先名', '店舗', '取引先']) || ''}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
     
@@ -73,5 +73,3 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
         rawOrderId: String(orderId || '')
     };
 };
-
-    

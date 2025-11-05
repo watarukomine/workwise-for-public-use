@@ -4,9 +4,10 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { ORDER_GAS_URL } from '@/lib/settings';
-import type { ScheduleEvent, WithId } from '@/lib/types';
-import { findKey } from '@/lib/utils';
+import type { ScheduleEvent, Staff, WithId } from '@/lib/types';
+import { findKey, mapRawToOrder } from '@/lib/utils';
 import { parseISO, isValid, addMinutes, subMinutes } from 'date-fns';
+import { useSelectedStaff } from './selected-staff-context';
 
 const TRAVEL_TIME_MINUTES = 30;
 
@@ -28,6 +29,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
   const [error, setErrorState] = useState<string | null>(null);
+  const { allStaff } = useSelectedStaff(); // Staff data to map names to IDs
 
   const setOrderGasUrl = (url: string) => {
     setOrderGasUrlState(url);
@@ -50,48 +52,52 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       const orderData = result.data || (Array.isArray(result) ? result : []);
       setOrdersState(orderData);
 
-      // Process orders to create schedule events
       const events: WithId<ScheduleEvent>[] = [];
-      orderData.forEach((order: any) => {
-        const staffName = findKey(order, ['担当']);
-        const scheduledTimeStr = findKey(order, ['チップ配置作業予定']);
-        
-        if (staffName && scheduledTimeStr) {
-          const scheduledTime = parseISO(scheduledTimeStr);
-          if (isValid(scheduledTime)) {
-            const duration = parseInt(findKey(order, ['作業時間（分）', '作業時間(分)', '作業時間']), 10) || 60;
-            const tripId = `trip-${findKey(order, ['受注ID', '受注id', '受注ID', 'id'])}`;
-            const taskStart = scheduledTime;
-            const taskEnd = addMinutes(taskStart, duration);
-            const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-
-            const customerName = findKey(order, ['お取引先名', '店舗', '取引先']) || '';
-            const taskDetails = `${findKey(order, ['タイヤサイズ', 'サイズ']) || ''}${findKey(order, ['本数']) ? ` / ${findKey(order, ['本数'])}本` : ''}`.trim();
-
-            const travelEvent: WithId<ScheduleEvent> = {
-              id: `${tripId}-travel`,
-              tripId,
-              title: `移動: ${customerName}`,
-              staffId: staffName,
-              start: travelStart.toISOString(),
-              end: taskStart.toISOString(),
-              rawOrderId: String(findKey(order, ['受注ID', '受注id', '受注ID', 'id']))
-            };
-
-            const taskEvent: WithId<ScheduleEvent> = {
-              id: `${tripId}-task`,
-              tripId,
-              title: `${customerName}\n${taskDetails}`,
-              staffId: staffName,
-              start: taskStart.toISOString(),
-              end: taskEnd.toISOString(),
-              rawOrderId: String(findKey(order, ['受注ID', '受注id', '受注ID', 'id']))
-            };
-
-            events.push(travelEvent, taskEvent);
+      if (allStaff.length > 0) {
+        orderData.forEach((order: any) => {
+          const staffName = findKey(order, ['担当']);
+          const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
+          const scheduledTimeStr = findKey(order, ['チップ配置作業予定']);
+          
+          if (staffMember && scheduledTimeStr) {
+            const scheduledTime = parseISO(scheduledTimeStr);
+            if (isValid(scheduledTime)) {
+              const mappedOrder = mapRawToOrder(order);
+              const duration = mappedOrder.estimatedDuration;
+              const tripId = `trip-${mappedOrder.rawOrderId}`;
+              const taskStart = scheduledTime;
+              const taskEnd = addMinutes(taskStart, duration);
+              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+              
+              const travelEvent: WithId<ScheduleEvent> = {
+                id: `${tripId}-travel`,
+                tripId,
+                title: `移動: ${mappedOrder.taskDetails.split('\n')[0]}`,
+                staffId: staffMember.id, // Use staff ID
+                start: travelStart.toISOString(),
+                end: taskStart.toISOString(),
+                rawOrderId: mappedOrder.rawOrderId,
+                calendarEventId: findKey(order, ['calendarEventId']), // Assuming you add this to your sheet
+              };
+  
+              const taskEvent: WithId<ScheduleEvent> = {
+                id: `${tripId}-task`,
+                tripId,
+                orderId: mappedOrder.id,
+                rawOrderId: mappedOrder.rawOrderId,
+                title: mappedOrder.taskDetails,
+                staffId: staffMember.id, // Use staff ID
+                locationId: mappedOrder.customerCode,
+                start: taskStart.toISOString(),
+                end: taskEnd.toISOString(),
+                calendarEventId: findKey(order, ['calendarEventId']), // And this
+              };
+  
+              events.push(travelEvent, taskEvent);
+            }
           }
-        }
-      });
+        });
+      }
       setScheduleEvents(events);
 
     } catch (e: any) {
@@ -102,7 +108,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [orderGasUrl]);
+  }, [orderGasUrl, allStaff]);
 
 
   useEffect(() => {

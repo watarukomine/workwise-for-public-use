@@ -257,15 +257,12 @@ const TimeIndicator = ({className}: {className?: string}) => {
     const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
     if (!isVisible) return null;
     
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-
-    const minutesFromStart = (currentHour - timelineStartHour) * 60 + currentMinute;
+    const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
     const leftPosition = minutesToPixels(minutesFromStart);
 
     return (
         <div
-            className={cn("absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none", className)}
+            className={cn("absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none z-30", className)}
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -298,7 +295,6 @@ export function ScheduleView({
   React.useEffect(() => {
     if (!rawOrdersData) return;
     
-    // An order is unassigned if it has no staff ('担当') or no scheduled time ('チップ配置作業予定')
     const newUnassignedOrders = rawOrdersData.filter(order => {
         const staffName = findKey(order, ['担当']);
         const scheduledTime = findKey(order, ['チップ配置作業予定']);
@@ -677,7 +673,6 @@ export function ScheduleView({
                 </CardHeader>
                 <CardContent className="pt-6">
                     <div className="relative">
-                      
                       <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
                           <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
                           <div className="relative h-8 flex-1">
@@ -694,30 +689,27 @@ export function ScheduleView({
                               ))}
                           </div>
                       </div>
-                      <div 
-                        className="relative"
-                        style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                      >
-                         {isToday(currentDate) && <TimeIndicator className="z-30"/>}
+                      <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                          {isToday(currentDate) && <TimeIndicator />}
+                          <ScrollArea className="w-full whitespace-nowrap">
+                            <div className="relative space-y-2">
+                                {staffData?.map((staff) => {
+                                    const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                    return (
+                                        <StaffRow
+                                            key={staff.id}
+                                            staff={staff}
+                                            events={events}
+                                            getCustomerByCode={getCustomerByCode}
+                                            isOver={currentOverStaffId === staff.id}
+                                            onDoubleClickEvent={handleDoubleClickEvent}
+                                            onDoubleClickTimeline={handleDoubleClickTimeline}
+                                        />
+                                    );
+                                })}
+                            </div>
+                          </ScrollArea>
                       </div>
-                      <ScrollArea className="w-full whitespace-nowrap -mt-8">
-                        <div className="relative mt-2 space-y-2">
-                            {staffData?.map((staff) => {
-                                const events = scheduleData.filter((e) => e.staffId === staff.id);
-                                return (
-                                    <StaffRow
-                                        key={staff.id}
-                                        staff={staff}
-                                        events={events}
-                                        getCustomerByCode={getCustomerByCode}
-                                        isOver={currentOverStaffId === staff.id}
-                                        onDoubleClickEvent={handleDoubleClickEvent}
-                                        onDoubleClickTimeline={handleDoubleClickTimeline}
-                                    />
-                                );
-                            })}
-                        </div>
-                      </ScrollArea>
                     </div>
                 </CardContent>
             </Card>
@@ -896,7 +888,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   
   const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
   let textColorClass = 'text-primary-foreground';
-  if (brightStaff.includes(staff.name)) {
+  if (staff.name && brightStaff.includes(staff.name)) {
       textColorClass = 'text-black';
   }
   
