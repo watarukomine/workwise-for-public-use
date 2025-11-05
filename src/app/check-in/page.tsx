@@ -15,7 +15,7 @@ import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Update Location' | 'Send Message';
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
 type StatusValue = StaffStatus['status'];
 
 export default function CheckInPage() {
@@ -38,7 +38,7 @@ export default function CheckInPage() {
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
         'Finish Task': '作業終了',
-        'Update Location': '位置情報更新',
+        'Wait': '位置情報更新',
         'Send Message': 'メッセージ送信'
     };
     return map[action];
@@ -89,7 +89,7 @@ export default function CheckInPage() {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
       'Finish Task': '待機中',
-      'Update Location': '待機中',
+      'Wait': '待機中',
       'Arrive': '作業待ち',
     };
 
@@ -184,14 +184,14 @@ export default function CheckInPage() {
     );
   };
 
-  const actionButtons: { action: ActionType; label: string; icon: React.ElementType }[] = [
-    { action: 'Clock In', label: '出勤', icon: LogIn },
-    { action: 'Clock Out', label: '退勤', icon: LogOut },
-    { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
-    { action: 'Arrive', label: '現場到着', icon: MapPin },
-    { action: 'Begin Task', label: '作業開始', icon: Clock },
-    { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
-    { action: 'Update Location', label: '位置情報更新', icon: RefreshCw },
+  const actionButtons: { action: ActionType; label: string; icon: React.ElementType, requiresOrderId: boolean }[] = [
+    { action: 'Clock In', label: '出勤', icon: LogIn, requiresOrderId: false },
+    { action: 'Clock Out', label: '退勤', icon: LogOut, requiresOrderId: false },
+    { action: 'Start Travel', label: '移動開始', icon: PlayCircle, requiresOrderId: true },
+    { action: 'Arrive', label: '現場到着', icon: MapPin, requiresOrderId: true },
+    { action: 'Begin Task', label: '作業開始', icon: Clock, requiresOrderId: true },
+    { action: 'Finish Task', label: '作業終了', icon: CheckCircle, requiresOrderId: true },
+    { action: 'Wait', label: '位置情報更新', icon: RefreshCw, requiresOrderId: false },
   ];
 
   return (
@@ -203,16 +203,16 @@ export default function CheckInPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            {actionButtons.map(({ action, label, icon: Icon }) => (
+            {actionButtons.map(({ action, label, icon: Icon, requiresOrderId }) => (
               <Button
                 key={action}
                 size="lg"
                 className={cn(
                   "h-20 text-base flex-col",
-                  action === 'Update Location' && "col-span-2"
+                  action === 'Wait' && "col-span-2"
                 )}
                 onClick={() => handleAction(action)}
-                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Send Message', 'Update Location'].includes(action))}
+                disabled={isLoading || (requiresOrderId && !orderId)}
               >
                 {isLoading === action ? (
                   <Loader2 className="h-6 w-6 animate-spin" />
@@ -288,4 +288,5 @@ export default function CheckInPage() {
       </Card>
     </div>
   );
-}
+
+    
