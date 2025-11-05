@@ -8,11 +8,12 @@ import { firebaseConfig } from '@/firebase/config';
 const registerServiceWorker = async () => {
     if ('serviceWorker' in navigator) {
         try {
-            // Pass the config as a query parameter to the service worker
-            const serializedConfig = encodeURIComponent(JSON.stringify(firebaseConfig));
-            const serviceWorkerUrl = `/firebase-messaging-sw.js?firebaseConfig=${serializedConfig}`;
+            // The service worker is now self-contained and does not need config passed via URL
+            const serviceWorkerUrl = '/firebase-messaging-sw.js';
             
-            const registration = await navigator.serviceWorker.register(serviceWorkerUrl);
+            const registration = await navigator.serviceWorker.register(serviceWorkerUrl, {
+                scope: '/'
+            });
             console.log('Service Worker registration successful, scope is:', registration.scope);
             return registration;
         } catch (err) {
@@ -44,12 +45,13 @@ export const requestNotificationPermission = async () => {
   if (permission === 'granted') {
     console.log('Notification permission granted.');
     try {
-      if (!firebaseConfig.vapidKey || firebaseConfig.vapidKey.includes('YOUR_VAPID_KEY')) {
+      const vapidKeyFromConfig = firebaseConfig.vapidKey;
+      if (!vapidKeyFromConfig || vapidKeyFromConfig.includes('YOUR_VAPID_KEY')) {
         throw new Error('VAPID key is not configured in firebase/config.ts');
       }
       
       const fcmToken = await getToken(messaging, {
-        vapidKey: firebaseConfig.vapidKey,
+        vapidKey: vapidKeyFromConfig,
         serviceWorkerRegistration: registration,
       });
 
