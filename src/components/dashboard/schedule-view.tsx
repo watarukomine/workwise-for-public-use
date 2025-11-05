@@ -363,6 +363,7 @@ export function ScheduleView({
             staffName: "",
             statusValue: "未割当",
             timestamp: new Date().toISOString(),
+            scheduledTime: "", // Clear the scheduled time
         });
         
         const eventsToDelete = scheduleData.filter(e => e.tripId === eventToUnassign.tripId);
@@ -463,6 +464,14 @@ export function ScheduleView({
                 const newTaskEnd = addMinutes(newTaskStart, taskDuration);
                 const newTravelStart = subMinutes(newTaskStart, TRAVEL_TIME_MINUTES);
                 
+                if (originalTask.rawOrderId) {
+                     await updateSheetStatus({
+                        gasUrl: ORDER_GAS_URL,
+                        eventTitle: `(ID: ${originalTask.rawOrderId})`,
+                        scheduledTime: newTaskStart.toISOString(),
+                     });
+                }
+                
                 for (const event of originalTripEvents) {
                     let updatedEvent = { ...event, staffId: newStaffId };
                     if (event.id.endsWith('-task')) {
@@ -561,6 +570,7 @@ export function ScheduleView({
                   staffName: staff.name,
                   statusValue: '作業待ち',
                   timestamp: new Date().toISOString(),
+                  scheduledTime: taskStart.toISOString(), // Write back the actual scheduled time
               });
               
               const tripId = `trip-${Date.now()}`;
@@ -650,6 +660,14 @@ export function ScheduleView({
         } else if (dialogState.mode === 'edit') {
             const staff = getStaffById(dialogState.event.staffId);
             if (!staff || !staff.calendarId) throw new Error("担当スタッフにカレンダーIDが設定されていません。");
+            
+            if (dialogState.event.rawOrderId) {
+                await updateSheetStatus({
+                    gasUrl: ORDER_GAS_URL,
+                    eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
+                    scheduledTime: newStart.toISOString(),
+                });
+            }
 
             await callGasForCalendar({ operation: 'update', calendarId: staff.calendarId, eventId: dialogState.event.calendarEventId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
             const updatedEvent = {
