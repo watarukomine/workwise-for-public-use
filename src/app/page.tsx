@@ -2,7 +2,6 @@
 'use client';
 
 import * as React from 'react';
-import { useEffect } from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
 import { customerData, staffStatusData } from '@/lib/data';
@@ -29,7 +28,6 @@ export default function DashboardPage() {
   const { 
     orders: rawOrders, 
     scheduleEvents, 
-    setScheduleEvents,
     isLoading: isLoadingOrders,
   } = useOrder();
   
@@ -37,8 +35,6 @@ export default function DashboardPage() {
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
   const { forceMobileView, setForceMobileView } = useAppShell();
-  
-  const getStorageKey = (date: Date) => `scheduleData-${format(date, 'yyyy-MM-dd')}`;
   
   const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || isStaffLoading || !profile) return [];
@@ -48,7 +44,7 @@ export default function DashboardPage() {
     let selectedStaff: WithId<Staff>[];
 
     if (profile.role !== 'admin') {
-      selectedStaff = staffToUse.filter(staff => staff.id === profile.id);
+      selectedStaff = staffToUse.filter(staff => staff.id === profile.id || staff.name === profile.name);
     } else {
       if (appliedSelectedStaffIds.length === 0) {
         selectedStaff = staffToUse;
@@ -88,27 +84,19 @@ export default function DashboardPage() {
 
   const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading;
 
-  useEffect(() => {
-    const key = getStorageKey(currentDate);
-    const savedData = localStorage.getItem(key);
-    if (savedData) {
-        try {
-            setScheduleEvents(JSON.parse(savedData));
-        } catch(e) {
-            console.error("Failed to parse schedule data from localStorage", e);
-            setScheduleEvents([]);
-        }
-    } else {
-        setScheduleEvents([]);
-    }
-  }, [currentDate, setScheduleEvents]);
-
   const handleDateChange = (direction: 'next' | 'prev' | 'today') => {
       setCurrentDate(current => {
           if (direction === 'today') return startOfToday();
           return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
       });
   };
+
+  const dailySchedule = React.useMemo(() => {
+    return scheduleEvents.filter(event => {
+      const eventDate = parseISO(event.start as string);
+      return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+    });
+  }, [scheduleEvents, currentDate]);
 
   if (isLoading) {
       return (
@@ -181,16 +169,16 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         {showVerticalView ? (
             <VerticalScheduleView 
-                scheduleData={scheduleEvents}
+                scheduleData={dailySchedule}
                 staffData={filteredStaff}
             />
         ) : (
             <ScheduleView 
                 staffData={filteredStaff} 
                 customerData={customers} 
-                scheduleData={scheduleEvents}
+                scheduleData={dailySchedule}
                 rawOrdersData={rawOrders}
-                setScheduleData={setScheduleEvents}
+                setScheduleData={() => {}}
                 currentDate={currentDate}
             />
         )}

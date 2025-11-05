@@ -5,21 +5,19 @@ import React, { createContext, useState, useContext, ReactNode, useEffect, useCa
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import type { ScheduleEvent, WithId } from '@/lib/types';
-import { useUserProfile } from '@/hooks/use-user-profile';
-import { useSelectedStaff } from './selected-staff-context';
-import { format } from 'date-fns';
+import { findKey } from '@/lib/utils';
+import { parseISO, isValid, addMinutes, subMinutes } from 'date-fns';
+
+const TRAVEL_TIME_MINUTES = 30;
 
 interface OrderContextType {
   orders: any[];
-  setOrders: (orders: any[]) => void;
   scheduleEvents: WithId<ScheduleEvent>[];
-  setScheduleEvents: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
-  refetchScheduleEvents: () => Promise<void>;
+  refetchOrders: () => Promise<void>;
   isLoading: boolean;
   orderGasUrl: string;
   setOrderGasUrl: (url: string) => void;
   error: string | null;
-  setError: (error: string | null) => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -34,90 +32,91 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const setOrderGasUrl = (url: string) => {
     setOrderGasUrlState(url);
   };
-
-  const setOrders = (data: any[]) => {
-    setOrdersState(data);
-  };
-
-  const setError = (error: string | null) => {
-    setErrorState(error);
-  };
-
-  const getStorageKey = (date: Date) => `scheduleData-${format(date, 'yyyy-MM-dd')}`;
-
-  // Load from localStorage on mount
-  useEffect(() => {
-    try {
-        const todayKey = getStorageKey(new Date());
-        const savedEvents = localStorage.getItem(todayKey);
-        if (savedEvents) {
-            setScheduleEvents(JSON.parse(savedEvents));
-        }
-    } catch (error) {
-        console.error("Failed to load schedule from localStorage", error);
+  
+  const fetchAndProcessData = useCallback(async () => {
+    if (!orderGasUrl) {
+      setErrorState('GASのURLが設定されていません。');
+      setIsLoading(false);
+      return;
     }
-  }, []);
+    
+    setIsLoading(true);
+    setErrorState(null);
 
-  // Save to localStorage whenever scheduleEvents changes
-  useEffect(() => {
     try {
-        if (scheduleEvents.length > 0) {
-            const date = new Date(scheduleEvents[0].start as string);
-            const key = getStorageKey(date);
-            localStorage.setItem(key, JSON.stringify(scheduleEvents));
+      const result = await fetchGasData(orderGasUrl);
+      if (result.error && result.message) throw new Error(result.message);
+      
+      const orderData = result.data || (Array.isArray(result) ? result : []);
+      setOrdersState(orderData);
+
+      // Process orders to create schedule events
+      const events: WithId<ScheduleEvent>[] = [];
+      orderData.forEach((order: any) => {
+        const staffName = findKey(order, ['担当']);
+        const scheduledTimeStr = findKey(order, ['チップ配置作業予定']);
+        
+        if (staffName && scheduledTimeStr) {
+          const scheduledTime = parseISO(scheduledTimeStr);
+          if (isValid(scheduledTime)) {
+            const duration = parseInt(findKey(order, ['作業時間（分）', '作業時間(分)', '作業時間']), 10) || 60;
+            const tripId = `trip-${findKey(order, ['受注ID', '受注id', '受注ID', 'id'])}`;
+            const taskStart = scheduledTime;
+            const taskEnd = addMinutes(taskStart, duration);
+            const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+
+            const customerName = findKey(order, ['お取引先名', '店舗', '取引先']) || '';
+            const taskDetails = `${findKey(order, ['タイヤサイズ', 'サイズ']) || ''}${findKey(order, ['本数']) ? ` / ${findKey(order, ['本数'])}本` : ''}`.trim();
+
+            const travelEvent: WithId<ScheduleEvent> = {
+              id: `${tripId}-travel`,
+              tripId,
+              title: `移動: ${customerName}`,
+              staffId: staffName,
+              start: travelStart.toISOString(),
+              end: taskStart.toISOString(),
+              rawOrderId: String(findKey(order, ['受注ID', '受注id', '受注ID', 'id']))
+            };
+
+            const taskEvent: WithId<ScheduleEvent> = {
+              id: `${tripId}-task`,
+              tripId,
+              title: `${customerName}\n${taskDetails}`,
+              staffId: staffName,
+              start: taskStart.toISOString(),
+              end: taskEnd.toISOString(),
+              rawOrderId: String(findKey(order, ['受注ID', '受注id', '受注ID', 'id']))
+            };
+
+            events.push(travelEvent, taskEvent);
+          }
         }
-    } catch (error) {
-        console.error("Failed to save schedule to localStorage", error);
+      });
+      setScheduleEvents(events);
+
+    } catch (e: any) {
+      console.error("Failed to fetch or process data from GAS:", e);
+      setErrorState(`データの取得または処理に失敗しました: ${e.message}`);
+      setOrdersState([]);
+      setScheduleEvents([]);
+    } finally {
+      setIsLoading(false);
     }
-  }, [scheduleEvents]);
-
-
-  const refetchScheduleEvents = useCallback(async () => {
-    // This function is now a no-op as we use localStorage, but kept for potential future use.
-    return Promise.resolve();
-  }, []);
-
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      if (orderGasUrl) {
-        setIsLoading(true);
-        setErrorState(null);
-        try {
-          // Fetch orders
-          const result = await fetchGasData(orderGasUrl);
-          if (result.error && result.message) throw new Error(result.message);
-          const orderData = result.data || (Array.isArray(result) ? result : []);
-          setOrders(orderData);
-
-        } catch (e: any) {
-          console.error("Failed to fetch initial data from GAS:", e);
-          setErrorState(`初期データの取得に失敗しました: ${e.message}`);
-          setOrders([]);
-          setScheduleEvents([]);
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        setErrorState('GASのURLが設定されていません。');
-        setIsLoading(false);
-      }
-    };
-
-    fetchInitialData();
   }, [orderGasUrl]);
 
 
+  useEffect(() => {
+    fetchAndProcessData();
+  }, [fetchAndProcessData]);
+
   const value = {
     orders,
-    setOrders,
     scheduleEvents,
-    setScheduleEvents,
-    refetchScheduleEvents,
+    refetchOrders: fetchAndProcessData,
     isLoading,
     orderGasUrl,
     setOrderGasUrl,
     error,
-    setError,
   };
 
   return (
