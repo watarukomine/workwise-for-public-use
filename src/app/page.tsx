@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -93,6 +92,7 @@ export default function DashboardPage() {
   };
 
   const dailySchedule = React.useMemo(() => {
+    if (!scheduleEvents) return [];
     return scheduleEvents.filter(event => {
       const eventDate = parseISO(event.start as string);
       return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
@@ -177,7 +177,6 @@ export default function DashboardPage() {
             <ScheduleView 
                 staffData={filteredStaff} 
                 customerData={customers} 
-                scheduleData={dailySchedule}
                 rawOrdersData={rawOrders}
                 currentDate={currentDate}
             />

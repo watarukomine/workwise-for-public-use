@@ -13,6 +13,7 @@ const TRAVEL_TIME_MINUTES = 30;
 interface OrderContextType {
   orders: any[];
   scheduleEvents: WithId<ScheduleEvent>[];
+  setScheduleEvents: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
   refetchOrders: () => Promise<void>;
   isLoading: boolean;
   orderGasUrl: string;
@@ -119,6 +120,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const value = {
     orders,
     scheduleEvents,
+    setScheduleEvents,
     refetchOrders: fetchAndProcessData,
     isLoading,
     orderGasUrl,
