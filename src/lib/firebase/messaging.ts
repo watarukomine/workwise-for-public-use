@@ -8,7 +8,11 @@ import { firebaseConfig } from '@/firebase/config';
 const registerServiceWorker = async () => {
     if ('serviceWorker' in navigator) {
         try {
-            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+            // Pass the config as a query parameter to the service worker
+            const serializedConfig = encodeURIComponent(JSON.stringify(firebaseConfig));
+            const serviceWorkerUrl = `/firebase-messaging-sw.js?firebaseConfig=${serializedConfig}`;
+            
+            const registration = await navigator.serviceWorker.register(serviceWorkerUrl);
             console.log('Service Worker registration successful, scope is:', registration.scope);
             return registration;
         } catch (err) {
