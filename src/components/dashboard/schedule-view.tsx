@@ -449,10 +449,8 @@ export function ScheduleView({
                     } else if (event.id.endsWith('-travel')) {
                         eventStartTime = newTravelStart.toISOString();
                         eventEndTime = newTaskStart.toISOString();
-                    } else { // Generic event
-                        const duration = differenceInMinutes(parseISO(event.end as string), parseISO(event.start as string));
-                        eventStartTime = newStart.toISOString();
-                        eventEndTime = addMinutes(newStart, duration).toISOString();
+                    } else { // Should not happen for trip events
+                        continue;
                     }
                     
                     if (event.calendarEventId) {
@@ -601,6 +599,7 @@ export function ScheduleView({
                     eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
                     scheduledTime: newStart.toISOString(),
                     timestamp: new Date().toISOString(),
+                    calendarEventId: dialogState.event.calendarEventId,
                 });
             }
 
@@ -699,7 +698,7 @@ export function ScheduleView({
                                {isToday(currentDate) && (
                                 <div 
                                     className="absolute top-0 h-full pointer-events-none z-40"
-                                    style={{ left: `0px`, width: `100%`}}
+                                    style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
                                 >
                                     <TimeIndicator />
                                 </div>

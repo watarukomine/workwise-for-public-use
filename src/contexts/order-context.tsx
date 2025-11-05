@@ -76,7 +76,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
                 start: travelStart.toISOString(),
                 end: taskStart.toISOString(),
                 rawOrderId: mappedOrder.rawOrderId,
-                calendarEventId: findKey(order, ['calendarEventId']), // Assuming you add this to your sheet
+                calendarEventId: findKey(order, ['calendarEventId']), 
               };
   
               const taskEvent: WithId<ScheduleEvent> = {
@@ -89,7 +89,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
                 locationId: mappedOrder.customerCode,
                 start: taskStart.toISOString(),
                 end: taskEnd.toISOString(),
-                calendarEventId: findKey(order, ['calendarEventId']), // And this
+                calendarEventId: findKey(order, ['calendarEventId']),
               };
   
               events.push(travelEvent, taskEvent);
