@@ -29,7 +29,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
   const [error, setErrorState] = useState<string | null>(null);
-  const { allStaff } = useSelectedStaff(); // Staff data to map names to IDs
+  const { allStaff, isLoading: isStaffLoading } = useSelectedStaff(); // Staff data to map names to IDs
 
   const setOrderGasUrl = (url: string) => {
     setOrderGasUrlState(url);
@@ -112,10 +112,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-    if (allStaff.length > 0) { // Ensure staff data is loaded before processing orders
+    if (!isStaffLoading && allStaff.length > 0) {
       fetchAndProcessData();
+    } else if (!isStaffLoading && allStaff.length === 0) {
+      // If there are no staff, there's no point in trying to process orders.
+      // This can happen if the staff sheet fails to load.
+      setIsLoading(false);
     }
-  }, [fetchAndProcessData, allStaff]);
+  }, [allStaff, isStaffLoading, orderGasUrl]);
 
   const value = {
     orders,
