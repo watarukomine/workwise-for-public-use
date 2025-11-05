@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
@@ -112,8 +111,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-    fetchAndProcessData();
-  }, [fetchAndProcessData]);
+    if (allStaff.length > 0) { // Ensure staff data is loaded before processing orders
+      fetchAndProcessData();
+    }
+  }, [fetchAndProcessData, allStaff]);
 
   const value = {
     orders,

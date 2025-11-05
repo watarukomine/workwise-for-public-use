@@ -434,12 +434,12 @@ export function ScheduleView({
                         eventTitle: `(ID: ${originalTask.rawOrderId})`,
                         scheduledTime: newTaskStart.toISOString(),
                         staffName: newStaff.name,
+                        statusValue: '作業待ち',
                         timestamp: new Date().toISOString(),
                      });
                 }
                 
                 for (const event of originalTripEvents) {
-                    let updatedEvent = { ...event, staffId: newStaffId };
                     let eventStartTime: string;
                     let eventEndTime: string;
 

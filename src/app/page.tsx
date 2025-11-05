@@ -4,20 +4,21 @@ import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
 import { customerData, staffStatusData } from '@/lib/data';
-import type { Customer, ScheduleEvent, StaffStatus, WithId, Staff } from '@/lib/types';
+import type { Customer, WithId, Staff } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, ChevronLeft, ChevronRight, Loader2, Monitor, Smartphone } from 'lucide-react';
+import { AlertCircle, ChevronLeft, ChevronRight, Monitor, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay, parseISO, isValid } from 'date-fns';
+import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { VerticalScheduleView } from '@/components/dashboard/vertical-schedule-view';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
+import { Loader2 } from 'lucide-react';
 
 
 export default function DashboardPage() {
