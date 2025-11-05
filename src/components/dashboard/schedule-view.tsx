@@ -276,7 +276,7 @@ export function ScheduleView({
   const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
-  const { scheduleEvents, setScheduleEvents } = useOrder();
+  const { scheduleEvents, setScheduleEvents, refetchOrders } = useOrder();
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
@@ -298,19 +298,20 @@ export function ScheduleView({
   React.useEffect(() => {
     if (!rawOrdersData) return;
     
+    const allMappedOrders = rawOrdersData.map(mapRawToOrder);
     const scheduledRawOrderIds = new Set(dailySchedule.map(e => e.rawOrderId).filter(Boolean));
 
-    const newUnassignedOrders = rawOrdersData.filter(order => {
-        const rawOrderId = findKey(order, ['受注 ID', '受注id', '受注ID', 'id']);
-        if (scheduledRawOrderIds.has(rawOrderId)) return false;
+    const newUnassignedOrders = allMappedOrders.filter(order => {
+        if (!order.rawOrderId) return false;
+        
+        if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
+        
+        const scheduledDateKey = findKey(order.raw, ['作業予定日']);
+        if (!scheduledDateKey) return false;
 
-        const workDate = findKey(order, ['作業予定日']);
-        if (!workDate) return false;
-
-        const scheduledDate = parseISO(workDate);
+        const scheduledDate = parseISO(scheduledDateKey);
         return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
-    }).map(mapRawToOrder);
-
+    });
     setUnassignedOrders(newUnassignedOrders);
   }, [rawOrdersData, dailySchedule, currentDate]);
 
@@ -344,19 +345,8 @@ export function ScheduleView({
       return;
     }
 
-    const tripEvents = scheduleEvents.filter(e => e.tripId === eventToUnassign.tripId);
-    const taskEvent = tripEvents.find(e => e.id.endsWith('-task'));
-    const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
-
     try {
-      if (taskEvent?.calendarEventId) {
-        await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: taskEvent.calendarEventId });
-      }
-      if (travelEvent?.calendarEventId) {
-        await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: travelEvent.calendarEventId });
-      }
-      
-      await updateSheetStatus({
+      const result = await updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
         staffName: "",
@@ -366,6 +356,15 @@ export function ScheduleView({
         travelCalendarEventId: "",
         timestamp: new Date().toISOString(),
       });
+
+      if (result.status === 'error') throw new Error(result.message);
+      
+      const tripEvents = scheduleEvents.filter(e => e.tripId === eventToUnassign.tripId);
+      for (const event of tripEvents) {
+          if (event.calendarEventId) {
+            await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: event.calendarEventId });
+          }
+      }
       
       const originalOrderRaw = rawOrdersData.find(o => findKey(o, ['受注 ID','受注id', '受注ID', 'id']) === eventToUnassign.rawOrderId);
       if (originalOrderRaw) {
@@ -419,8 +418,7 @@ export function ScheduleView({
       return addMinutes(startOfTimelineDay, newStartMinutes);
     };
 
-    // --- MOVING AN EXISTING EVENT ---
-    if ('staffId' in item) {
+    if ('staffId' in item) { // Moving an existing event
         const draggedEvent = item as WithId<ScheduleEvent>;
         const newStaff = getStaffById(newStaffId);
         const oldStaff = getStaffById(draggedEvent.staffId);
@@ -453,7 +451,6 @@ export function ScheduleView({
                 let updatedTaskEventId = originalTask.calendarEventId;
                 let updatedTravelEventId = originalTravel?.calendarEventId;
 
-                // If staff changes, we need to delete old events and create new ones.
                 if (isStaffChange) {
                      if(oldStaff.calendarId && updatedTaskEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: updatedTaskEventId });
                      if(oldStaff.calendarId && updatedTravelEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: updatedTravelEventId });
@@ -464,7 +461,7 @@ export function ScheduleView({
                        updatedTaskEventId = newTaskResult.eventId;
                        updatedTravelEventId = newTravelResult.eventId;
                      }
-                } else { // Only time has changed
+                } else { 
                      if (newStaff.calendarId && updatedTaskEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: updatedTaskEventId, startTime: newTaskStart.toISOString(), endTime: newTaskEnd.toISOString()});
                      if (newStaff.calendarId && updatedTravelEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: updatedTravelEventId, startTime: newTravelStart.toISOString(), endTime: newTaskStart.toISOString()});
                 }
@@ -480,14 +477,13 @@ export function ScheduleView({
                     calendarId: newStaff.calendarId,
                 });
                 
-                // Optimistically update UI
-                setScheduleEvents(prev => prev.map(e => {
-                    if (e.tripId === draggedEvent.tripId) {
-                        if (e.id.endsWith('-task')) return {...originalTask, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString(), calendarEventId: updatedTaskEventId};
-                        if (e.id.endsWith('-travel') && originalTravel) return {...originalTravel, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString(), calendarEventId: updatedTravelEventId};
-                    }
-                    return e;
-                }).filter(Boolean) as WithId<ScheduleEvent>[]);
+                setScheduleEvents(prev => {
+                    const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId);
+                    const updatedTask = {...originalTask, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString(), calendarEventId: updatedTaskEventId};
+                    const updatedTravel = originalTravel ? {...originalTravel, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString(), calendarEventId: updatedTravelEventId} : undefined;
+                    if (updatedTravel) return [...otherEvents, updatedTask, updatedTravel];
+                    return [...otherEvents, updatedTask];
+                });
 
             } else { // --- Generic event without tripId ---
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
@@ -514,9 +510,9 @@ export function ScheduleView({
 
         } catch(e: any) {
             toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
+            await refetchOrders();
         }
-    // --- ADDING A NEW EVENT FROM ORDERS/GENERIC ---
-    } else if ('estimatedDuration' in item) {
+    } else if ('estimatedDuration' in item) { // Adding a new event from orders
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
