@@ -74,7 +74,8 @@ export async function updateSheetStatus(args: {
     actionType?: string | null;
     actionTimestamp?: string | null;
     scheduledTime?: string | null;
-    calendarEventId?: string | null;
+    taskCalendarEventId?: string | null;
+    travelCalendarEventId?: string | null;
 }): Promise<GasResponse> {
     return callGasApi(args);
 }
@@ -91,3 +92,5 @@ export async function handleCalendarEvent(args: {
 }): Promise<GasResponse> {
     return callGasApi({ ...args });
 }
+
+    

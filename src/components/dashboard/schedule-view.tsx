@@ -441,29 +441,31 @@ export function ScheduleView({
                 }
                 
                 for (const event of originalTripEvents) {
-                    let eventStartTime: string;
-                    let eventEndTime: string;
+                    if (!event.calendarEventId) continue;
+                    
+                    let eventStartTime: string, eventEndTime: string;
 
                     if (event.id.endsWith('-task')) {
                         eventStartTime = newTaskStart.toISOString();
                         eventEndTime = newTaskEnd.toISOString();
-                    } else if (event.id.endsWith('-travel')) {
+                    } else { // travel
                         eventStartTime = newTravelStart.toISOString();
                         eventEndTime = newTaskStart.toISOString();
-                    } else { // Should not happen for trip events
-                        continue;
                     }
                     
-                    if (event.calendarEventId) {
-                         if (isStaffChange) {
-                            if(oldStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: event.calendarEventId });
-                            const createResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId!, title: event.title, startTime: eventStartTime, endTime: eventEndTime, description: event.description });
-                            if (createResult.eventId && originalTask.rawOrderId) {
-                                await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${originalTask.rawOrderId})`, calendarEventId: createResult.eventId });
-                            }
-                        } else {
-                            await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId!, eventId: event.calendarEventId, startTime: eventStartTime, endTime: eventEndTime });
+                    if (isStaffChange) {
+                        if(oldStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: event.calendarEventId });
+                        if(newStaff.calendarId) {
+                           const createResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: event.title, startTime: eventStartTime, endTime: eventEndTime, description: event.description });
+                           if (createResult.eventId && originalTask.rawOrderId) {
+                              const updateData: any = { gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${originalTask.rawOrderId})` };
+                              if(event.id.endsWith('-task')) updateData.taskCalendarEventId = createResult.eventId;
+                              else updateData.travelCalendarEventId = createResult.eventId;
+                              await updateSheetStatus(updateData);
+                           }
                         }
+                    } else {
+                        if(newStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: event.calendarEventId, startTime: eventStartTime, endTime: eventEndTime });
                     }
                 }
             } else { // Generic event without tripId
@@ -473,9 +475,9 @@ export function ScheduleView({
                 if (draggedEvent.calendarEventId) {
                     if(isStaffChange) {
                         if(oldStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: draggedEvent.calendarEventId });
-                        await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId!, title: draggedEvent.title, startTime: newStart.toISOString(), endTime: newEnd.toISOString(), description: draggedEvent.description });
+                        if(newStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: draggedEvent.title, startTime: newStart.toISOString(), endTime: newEnd.toISOString(), description: draggedEvent.description });
                     } else {
-                        await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId!, eventId: draggedEvent.calendarEventId, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
+                        if(newStaff.calendarId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId!, eventId: draggedEvent.calendarEventId, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
                     }
                 }
             }
@@ -518,7 +520,7 @@ export function ScheduleView({
               const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
               
               const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
-              await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
+              const travelResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
               
               const taskTitle = order.taskDetails;
               const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
@@ -531,7 +533,8 @@ export function ScheduleView({
                   statusValue: '作業待ち',
                   scheduledTime: taskStart.toISOString(),
                   timestamp: new Date().toISOString(),
-                  calendarEventId: taskResult.eventId,
+                  taskCalendarEventId: taskResult.eventId,
+                  travelCalendarEventId: travelResult.eventId,
               });
               
               toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
@@ -600,7 +603,6 @@ export function ScheduleView({
                     eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
                     scheduledTime: newStart.toISOString(),
                     timestamp: new Date().toISOString(),
-                    calendarEventId: dialogState.event.calendarEventId,
                 });
             }
 
@@ -958,3 +960,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
