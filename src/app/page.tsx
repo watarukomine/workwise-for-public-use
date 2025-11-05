@@ -2,6 +2,7 @@
 'use client';
 
 import * as React from 'react';
+import { useEffect } from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
 import { customerData, staffStatusData } from '@/lib/data';
@@ -30,13 +31,14 @@ export default function DashboardPage() {
     scheduleEvents, 
     setScheduleEvents,
     isLoading: isLoadingOrders,
-    refetchScheduleEvents,
   } = useOrder();
   
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
   const { forceMobileView, setForceMobileView } = useAppShell();
+  
+  const getStorageKey = (date: Date) => `scheduleData-${format(date, 'yyyy-MM-dd')}`;
   
   const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || isStaffLoading || !profile) return [];
@@ -86,21 +88,27 @@ export default function DashboardPage() {
 
   const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading;
 
+  useEffect(() => {
+    const key = getStorageKey(currentDate);
+    const savedData = localStorage.getItem(key);
+    if (savedData) {
+        try {
+            setScheduleEvents(JSON.parse(savedData));
+        } catch(e) {
+            console.error("Failed to parse schedule data from localStorage", e);
+            setScheduleEvents([]);
+        }
+    } else {
+        setScheduleEvents([]);
+    }
+  }, [currentDate, setScheduleEvents]);
+
   const handleDateChange = (direction: 'next' | 'prev' | 'today') => {
       setCurrentDate(current => {
           if (direction === 'today') return startOfToday();
           return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
       });
   };
-  
-  const dailySchedule = React.useMemo(() => {
-    if (!scheduleEvents) return [];
-    return scheduleEvents.filter(event => {
-        const eventDate = typeof event.start === 'string' ? new Date(event.start) : event.start;
-        return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-    }).sort((a,b) => new Date(a.start as string).getTime() - new Date(b.start as string).getTime());
-  }, [scheduleEvents, currentDate]);
-
 
   if (isLoading) {
       return (
@@ -173,14 +181,14 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         {showVerticalView ? (
             <VerticalScheduleView 
-                scheduleData={dailySchedule}
+                scheduleData={scheduleEvents}
                 staffData={filteredStaff}
             />
         ) : (
             <ScheduleView 
                 staffData={filteredStaff} 
                 customerData={customers} 
-                scheduleData={dailySchedule}
+                scheduleData={scheduleEvents}
                 rawOrdersData={rawOrders}
                 setScheduleData={setScheduleEvents}
                 currentDate={currentDate}

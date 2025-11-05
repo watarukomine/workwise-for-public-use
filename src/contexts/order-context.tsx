@@ -7,6 +7,7 @@ import { ORDER_GAS_URL } from '@/lib/settings';
 import type { ScheduleEvent, WithId } from '@/lib/types';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useSelectedStaff } from './selected-staff-context';
+import { format } from 'date-fns';
 
 interface OrderContextType {
   orders: any[];
@@ -29,8 +30,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
   const [error, setErrorState] = useState<string | null>(null);
-  const { profile } = useUserProfile();
-  const { allStaff } = useSelectedStaff();
 
   const setOrderGasUrl = (url: string) => {
     setOrderGasUrlState(url);
@@ -44,36 +43,39 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setErrorState(error);
   };
 
-  const refetchScheduleEvents = useCallback(async () => {
-    if (!profile || allStaff.length === 0) return;
+  const getStorageKey = (date: Date) => `scheduleData-${format(date, 'yyyy-MM-dd')}`;
 
-    const staffCalendarIds = allStaff.reduce((acc, staff) => {
-      if (staff.calendarId) {
-        acc[staff.id] = staff.calendarId;
-      }
-      return acc;
-    }, {} as Record<string, string>);
-
+  // Load from localStorage on mount
+  useEffect(() => {
     try {
-      const response = await fetch(orderGasUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operation: 'getEvents', staffCalendarIds }),
-        cache: 'no-store',
-      });
-      if (!response.ok) {
-        throw new Error(`GAS request failed with status ${response.status}`);
-      }
-      const result = await response.json();
-      if (result.status === 'error') {
-        throw new Error(result.message);
-      }
-      setScheduleEvents(result.data || []);
-    } catch (e: any) {
-      console.error("Failed to refetch schedule events:", e);
-      setErrorState(`スケジュールの再取得に失敗しました: ${e.message}`);
+        const todayKey = getStorageKey(new Date());
+        const savedEvents = localStorage.getItem(todayKey);
+        if (savedEvents) {
+            setScheduleEvents(JSON.parse(savedEvents));
+        }
+    } catch (error) {
+        console.error("Failed to load schedule from localStorage", error);
     }
-  }, [orderGasUrl, profile, allStaff]);
+  }, []);
+
+  // Save to localStorage whenever scheduleEvents changes
+  useEffect(() => {
+    try {
+        if (scheduleEvents.length > 0) {
+            const date = new Date(scheduleEvents[0].start as string);
+            const key = getStorageKey(date);
+            localStorage.setItem(key, JSON.stringify(scheduleEvents));
+        }
+    } catch (error) {
+        console.error("Failed to save schedule to localStorage", error);
+    }
+  }, [scheduleEvents]);
+
+
+  const refetchScheduleEvents = useCallback(async () => {
+    // This function is now a no-op as we use localStorage, but kept for potential future use.
+    return Promise.resolve();
+  }, []);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -86,9 +88,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           if (result.error && result.message) throw new Error(result.message);
           const orderData = result.data || (Array.isArray(result) ? result : []);
           setOrders(orderData);
-
-          // Fetch schedule events
-          await refetchScheduleEvents();
 
         } catch (e: any) {
           console.error("Failed to fetch initial data from GAS:", e);
@@ -105,7 +104,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     };
 
     fetchInitialData();
-  }, [orderGasUrl, refetchScheduleEvents]);
+  }, [orderGasUrl]);
 
 
   const value = {
