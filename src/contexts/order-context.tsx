@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
@@ -120,7 +119,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       // This can happen if the staff sheet fails to load.
       setIsLoading(false);
     }
-  }, [isStaffLoading, orderGasUrl, allStaff.length]); // Use allStaff.length to prevent re-fetching on every render
+  }, [fetchAndProcessData, isStaffLoading]);
 
   const value = {
     orders,
