@@ -3,7 +3,6 @@
 const SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
 // データを読み書きするシート名を正確に入力してください
 const ORDER_SHEET_NAME = "受注管理"; 
-const STAFF_SHEET_NAME = "スタッフマスタ";
 // ↓↓↓↓【設定はここまで】↓↓↓↓
 
 /**
@@ -60,21 +59,16 @@ function doPost(e) {
         })).setMimeType(ContentService.MimeType.JSON);
       }
     } else {
-      console.error("No JSON data received in request");
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "error",
-        message: "リクエストにJSONデータがありません"
-      })).setMimeType(ContentService.MimeType.JSON);
+       return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "リクエストにJSONデータがありません" })).setMimeType(ContentService.MimeType.JSON);
     }
     
-    if (params.operation) { // 'create', 'update', 'delete' calendar events
-      return handleCalendarEvent(params);
-    } else if (params.eventTitle) { // Update sheet from app
+    // Simplified: Only handle sheet updates
+    if (params.eventTitle) {
       return updateSheetWithOrderInfo(params);
     } else {
       return ContentService.createTextOutput(JSON.stringify({
         status: "error",
-        message: "必要なパラメータ (operation または eventTitle) がありません"
+        message: "必要なパラメータ (eventTitle) がありません"
       })).setMimeType(ContentService.MimeType.JSON);
     }
   } catch (error) {
@@ -92,7 +86,7 @@ function doPost(e) {
 function updateSheetWithOrderInfo(params) {
   const { 
       eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, 
-      actionTimestamp, scheduledTime, taskCalendarEventId, travelCalendarEventId, calendarId
+      actionTimestamp, scheduledTime
   } = params;
 
   try {
@@ -132,22 +126,23 @@ function updateSheetWithOrderInfo(params) {
     console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
     
     const updateColumn = (colName, value) => {
-      const colIdx = headers.indexOf(colName);
-      if (colIdx !== -1 && (value !== undefined || value !== null)) {
-        sheet.getRange(rowNum, colIdx + 1).setValue(value);
-        console.log(`Updated column '${colName}' with value: ${value}`);
+      if (value !== undefined) {
+        const colIdx = headers.indexOf(colName);
+        if (colIdx !== -1) {
+          sheet.getRange(rowNum, colIdx + 1).setValue(value);
+          console.log(`Updated column '${colName}' with value: ${value}`);
+        }
       }
     };
 
     updateColumn("担当", staffName);
     updateColumn("受注ステータス", statusValue);
-    updateColumn("最終更新日時", timestamp ? new Date(timestamp) : new Date());
-    if(latitude !== undefined && longitude !== undefined) updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
-    updateColumn("チップ配置作業予定", scheduledTime ? new Date(scheduledTime) : "");
-    updateColumn("taskCalendarEventId", taskCalendarEventId);
-    updateColumn("travelCalendarEventId", travelCalendarEventId);
-    updateColumn("calendarId", calendarId);
-
+    updateColumn("最終更新日時", timestamp ? new Date(timestamp) : undefined);
+    if(latitude !== undefined && longitude !== undefined) {
+      updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
+    }
+    updateColumn("チップ配置作業予定", scheduledTime ? new Date(scheduledTime) : (scheduledTime === "" ? "" : undefined)); 
+    
     if (actionType && actionTimestamp) {
         const dateValue = new Date(actionTimestamp);
         const actionColMap = {
@@ -157,35 +152,6 @@ function updateSheetWithOrderInfo(params) {
         if(actionColMap[actionType]) {
             updateColumn(actionColMap[actionType], dateValue);
         }
-    }
-    
-    // Also update calendar if scheduledTime and calendar IDs are present
-    const staffCalendarId = sheet.getRange(rowNum, headers.indexOf("calendarId") + 1).getValue();
-    if (scheduledTime && staffCalendarId) {
-      console.log(`Updating linked calendar events on calendar ${staffCalendarId}`);
-      const calendar = CalendarApp.getCalendarById(staffCalendarId);
-      if(calendar) {
-          const taskStart = new Date(scheduledTime);
-          const workDuration = sheet.getRange(rowNum, headers.indexOf("作業時間（分）") + 1).getValue() || 60;
-          const taskEnd = new Date(taskStart.getTime() + workDuration * 60000);
-          const travelStart = new Date(taskStart.getTime() - 30 * 60000);
-
-          const currentTaskEventId = sheet.getRange(rowNum, headers.indexOf("taskCalendarEventId") + 1).getValue();
-          const currentTravelEventId = sheet.getRange(rowNum, headers.indexOf("travelCalendarEventId") + 1).getValue();
-          
-          if(currentTaskEventId) {
-            try {
-              const event = calendar.getEventById(currentTaskEventId);
-              if (event) event.setTime(taskStart, taskEnd);
-            } catch(e) { console.error(`Failed to update task event ${currentTaskEventId}: ${e.message}`);}
-          }
-          if(currentTravelEventId) {
-            try {
-              const event = calendar.getEventById(currentTravelEventId);
-              if(event) event.setTime(travelStart, taskStart);
-            } catch(e) { console.error(`Failed to update travel event ${currentTravelEventId}: ${e.message}`);}
-          }
-      }
     }
         
     return ContentService.createTextOutput(JSON.stringify({
@@ -199,68 +165,5 @@ function updateSheetWithOrderInfo(params) {
       status: "error",
       message: error.message
     })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-
-/**
- * カレンダーイベントを作成・更新・削除する
- */
-function handleCalendarEvent(params) {
-  try {
-    console.log("handleCalendarEvent called with:", JSON.stringify(params));
-    
-    const { operation, calendarId, eventId, title, description, startTime, endTime } = params;
-    
-    if (!operation || !calendarId) {
-      throw new Error("必須パラメータ 'operation' または 'calendarId' がありません");
-    }
-    
-    const calendar = CalendarApp.getCalendarById(calendarId);
-    if (!calendar) throw new Error(`カレンダーID「${calendarId}」が見つからないか、アクセス権がありません。`);
-
-    let result = {};
-    
-    switch (operation) {
-      case 'create':
-        if (!title || !startTime || !endTime) throw new Error("予定の作成には title, startTime, endTime が必要です。");
-        const newEvent = calendar.createEvent(title, new Date(startTime), new Date(endTime), { description: description || '' });
-        result = { status: "success", message: "カレンダーに予定を作成しました。", eventId: newEvent.getId() };
-        break;
-        
-      case 'update':
-        if (!eventId) throw new Error("予定の更新には eventId が必要です。");
-        const eventToUpdate = calendar.getEventById(eventId);
-        if (!eventToUpdate) throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        if (title) eventToUpdate.setTitle(title);
-        if (startTime && endTime) eventToUpdate.setTime(new Date(startTime), new Date(endTime));
-        if (description !== undefined) eventToUpdate.setDescription(description || "");
-        result = { status: "success", message: "カレンダーの予定を更新しました。", eventId: eventId };
-        break;
-        
-      case 'delete':
-        if (!eventId) throw new Error("予定の削除には eventId が必要です。");
-        try {
-            const eventToDelete = calendar.getEventById(eventId);
-            if (eventToDelete) {
-                eventToDelete.deleteEvent();
-                result = { status: "success", message: "カレンダーから予定を削除しました。" };
-            } else {
-                 result = { status: "success", message: "イベントは既に削除されているか、見つかりませんでした。" };
-            }
-        } catch(e) {
-            console.warn(`Could not delete event ${eventId}, it might have been already deleted. Error: ${e.message}`);
-            result = { status: "success", message: `イベント削除中に軽微なエラー: ${e.message}` };
-        }
-        break;
-        
-      default:
-        throw new Error(`不明な操作です: ${operation}`);
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    console.error("Error in handleCalendarEvent:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }

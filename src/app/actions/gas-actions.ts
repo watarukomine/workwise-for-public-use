@@ -1,4 +1,3 @@
-
 'use server';
 
 interface GasApiArgs {
@@ -10,7 +9,6 @@ interface GasResponse {
     status: 'success' | 'error';
     message: string;
     data?: any;
-    eventId?: string;
 }
 
 async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
@@ -74,22 +72,6 @@ export async function updateSheetStatus(args: {
     actionType?: string | null;
     actionTimestamp?: string | null;
     scheduledTime?: string | null;
-    taskCalendarEventId?: string | null;
-    travelCalendarEventId?: string | null;
-    calendarId?: string | null;
 }): Promise<GasResponse> {
     return callGasApi(args);
-}
-
-export async function handleCalendarEvent(args: {
-    gasUrl: string;
-    operation: 'create' | 'update' | 'delete';
-    calendarId: string;
-    eventId?: string;
-    title?: string;
-    description?: string;
-    startTime?: string;
-    endTime?: string;
-}): Promise<GasResponse> {
-    return callGasApi({ ...args });
 }
