@@ -28,7 +28,13 @@ function doGet(e) {
     const data = values.map((row, rowIndex) => {
       const obj = {};
       headers.forEach((header, index) => {
-        obj[header] = (row[index] instanceof Date) ? row[index].toISOString() : row[index];
+        const cellValue = row[index];
+        // Check if the cell value is a valid Date object before calling toISOString()
+        if (cellValue && cellValue instanceof Date) {
+          obj[header] = cellValue.toISOString();
+        } else {
+          obj[header] = cellValue;
+        }
       });
       obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowIndex + 2}`;
       return obj;
@@ -36,6 +42,7 @@ function doGet(e) {
 
     return ContentService.createTextOutput(JSON.stringify({ data: data })).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
+    console.error("GAS doGet Error:", error.message, error.stack);
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -136,7 +143,7 @@ function updateSheetWithOrderInfo(params) {
     console.log("Updating sheet with:", JSON.stringify(params));
     
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
-    if (!match || !match[1] || match[1] === 'N/A') {
+    if (!match || !match[1] || match[1].toUpperCase() === 'N/A') {
       return ContentService.createTextOutput(JSON.stringify({ 
         status: "success", 
         message: "汎用タスクまたはIDなしタスクのためシート更新はスキップされました。" 
@@ -321,5 +328,3 @@ function handleCalendarEvent(params) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
-
-    
