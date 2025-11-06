@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -413,18 +414,22 @@ export function ScheduleView({
         const newStaff = getStaffById(newStaffId);
         if (!newStaff) return;
         
-        await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-            staffName: newStaff.name,
-            statusValue: '作業待ち',
-            scheduledTime: getNewStartFromDrop().toISOString(),
-            timestamp: new Date().toISOString(),
-        });
-        
-        toast({ title: 'スケジュールを更新しました' });
-        await refetchOrders();
-
+        try {
+            await updateSheetStatus({
+                gasUrl: ORDER_GAS_URL,
+                eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+                staffName: newStaff.name,
+                statusValue: '作業待ち',
+                scheduledTime: getNewStartFromDrop().toISOString(),
+                timestamp: new Date().toISOString(),
+            });
+            
+            toast({ title: 'スケジュールを更新しました' });
+            await refetchOrders();
+        } catch(e: any) {
+            toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
+            await refetchOrders(); // Revert UI
+        }
     } else if ('estimatedDuration' in item) { // Adding a new event from orders
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
@@ -553,11 +558,14 @@ export function ScheduleView({
   const handleEmailEvent = async () => {
     if (dialogState.mode !== 'edit') return;
     const event = dialogState.event;
+    const staff = getStaffById(event.staffId);
+    
     const mailtoLink = await createICalLink({
         title: event.title,
         description: event.description || '',
         start: typeof event.start === 'string' ? event.start : event.start.toISOString(),
         end: typeof event.end === 'string' ? event.end : event.end.toISOString(),
+        toEmail: staff?.email || '',
     });
     window.location.href = mailtoLink;
   }

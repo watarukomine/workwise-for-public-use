@@ -1,3 +1,4 @@
+
 'use server';
 import { createEvents, type EventAttributes } from 'ics';
 import { URLSearchParams } from 'url';
@@ -7,10 +8,11 @@ interface CreateICalLinkArgs {
   description: string;
   start: string; // ISO String
   end: string;   // ISO String
+  toEmail?: string; // Add email address parameter
 }
 
 export async function createICalLink(args: CreateICalLinkArgs): Promise<string> {
-  const { title, description, start, end } = args;
+  const { title, description, start, end, toEmail } = args;
 
   const startDateTime = new Date(start);
   const endDateTime = new Date(end);
@@ -47,7 +49,8 @@ ${value}
         `.trim(),
       });
       
-      const mailtoLink = `mailto:?${mailtoParams.toString()}`;
+      // Use the provided email address in the mailto link
+      const mailtoLink = `mailto:${toEmail || ''}?${mailtoParams.toString()}`;
       resolve(mailtoLink);
     });
   });
