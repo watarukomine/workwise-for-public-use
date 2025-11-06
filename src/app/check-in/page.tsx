@@ -15,7 +15,7 @@ import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Update Location' | 'Send Message';
 type StatusValue = StaffStatus['status'];
 
 export default function CheckInPage() {
@@ -38,7 +38,7 @@ export default function CheckInPage() {
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
         'Finish Task': '作業終了',
-        'Wait': '位置情報更新',
+        'Update Location': '位置情報更新',
         'Send Message': 'メッセージ送信'
     };
     return map[action];
@@ -83,19 +83,13 @@ export default function CheckInPage() {
         }, 1000);
         return;
     }
-    
-    if (!orderId && !['Wait'].includes(action)) {
-        setError('このアクションにはオーダーIDが必要です。スケジュール画面からタスクを選択してください。');
-        setIsLoading(null);
-        return;
-    }
 
     // Map actions to their corresponding status values for the sheet update
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
       'Finish Task': '待機中',
-      'Wait': '待機中',
+      'Update Location': '待機中',
       'Arrive': '作業待ち',
     };
 
@@ -122,6 +116,18 @@ export default function CheckInPage() {
         
         if (!profile?.name) {
             setError('ユーザー情報が取得できません。ログインしているか確認してください。');
+            setIsLoading(null);
+            return;
+        }
+        
+        // For "Update Location", if there's no orderId, just show location and don't call GAS.
+        if (action === 'Update Location' && !orderId) {
+            toast({
+                title: '位置情報を更新しました',
+                description: `現在地: (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
+            });
+            const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            setLastAction({ action, time: currentTime });
             setIsLoading(null);
             return;
         }
@@ -197,7 +203,7 @@ export default function CheckInPage() {
     { action: 'Arrive', label: '現場到着', icon: MapPin, requiresOrderId: true },
     { action: 'Begin Task', label: '作業開始', icon: Clock, requiresOrderId: true },
     { action: 'Finish Task', label: '作業終了', icon: CheckCircle, requiresOrderId: true },
-    { action: 'Wait', label: '位置情報更新', icon: RefreshCw, requiresOrderId: false },
+    { action: 'Update Location', label: '位置情報更新', icon: RefreshCw, requiresOrderId: false },
   ];
 
   return (
@@ -215,7 +221,7 @@ export default function CheckInPage() {
                 size="lg"
                 className={cn(
                   "h-20 text-base flex-col",
-                  action === 'Wait' && "col-span-2"
+                  action === 'Update Location' && "col-span-2"
                 )}
                 onClick={() => handleAction(action)}
                 disabled={!!isLoading || (requiresOrderId && !orderId)}

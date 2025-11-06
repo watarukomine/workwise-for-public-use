@@ -37,6 +37,7 @@ function doGet(e) {
 
     return ContentService.createTextOutput(JSON.stringify({ data: data })).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
+    console.error("GAS doGet Error:", error.message, error.stack);
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -137,7 +138,7 @@ function updateSheetWithOrderInfo(params) {
     console.log("Updating sheet with:", JSON.stringify(params));
     
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
-    if (!match || !match[1] || match[1] === 'N/A') {
+    if (!match || !match[1] || match[1].toUpperCase() === 'N/A') {
       return ContentService.createTextOutput(JSON.stringify({ 
         status: "success", 
         message: "汎用タスクまたはIDなしタスクのためシート更新はスキップされました。" 
