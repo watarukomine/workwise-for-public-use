@@ -151,24 +151,24 @@ function updateSheetWithOrderInfo(params) {
     updateColumn("taskCalendarEventId", taskCalendarEventId);
     updateColumn("travelCalendarEventId", travelCalendarEventId);
     
-    // --- Calendar Update Logic ---
+    const staffDataSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(STAFF_SHEET_NAME);
+    const staffData = staffDataSheet.getDataRange().getValues();
+    const staffHeaders = staffData[0];
+    const staffNameCol = staffHeaders.indexOf("スタッフ名");
+    const calendarIdCol = staffHeaders.indexOf("calendarId");
+    const currentStaffName = staffName || sheet.getRange(rowNum, headers.indexOf("担当") + 1).getValue();
+    
     let staffCalendarId;
-    if (staffName) {
-      const staffSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(STAFF_SHEET_NAME);
-      const staffData = staffSheet.getDataRange().getValues();
-      const staffHeaders = staffData[0];
-      const nameCol = staffHeaders.indexOf("スタッフ名");
-      const calIdCol = staffHeaders.indexOf("calendarId");
-      
-      for (let i = 1; i < staffData.length; i++) {
-        if (staffData[i][nameCol] === staffName) {
-          staffCalendarId = staffData[i][calIdCol];
-          break;
+    if (currentStaffName) {
+        for(let i=1; i < staffData.length; i++) {
+            if(staffData[i][staffNameCol] === currentStaffName) {
+                staffCalendarId = staffData[i][calendarIdCol];
+                break;
+            }
         }
-      }
     }
     
-    console.log(`Found calendarId: ${staffCalendarId} for staff: ${staffName}`);
+    console.log(`Found calendarId: ${staffCalendarId} for staff: ${currentStaffName}`);
 
     if (scheduledTime && staffCalendarId) {
       console.log(`Updating linked calendar events on calendar ${staffCalendarId}`);
@@ -186,18 +186,14 @@ function updateSheetWithOrderInfo(params) {
             try {
               const event = calendar.getEventById(currentTaskEventId);
               if (event) event.setTime(taskStart, taskEnd);
-              console.log(`Updated task event ${currentTaskEventId}`);
             } catch(e) { console.error(`Failed to update task event ${currentTaskEventId}: ${e.message}`);}
           }
           if(currentTravelEventId) {
             try {
               const event = calendar.getEventById(currentTravelEventId);
               if(event) event.setTime(travelStart, taskStart);
-               console.log(`Updated travel event ${currentTravelEventId}`);
             } catch(e) { console.error(`Failed to update travel event ${currentTravelEventId}: ${e.message}`);}
           }
-      } else {
-         console.error(`Could not access calendar with ID: ${staffCalendarId}`);
       }
     }
         

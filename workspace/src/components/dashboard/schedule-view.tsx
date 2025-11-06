@@ -290,23 +290,25 @@ export function ScheduleView({
   React.useEffect(() => {
     if (!rawOrdersData) return;
     
+    const dailySchedule = scheduleEvents.filter(event => {
+        const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+        return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+    });
+    const scheduledRawOrderIds = new Set(dailySchedule.map(e => e.rawOrderId).filter(Boolean));
+
     const newUnassignedOrders = rawOrdersData.filter(order => {
-        const staffName = findKey(order, ['担当']);
-        const scheduledTime = findKey(order, ['チップ配置作業予定']);
-        const isAssigned = staffName && scheduledTime;
-
-        if (isAssigned) return false;
-
         const workDate = findKey(order, ['作業予定日']);
-        
         if (!workDate) return false;
-
         const scheduledDate = parseISO(workDate);
-        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
+        if (!isValid(scheduledDate) || !isEqual(startOfDay(scheduledDate), startOfDay(currentDate))) {
+            return false;
+        }
+        const orderId = findKey(order, ['受注 ID', '受注id', '受注ID', 'id']);
+        return !scheduledRawOrderIds.has(String(orderId));
     }).map(mapRawToOrder);
 
     setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, currentDate, scheduleEvents]);
+  }, [rawOrdersData, scheduleEvents, currentDate]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -329,40 +331,57 @@ export function ScheduleView({
       }
   };
 
-  const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
+  const unassignTask = (eventToUnassign: WithId<ScheduleEvent>) => {
       if (!eventToUnassign.rawOrderId) return;
       const staff = getStaffById(eventToUnassign.staffId);
       if (!staff || !staff.calendarId) {
           toast({ variant: 'destructive', title: 'エラー', description: '担当スタッフにカレンダーIDが設定されていません。' });
           return;
       }
+      
+      const originalEvents = [...scheduleEvents];
+      const originalUnassigned = [...unassignedOrders];
 
-      try {
-        await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
-            staffName: "",
-            statusValue: "未割当",
-            scheduledTime: "",
-            timestamp: new Date().toISOString(),
+      const originalOrderRaw = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
+      if (originalOrderRaw) {
+        const orderToAddBack = mapRawToOrder(originalOrderRaw);
+         setUnassignedOrders(prev => {
+          if (!prev.some(o => o.id === orderToAddBack.id)) {
+            return [...prev, orderToAddBack];
+          }
+          return prev;
         });
-        
-        const eventsToDelete = scheduleEvents.filter(e => e.tripId === eventToUnassign.tripId);
-        for (const event of eventsToDelete) {
-            if (event.calendarEventId) {
-                await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: event.calendarEventId });
-            }
-        }
-          
-        await refetchOrders();
-        toast({ title: 'タスクを未割り当てに戻しました' });
-      } catch(e: any) {
-          console.error("Unassignment failed:", e);
-          toast({ variant: 'destructive', title: '更新エラー', description: `シートまたはカレンダーの更新に失敗しました: ${e.message}` });
       }
+      setScheduleEvents(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
+      toast({ title: 'タスクを未割り当てに戻しました' });
+
+      (async () => {
+        try {
+          await updateSheetStatus({
+              gasUrl: ORDER_GAS_URL,
+              eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
+              staffName: "",
+              statusValue: "未割当",
+              scheduledTime: "",
+              timestamp: new Date().toISOString(),
+          });
+          
+          const eventsToDelete = originalEvents.filter(e => e.tripId === eventToUnassign.tripId);
+          for (const event of eventsToDelete) {
+              if (event.calendarEventId) {
+                  await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: event.calendarEventId });
+              }
+          }
+        } catch(e: any) {
+            console.error("Unassignment failed:", e);
+            toast({ variant: 'destructive', title: '更新エラー', description: `シートまたはカレンダーの更新に失敗しました: ${e.message}` });
+            setScheduleEvents(originalEvents);
+            setUnassignedOrders(originalUnassigned);
+        }
+      })();
   };
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     const item = active.data.current;
 
@@ -373,11 +392,11 @@ export function ScheduleView({
     
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         if (item.rawOrderId) {
-          await unassignTask(item);
+          unassignTask(item);
         } else {
            const staff = getStaffById(item.staffId);
            if(item.calendarEventId && staff?.calendarId) {
-              await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: item.calendarEventId });
+              handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: item.calendarEventId });
            }
            setScheduleEvents(prev => prev.filter(e => e.id !== item.id));
            toast({ title: '汎用タスクを削除しました' });
@@ -406,81 +425,103 @@ export function ScheduleView({
         const oldStaff = getStaffById(draggedEvent.staffId);
         if (!newStaff || !oldStaff) return;
         
-        try {
-            const newStart = getNewStartFromDrop();
-            const isStaffChange = draggedEvent.staffId !== newStaffId;
-            const customer = getCustomerByCode(draggedEvent.locationId);
-            
-            // Trip-based event (from sheet)
-            if (draggedEvent.tripId) {
-                const originalTripEvents = scheduleEvents.filter(e => e.tripId === draggedEvent.tripId);
+        const originalEvents = [...scheduleEvents];
+        const newStart = getNewStartFromDrop();
+        const isStaffChange = draggedEvent.staffId !== newStaffId;
+        const customer = getCustomerByCode(draggedEvent.locationId);
+
+        let optimisticEvents = originalEvents;
+
+        // Optimistic UI update
+        if (draggedEvent.tripId) {
+            const taskDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+            const newEnd = addMinutes(newStart, taskDuration);
+            optimisticEvents = originalEvents.map(e => {
+                if (e.id === draggedEvent.id) {
+                    return { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
+                }
+                if (e.tripId === draggedEvent.tripId && e.id !== draggedEvent.id) {
+                    const isTask = e.id.endsWith('-task');
+                    const isTravel = e.id.endsWith('-travel');
+                    let updatedEvent = { ...e, staffId: newStaffId };
+                    
+                    if(draggedEvent.id.endsWith('-task') && isTravel) {
+                       updatedEvent.start = subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString();
+                       updatedEvent.end = newStart.toISOString();
+                    } else if (draggedEvent.id.endsWith('-travel') && isTask) {
+                       updatedEvent.start = addMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString();
+                       updatedEvent.end = addMinutes(newStart, TRAVEL_TIME_MINUTES + taskDuration).toISOString();
+                    }
+                    return updatedEvent;
+                }
+                return e;
+            });
+        } else { // Generic event
+          const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+          const newEnd = addMinutes(newStart, duration);
+          optimisticEvents = originalEvents.map(e => e.id === draggedEvent.id ? {...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString()} : e);
+        }
+        setScheduleEvents(optimisticEvents);
+
+
+        // Background Sync
+        (async () => {
+          try {
+              if (draggedEvent.tripId) {
+                const originalTripEvents = originalEvents.filter(e => e.tripId === draggedEvent.tripId);
                 const originalTask = originalTripEvents.find(e => e.id.endsWith('-task'))!;
                 const originalTravel = originalTripEvents.find(e => e.id.endsWith('-travel'));
                 
-                const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
-                
                 let newTaskStart = newStart;
-                let travelDuration = TRAVEL_TIME_MINUTES;
-                if (originalTravel) {
-                  travelDuration = differenceInMinutes(parseISO(originalTravel.end as string), parseISO(originalTravel.start as string));
-                }
-
                 if (draggedEvent.id.endsWith('-travel')) {
-                    newTaskStart = addMinutes(newStart, travelDuration);
+                  const travelDuration = originalTravel ? differenceInMinutes(parseISO(originalTravel.end as string), parseISO(originalTravel.start as string)) : TRAVEL_TIME_MINUTES;
+                  newTaskStart = addMinutes(newStart, travelDuration);
                 }
-                
-                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
-                const newTravelStart = subMinutes(newTaskStart, travelDuration);
 
-                // This logic is now complex, let's simplify and always update sheet and calendar
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${originalTask.rawOrderId})`,
                     scheduledTime: newTaskStart.toISOString(),
                     staffName: newStaff.name,
-                    statusValue: '作業待ち', // Reset status on change
+                    statusValue: '作業待ち',
                     timestamp: new Date().toISOString(),
-                    taskCalendarEventId: originalTask.calendarEventId,
-                    travelCalendarEventId: originalTravel?.calendarEventId,
                 });
-                
+
                 if (isStaffChange) {
-                     if(oldStaff.calendarId && originalTask.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: originalTask.calendarEventId });
-                     if(oldStaff.calendarId && originalTravel?.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: originalTravel.calendarEventId });
+                    if (oldStaff.calendarId) {
+                        if (originalTask.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: originalTask.calendarEventId });
+                        if (originalTravel?.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: originalTravel.calendarEventId });
+                    }
+                    // Re-fetching will create new calendar events if needed.
+                    await refetchOrders();
                 }
 
-                await refetchOrders();
-            } else { // Generic event without tripId
-                const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                const newEnd = addMinutes(newStart, duration);
-                
-                if (isStaffChange) {
-                  if (oldStaff.calendarId && draggedEvent.calendarEventId) {
-                    await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: draggedEvent.calendarEventId });
-                  }
-                  if (newStaff.calendarId) {
-                    const createResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: draggedEvent.title, description: draggedEvent.description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
-                     setScheduleEvents(prev => {
-                       const otherEvents = prev.filter(e => e.id !== draggedEvent.id);
-                       const updatedEvent = {...draggedEvent, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString(), calendarEventId: createResult.eventId };
-                       return [...otherEvents, updatedEvent];
-                     });
-                  }
-                } else { // Just time change for generic event
-                   if (newStaff.calendarId && draggedEvent.calendarEventId) {
-                       await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: draggedEvent.calendarEventId, startTime: newStart.toISOString(), endTime: newEnd.toISOString()});
-                       setScheduleEvents(prev => prev.map(e => e.id === draggedEvent.id ? {...e, start: newStart.toISOString(), end: newEnd.toISOString()} : e));
-                   }
-                }
-            }
-            if (isStaffChange && draggedEvent.rawOrderId) {
-                toast({ title: `${newStaff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
-            } else {
-                toast({ title: "スケジュールを更新しました" });
-            }
-        } catch(e: any) {
-            toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
-        }
+              } else { // Generic Event
+                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                 const newEnd = addMinutes(newStart, duration);
+                 if (isStaffChange) {
+                    if (oldStaff.calendarId && draggedEvent.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: draggedEvent.calendarEventId });
+                    if (newStaff.calendarId) {
+                       const result = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: draggedEvent.title, description: draggedEvent.description, startTime: newStart.toISOString(), endTime: newEnd.toISOString()});
+                       setScheduleEvents(prev => prev.map(e => e.id === draggedEvent.id ? {...e, calendarEventId: result.eventId} : e));
+                    }
+                 } else {
+                    if(newStaff.calendarId && draggedEvent.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: draggedEvent.calendarEventId, startTime: newStart.toISOString(), endTime: newEnd.toISOString()});
+                 }
+              }
+
+              if (isStaffChange && draggedEvent.rawOrderId) {
+                  toast({ title: `${newStaff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
+              } else {
+                  toast({ title: "スケジュールを更新しました" });
+              }
+
+          } catch (e: any) {
+              toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
+              setScheduleEvents(originalEvents);
+          }
+        })();
+
     } else if ('estimatedDuration' in item) { // Adding a new event from orders
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
@@ -493,65 +534,39 @@ export function ScheduleView({
         const taskStart = getNewStartFromDrop();
         const customer = getCustomerByCode(order.customerCode);
         const isGeneric = order.id.startsWith('generic-');
+        
+        const originalUnassigned = [...unassignedOrders];
+        setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
 
-        try {
-            if (isGeneric) {
-                const newEventEnd = addMinutes(taskStart, order.estimatedDuration);
-                const result = await handleCalendarEvent({ 
-                    gasUrl: ORDER_GAS_URL,
-                    operation: 'create', 
-                    calendarId: staff.calendarId, 
-                    title: order.taskDetails, 
-                    startTime: taskStart.toISOString(), 
-                    endTime: newEventEnd.toISOString() 
-                });
-
-                if (result.status === 'error') throw new Error(result.message);
-
-                const newEvent: WithId<ScheduleEvent> = {
-                    id: `event-${Date.now()}`,
-                    title: order.taskDetails,
-                    description: '',
-                    staffId: newStaffId,
-                    locationId: '',
-                    start: taskStart.toISOString(),
-                    end: newEventEnd.toISOString(),
-                    calendarEventId: result.eventId
-                 };
-                 setScheduleEvents(prev => [...prev, newEvent]);
-
-            } else {
-              const taskEnd = addMinutes(taskStart, order.estimatedDuration);
-              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-              
-              const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
-              const travelResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
-              
-              const taskTitle = order.taskDetails;
-              const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
-              const taskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
-
-              if (taskResult.status === 'error' || travelResult.status === 'error') {
-                  throw new Error(taskResult.message || travelResult.message);
+        (async () => {
+          try {
+              if (isGeneric) {
+                  const newEventEnd = addMinutes(taskStart, order.estimatedDuration);
+                  const result = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: order.taskDetails, startTime: taskStart.toISOString(), endTime: newEventEnd.toISOString() });
+                  if (result.status === 'error') throw new Error(result.message);
+                  const newEvent: WithId<ScheduleEvent> = { id: `event-${Date.now()}`, title: order.taskDetails, staffId: newStaffId, start: taskStart.toISOString(), end: newEventEnd.toISOString(), calendarEventId: result.eventId };
+                  setScheduleEvents(prev => [...prev, newEvent]);
+              } else {
+                const taskEnd = addMinutes(taskStart, order.estimatedDuration);
+                const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+                const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
+                const travelResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
+                const taskTitle = order.taskDetails;
+                const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
+                const taskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
+                if (taskResult.status === 'error' || travelResult.status === 'error') throw new Error(taskResult.message || travelResult.message);
+                await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString(), taskCalendarEventId: taskResult.eventId, travelCalendarEventId: travelResult.eventId });
+                const tripId = `trip-${order.rawOrderId}`;
+                const travelEvent: WithId<ScheduleEvent> = { id: `${tripId}-travel`, tripId, title: travelTitle, staffId: newStaffId, start: travelStart.toISOString(), end: taskStart.toISOString(), rawOrderId: order.rawOrderId, calendarEventId: travelResult.eventId };
+                const taskEvent: WithId<ScheduleEvent> = { id: `${tripId}-task`, tripId, orderId: order.id, rawOrderId: order.rawOrderId, title: taskTitle, staffId: newStaffId, locationId: order.customerCode, start: taskStart.toISOString(), end: taskEnd.toISOString(), calendarEventId: taskResult.eventId, description: taskDescription };
+                setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
+                toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
               }
-
-              await updateSheetStatus({
-                  gasUrl: ORDER_GAS_URL,
-                  eventTitle: `(ID: ${order.rawOrderId})`,
-                  staffName: staff.name,
-                  statusValue: '作業待ち',
-                  scheduledTime: taskStart.toISOString(),
-                  timestamp: new Date().toISOString(),
-                  taskCalendarEventId: taskResult.eventId,
-                  travelCalendarEventId: travelResult.eventId,
-              });
-              
-              toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
-              await refetchOrders();
-            }
-        } catch (e: any) {
-             toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-        }
+          } catch (e: any) {
+               toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+               setUnassignedOrders(originalUnassigned);
+          }
+        })();
     }
   };
 
@@ -618,29 +633,13 @@ export function ScheduleView({
             if (!staff || !staff.calendarId) throw new Error("担当スタッフにカレンダーIDが設定されていません。");
             
             if (dialogState.event.rawOrderId) { // Sheet-based event
-                const duration = differenceInMinutes(parseISO(dialogState.event.end as string), parseISO(dialogState.event.start as string));
-                const newEnd = addMinutes(newStart, duration);
-
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
                     scheduledTime: newStart.toISOString(),
                     timestamp: new Date().toISOString(),
-                    taskCalendarEventId: dialogState.event.calendarEventId
                 });
-
-                setScheduleEvents(prev => prev.map(e => {
-                    if (e.tripId === dialogState.event.tripId) {
-                        const originalDuration = differenceInMinutes(parseISO(e.end as string), parseISO(e.start as string));
-                        if (e.id.endsWith('-task')) {
-                            return {...e, start: newStart.toISOString(), end: addMinutes(newStart, originalDuration).toISOString()};
-                        }
-                        if (e.id.endsWith('-travel')) {
-                            return {...e, start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString()};
-                        }
-                    }
-                    return e;
-                }));
+                await refetchOrders();
 
             } else if(dialogState.event.calendarEventId) { // Generic event
                 await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: staff.calendarId, eventId: dialogState.event.calendarEventId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
@@ -653,23 +652,19 @@ export function ScheduleView({
     }
   };
 
-  const handleDeleteEvent = async () => {
+  const handleDeleteEvent = () => {
     if (dialogState.mode !== 'edit') return;
     const eventToDelete = dialogState.event;
     
     if (eventToDelete.rawOrderId) {
-        await unassignTask(eventToDelete);
+        unassignTask(eventToDelete);
     } else {
         const staff = getStaffById(eventToDelete.staffId);
         if(eventToDelete.calendarEventId && staff?.calendarId) {
-            try {
-                await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: eventToDelete.calendarEventId });
-                setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
-                toast({ title: '予定を削除しました' });
-            } catch (e: any) {
-                toast({ variant: 'destructive', title: '削除エラー', description: `カレンダーの更新に失敗しました: ${e.message}` });
-            }
+            handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: eventToDelete.calendarEventId });
         }
+        setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+        toast({ title: '予定を削除しました' });
     }
 
     setDialogState({ mode: 'closed' });
@@ -690,6 +685,14 @@ export function ScheduleView({
   };
 
   const { event, staff, customer, title } = getDialogDetails();
+  
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleEvents) return [];
+      return scheduleEvents.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+      });
+  }, [scheduleEvents, currentDate]);
 
   if (!isClient) {
     return (
@@ -706,14 +709,6 @@ export function ScheduleView({
       </Card>
     );
   }
-
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-      });
-  }, [scheduleEvents, currentDate]);
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
