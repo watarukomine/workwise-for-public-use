@@ -25,12 +25,20 @@ export function VerticalScheduleView({ scheduleData, staffData }: VerticalSchedu
     const { customers } = useCustomer();
     const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => {
         if (!id) return undefined;
-        return customers.find(c => c.userCode === id);
+        // customer.id is userCode in some contexts. Let's find by either.
+        return customers.find(c => c.id === id || c.userCode === id);
     };
     
-    // Filter for events assigned to the currently displayed staff
+    // Filter for events assigned to the currently displayed staff and sort by start time
     const staffIds = new Set(staffData.map(s => s.id));
-    const relevantEvents = scheduleData.filter(event => event.staffId && staffIds.has(event.staffId));
+    const relevantEvents = scheduleData
+        .filter(event => event.staffId && staffIds.has(event.staffId))
+        .sort((a, b) => {
+            const startA = typeof a.start === 'string' ? parseISO(a.start) : a.start;
+            const startB = typeof b.start === 'string' ? parseISO(b.start) : b.start;
+            return startA.getTime() - startB.getTime();
+        });
+
 
   if (relevantEvents.length === 0) {
     return (
@@ -54,7 +62,6 @@ export function VerticalScheduleView({ scheduleData, staffData }: VerticalSchedu
       {relevantEvents.map((event, index) => {
         const customer = getCustomerById(event.locationId);
         const isTravel = event.title.includes('移動');
-        const nextEvent = relevantEvents[index + 1];
         
         const eventCard = (
             <Card className={cn("cursor-pointer hover:bg-muted/50", isTravel && "bg-secondary/50 border-dashed")}>
@@ -89,14 +96,6 @@ export function VerticalScheduleView({ scheduleData, staffData }: VerticalSchedu
               </Link>
             ) : (
               eventCard
-            )}
-            
-            {/* Show travel time between tasks */}
-            {nextEvent && !isTravel && !nextEvent.title.includes('移動') && (
-                <div className="flex items-center justify-center gap-2 my-2 text-xs text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    <span>次の現場まで 約30分</span>
-                </div>
             )}
           </React.Fragment>
         );
