@@ -45,6 +45,9 @@ import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
+import { Mail } from 'lucide-react';
+import { createICalLink } from '@/app/actions/create-ical-link';
+
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -361,7 +364,7 @@ export function ScheduleView({
             scheduledTime: "",
             timestamp: new Date().toISOString(),
         });
-        await refetchOrders(); // This ensures data consistency
+        await refetchOrders();
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
@@ -410,24 +413,17 @@ export function ScheduleView({
         const newStaff = getStaffById(newStaffId);
         if (!newStaff) return;
         
-        try {
-            await updateSheetStatus({
-                gasUrl: ORDER_GAS_URL,
-                eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                staffName: newStaff.name,
-                statusValue: '作業待ち',
-                scheduledTime: getNewStartFromDrop().toISOString(),
-                timestamp: new Date().toISOString(),
-            });
-            
-            toast({ title: 'スケジュールを更新しました' });
-            await refetchOrders();
-
-        } catch(e: any) {
-            toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
-            // Refetch to ensure we're in a consistent state after failure
-            await refetchOrders();
-        }
+        await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+            staffName: newStaff.name,
+            statusValue: '作業待ち',
+            scheduledTime: getNewStartFromDrop().toISOString(),
+            timestamp: new Date().toISOString(),
+        });
+        
+        toast({ title: 'スケジュールを更新しました' });
+        await refetchOrders();
 
     } else if ('estimatedDuration' in item) { // Adding a new event from orders
         const order = item as WithId<Order>;
@@ -451,23 +447,17 @@ export function ScheduleView({
              };
              setScheduleEvents(prev => [...prev, newEvent]);
         } else {
-            try {
-              await updateSheetStatus({
-                  gasUrl: ORDER_GAS_URL,
-                  eventTitle: `(ID: ${order.rawOrderId})`,
-                  staffName: staff.name,
-                  statusValue: '作業待ち',
-                  scheduledTime: taskStart.toISOString(),
-                  timestamp: new Date().toISOString(),
-              });
-              
-              toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
-              await refetchOrders();
-              
-            } catch (e: any) {
-                 toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                 await refetchOrders();
-            }
+            await updateSheetStatus({
+                gasUrl: ORDER_GAS_URL,
+                eventTitle: `(ID: ${order.rawOrderId})`,
+                staffName: staff.name,
+                statusValue: '作業待ち',
+                scheduledTime: taskStart.toISOString(),
+                timestamp: new Date().toISOString(),
+            });
+            
+            toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
+            await refetchOrders();
         }
     }
   };
@@ -531,17 +521,13 @@ export function ScheduleView({
         if (!staff) return;
 
         if (dialogState.event.rawOrderId) {
-            try {
-                await updateSheetStatus({
-                    gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
-                    scheduledTime: newStart.toISOString(),
-                    timestamp: new Date().toISOString(),
-                });
-                await refetchOrders();
-            } catch (e: any) {
-                 toast({ variant: 'destructive', title: '保存エラー', description: `シートの更新に失敗しました: ${e.message}` });
-            }
+            await updateSheetStatus({
+                gasUrl: ORDER_GAS_URL,
+                eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
+                scheduledTime: newStart.toISOString(),
+                timestamp: new Date().toISOString(),
+            });
+            await refetchOrders();
         } else {
              // For generic, non-sheet events, just update local state
              setScheduleEvents(prev => prev.map(e => e.id === dialogState.event.id ? { ...e, title, description, start: newStart.toISOString(), end: newEnd.toISOString() } : e));
@@ -563,6 +549,18 @@ export function ScheduleView({
 
     setDialogState({ mode: 'closed' });
   };
+
+  const handleEmailEvent = async () => {
+    if (dialogState.mode !== 'edit') return;
+    const event = dialogState.event;
+    const mailtoLink = await createICalLink({
+        title: event.title,
+        description: event.description || '',
+        start: typeof event.start === 'string' ? event.start : event.start.toISOString(),
+        end: typeof event.end === 'string' ? event.end : event.end.toISOString(),
+    });
+    window.location.href = mailtoLink;
+  }
 
   const getDialogDetails = () => {
     if (dialogState.mode === 'edit') {
@@ -732,18 +730,24 @@ export function ScheduleView({
                   </div>
       
                   <DialogFooter className="sm:justify-between">
-                      <div className="flex gap-2">
-                          {dialogState.mode === 'edit' && (
-                              <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
-                          )}
-                      </div>
-                      <div className="flex gap-2 mt-4 sm:mt-0">
-                          <DialogClose asChild>
-                              <Button variant="ghost">キャンセル</Button>
-                          </DialogClose>
-                          <Button onClick={handleSaveEvent}>保存</Button>
-                      </div>
-                  </DialogFooter>
+                       <div className="flex gap-2">
+                           {dialogState.mode === 'edit' && (
+                                <>
+                                  <Button variant="outline" onClick={handleEmailEvent}>
+                                    <Mail className="mr-2 h-4 w-4" />
+                                    iCalをメールで送信
+                                  </Button>
+                                  <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
+                                </>
+                           )}
+                       </div>
+                       <div className="flex gap-2 mt-4 sm:mt-0">
+                           <DialogClose asChild>
+                               <Button variant="ghost">キャンセル</Button>
+                           </DialogClose>
+                           <Button onClick={handleSaveEvent}>保存</Button>
+                       </div>
+                   </DialogFooter>
               </DialogContent>
           </Dialog>
       </TooltipProvider>

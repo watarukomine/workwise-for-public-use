@@ -1,4 +1,3 @@
-
 import type { Timestamp } from 'firebase/firestore';
 
 export type WithId<T> = T & { id: string };
@@ -51,7 +50,6 @@ export type ScheduleEvent = {
   staffId?: string;
   start: Date | string | Timestamp;
   end: Date | string | Timestamp;
-  calendarEventId?: string;
   // For react-big-calendar
   staffName?: string;
   status?: string;
@@ -82,5 +80,4 @@ export type Order = {
   deliveryDate?: string; // from user's code
   staff?: string; // from user's code
   status?: string; // from user's code
-  calendarEventId?: string; // from user's code
 };
