@@ -1,4 +1,3 @@
-
 // ↓↓↓↓【要設定】↓↓↓↓
 // スプレッドシートのID（URLの .../d/【この部分】/edit...）を貼り付けてください
 const SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
@@ -12,7 +11,10 @@ const STAFF_SHEET_NAME = "スタッフマスタ";
  */
 function doGet(e) {
   try {
-    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(ORDER_SHEET_NAME);
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    if (!spreadsheet) throw new Error(`スプレッドシート（ID: ${SPREADSHEET_ID}）が開けません。存在しないか、権限がありません。`);
+
+    const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
     if (!sheet) throw new Error(`シート '${ORDER_SHEET_NAME}' が見つかりません。`);
     
     const dataRange = sheet.getDataRange();
@@ -29,7 +31,12 @@ function doGet(e) {
     const data = values.map((row, rowIndex) => {
       const obj = {};
       headers.forEach((header, index) => {
-        obj[header] = (row[index] instanceof Date) ? row[index].toISOString() : row[index];
+        const cellValue = row[index];
+        if (cellValue && cellValue instanceof Date) {
+          obj[header] = cellValue.toISOString();
+        } else {
+          obj[header] = cellValue;
+        }
       });
       obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowIndex + 2}`;
       return obj;
@@ -147,8 +154,11 @@ function updateSheetWithOrderInfo(params) {
     
     const orderId = match[1];
     console.log("Extracted order ID:", orderId);
+    
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    if (!spreadsheet) throw new Error(`スプレッドシート（ID: ${SPREADSHEET_ID}）が開けません。存在しないか、権限がありません。`);
 
-    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(ORDER_SHEET_NAME);
+    const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
     if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
 
     const data = sheet.getDataRange().getValues();
@@ -201,7 +211,9 @@ function updateSheetWithOrderInfo(params) {
         }
     }
 
-    const staffDataSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(STAFF_SHEET_NAME);
+    const staffDataSheet = spreadsheet.getSheetByName(STAFF_SHEET_NAME);
+    if (!staffDataSheet) throw new Error(`シート「${STAFF_SHEET_NAME}」が見つかりません。`);
+
     const staffData = staffDataSheet.getDataRange().getValues();
     const staffHeaders = staffData[0];
     const staffNameCol = staffHeaders.indexOf("スタッフ名");
@@ -323,3 +335,5 @@ function handleCalendarEvent(params) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
+
+    
