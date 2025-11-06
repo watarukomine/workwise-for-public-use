@@ -1,3 +1,4 @@
+
 // ↓↓↓↓【要設定】↓↓↓↓
 // スプレッドシートのID（URLの .../d/【この部分】/edit...）を貼り付けてください
 const SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
