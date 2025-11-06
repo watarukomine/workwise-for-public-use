@@ -3,7 +3,7 @@
 const SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
 // データを読み書きするシート名を正確に入力してください
 const ORDER_SHEET_NAME = "受注管理"; 
-const STAFF_SHEET_NAME = "スタッフマスタ";
+const STAFF_SHEET_NAME = "スタッフ一覧";
 // ↓↓↓↓【設定はここまで】↓↓↓↓
 
 /**
@@ -11,7 +11,10 @@ const STAFF_SHEET_NAME = "スタッフマスタ";
  */
 function doGet(e) {
   try {
-    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(ORDER_SHEET_NAME);
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    if (!spreadsheet) throw new Error(`スプレッドシート（ID: ${SPREADSHEET_ID}）が開けません。存在しないか、権限がありません。`);
+
+    const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
     if (!sheet) throw new Error(`シート '${ORDER_SHEET_NAME}' が見つかりません。`);
     
     const dataRange = sheet.getDataRange();
@@ -29,7 +32,6 @@ function doGet(e) {
       const obj = {};
       headers.forEach((header, index) => {
         const cellValue = row[index];
-        // Check if the cell value is a valid Date object before calling toISOString()
         if (cellValue && cellValue instanceof Date) {
           obj[header] = cellValue.toISOString();
         } else {
@@ -152,8 +154,11 @@ function updateSheetWithOrderInfo(params) {
     
     const orderId = match[1];
     console.log("Extracted order ID:", orderId);
+    
+    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
+    if (!spreadsheet) throw new Error(`スプレッドシート（ID: ${SPREADSHEET_ID}）が開けません。存在しないか、権限がありません。`);
 
-    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(ORDER_SHEET_NAME);
+    const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
     if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
 
     const data = sheet.getDataRange().getValues();
@@ -206,7 +211,9 @@ function updateSheetWithOrderInfo(params) {
         }
     }
 
-    const staffDataSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(STAFF_SHEET_NAME);
+    const staffDataSheet = spreadsheet.getSheetByName(STAFF_SHEET_NAME);
+    if (!staffDataSheet) throw new Error(`シート「${STAFF_SHEET_NAME}」が見つかりません。`);
+
     const staffData = staffDataSheet.getDataRange().getValues();
     const staffHeaders = staffData[0];
     const staffNameCol = staffHeaders.indexOf("スタッフ名");
