@@ -67,7 +67,9 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
-    if (params.operation) { // 'create', 'update', 'delete' calendar events
+    if (params.operation === 'sendEmail') {
+      return handleSendEmail(params);
+    } else if (params.operation) { // 'create', 'update', 'delete' calendar events
       return handleCalendarEvent(params);
     } else if (params.eventTitle) { // Update sheet from app
       return updateSheetWithOrderInfo(params);
@@ -82,6 +84,41 @@ function doPost(e) {
     return ContentService.createTextOutput(JSON.stringify({
       status: "error",
       message: "エラーが発生しました: " + error.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function handleSendEmail(params) {
+  try {
+    const { to, subject, body, icsData } = params;
+    if (!to || !subject || !body) {
+      throw new Error("メールの送信には to, subject, body が必要です。");
+    }
+    
+    const options = {
+      name: 'カレンダーの予定',
+      attachments: []
+    };
+    if (icsData) {
+      options.attachments.push({
+        fileName: "invite.ics",
+        mimeType: "text/calendar",
+        content: icsData
+      });
+    }
+
+    MailApp.sendEmail(to, subject, body, options);
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      message: `メールを ${to} に送信しました。`
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch(e) {
+    console.error("Error in handleSendEmail:", e.message, e.stack);
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: `メール送信エラー: ${e.message}`
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -151,6 +188,17 @@ function updateSheetWithOrderInfo(params) {
     updateColumn("taskCalendarEventId", taskCalendarEventId);
     updateColumn("travelCalendarEventId", travelCalendarEventId);
     
+    if (actionType && actionTimestamp) {
+        const dateValue = new Date(actionTimestamp);
+        const actionColMap = {
+            'Start Travel': "移動開始", 'Arrive': "現場到着",
+            'Begin Task': "作業開始", 'Finish Task': "作業終了"
+        };
+        if(actionColMap[actionType]) {
+            updateColumn(actionColMap[actionType], dateValue);
+        }
+    }
+
     const staffDataSheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(STAFF_SHEET_NAME);
     const staffData = staffDataSheet.getDataRange().getValues();
     const staffHeaders = staffData[0];
@@ -273,3 +321,5 @@ function handleCalendarEvent(params) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
+
+    
