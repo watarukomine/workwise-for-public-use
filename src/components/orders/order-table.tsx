@@ -37,11 +37,19 @@ const formatDate = (dateString: string) => {
 };
 
 const formatTime = (timeString: string) => {
-    // Handles ISO-8601 DateTime strings or just time strings
     if (!timeString) return timeString;
+    
+    // Handle cases like "1899-12-29T15:00:00.000Z"
+    if (typeof timeString === 'string' && timeString.startsWith('1899-12-')) {
+        const date = new Date(timeString);
+        if (isValid(date)) {
+            return format(date, 'HH:mm');
+        }
+    }
+
+    // Handles ISO-8601 DateTime strings or just time strings
     const date = new Date(timeString);
     if (!isValid(date)) {
-        // Handle cases like "10:00" which might be parsed as invalid date alone
         const today = new Date();
         const [hours, minutes] = timeString.split(':');
         if (hours && minutes) {
@@ -85,7 +93,6 @@ const parseDate = (dateString: any): Date | null => {
   if (isValid(date)) {
     return date;
   }
-  // Add other parsing logic if necessary for other formats
   return null;
 }
 
@@ -102,7 +109,6 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     let ordersToDisplay = rawOrders.filter(order => {
         const scheduledDate = parseDate(order['作業予定日']);
         const receptionDate = parseDate(order['受付日']);
-        // Check if scheduled for today or received today.
         const isScheduledForToday = scheduledDate ? isToday(startOfDay(scheduledDate)) : false;
         const isReceivedToday = receptionDate ? isToday(startOfDay(receptionDate)) : false;
         return isScheduledForToday || isReceivedToday;
@@ -112,7 +118,6 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
       return ordersToDisplay;
     }
     
-    // A simple search across all values of an order object
     return ordersToDisplay.filter(order =>
         Object.values(order).some(value => 
             String(value).toLowerCase().includes(searchTerm.toLowerCase())
