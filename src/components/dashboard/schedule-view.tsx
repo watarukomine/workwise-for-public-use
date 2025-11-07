@@ -1045,7 +1045,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
 
   return (
     <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center border-t border-b", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
