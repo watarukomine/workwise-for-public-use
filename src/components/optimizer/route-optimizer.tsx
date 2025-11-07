@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import { useFormStatus } from 'react-dom';
@@ -8,7 +7,7 @@ import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon } from 'lucide-react';
+import { ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon, ExternalLink } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -305,6 +304,19 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     setWaypoints(prev => prev.filter((_, i) => i !== index));
   };
   
+    const handleOpenGoogleMaps = () => {
+        if (!state.data || !state.data.optimizedRoute || state.data.optimizedRoute.length < 2) return;
+
+        const route = state.data.optimizedRoute;
+        const origin = `${route[0].latitude},${route[0].longitude}`;
+        const destination = `${route[route.length - 1].latitude},${route[route.length - 1].longitude}`;
+        const waypoints = route.slice(1, -1).map(loc => `${loc.latitude},${loc.longitude}`).join('|');
+
+        const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
+        
+        window.open(googleMapsUrl, '_blank', 'noopener,noreferrer');
+    };
+
   return (
     <div className="space-y-4">
       <Card>
@@ -414,9 +426,15 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
 
         {state.data && (
             <Card>
-            <CardHeader>
-                <CardTitle>最適化されたルート</CardTitle>
-                <CardDescription>選択に基づいた最も効率的な経路です。</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                    <CardTitle>最適化されたルート</CardTitle>
+                    <CardDescription>選択に基づいた最も効率的な経路です。</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleOpenGoogleMaps}>
+                    <ExternalLink className="mr-2 h-4 w-4"/>
+                    Googleマップで開く
+                </Button>
             </CardHeader>
             <CardContent className="space-y-6">
                 <div>
