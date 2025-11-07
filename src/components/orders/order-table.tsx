@@ -259,4 +259,3 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     </Card>
   );
 }
-
