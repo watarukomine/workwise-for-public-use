@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Firestore Security Rules for WorkWise application.
  *
@@ -29,25 +30,18 @@ service cloud.firestore {
     /**
      * @description Controls access to staff member data.
      * @path /staff/{staffId}
-     * @allow (create) - Authenticated user with matching staffId can create their own document.
-     * @allow (get, list, update, delete) - Authenticated user with matching staffId can read/write their own document.
-     * @deny (create) - Authenticated user with non-matching staffId attempts to create a staff document.
+     * @allow (create, get, update) - Authenticated user with matching staffId can manage their own document.
+     * @deny (list, delete) - Listing or deleting staff profiles is not allowed from the client.
      * @principle Enforces document ownership for all operations.
      */
     match /staff/{staffId} {
-      function isOwner(staffId) {
+      function isOwner() {
         return request.auth != null && request.auth.uid == staffId;
       }
-
-      function isExistingOwner(staffId) {
-          return request.auth != null && resource != null && resource.data.id == staffId;
-      }
-
-      allow get: if isOwner(staffId);
-      allow list: if false;
-      allow create: if isOwner(staffId) && request.resource.data.id == staffId;
-      allow update: if isExistingOwner(staffId);
-      allow delete: if isExistingOwner(staffId);
+      
+      // Allow read/write only for the user themselves.
+      allow read, write: if isOwner();
+      allow list: if false; // Disallow listing all staff documents for security.
     }
 
     /**
@@ -56,13 +50,10 @@ service cloud.firestore {
      * @allow (create) - Authenticated user can create a customer.
      * @allow (get, list, update, delete) - Authenticated user can read/write customer data.
      * @deny (create) - Unauthenticated user attempts to create a customer.
-     * @principle Open access for prototyping.
+     * @principle Open access for prototyping for authenticated users.
      */
     match /customers/{customerId} {
-      allow get, list: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -71,13 +62,10 @@ service cloud.firestore {
      * @allow (create) - Authenticated user can create a work schedule.
      * @allow (get, list, update, delete) - Authenticated user can read/write work schedule data.
      * @deny (create) - Unauthenticated user attempts to create a work schedule.
-     * @principle Open access for prototyping.
+     * @principle Open access for prototyping for authenticated users.
      */
     match /workSchedules/{workScheduleId} {
-      allow get, list: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -86,13 +74,10 @@ service cloud.firestore {
      * @allow (create) - Authenticated user can create a location.
      * @allow (get, list, update, delete) - Authenticated user can read/write location data.
      * @deny (create) - Unauthenticated user attempts to create a location.
-     * @principle Open access for prototyping.
+     * @principle Open access for prototyping for authenticated users.
      */
     match /locations/{locationId} {
-      allow get, list: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
 
     /**
@@ -101,13 +86,10 @@ service cloud.firestore {
      * @allow (create) - Authenticated user can create an employee action.
      * @allow (get, list, update, delete) - Authenticated user can read/write employee action data.
      * @deny (create) - Unauthenticated user attempts to create an employee action.
-     * @principle Open access for prototyping.
+     * @principle Open access for prototyping for authenticated users.
      */
     match /employeeActions/{employeeActionId} {
-      allow get, list: if true;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+      allow read, write: if request.auth != null;
     }
   }
 }

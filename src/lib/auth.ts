@@ -1,3 +1,4 @@
+
 'use client';
 
 import { 
@@ -6,13 +7,50 @@ import {
   createUserWithEmailAndPassword, 
   signOut as firebaseSignOut,
   updateProfile,
+  type User,
   type UserCredential
 } from 'firebase/auth';
+import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
 import { fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
+import type { Staff } from './types';
 
-// This ensures Firebase is initialized before we use getAuth()
-const { auth } = initializeFirebase();
+// This ensures Firebase is initialized before we use getAuth() or getFirestore()
+const { auth, firestore } = initializeFirebase();
+
+/**
+ * Creates or updates a user's profile document in the 'staff' collection in Firestore.
+ * @param user The Firebase aAuth user object.
+ * @param staffInfo Optional additional information from the staff master spreadsheet.
+ */
+const createOrUpdateStaffDocument = async (user: User, staffInfo?: Staff) => {
+    if (!firestore) return;
+    const staffDocRef = doc(firestore, 'staff', user.uid);
+    console.log(`Creating or updating staff document for UID: ${user.uid}`);
+
+    // Check if a document already exists to avoid overwriting createdAt
+    const docSnap = await getDoc(staffDocRef);
+
+    const profileData: Partial<Staff> = {
+        id: user.uid,
+        name: staffInfo?.name || user.displayName || 'Unnamed User',
+        email: user.email,
+        avatarUrl: staffInfo?.avatarUrl || user.photoURL || undefined,
+        role: staffInfo?.role || 'staff',
+        calendarId: staffInfo?.calendarId,
+        color: staffInfo?.color,
+        '母店': staffInfo?.['母店'],
+        updatedAt: serverTimestamp(),
+    };
+
+    if (!docSnap.exists()) {
+        profileData.createdAt = serverTimestamp();
+    }
+
+    await setDoc(staffDocRef, profileData, { merge: true });
+    console.log('Staff document successfully written to Firestore.');
+};
+
 
 /**
  * Signs in a user with email and password. If the user does not exist in Firebase Auth,
@@ -28,13 +66,15 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     // 1. First, try to sign in normally. This will succeed if the user exists in Firebase with the correct password.
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log('Firebase sign in successful for:', userCredential.user.email);
+    // Ensure Firestore document exists on sign-in as well
+    await createOrUpdateStaffDocument(userCredential.user);
     return userCredential;
 
   } catch (error: any) {
     // 2. If login fails, check if it's an "invalid credential" error.
     // This code is returned for both "user not found" and "wrong password".
-    if (error.code === 'auth/invalid-credential') {
-      console.log('Invalid credential. Checking spreadsheet for user to auto-provision account...');
+    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
+      console.log('Invalid credential or user not found. Checking spreadsheet for user to auto-provision account...');
       
       try {
         // 3. Fetch the source of truth: the staff list from the spreadsheet.
@@ -51,7 +91,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
         // We can now confidently attempt to create their Firebase account.
         console.log(`Valid staff member found in sheet: ${staffMember.name}. Attempting to create Firebase account...`);
         try {
-          return await signUpWithEmail(email, password, staffMember.name);
+          return await signUpWithEmail(email, password, staffMember.name, staffMember);
         } catch (signUpError: any) {
            console.error('An unexpected error occurred during automatic sign-up:', signUpError);
            // This could happen due to network issues or other Firebase problems.
@@ -77,19 +117,24 @@ export const signInWithEmail = async (email: string, password: string): Promise<
  * @param email The new user's email.
  * @param password The new user's password.
  * @param name The new user's display name.
+ * @param staffInfo Optional staff info from GAS to populate Firestore.
  * @returns A promise that resolves with the user credential.
  */
-export const signUpWithEmail = async (email: string, password: string, name: string): Promise<UserCredential> => {
+export const signUpWithEmail = async (email: string, password: string, name: string, staffInfo?: Staff): Promise<UserCredential> => {
     console.log(`Attempting to sign up with Firebase for email: ${email}`);
     try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
         
-        // After creating the user, update their profile with the name.
-        if (name && userCredential.user) {
-          await updateProfile(userCredential.user, { displayName: name });
+        // After creating the user, update their Auth profile with the name.
+        if (name && user) {
+          await updateProfile(user, { displayName: name });
         }
+        
+        // Also create their profile document in Firestore.
+        await createOrUpdateStaffDocument(user, staffInfo);
 
-        console.log('Firebase sign up successful for new user:', userCredential.user.email);
+        console.log('Firebase sign up successful for new user:', user.email);
         return userCredential;
     } catch (error) {
         console.error('Firebase sign up error:', error);

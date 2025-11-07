@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export type WithId<T> = T & { id: string };
@@ -16,6 +17,8 @@ export type Staff = {
   password?: string; 
   'ロール'?: 'admin' | 'staff';
   department?: string; // from user's code
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 };
 
 export type Customer = {
@@ -55,6 +58,7 @@ export type ScheduleEvent = {
   status?: string;
   allDay?: boolean;
   resource?: any;
+  calendarEventId?: string;
 };
 
 export type StaffStatus = {

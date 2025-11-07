@@ -1,43 +1,57 @@
+
 'use client';
 
-import { useUser } from '@/firebase';
-import { useSelectedStaff } from '@/contexts/selected-staff-context';
-import { useMemo } from 'react';
+import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
 import type { WithId, Staff } from '@/lib/types';
+import { useMemo } from 'react';
 
 export function useUserProfile() {
-  const { user, isUserLoading, userError } = useUser();
-  const { allStaff, isLoading: isStaffLoading } = useSelectedStaff();
+  const { user, isUserLoading: isAuthLoading, userError } = useUser();
+  const firestore = useFirestore();
+
+  // Memoize the document reference to prevent re-renders
+  const staffDocRef = useMemoFirebase(() => {
+    if (user?.uid && firestore) {
+      return doc(firestore, 'staff', user.uid);
+    }
+    return null;
+  }, [user?.uid, firestore]);
+
+  // Use the useDoc hook to get the profile data from Firestore
+  const { data: staffData, isLoading: isProfileLoading, error: profileError } = useDoc<Staff>(staffDocRef);
 
   const profile: WithId<Staff> | null = useMemo(() => {
-    if (!user || !allStaff || allStaff.length === 0) {
+    if (!user) {
       return null;
     }
-
-    const staffProfile = allStaff.find(staff => staff.id === user.uid || staff.email === user.email);
-
+    
+    // If we have data from Firestore, use it as the source of truth
+    if (staffData) {
+      return {
+        id: user.uid,
+        ...staffData,
+        email: user.email, // Always take email from auth
+        name: staffData.name || user.displayName || 'Unknown User', // Fallback name
+      };
+    }
+    
+    // If Firestore data is still loading or doesn't exist, provide a basic profile from auth
     return {
       id: user.uid,
-      name: staffProfile?.name || user.displayName || user.email || 'Unknown User',
+      name: user.displayName || user.email || 'Unnamed User',
       email: user.email,
-      avatarUrl: staffProfile?.avatarUrl || user.photoURL || undefined,
-      // Use role from the comprehensive staff list, default to 'staff'
-      role: staffProfile?.role || 'staff',
-      // Include other relevant details from staffProfile if they exist
-      calendarId: staffProfile?.calendarId,
-      color: staffProfile?.color,
-      password: staffProfile?.password, // Note: sensitive data
+      role: 'staff', // Default role until Firestore data loads
     };
-  }, [user, allStaff]);
+
+  }, [user, staffData]);
   
-  const isLoading = isUserLoading || isStaffLoading;
+  const isLoading = isAuthLoading || (user && isProfileLoading);
+  const error = userError || profileError;
 
   return {
     profile,
     isLoading,
-    error: userError,
-    // These functions are now no-ops as auth is handled by Firebase.
-    setProfile: () => {}, 
-    clearProfile: () => {},
+    error,
   };
 }
