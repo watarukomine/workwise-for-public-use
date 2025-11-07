@@ -834,7 +834,8 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                     <CardTitle>タイムライン</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
-                    <div className="relative">
+                  <div className="relative">
+                      {/* Time Header */}
                       <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
                           <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
                           <div className="relative h-8 flex-1">
@@ -849,39 +850,42 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                                       </span>
                                   </div>
                               ))}
-                               {isToday(currentDate) && (
-                                <div 
-                                    className="absolute top-0 h-full pointer-events-none z-40"
-                                    style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                                >
-                                    <TimeIndicator />
-                                </div>
-                               )}
                           </div>
                       </div>
+
+                      {/* Timeline Body */}
                       <div className="relative">
-                        <ScrollArea className="w-full whitespace-nowrap">
-                          <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
-                              <div className="relative space-y-2">
-                                  {staffData?.map((staff) => {
-                                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                      return (
-                                          <StaffRow
-                                              key={staff.id}
-                                              staff={staff}
-                                              events={events}
-                                              getCustomerByCode={getCustomerByCode}
-                                              isOver={currentOverStaffId === staff.id}
-                                              onDoubleClickEvent={handleDoubleClickEvent}
-                                              onDoubleClickTimeline={handleDoubleClickTimeline}
-                                          />
-                                      );
-                                  })}
+                          <ScrollArea className="w-full whitespace-nowrap">
+                              <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
+                                  <div className="relative space-y-2">
+                                      {staffData?.map((staff) => {
+                                          const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                          return (
+                                              <StaffRow
+                                                  key={staff.id}
+                                                  staff={staff}
+                                                  events={events}
+                                                  getCustomerByCode={getCustomerByCode}
+                                                  isOver={currentOverStaffId === staff.id}
+                                                  onDoubleClickEvent={handleDoubleClickEvent}
+                                                  onDoubleClickTimeline={handleDoubleClickTimeline}
+                                              />
+                                          );
+                                      })}
+                                  </div>
                               </div>
-                          </div>
-                        </ScrollArea>
+                          </ScrollArea>
+                          {/* Time Indicator - Placed here to be on top */}
+                          {isToday(currentDate) && (
+                              <div 
+                                  className="absolute top-0 h-full pointer-events-none z-30"
+                                  style={{ left: `${STAFF_COL_WIDTH}px`, right: '0px'}}
+                              >
+                                  <TimeIndicator />
+                              </div>
+                          )}
                       </div>
-                    </div>
+                  </div>
                 </CardContent>
             </Card>
         </div>
