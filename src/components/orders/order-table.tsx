@@ -161,7 +161,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   
   const getFormattedValue = (order: any, header: string) => {
       const durationKeys = ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間'];
-      if (durationKeys.includes(header)) {
+      if (durationKeys.some(key => key.toLowerCase() === header.toLowerCase())) {
           const durationValue = findKey(order, durationKeys);
           if (durationValue !== undefined && durationValue !== null && durationValue !== '') {
               return formatDurationFromMinutes(durationValue);
