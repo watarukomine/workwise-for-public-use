@@ -877,7 +877,7 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                             {isToday(currentDate) && <TimeIndicator pixelsPerMinute={pixelsPerMinute} />}
                          </div>
                         <ScrollArea className="w-full whitespace-nowrap">
-                          <div className="relative mt-2" style={{ width: `calc(100% - ${STAFF_COL_WIDTH}px)`}}>
+                          <div className="relative mt-2">
                               <div className="relative space-y-2">
                                   {staffData?.map((staff) => {
                                       const events = dailySchedule.filter((e) => e.staffId === staff.id);
