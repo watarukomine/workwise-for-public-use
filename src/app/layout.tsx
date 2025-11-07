@@ -8,7 +8,7 @@ import React from 'react';
 import { SelectedStaffProvider } from '@/contexts/selected-staff-context';
 import { CustomerProvider } from '@/contexts/customer-context';
 import { OrderProvider } from '@/contexts/order-context';
-import { FirebaseClientProvider } from '@/firebase';
+import { UserProfileProvider } from '@/contexts/user-profile-provider';
 
 export default function RootLayout({
   children,
@@ -26,7 +26,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
+        <UserProfileProvider>
           <SelectedStaffProvider>
             <CustomerProvider>
               <OrderProvider>
@@ -38,7 +38,7 @@ export default function RootLayout({
               </OrderProvider>
             </CustomerProvider>
           </SelectedStaffProvider>
-        </FirebaseClientProvider>
+        </UserProfileProvider>
         <Toaster />
       </body>
     </html>

@@ -126,7 +126,7 @@ const DesktopNav = () => {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const router = useRouter();
-  const { profile, isLoading: isUserLoading } = useUserProfile();
+  const { profile, isLoading: isUserLoading, clearProfile } = useUserProfile();
   const [isAuthLoading, setIsAuthLoading] = React.useState(false);
   const { forceMobileView } = useAppShell();
   const isMobile = useIsMobile() || forceMobileView;
@@ -136,11 +136,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setIsAuthLoading(true);
     try {
       signOut();
+      clearProfile();
       toast({
         title: "ログアウトしました",
       });
       router.push('/login');
-      router.refresh();
     } catch (error) {
       console.error('Sign out error:', error);
       toast({

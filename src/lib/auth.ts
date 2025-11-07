@@ -1,167 +1,81 @@
 
 'use client';
 
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut as firebaseSignOut,
-  updateProfile,
-  type User,
-  type UserCredential
-} from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
-import { initializeFirebase } from '@/firebase';
 import { fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
-import type { Staff } from './types';
+import type { Staff, WithId } from './types';
 
-// This ensures Firebase is initialized before we use getAuth() or getFirestore()
-const { auth, firestore } = initializeFirebase();
-
-/**
- * Creates or updates a user's profile document in the 'staff' collection in Firestore.
- * @param user The Firebase aAuth user object.
- * @param staffInfo Optional additional information from the staff master spreadsheet.
- */
-const createOrUpdateStaffDocument = async (user: User, staffInfo?: Staff) => {
-    if (!firestore) return;
-    const staffDocRef = doc(firestore, 'staff', user.uid);
-    console.log(`Creating or updating staff document for UID: ${user.uid}`);
-
-    // Check if a document already exists to avoid overwriting createdAt
-    const docSnap = await getDoc(staffDocRef);
-
-    const profileData: Partial<Staff> = {
-        id: user.uid,
-        name: staffInfo?.name || user.displayName || 'Unnamed User',
-        email: user.email,
-        avatarUrl: staffInfo?.avatarUrl || user.photoURL || undefined,
-        role: staffInfo?.role || 'staff',
-        calendarId: staffInfo?.calendarId,
-        color: staffInfo?.color,
-        '母店': staffInfo?.['母店'],
-        updatedAt: serverTimestamp(),
-    };
-
-    if (!docSnap.exists()) {
-        profileData.createdAt = serverTimestamp();
-    }
-
-    await setDoc(staffDocRef, profileData, { merge: true });
-    console.log('Staff document successfully written to Firestore.');
-};
-
+const USER_SESSION_KEY = 'workwise-user-profile';
 
 /**
- * Signs in a user with email and password. If the user does not exist in Firebase Auth,
- * it attempts to find them in the GAS-provided staff list and automatically creates an account.
- * This function handles various scenarios including password mismatches between GAS and Firebase.
+ * Signs in a user by checking their credentials against the staff data from GAS.
  * @param email The user's email.
  * @param password The user's password.
- * @returns A promise that resolves with the user credential.
+ * @returns A promise that resolves with the user's profile if successful.
  */
-export const signInWithEmail = async (email: string, password: string): Promise<UserCredential> => {
-  console.log(`Attempting to sign in with Firebase for email: ${email}`);
+export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
+  console.log(`Attempting to sign in via spreadsheet for email: ${email}`);
   try {
-    // 1. First, try to sign in normally. This will succeed if the user exists in Firebase with the correct password.
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    console.log('Firebase sign in successful for:', userCredential.user.email);
-    // Ensure Firestore document exists on sign-in as well
-    await createOrUpdateStaffDocument(userCredential.user);
-    return userCredential;
+    const allStaff = await fetchStaffDataFromGAS();
+    const staffMember = allStaff.find(s => s.email === email);
+
+    if (!staffMember) {
+      throw new Error('指定されたメールアドレスのスタッフが見つかりません。');
+    }
+
+    // Passwords in the sheet might be numbers, so we compare them as strings.
+    if (String(staffMember.password) !== String(password)) {
+      throw new Error('パスワードが正しくありません。');
+    }
+
+    // On successful login, save profile to session storage
+    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffMember));
+    
+    console.log('Spreadsheet sign in successful for:', staffMember.name);
+    return staffMember;
 
   } catch (error: any) {
-    // 2. If login fails, check if it's an "invalid credential" error.
-    // This code is returned for both "user not found" and "wrong password".
-    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found') {
-      console.log('Invalid credential or user not found. Checking spreadsheet for user to auto-provision account...');
-      
-      try {
-        // 3. Fetch the source of truth: the staff list from the spreadsheet.
-        const allStaff = await fetchStaffDataFromGAS();
-        const staffMember = allStaff.find(s => s.email === email);
-
-        // 4. If no staff member with that email exists, or the password doesn't match the sheet, it's a true invalid credential case.
-        if (!staffMember || staffMember.password !== password) {
-          console.log('No staff member found in spreadsheet with matching email and password.');
-          throw new Error('メールアドレスまたはパスワードが正しくありません。');
-        }
-
-        // 5. If we reach here, the user is a valid staff member according to the sheet.
-        // We can now confidently attempt to create their Firebase account.
-        console.log(`Valid staff member found in sheet: ${staffMember.name}. Attempting to create Firebase account...`);
-        try {
-          return await signUpWithEmail(email, password, staffMember.name, staffMember);
-        } catch (signUpError: any) {
-           console.error('An unexpected error occurred during automatic sign-up:', signUpError);
-           // This could happen due to network issues or other Firebase problems.
-           throw new Error('アカウントの自動作成中にエラーが発生しました。もう一度お試しください。');
-        }
-
-      } catch (provisionError: any) {
-        // This catches errors from fetchStaffDataFromGAS or the explicit "not found" error.
-        console.error('Error during user check/provision from spreadsheet:', provisionError.message);
-        throw provisionError; // Re-throw the specific, user-facing error.
-      }
-    }
-    
-    // For any other Firebase errors (network issues, etc.), re-throw them.
-    console.error('An unexpected Firebase sign-in error occurred:', error);
-    throw error;
+    console.error('Spreadsheet sign-in error:', error);
+    throw error; // Re-throw the error to be caught by the calling function
   }
 };
 
 /**
- * Signs up a new user with email, password, and name using Firebase Authentication.
- * Also updates the user's display name.
+ * Mock function for sign up. In a spreadsheet-only world, this doesn't create a new user,
+ * but we can pretend it does for UI consistency.
  * @param email The new user's email.
  * @param password The new user's password.
  * @param name The new user's display name.
- * @param staffInfo Optional staff info from GAS to populate Firestore.
- * @returns A promise that resolves with the user credential.
+ * @returns A promise that rejects as this is not a real operation.
  */
-export const signUpWithEmail = async (email: string, password: string, name: string, staffInfo?: Staff): Promise<UserCredential> => {
-    console.log(`Attempting to sign up with Firebase for email: ${email}`);
-    try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        
-        // After creating the user, update their Auth profile with the name.
-        if (name && user) {
-          await updateProfile(user, { displayName: name });
-        }
-        
-        // Also create their profile document in Firestore.
-        await createOrUpdateStaffDocument(user, staffInfo);
+export const signUpWithEmail = async (email: string, password: string, name: string): Promise<void> => {
+    console.warn('Sign up is not supported in spreadsheet-only authentication mode.');
+    throw new Error('新規登録は現在サポートされていません。管理者に連絡してスプレッドシートにアカウントを追加してもらってください。');
+};
 
-        console.log('Firebase sign up successful for new user:', user.email);
-        return userCredential;
+/**
+ * Signs out the current user by clearing session storage.
+ */
+export const signOut = (): void => {
+    console.log('Signing out user by clearing session storage.');
+    try {
+        sessionStorage.removeItem(USER_SESSION_KEY);
     } catch (error) {
-        console.error('Firebase sign up error:', error);
-        throw error;
+        console.error('Sign out error:', error);
+        // This should rarely fail, but we'll log it if it does.
     }
 };
 
 /**
- * Signs out the current Firebase user.
- * @returns A promise that resolves when sign-out is complete.
+ * Gets the currently "signed-in" user from session storage.
+ * @returns The user's profile object or null.
  */
-export const signOut = async (): Promise<void> => {
-    console.log('Signing out Firebase user');
-    try {
-        await firebaseSignOut(auth);
-    } catch (error) {
-        console.error('Firebase sign out error:', error);
-        throw error;
-    }
-};
-
-/**
- * Gets the currently signed-in Firebase user.
- * This is a synchronous check and might be null on initial page load.
- * For real-time user state, use the `useUser` hook.
- * @returns The current user object or null.
- */
-export const getCurrentUser = () => {
-    return auth.currentUser;
+export const getCurrentUser = (): WithId<Staff> | null => {
+  try {
+    const userJson = sessionStorage.getItem(USER_SESSION_KEY);
+    if (!userJson) return null;
+    return JSON.parse(userJson);
+  } catch (error) {
+    console.error('Could not retrieve user from session storage:', error);
+    return null;
+  }
 };

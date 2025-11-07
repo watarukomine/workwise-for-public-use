@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -27,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { signInWithEmail, signUpWithEmail } from '@/lib/auth';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 const loginSchema = z.object({
   email: z.string().email({ message: '有効なメールアドレスを入力してください。' }),
@@ -46,6 +48,7 @@ export default function LoginPage() {
   const [activeTab, setActiveTab] = React.useState('login');
   const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
   const { toast } = useToast();
+  const { setProfile } = useUserProfile();
 
   const loginForm = useForm<LoginSchema>({
     resolver: zodResolver(loginSchema),
@@ -72,7 +75,8 @@ export default function LoginPage() {
     setIsLoading(true);
     setError(null);
     try {
-      await signInWithEmail(data.email, data.password);
+      const userProfile = await signInWithEmail(data.email, data.password);
+      setProfile(userProfile); // Update the user profile in the context
       toast({
         title: 'ログインしました',
         description: 'WorkWiseへようこそ！',
@@ -80,11 +84,7 @@ export default function LoginPage() {
       // Use window.location to ensure a full page reload, which helps in re-evaluating auth state.
       window.location.href = '/'; 
     } catch (e: any) {
-      let errorMessage = 'ログイン中にエラーが発生しました。';
-      if (e.code === 'auth/invalid-credential' || e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password') {
-        errorMessage = 'メールアドレスまたはパスワードが正しくありません。';
-      }
-      setError(errorMessage);
+      setError(e.message || 'ログイン中に不明なエラーが発生しました。');
     } finally {
       setIsLoading(false);
     }
@@ -95,19 +95,9 @@ export default function LoginPage() {
     setError(null);
     try {
       await signUpWithEmail(data.email, data.password, data.name);
-       toast({
-        title: 'アカウントを作成しました',
-        description: '自動的にログインします。',
-      });
-       window.location.href = '/';
+      // This part will likely not be reached as signUpWithEmail throws an error.
     } catch (e: any) {
-      let errorMessage = '新規登録中にエラーが発生しました。';
-      if (e.code === 'auth/email-already-in-use') {
-        errorMessage = 'このメールアドレスは既に使用されています。';
-      } else if (e.code === 'auth/weak-password') {
-        errorMessage = 'パスワードは6文字以上で設定してください。';
-      }
-      setError(errorMessage);
+      setError(e.message || '新規登録中に不明なエラーが発生しました。');
     } finally {
       setIsLoading(false);
     }
