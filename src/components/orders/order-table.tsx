@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -155,6 +156,9 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     '作業完了': formatTime,
     '最終更新日時': formatDateTime,
     'チップ配置作業予定': formatTime,
+    '作業時間（分）': formatDurationFromMinutes,
+    '作業時間(分)': formatDurationFromMinutes,
+    '作業時間': formatDurationFromMinutes,
     '作業所要時間': formatDurationFromMinutes,
   };
 
@@ -242,3 +246,4 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     </Card>
   );
 }
+
