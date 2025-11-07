@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogOut, CheckCircle, MessageSquare, Send, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -14,7 +14,7 @@ import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Complete Task' | 'Update Location' | 'Send Message';
+type ActionType = 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Complete Task' | 'Update Location' | 'Send Message';
 type StatusValue = StaffStatus['status'];
 
 export default function CheckInPage() {
@@ -31,7 +31,6 @@ export default function CheckInPage() {
 
   const getJapaneseActionName = (action: ActionType) => {
     const map: Record<ActionType, string> = {
-        'Clock In': '出勤',
         'Clock Out': '退勤',
         'Start Travel': '移動開始',
         'Arrive': '現場到着',
@@ -47,21 +46,6 @@ export default function CheckInPage() {
     setIsLoading(action);
     setError(null);
     const now = new Date();
-    
-    // Actions that don't require location or sheet updates
-    if (action === 'Clock In' || action === 'Clock Out') {
-        console.log(`Action: ${action}`);
-        setTimeout(() => {
-          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action, time: currentTime });
-          toast({
-            title: 'アクションを記録しました',
-            description: `${getJapaneseActionName(action)} at ${currentTime}`,
-          });
-          setIsLoading(null);
-        }, 1000);
-        return;
-    }
     
     if (action === 'Send Message') {
         if (!message.trim()) {
@@ -83,50 +67,32 @@ export default function CheckInPage() {
         return;
     }
 
-    // Map actions to their corresponding status values for the sheet update
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
       'Complete Task': '作業完了',
       'Update Location': '待機中',
       'Arrive': '作業待ち',
+      'Clock Out': '待機中', 
     };
 
     const statusValue = statusMap[action];
     
-    if (!statusValue) {
+    if (!statusValue && action !== 'Clock Out') {
         console.error("No status defined for this action:", action);
         setIsLoading(null);
         return;
     }
 
-    if (!navigator.geolocation) {
+    if (!navigator.geolocation && action !== 'Clock Out') {
       setError('お使いのブラウザは位置情報取得に対応していません。');
       setIsLoading(null);
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setLocation({ latitude, longitude });
-        
-        console.log(`Action: ${action}`, { latitude, longitude });
-        
+    const processAction = async (latitude?: number, longitude?: number) => {
         if (!profile?.name) {
             setError('ユーザー情報が取得できません。ログインしているか確認してください。');
-            setIsLoading(null);
-            return;
-        }
-        
-        // For "Update Location", if there's no orderId, just show location and don't call GAS.
-        if (action === 'Update Location' && !orderId) {
-            toast({
-                title: '位置情報を更新しました',
-                description: `現在地: (${latitude.toFixed(4)}, ${longitude.toFixed(4)})`,
-            });
-            const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-            setLastAction({ action, time: currentTime });
             setIsLoading(null);
             return;
         }
@@ -164,9 +130,23 @@ export default function CheckInPage() {
                 title: '更新エラー',
                 description: e.message || 'スプレッドシートの更新に失敗しました。'
             });
+        } finally {
+            setIsLoading(null);
         }
-        
-        setIsLoading(null);
+    };
+
+    if (action === 'Clock Out') {
+      // For clocking out, we don't need location.
+      processAction();
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setLocation({ latitude, longitude });
+        console.log(`Action: ${action}`, { latitude, longitude });
+        await processAction(latitude, longitude);
       },
       (err) => {
         let message = '';
@@ -289,7 +269,7 @@ export default function CheckInPage() {
               <AlertTitle>最後の記録</AlertTitle>
               <AlertDescription>
                 {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
-                {location && !['Clock In', 'Clock Out', 'Send Message'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
+                {location && !['Clock Out', 'Send Message'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
               </AlertDescription>
             </Alert>
           )}
@@ -328,5 +308,3 @@ export default function CheckInPage() {
     </div>
   );
 }
-
-    

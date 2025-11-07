@@ -1,3 +1,4 @@
+
 // ↓↓↓↓【要設定】↓↓↓↓
 // 「受注管理」シートがあるスプレッドシートのIDを貼り付けてください
 const ORDER_SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
@@ -148,14 +149,20 @@ function updateSheetWithOrderInfo(params) {
     
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
     if (!match || !match[1] || match[1].toUpperCase() === 'N/A') {
-      return ContentService.createTextOutput(JSON.stringify({ 
-        status: "success", 
-        message: "汎用タスクまたはIDなしタスクのためシート更新はスキップされました。" 
-      })).setMimeType(ContentService.MimeType.JSON);
+        if (actionType === 'Clock Out') {
+            console.log("Clock Out action without order ID. This might be a general clock out.");
+        } else {
+            return ContentService.createTextOutput(JSON.stringify({ 
+                status: "success", 
+                message: "汎用タスクまたはIDなしタスクのためシート更新はスキップされました。" 
+            })).setMimeType(ContentService.MimeType.JSON);
+        }
     }
     
-    const orderId = match[1];
-    console.log("Extracted order ID:", orderId);
+    const orderId = match ? match[1] : null;
+    if(orderId) {
+      console.log("Extracted order ID:", orderId);
+    }
     
     const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
     if (!spreadsheet) throw new Error(`スプレッドシート（ID: ${ORDER_SPREADSHEET_ID}）が開けません。存在しないか、権限がありません。`);
@@ -167,106 +174,127 @@ function updateSheetWithOrderInfo(params) {
     const headers = data[0];
     
     const orderIdCol = headers.indexOf("受注ID");
-    if (orderIdCol === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
+    if (orderIdCol === -1 && orderId) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
     
     let rowNum = -1;
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][orderIdCol]) === String(orderId)) {
-        rowNum = i + 1;
-        break;
-      }
-    }
-    if (rowNum === -1) {
-      throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
-    }
-    
-    console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
-    
-    const updateColumn = (colName, value) => {
-      if (value !== undefined) {
-        const colIdx = headers.indexOf(colName);
-        if (colIdx !== -1) {
-          sheet.getRange(rowNum, colIdx + 1).setValue(value);
-          console.log(`Updated column '${colName}' with value: ${value}`);
+    if (orderId) {
+        for (let i = 1; i < data.length; i++) {
+          if (String(data[i][orderIdCol]) === String(orderId)) {
+            rowNum = i + 1;
+            break;
+          }
         }
-      }
-    };
-
-    updateColumn("担当", staffName);
-    updateColumn("受注ステータス", statusValue);
-    updateColumn("最終更新日時", timestamp ? new Date(timestamp) : undefined);
-    if(latitude !== undefined && longitude !== undefined) {
-      updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
-    }
-    updateColumn("チップ配置作業予定", scheduledTime ? new Date(scheduledTime) : (scheduledTime === "" ? "" : undefined)); 
-    updateColumn("taskCalendarEventId", taskCalendarEventId);
-    updateColumn("travelCalendarEventId", travelCalendarEventId);
-    
-    if (actionType && actionTimestamp) {
-        const dateValue = new Date(actionTimestamp);
-        const actionColMap = {
-            'Start Travel': "移動開始", 
-            'Arrive': "現場到着",
-            'Begin Task': "作業開始", 
-            'Complete Task': "作業完了"
-        };
-        if(actionColMap[actionType]) {
-            updateColumn(actionColMap[actionType], dateValue);
-        }
-    }
-
-    const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
-    const staffDataSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
-    if (!staffDataSheet) throw new Error(`シート「${STAFF_SHEET_NAME}」がスプレッドシートID '${STAFF_SPREADSHEET_ID}' 内に見つかりません。`);
-
-    const staffData = staffDataSheet.getDataRange().getValues();
-    const staffHeaders = staffData[0];
-    const staffNameCol = staffHeaders.indexOf("スタッフ名");
-    const calendarIdCol = staffHeaders.indexOf("calendarId");
-    const currentStaffName = staffName || sheet.getRange(rowNum, headers.indexOf("担当") + 1).getValue();
-    
-    let staffCalendarId;
-    if (currentStaffName) {
-        for(let i=1; i < staffData.length; i++) {
-            if(staffData[i][staffNameCol] === currentStaffName) {
-                staffCalendarId = staffData[i][calendarIdCol];
+    } else if (actionType === 'Clock Out' && staffName) {
+        // If clocking out without orderId, find the last entry for that staff member. This logic might need refinement.
+        const staffCol = headers.indexOf("担当");
+        for (let i = data.length - 1; i >= 1; i--) {
+            if (data[i][staffCol] === staffName) {
+                rowNum = i + 1;
                 break;
             }
         }
     }
-    
-    console.log(`Found calendarId: ${staffCalendarId} for staff: ${currentStaffName}`);
 
-    if (scheduledTime && staffCalendarId) {
-      console.log(`Updating linked calendar events on calendar ${staffCalendarId}`);
-      const calendar = CalendarApp.getCalendarById(staffCalendarId);
-      if(calendar) {
-          const taskStart = new Date(scheduledTime);
-          const workDuration = sheet.getRange(rowNum, headers.indexOf("作業時間（分）") + 1).getValue() || 60;
-          const taskEnd = new Date(taskStart.getTime() + workDuration * 60000);
-          const travelStart = new Date(taskStart.getTime() - 30 * 60000);
+    if (rowNum === -1 && orderId) {
+      throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
+    }
 
-          const currentTaskEventId = sheet.getRange(rowNum, headers.indexOf("taskCalendarEventId") + 1).getValue();
-          const currentTravelEventId = sheet.getRange(rowNum, headers.indexOf("travelCalendarEventId") + 1).getValue();
-          
-          if(currentTaskEventId) {
-            try {
-              const event = calendar.getEventById(currentTaskEventId);
-              if (event) event.setTime(taskStart, taskEnd);
-            } catch(e) { console.error(`Failed to update task event ${currentTaskEventId}: ${e.message}`);}
+    if (rowNum !== -1) {
+        console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
+        
+        const updateColumn = (colName, value) => {
+          if (value !== undefined) {
+            const colIdx = headers.indexOf(colName);
+            if (colIdx !== -1) {
+              sheet.getRange(rowNum, colIdx + 1).setValue(value);
+              console.log(`Updated column '${colName}' with value: ${value}`);
+            }
           }
-          if(currentTravelEventId) {
-            try {
-              const event = calendar.getEventById(currentTravelEventId);
-              if(event) event.setTime(travelStart, taskStart);
-            } catch(e) { console.error(`Failed to update travel event ${currentTravelEventId}: ${e.message}`);}
+        };
+
+        updateColumn("担当", staffName);
+        updateColumn("受注ステータス", statusValue);
+        updateColumn("最終更新日時", timestamp ? new Date(timestamp) : undefined);
+        if(latitude !== undefined && longitude !== undefined) {
+          updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
+        }
+        updateColumn("チップ配置作業予定", scheduledTime ? new Date(scheduledTime) : (scheduledTime === "" ? "" : undefined)); 
+        updateColumn("taskCalendarEventId", taskCalendarEventId);
+        updateColumn("travelCalendarEventId", travelCalendarEventId);
+        
+        if (actionType && actionTimestamp) {
+            const dateValue = new Date(actionTimestamp);
+            const actionColMap = {
+                'Start Travel': "移動開始", 
+                'Arrive': "現場到着",
+                'Begin Task': "作業開始", 
+                'Complete Task': "作業完了",
+                'Clock Out': "退勤ボタン",
+            };
+            if(actionColMap[actionType]) {
+                updateColumn(actionColMap[actionType], dateValue);
+            }
+        }
+    } else if (actionType === 'Clock Out' && staffName) {
+      console.warn(`Clock out for ${staffName} recorded but no recent order row found to stamp.`);
+      // Optionally, you could log this to a different sheet.
+    }
+
+
+    if (orderId && scheduledTime) {
+      const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
+      const staffDataSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
+      if (!staffDataSheet) throw new Error(`シート「${STAFF_SHEET_NAME}」がスプレッドシートID '${STAFF_SPREADSHEET_ID}' 内に見つかりません。`);
+
+      const staffData = staffDataSheet.getDataRange().getValues();
+      const staffHeaders = staffData[0];
+      const staffNameCol = staffHeaders.indexOf("スタッフ名");
+      const calendarIdCol = staffHeaders.indexOf("calendarId");
+      const currentStaffName = staffName || sheet.getRange(rowNum, headers.indexOf("担当") + 1).getValue();
+      
+      let staffCalendarId;
+      if (currentStaffName) {
+          for(let i=1; i < staffData.length; i++) {
+              if(staffData[i][staffNameCol] === currentStaffName) {
+                  staffCalendarId = staffData[i][calendarIdCol];
+                  break;
+              }
           }
+      }
+      
+      console.log(`Found calendarId: ${staffCalendarId} for staff: ${currentStaffName}`);
+
+      if (staffCalendarId) {
+        console.log(`Updating linked calendar events on calendar ${staffCalendarId}`);
+        const calendar = CalendarApp.getCalendarById(staffCalendarId);
+        if(calendar) {
+            const taskStart = new Date(scheduledTime);
+            const workDuration = sheet.getRange(rowNum, headers.indexOf("作業時間（分）") + 1).getValue() || 60;
+            const taskEnd = new Date(taskStart.getTime() + workDuration * 60000);
+            const travelStart = new Date(taskStart.getTime() - 30 * 60000);
+
+            const currentTaskEventId = sheet.getRange(rowNum, headers.indexOf("taskCalendarEventId") + 1).getValue();
+            const currentTravelEventId = sheet.getRange(rowNum, headers.indexOf("travelCalendarEventId") + 1).getValue();
+            
+            if(currentTaskEventId) {
+              try {
+                const event = calendar.getEventById(currentTaskEventId);
+                if (event) event.setTime(taskStart, taskEnd);
+              } catch(e) { console.error(`Failed to update task event ${currentTaskEventId}: ${e.message}`);}
+            }
+            if(currentTravelEventId) {
+              try {
+                const event = calendar.getEventById(currentTravelEventId);
+                if(event) event.setTime(travelStart, taskStart);
+              } catch(e) { console.error(`Failed to update travel event ${currentTravelEventId}: ${e.message}`);}
+            }
+        }
       }
     }
         
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
-      message: `受注ID: ${orderId} を更新しました。`,
+      message: `アクション「${actionType}」を記録しました。`,
     })).setMimeType(ContentService.MimeType.JSON);
     
   } catch (error) {
