@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import { cn, findKey } from '@/lib/utils';
-import { format, isToday, parseISO, isValid, startOfDay, differenceInMinutes } from 'date-fns';
+import { format, isToday, parseISO, isValid, startOfDay } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 
 interface OrderTableProps {
@@ -146,25 +146,6 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     }
   };
   
-  const getFormattedValue = (order: any, header: string) => {
-    const durationKeys = ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間'];
-    if (durationKeys.includes(header)) {
-        const durationMinutes = findKey(order, durationKeys);
-        if (durationMinutes !== undefined && durationMinutes !== '') {
-            return formatDurationFromMinutes(durationMinutes);
-        }
-        return '';
-    }
-
-    const value = order[header];
-    if (headersToFormat[header]) {
-      return headersToFormat[header](value);
-    }
-    
-    return value !== undefined && value !== null ? String(value) : '';
-  };
-
-
   const headersToFormat: Record<string, (value: any) => string> = {
     '作業予定日': formatDate,
     '受付日': formatDate,
@@ -177,6 +158,25 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     '作業終了': formatTime,
     '最終更新日時': formatDateTime,
   };
+  
+  const getFormattedValue = (order: any, header: string) => {
+      const durationKeys = ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間'];
+      if (durationKeys.includes(header)) {
+          const durationValue = findKey(order, durationKeys);
+          if (durationValue !== undefined && durationValue !== null && durationValue !== '') {
+              return formatDurationFromMinutes(durationValue);
+          }
+          return '';
+      }
+  
+      const value = order[header];
+      if (headersToFormat[header]) {
+        return headersToFormat[header](value);
+      }
+      
+      return value !== undefined && value !== null ? String(value) : '';
+  };
+
 
   return (
     <Card>
@@ -259,3 +259,4 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     </Card>
   );
 }
+
