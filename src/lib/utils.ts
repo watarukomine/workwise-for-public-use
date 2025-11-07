@@ -31,6 +31,16 @@ export const findKey = (item: any, possibleKeys: string[]) => {
 };
 
 export const formatTime = (date: Date | string) => {
+  if (!date) return 'Invalid time';
+
+  // Handle cases like "1899-12-29T15:00:00.000Z" which come from Sheets for time-only values
+  if (typeof date === 'string' && date.startsWith('1899-12-')) {
+    const d = parseISO(date);
+    if (isValid(d)) {
+      return format(d, 'HH:mm');
+    }
+  }
+
   const d = typeof date === 'string' ? parseISO(date) : date;
    if (!d || !isValid(d) || isNaN(d.getTime())) {
      if (typeof date === 'string') {
