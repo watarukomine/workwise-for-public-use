@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -17,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, isToday, parseISO, isValid } from 'date-fns';
+import { format, isToday, parseISO, isValid, startOfDay } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 
 interface OrderTableProps {
@@ -59,6 +58,16 @@ const formatTime = (timeString: string) => {
     }
 };
 
+const formatDurationFromMinutes = (minutes: number | string) => {
+    const numMinutes = Number(minutes);
+    if (isNaN(numMinutes) || numMinutes < 0) {
+        return minutes; // Return original if not a valid number
+    }
+    const hours = Math.floor(numMinutes / 60);
+    const mins = numMinutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+};
+
 const formatDateTime = (dateTimeString: string) => {
     if (!dateTimeString || !isValid(parseISO(dateTimeString))) return dateTimeString;
     try {
@@ -92,8 +101,9 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     let ordersToDisplay = rawOrders.filter(order => {
         const scheduledDate = parseDate(order['作業予定日']);
         const receptionDate = parseDate(order['受付日']);
-        const isScheduledForToday = scheduledDate ? isToday(scheduledDate) : false;
-        const isReceivedToday = receptionDate ? isToday(receptionDate) : false;
+        // Check if scheduled for today or received today.
+        const isScheduledForToday = scheduledDate ? isToday(startOfDay(scheduledDate)) : false;
+        const isReceivedToday = receptionDate ? isToday(startOfDay(receptionDate)) : false;
         return isScheduledForToday || isReceivedToday;
     });
 
@@ -119,7 +129,14 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
 
   const headers = rawOrders && rawOrders.length > 0 
-    ? Object.keys(rawOrders[0]).filter(key => key !== 'Order_URL') // Hide Order_URL column
+    ? Object.keys(rawOrders[0]).filter(key => 
+        ![
+          'Order_URL',
+          'taskCalendarEventId', 
+          'travelCalendarEventId', 
+          '緊急連絡先'
+        ].includes(key)
+      )
     : [];
     
   const handleRowClick = (order: any) => {
@@ -128,15 +145,17 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     }
   };
 
-  const headersToFormat: Record<string, (value: string) => string> = {
+  const headersToFormat: Record<string, (value: any) => string> = {
     '作業予定日': formatDate,
     '受付日': formatDate,
     '予定時間': formatTime,
     '移動開始': formatTime,
     '現場到着': formatTime,
     '作業開始': formatTime,
-    '作業終了': formatTime,
+    '作業完了': formatTime,
     '最終更新日時': formatDateTime,
+    'チップ配置作業予定': formatTime,
+    '作業所要時間': formatDurationFromMinutes,
   };
 
   return (
