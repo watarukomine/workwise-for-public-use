@@ -196,13 +196,10 @@ export default function CheckInPage() {
   };
 
   const actionButtons: { action: ActionType; label: string; icon: React.ElementType, requiresOrderId: boolean }[] = [
-    { action: 'Clock In', label: '出勤', icon: LogIn, requiresOrderId: false },
-    { action: 'Clock Out', label: '退勤', icon: LogOut, requiresOrderId: false },
     { action: 'Start Travel', label: '移動開始', icon: PlayCircle, requiresOrderId: true },
     { action: 'Arrive', label: '現場到着', icon: MapPin, requiresOrderId: true },
     { action: 'Begin Task', label: '作業開始', icon: Clock, requiresOrderId: true },
     { action: 'Complete Task', label: '作業完了', icon: CheckCircle, requiresOrderId: true },
-    { action: 'Update Location', label: '位置情報更新', icon: RefreshCw, requiresOrderId: false },
   ];
 
   const pageLoading = isLoading || isProfileLoading;
@@ -220,10 +217,7 @@ export default function CheckInPage() {
               <Button
                 key={action}
                 size="lg"
-                className={cn(
-                  "h-20 text-base flex-col",
-                  action === 'Update Location' && "col-span-2"
-                )}
+                className="h-20 text-base flex-col"
                 onClick={() => handleAction(action)}
                 disabled={pageLoading || (requiresOrderId && !orderId)}
               >
@@ -237,6 +231,38 @@ export default function CheckInPage() {
                 )}
               </Button>
             ))}
+            <Button
+                key="Update Location"
+                size="lg"
+                className="h-20 text-base flex-col"
+                onClick={() => handleAction('Update Location')}
+                disabled={pageLoading}
+              >
+                {isLoading === 'Update Location' || (pageLoading && isLoading === null) ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <>
+                    <RefreshCw className="h-6 w-6 mb-1" />
+                    位置情報更新
+                  </>
+                )}
+              </Button>
+            <Button
+                key="Clock Out"
+                size="lg"
+                className="h-20 text-base flex-col"
+                onClick={() => handleAction('Clock Out')}
+                disabled={pageLoading}
+              >
+                {isLoading === 'Clock Out' || (pageLoading && isLoading === null) ? (
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                  <>
+                    <LogOut className="h-6 w-6 mb-1" />
+                    退勤
+                  </>
+                )}
+              </Button>
           </div>
 
           {error && (
@@ -302,3 +328,5 @@ export default function CheckInPage() {
     </div>
   );
 }
+
+    
