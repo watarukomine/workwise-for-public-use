@@ -24,7 +24,7 @@ export default function CheckInPage() {
   const [lastAction, setLastAction] = React.useState<{ action: ActionType; time: string } | null>(null);
   const [message, setMessage] = React.useState('');
   const { toast } = useToast();
-  const { profile } = useUserProfile();
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
 
@@ -205,6 +205,8 @@ export default function CheckInPage() {
     { action: 'Update Location', label: '位置情報更新', icon: RefreshCw, requiresOrderId: false },
   ];
 
+  const pageLoading = isLoading || isProfileLoading;
+
   return (
     <div className="max-w-md mx-auto space-y-6">
       <Card>
@@ -223,9 +225,9 @@ export default function CheckInPage() {
                   action === 'Update Location' && "col-span-2"
                 )}
                 onClick={() => handleAction(action)}
-                disabled={!!isLoading || (requiresOrderId && !orderId)}
+                disabled={pageLoading || (requiresOrderId && !orderId)}
               >
-                {isLoading === action ? (
+                {isLoading === action || (pageLoading && isLoading === null) ? (
                   <Loader2 className="h-6 w-6 animate-spin" />
                 ) : (
                   <>
@@ -281,12 +283,12 @@ export default function CheckInPage() {
             placeholder="メッセージを入力..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            disabled={isLoading === 'Send Message'}
+            disabled={pageLoading}
           />
           <Button
             className="w-full"
             onClick={() => handleAction('Send Message')}
-            disabled={!!isLoading}
+            disabled={pageLoading}
           >
             {isLoading === 'Send Message' ? (
               <Loader2 className="h-4 w-4 animate-spin" />
