@@ -289,12 +289,12 @@ export default function CheckInPage() {
             placeholder="メッセージを入力..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            disabled={pageLoading}
+            disabled={pageLoading || isLoading === 'Send Message'}
           />
           <Button
             className="w-full"
             onClick={() => handleAction('Send Message')}
-            disabled={pageLoading}
+            disabled={pageLoading || isLoading === 'Send Message'}
           >
             {isLoading === 'Send Message' ? (
               <Loader2 className="h-4 w-4 animate-spin" />
