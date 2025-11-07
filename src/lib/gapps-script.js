@@ -1,21 +1,22 @@
 // ↓↓↓↓【要設定】↓↓↓↓
-// スプレッドシートのID（URLの .../d/【この部分】/edit...）を貼り付けてください
-const SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
-// データを読み書きするシート名を正確に入力してください
+// 「受注管理」シートがあるスプレッドシートのIDを貼り付けてください
+const ORDER_SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
 const ORDER_SHEET_NAME = "受注管理"; 
-const STAFF_SHEET_NAME = "スタッフマスタ";
+
+// 「スタッフマスタ」シートがあるスプレッドシートのIDを貼り付けてください
+const STAFF_SPREADSHEET_ID = "1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60";
+const STAFF_SHEET_NAME = "Sheet1"; // 実際のシート名に合わせて変更してください
 // ↓↓↓↓【設定はここまで】↓↓↓↓
+
 
 /**
  * GET リクエストを処理し、スプレッドシートのデータを JSON で返します
  */
 function doGet(e) {
   try {
-    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-    if (!spreadsheet) throw new Error(`スプレッドシート（ID: ${SPREADSHEET_ID}）が開けません。存在しないか、権限がありません。`);
-
+    const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
     const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
-    if (!sheet) throw new Error(`シート '${ORDER_SHEET_NAME}' が見つかりません。`);
+    if (!sheet) throw new Error(`シート '${ORDER_SHEET_NAME}' がスプレッドシートID '${ORDER_SPREADSHEET_ID}' 内に見つかりません。`);
     
     const dataRange = sheet.getDataRange();
     const values = dataRange.getValues();
@@ -32,7 +33,8 @@ function doGet(e) {
       const obj = {};
       headers.forEach((header, index) => {
         const cellValue = row[index];
-        if (cellValue && cellValue instanceof Date) {
+        // Check if the cell value is a valid Date object before calling toISOString
+        if (cellValue && cellValue instanceof Date && !isNaN(cellValue)) {
           obj[header] = cellValue.toISOString();
         } else {
           obj[header] = cellValue;
@@ -155,8 +157,8 @@ function updateSheetWithOrderInfo(params) {
     const orderId = match[1];
     console.log("Extracted order ID:", orderId);
     
-    const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
-    if (!spreadsheet) throw new Error(`スプレッドシート（ID: ${SPREADSHEET_ID}）が開けません。存在しないか、権限がありません。`);
+    const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+    if (!spreadsheet) throw new Error(`スプレッドシート（ID: ${ORDER_SPREADSHEET_ID}）が開けません。存在しないか、権限がありません。`);
 
     const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
     if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
@@ -203,16 +205,19 @@ function updateSheetWithOrderInfo(params) {
     if (actionType && actionTimestamp) {
         const dateValue = new Date(actionTimestamp);
         const actionColMap = {
-            'Start Travel': "移動開始", 'Arrive': "現場到着",
-            'Begin Task': "作業開始", 'Finish Task': "作業終了"
+            'Start Travel': "移動開始", 
+            'Arrive': "現場到着",
+            'Begin Task': "作業開始", 
+            'Complete Task': "作業完了"
         };
         if(actionColMap[actionType]) {
             updateColumn(actionColMap[actionType], dateValue);
         }
     }
 
-    const staffDataSheet = spreadsheet.getSheetByName(STAFF_SHEET_NAME);
-    if (!staffDataSheet) throw new Error(`シート「${STAFF_SHEET_NAME}」が見つかりません。`);
+    const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
+    const staffDataSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
+    if (!staffDataSheet) throw new Error(`シート「${STAFF_SHEET_NAME}」がスプレッドシートID '${STAFF_SPREADSHEET_ID}' 内に見つかりません。`);
 
     const staffData = staffDataSheet.getDataRange().getValues();
     const staffHeaders = staffData[0];
@@ -335,5 +340,3 @@ function handleCalendarEvent(params) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
-
-    

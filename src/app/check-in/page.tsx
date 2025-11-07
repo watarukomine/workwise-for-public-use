@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -15,7 +14,7 @@ import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Update Location' | 'Send Message';
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Complete Task' | 'Update Location' | 'Send Message';
 type StatusValue = StaffStatus['status'];
 
 export default function CheckInPage() {
@@ -37,7 +36,7 @@ export default function CheckInPage() {
         'Start Travel': '移動開始',
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
-        'Finish Task': '作業終了',
+        'Complete Task': '作業完了',
         'Update Location': '位置情報更新',
         'Send Message': 'メッセージ送信'
     };
@@ -88,7 +87,7 @@ export default function CheckInPage() {
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '待機中',
+      'Complete Task': '作業完了',
       'Update Location': '待機中',
       'Arrive': '作業待ち',
     };
@@ -202,7 +201,7 @@ export default function CheckInPage() {
     { action: 'Start Travel', label: '移動開始', icon: PlayCircle, requiresOrderId: true },
     { action: 'Arrive', label: '現場到着', icon: MapPin, requiresOrderId: true },
     { action: 'Begin Task', label: '作業開始', icon: Clock, requiresOrderId: true },
-    { action: 'Finish Task', label: '作業終了', icon: CheckCircle, requiresOrderId: true },
+    { action: 'Complete Task', label: '作業完了', icon: CheckCircle, requiresOrderId: true },
     { action: 'Update Location', label: '位置情報更新', icon: RefreshCw, requiresOrderId: false },
   ];
 
@@ -251,7 +250,7 @@ export default function CheckInPage() {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>オーダーが選択されていません</AlertTitle>
               <AlertDescription>
-                「移動開始」「現場到着」「作業開始」「作業終了」を記録するには、スケジュール画面からタスクを選択してください。
+                「移動開始」「現場到着」「作業開始」「作業完了」を記録するには、スケジュール画面からタスクを選択してください。
               </AlertDescription>
             </Alert>
           )}
