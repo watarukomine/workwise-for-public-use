@@ -16,8 +16,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { format, isToday, parseISO, isValid, startOfDay } from 'date-fns';
+import { cn, findKey } from '@/lib/utils';
+import { format, isToday, parseISO, isValid, startOfDay, differenceInMinutes } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 
 interface OrderTableProps {
@@ -145,21 +145,32 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
       window.open(order.Order_URL, '_blank', 'noopener,noreferrer');
     }
   };
+  
+  const calculateDuration = (order: any) => {
+    const startTime = parseDate(findKey(order, ['作業開始']));
+    const endTime = parseDate(findKey(order, ['作業完了', '作業終了']));
+    if (startTime && endTime) {
+      const duration = differenceInMinutes(endTime, startTime);
+      return formatDurationFromMinutes(duration);
+    }
+    const durationMinutes = findKey(order, ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間']);
+    if (durationMinutes) {
+        return formatDurationFromMinutes(durationMinutes);
+    }
+    return '';
+  };
 
   const headersToFormat: Record<string, (value: any) => string> = {
     '作業予定日': formatDate,
     '受付日': formatDate,
     '予定時間': formatTime,
+    'チップ配置作業予定': formatTime,
     '移動開始': formatTime,
     '現場到着': formatTime,
     '作業開始': formatTime,
     '作業完了': formatTime,
+    '作業終了': formatTime,
     '最終更新日時': formatDateTime,
-    'チップ配置作業予定': formatTime,
-    '作業時間（分）': formatDurationFromMinutes,
-    '作業時間(分)': formatDurationFromMinutes,
-    '作業時間': formatDurationFromMinutes,
-    '作業所要時間': formatDurationFromMinutes,
   };
 
   return (
@@ -201,13 +212,18 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                       onDoubleClick={() => handleRowClick(order)}
                       className={cn(isAdmin && hasUrl && "cursor-pointer hover:bg-muted/50")}
                     >
-                      {headers.map(header => (
-                        <TableCell key={header}>
-                          {headersToFormat[header] 
-                            ? headersToFormat[header](order[header])
-                            : (order[header] !== undefined && order[header] !== null ? String(order[header]) : '')}
-                        </TableCell>
-                      ))}
+                      {headers.map(header => {
+                        let cellContent;
+                        const durationKeys = ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間'];
+                        if (durationKeys.includes(header)) {
+                           cellContent = calculateDuration(order);
+                        } else if (headersToFormat[header]) {
+                          cellContent = headersToFormat[header](order[header]);
+                        } else {
+                          cellContent = order[header] !== undefined && order[header] !== null ? String(order[header]) : '';
+                        }
+                        return <TableCell key={header}>{cellContent}</TableCell>
+                      })}
                     </TableRow>
                   )
                 })
@@ -246,4 +262,3 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     </Card>
   );
 }
-
