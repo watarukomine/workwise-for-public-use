@@ -12,7 +12,7 @@
  * スタッフマスターのデータを取得・更新するためのGoogle Apps ScriptのURL。
  * 主に staff-context.tsx や auth.ts で使用されます。
  */
-export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbx24E99Vtxk9fXgwV0qF1Mhye5ynIh5PK2Bz2bqUSDGKsL5Z1Uc1ZC4AQeCqzTFogg7/exec';
+export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycby9oci_4IH0EgV1rVBWnakqeAIxRlbCPrZ5Og8FGcloUHxTbekzjrA0aawPeZK4lHeN/exec';
 
 /**
  * 顧客情報（販売店情報）を取得・更新するためのGoogle Apps ScriptのURL。
@@ -24,7 +24,7 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b
  * 受注情報を取得・更新し、カレンダー連携も行うGoogle Apps ScriptのURL。
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
-export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwouNrsEOaMc44w4BPfWOqnsrsSN-kuCRwvG1ULOjTHcOubBU71xq6wKw033IVil0IE/exec';
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbzGgjLq9caVM02k0eMvA0aL5sOkv-vvsFfFxiCKJGqS8B5oo3NKxm89I8muU__HJdoL/exec';
 
 
 // --- スプレッドシート本体のURL ---
