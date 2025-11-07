@@ -21,7 +21,7 @@ const simpleHash = (str: string) => {
 export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
     const url = STAFF_GAS_URL;
     if (!url || url.includes('TODO_REPLACE_THIS_URL')) {
-        console.log("スタッフ情報を取得するためのGoogle Apps Script URLが設定されていません。");
+        console.warn("スタッフ情報を取得するためのGoogle Apps Script URLが設定されていません。");
         throw new Error("スタッフ情報を取得するためのURLが /src/lib/settings.ts で設定されていません。");
     }
 
@@ -31,12 +31,13 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
         const dataToProcess = result.data || (Array.isArray(result) ? result : []);
         
         if (dataToProcess.length === 0) {
+            console.warn("GASから取得したスタッフデータが空です。");
             return [];
         }
 
         return dataToProcess.map((item: any) => {
             const getRole = (): 'admin' | 'staff' => {
-                const roleValue = findKey(item, ['権限', 'role', 'Role', 'ロール']);
+                const roleValue = findKey(item, ['ロール', '権限', 'role', 'Role']);
                 if (typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
                     return 'admin';
                 }
@@ -57,7 +58,6 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 calendarId: findKey(item, ['calendarId', 'カレンダーID']),
                 color: assignedColor || fallbackColor,
                 avatarUrl: findKey(item, ['avatarUrl']) || '',
-                area: findKey(item, ['エリア', 'area']),
                 '母店': findKey(item, ['母店']),
                 ...item
             };
@@ -65,7 +65,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
     } catch (error: any) {
         console.error('Error fetching staff data from GAS:', error);
-        throw new Error(error.message || 'スプレッドシートからスタッフデータを取得できませんでした。');
+        throw new Error(error.message || 'スプレッドシートからスタッフデータを取得できませんでした。GASのURL、デプロイ設定（全員に公開）、シートの構成を確認してください。');
     }
 };
 
