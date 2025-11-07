@@ -28,6 +28,7 @@ export default function DashboardPage() {
   
   const { 
     orders: rawOrders, 
+    scheduleEvents,
     isLoading: isLoadingOrders,
   } = useOrder();
   
@@ -90,6 +91,15 @@ export default function DashboardPage() {
           return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
       });
   };
+  
+  const dailySchedule = React.useMemo(() => {
+    if (!scheduleEvents) return [];
+    return scheduleEvents.filter(event => {
+        const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+        return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+    });
+}, [scheduleEvents, currentDate]);
+
 
   if (isLoading) {
       return (
@@ -162,7 +172,7 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         {showVerticalView ? (
             <VerticalScheduleView 
-                scheduleData={[]} // This view is not fully implemented with new data flow
+                scheduleData={dailySchedule}
                 staffData={filteredStaff}
             />
         ) : (
