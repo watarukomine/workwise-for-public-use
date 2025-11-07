@@ -298,7 +298,7 @@ export function ScheduleView({
 
   const pixelsToMinutes = (pixels: number) => Math.round(pixels / pixelsPerMinute / 15) * 15;
 
-  const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
+  const getEventDimensions = React.useCallback((eventStart: Date | string, eventEnd: Date | string) => {
     const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventStart;
     const end = typeof eventEnd === 'string' ? parseISO(eventEnd) : eventEnd;
   
@@ -316,7 +316,7 @@ export function ScheduleView({
       left: leftInMinutes * pixelsPerMinute,
       width: (widthInMinutes > 0 ? widthInMinutes : 30) * pixelsPerMinute, 
     };
-  };
+  }, [pixelsPerMinute]);
 
   React.useEffect(() => {
     if (!rawOrdersData) return;
