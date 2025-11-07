@@ -625,13 +625,14 @@ export function ScheduleView({
     const { title, description } = editedEventDetails;
 
     try {
+        let savedEvent: WithId<ScheduleEvent> | null = null;
         if (dialogState.mode === 'new') {
             const staff = getStaffById(dialogState.staffId);
             if (!staff || !staff.calendarId) throw new Error("担当スタッフにカレンダーIDが設定されていません。");
 
             const result = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
             
-             const newEvent: WithId<ScheduleEvent> = {
+             savedEvent = {
                 id: `event-${Date.now()}`,
                 title, description,
                 staffId: dialogState.staffId,
@@ -640,15 +641,13 @@ export function ScheduleView({
                 end: newEnd.toISOString(),
                 calendarEventId: result.eventId,
             };
-            setScheduleEvents(prev => [...prev, newEvent]);
-            setDialogState({ mode: 'closed' });
-            return newEvent;
+            setScheduleEvents(prev => [...prev, savedEvent!]);
 
         } else if (dialogState.mode === 'edit') {
             const staff = getStaffById(dialogState.event.staffId);
             if (!staff || !staff.calendarId) throw new Error("担当スタッフにカレンダーIDが設定されていません。");
             
-            const updatedEvent: WithId<ScheduleEvent> = { ...dialogState.event, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
+            savedEvent = { ...dialogState.event, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
 
             if (dialogState.event.rawOrderId) { 
                 await updateSheetStatus({
@@ -660,15 +659,15 @@ export function ScheduleView({
                 await refetchOrders();
             } else if(dialogState.event.calendarEventId) { 
                 await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: staff.calendarId, eventId: dialogState.event.calendarEventId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
-                setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+                setScheduleEvents(prev => prev.map(e => e.id === savedEvent!.id ? savedEvent! : e));
             }
-            setDialogState({ mode: 'closed' });
-            return updatedEvent;
         }
+        setDialogState({ mode: 'closed' });
+        return savedEvent;
     } catch (e: any) {
         toast({ variant: 'destructive', title: '保存エラー', description: `カレンダーの更新に失敗しました: ${e.message}` });
+        return null;
     }
-    return null;
   };
 
   const handleDeleteEvent = async (eventToDelete: WithId<ScheduleEvent>) => {
@@ -851,17 +850,17 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                                       </span>
                                   </div>
                               ))}
-                               {isToday(currentDate) && (
-                                <div 
-                                    className="absolute top-0 h-full pointer-events-none z-40"
-                                    style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                                >
-                                    <TimeIndicator />
-                                </div>
-                               )}
                           </div>
                       </div>
                       <div className="relative">
+                         {isToday(currentDate) && (
+                            <div 
+                                className="absolute top-0 h-full pointer-events-none z-50"
+                                style={{ left: `${STAFF_COL_WIDTH}px`, right: 0 }}
+                            >
+                                <TimeIndicator />
+                            </div>
+                         )}
                         <ScrollArea className="w-full whitespace-nowrap">
                           <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
                               <div className="relative space-y-2">
@@ -953,7 +952,7 @@ iCalファイルが添付されていますので、カレンダーに取り込�
       
                   <DialogFooter className="sm:justify-between flex-wrap gap-2">
                        <div className="flex gap-2">
-                           {dialogState.mode === 'edit' && event && staff?.email && (
+                           {dialogState.mode === 'edit' && event && (
                               <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                       <Button variant="destructive">削除</Button>
@@ -962,7 +961,7 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                                       <AlertDialogHeader>
                                           <AlertDialogTitle>予定を削除しますか？</AlertDialogTitle>
                                           <AlertDialogDescription>
-                                              この操作は元に戻せません。担当者に削除を通知するメールを送信することもできます。
+                                              この操作は元に戻せません。{staff?.email && '担当者に削除を通知するメールを送信することもできます。'}
                                           </AlertDialogDescription>
                                       </AlertDialogHeader>
                                       <AlertDialogFooter>
@@ -970,10 +969,12 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                                           <AlertDialogAction onClick={() => handleDeleteEvent(event)}>
                                             削除のみ
                                           </AlertDialogAction>
-                                           <AlertDialogAction onClick={async () => { await handleEmailEvent(event, 'delete'); handleDeleteEvent(event); }} disabled={isSendingEmail}>
+                                          {staff?.email &&
+                                           <AlertDialogAction onClick={async () => { await handleEmailEvent(event, 'delete'); await handleDeleteEvent(event); }} disabled={isSendingEmail}>
                                             {isSendingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                                             削除して通知
                                           </AlertDialogAction>
+                                          }
                                       </AlertDialogFooter>
                                   </AlertDialogContent>
                               </AlertDialog>
@@ -983,15 +984,17 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                            <DialogClose asChild>
                                <Button variant="ghost">キャンセル</Button>
                            </DialogClose>
+                           {staff?.email &&
                            <Button onClick={async () => {
                                 const savedEvent = await handleSaveEvent();
-                                if (savedEvent && staff?.email) {
-                                    handleEmailEvent(savedEvent, dialogState.mode === 'new' ? 'create' : 'update');
+                                if (savedEvent) {
+                                    await handleEmailEvent(savedEvent, dialogState.mode === 'new' ? 'create' : 'update');
                                 }
                            }} disabled={isSendingEmail}>
                                 {isSendingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                                 保存して通知
                            </Button>
+                           }
                            <Button onClick={handleSaveEvent}>保存</Button>
                        </div>
                    </DialogFooter>
@@ -1071,7 +1074,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 100 : 1,
+    zIndex: isDragging ? 100 : 20,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
