@@ -58,7 +58,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-
+const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
 const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
@@ -78,14 +78,37 @@ const timeStringToDate = (timeStr: string, baseDate: Date) => {
     return date;
 };
 
+const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
+
+const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
+
+const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
+  const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventStart;
+  const end = typeof eventEnd === 'string' ? parseISO(eventEnd) : eventEnd;
+
+  if (!start || !end || !isValid(start) || !isValid(end)) {
+    return { left: 0, width: minutesToPixels(60) }; 
+  }
+  
+  const startOfDay = new Date(start);
+  startOfDay.setHours(timelineStartHour, 0, 0, 0);
+
+  const leftInMinutes = differenceInMinutes(start, startOfDay);
+  const widthInMinutes = differenceInMinutes(end, start);
+
+  return {
+    left: minutesToPixels(leftInMinutes),
+    width: minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30), 
+  };
+};
+
 interface DraggableOrderProps {
   order: WithId<Order>;
   customer?: WithId<Customer>;
   className?: string;
-  pixelsPerMinute: number;
 }
 
-const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className, pixelsPerMinute }) => {
+const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: `order-${order.id}`,
@@ -96,7 +119,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
     opacity: isDragging ? 0.8 : 1,
-    width: `${(order.estimatedDuration || 60) * pixelsPerMinute}px`,
+    width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
   };
   
   const [line1, line2] = order.taskDetails.split('\n');
@@ -160,7 +183,7 @@ const genericTasks: WithId<Order>[] = [
       { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60 },
 ];
 
-function GenericTasks({ pixelsPerMinute }: { pixelsPerMinute: number }) {
+function GenericTasks() {
     const getDraggableClassName = (task: Order) => {
         if (task.id === 'generic-travel') return 'bg-yellow-500 text-black';
         if (task.id === 'generic-work') return 'bg-gray-400 text-white';
@@ -180,7 +203,6 @@ function GenericTasks({ pixelsPerMinute }: { pixelsPerMinute: number }) {
                             key={task.id}
                             order={task}
                             className={getDraggableClassName(task)}
-                            pixelsPerMinute={pixelsPerMinute}
                         />
                     ))}
                 </div>
@@ -189,7 +211,7 @@ function GenericTasks({ pixelsPerMinute }: { pixelsPerMinute: number }) {
     );
 }
 
-function UnassignedTasks({ orders, customers, date, pixelsPerMinute }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date, pixelsPerMinute: number }) {
+function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date }) {
     const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
     const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
     
@@ -213,7 +235,6 @@ function UnassignedTasks({ orders, customers, date, pixelsPerMinute }: { orders:
                                     key={order.id}
                                     order={order}
                                     customer={getCustomerByCode(order.customerCode)}
-                                    pixelsPerMinute={pixelsPerMinute}
                                 />
                             ))}
                             {orders.length === 0 && (
@@ -229,7 +250,7 @@ function UnassignedTasks({ orders, customers, date, pixelsPerMinute }: { orders:
     );
 }
 
-const TimeIndicator = ({ pixelsPerMinute }: { pixelsPerMinute: number }) => {
+const TimeIndicator = () => {
     const [now, setNow] = React.useState<Date | null>(null);
 
     React.useEffect(() => {
@@ -246,7 +267,7 @@ const TimeIndicator = ({ pixelsPerMinute }: { pixelsPerMinute: number }) => {
     if (!isVisible) return null;
     
     const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
-    const leftPosition = minutesFromStart * pixelsPerMinute;
+    const leftPosition = minutesToPixels(minutesFromStart);
 
     return (
         <div
@@ -274,50 +295,11 @@ export function ScheduleView({
   const [isSendingEmail, setIsSendingEmail] = React.useState(false);
 
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
-  const timelineContainerRef = React.useRef<HTMLDivElement>(null);
-  const [pixelsPerMinute, setPixelsPerMinute] = React.useState(1.5);
   
   React.useEffect(() => {
     setIsClient(true);
   }, []);
   
-  React.useEffect(() => {
-    function updatePixelsPerMinute() {
-      if (timelineContainerRef.current) {
-        const containerWidth = timelineContainerRef.current.offsetWidth;
-        const totalMinutes = timelineTotalHours * 60;
-        setPixelsPerMinute(containerWidth / totalMinutes);
-      }
-    }
-
-    updatePixelsPerMinute();
-
-    window.addEventListener('resize', updatePixelsPerMinute);
-    return () => window.removeEventListener('resize', updatePixelsPerMinute);
-  }, []);
-
-  const pixelsToMinutes = (pixels: number) => Math.round(pixels / pixelsPerMinute / 15) * 15;
-
-  const getEventDimensions = React.useCallback((eventStart: Date | string, eventEnd: Date | string) => {
-    const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventStart;
-    const end = typeof eventEnd === 'string' ? parseISO(eventEnd) : eventEnd;
-  
-    if (!start || !end || !isValid(start) || !isValid(end)) {
-      return { left: 0, width: 60 * pixelsPerMinute }; 
-    }
-    
-    const startOfDay = new Date(start);
-    startOfDay.setHours(timelineStartHour, 0, 0, 0);
-  
-    const leftInMinutes = differenceInMinutes(start, startOfDay);
-    const widthInMinutes = differenceInMinutes(end, start);
-  
-    return {
-      left: leftInMinutes * pixelsPerMinute,
-      width: (widthInMinutes > 0 ? widthInMinutes : 30) * pixelsPerMinute, 
-    };
-  }, [pixelsPerMinute]);
-
   React.useEffect(() => {
     if (!rawOrdersData) return;
     
@@ -844,8 +826,8 @@ iCalファイルが添付されていますので、カレンダーに取り込�
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
         <div className="space-y-4">
-            <GenericTasks pixelsPerMinute={pixelsPerMinute} />
-            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} pixelsPerMinute={pixelsPerMinute} />
+            <GenericTasks />
+            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
 
             <Card>
                 <CardHeader>
@@ -855,29 +837,31 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                     <div className="relative">
                       <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
                           <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
-                          <div ref={timelineContainerRef} className="relative h-8 flex-1">
+                          <div className="relative h-8 flex-1">
                               {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                   <div
                                       key={i}
                                       className="absolute h-full border-l"
-                                      style={{ left: `${i * 60 * pixelsPerMinute}px` }}
+                                      style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
                                   >
                                       <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
                                           {timelineStartHour + i}:00
                                       </span>
                                   </div>
                               ))}
+                               {isToday(currentDate) && (
+                                <div 
+                                    className="absolute top-0 h-full pointer-events-none z-40"
+                                    style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                >
+                                    <TimeIndicator />
+                                </div>
+                               )}
                           </div>
                       </div>
                       <div className="relative">
-                         <div 
-                            className="absolute top-0 h-full pointer-events-none z-50"
-                            style={{ left: `${STAFF_COL_WIDTH}px`, right: 0 }}
-                         >
-                            {isToday(currentDate) && <TimeIndicator pixelsPerMinute={pixelsPerMinute} />}
-                         </div>
                         <ScrollArea className="w-full whitespace-nowrap">
-                          <div className="relative mt-2">
+                          <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
                               <div className="relative space-y-2">
                                   {staffData?.map((staff) => {
                                       const events = dailySchedule.filter((e) => e.staffId === staff.id);
@@ -890,8 +874,6 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                                               isOver={currentOverStaffId === staff.id}
                                               onDoubleClickEvent={handleDoubleClickEvent}
                                               onDoubleClickTimeline={handleDoubleClickTimeline}
-                                              pixelsPerMinute={pixelsPerMinute}
-                                              getEventDimensions={getEventDimensions}
                                           />
                                       );
                                   })}
@@ -1029,11 +1011,9 @@ interface StaffRowProps {
   isOver: boolean;
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
-  pixelsPerMinute: number;
-  getEventDimensions: (start: Date | string, end: Date | string) => { left: number; width: number; };
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, pixelsPerMinute, getEventDimensions }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
@@ -1066,7 +1046,6 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
               staff={staff}
               getCustomerByCode={getCustomerByCode}
               onDoubleClick={() => onDoubleClickEvent(event)}
-              getEventDimensions={getEventDimensions}
             />
           ))}
         </div>
@@ -1080,10 +1059,9 @@ interface DraggableEventProps {
   staff: WithId<Staff>;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   onDoubleClick: () => void;
-  getEventDimensions: (start: Date | string, end: Date | string) => { left: number; width: number; };
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, getEventDimensions }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
