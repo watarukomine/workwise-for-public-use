@@ -146,19 +146,24 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     }
   };
   
-  const calculateDuration = (order: any) => {
-    const startTime = parseDate(findKey(order, ['作業開始']));
-    const endTime = parseDate(findKey(order, ['作業完了', '作業終了']));
-    if (startTime && endTime) {
-      const duration = differenceInMinutes(endTime, startTime);
-      return formatDurationFromMinutes(duration);
+  const getFormattedValue = (order: any, header: string) => {
+    const durationKeys = ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間'];
+    if (durationKeys.includes(header)) {
+        const durationMinutes = findKey(order, durationKeys);
+        if (durationMinutes !== undefined && durationMinutes !== '') {
+            return formatDurationFromMinutes(durationMinutes);
+        }
+        return '';
     }
-    const durationMinutes = findKey(order, ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間']);
-    if (durationMinutes) {
-        return formatDurationFromMinutes(durationMinutes);
+
+    const value = order[header];
+    if (headersToFormat[header]) {
+      return headersToFormat[header](value);
     }
-    return '';
+    
+    return value !== undefined && value !== null ? String(value) : '';
   };
+
 
   const headersToFormat: Record<string, (value: any) => string> = {
     '作業予定日': formatDate,
@@ -213,15 +218,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                       className={cn(isAdmin && hasUrl && "cursor-pointer hover:bg-muted/50")}
                     >
                       {headers.map(header => {
-                        let cellContent;
-                        const durationKeys = ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間'];
-                        if (durationKeys.includes(header)) {
-                           cellContent = calculateDuration(order);
-                        } else if (headersToFormat[header]) {
-                          cellContent = headersToFormat[header](order[header]);
-                        } else {
-                          cellContent = order[header] !== undefined && order[header] !== null ? String(order[header]) : '';
-                        }
+                        const cellContent = getFormattedValue(order, header);
                         return <TableCell key={header}>{cellContent}</TableCell>
                       })}
                     </TableRow>
