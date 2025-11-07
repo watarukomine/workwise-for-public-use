@@ -60,7 +60,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 
-const PIXELS_PER_MINUTE = 2.5;
+const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
 const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
