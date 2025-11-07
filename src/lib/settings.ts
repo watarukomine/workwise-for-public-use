@@ -12,7 +12,7 @@
  * スタッフマスターのデータを取得・更新するためのGoogle Apps ScriptのURL。
  * 主に staff-context.tsx や auth.ts で使用されます。
  */
-export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycby9oci_4IH0EgV1rVBWnakqeAIxRlbCPrZ5Og8FGcloUHxTbekzjrA0aawPeZK4lHeN/exec';
+export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbw9Irf9pbEMudtlgmNRyJLDiA03sMVmsR_JqO5OXxNLgOQTC7Fn8SIVJqtEbYs19U84/exec';
 
 /**
  * 顧客情報（販売店情報）を取得・更新するためのGoogle Apps ScriptのURL。
