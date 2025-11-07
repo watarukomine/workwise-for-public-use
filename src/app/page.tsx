@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -27,8 +28,8 @@ export default function DashboardPage() {
   
   const { 
     orders: rawOrders, 
-    scheduleEvents,
     isLoading: isLoadingOrders,
+    scheduleEvents,
   } = useOrder();
   
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -98,7 +99,6 @@ export default function DashboardPage() {
         return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
     });
   }, [scheduleEvents, currentDate]);
-
 
   if (isLoading) {
       return (
