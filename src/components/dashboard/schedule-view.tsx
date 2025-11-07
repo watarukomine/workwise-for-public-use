@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -60,7 +59,6 @@ import {
 } from "@/components/ui/alert-dialog";
 
 
-const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
 const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
@@ -80,37 +78,14 @@ const timeStringToDate = (timeStr: string, baseDate: Date) => {
     return date;
 };
 
-const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
-
-const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
-
-const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
-  const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventStart;
-  const end = typeof eventEnd === 'string' ? parseISO(eventEnd) : eventEnd;
-
-  if (!start || !end || !isValid(start) || !isValid(end)) {
-    return { left: 0, width: minutesToPixels(60) }; 
-  }
-  
-  const startOfDay = new Date(start);
-  startOfDay.setHours(timelineStartHour, 0, 0, 0);
-
-  const leftInMinutes = differenceInMinutes(start, startOfDay);
-  const widthInMinutes = differenceInMinutes(end, start);
-
-  return {
-    left: minutesToPixels(leftInMinutes),
-    width: minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30), 
-  };
-};
-
 interface DraggableOrderProps {
   order: WithId<Order>;
   customer?: WithId<Customer>;
   className?: string;
+  pixelsPerMinute: number;
 }
 
-const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className }) => {
+const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className, pixelsPerMinute }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: `order-${order.id}`,
@@ -121,7 +96,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
     opacity: isDragging ? 0.8 : 1,
-    width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
+    width: `${(order.estimatedDuration || 60) * pixelsPerMinute}px`,
   };
   
   const [line1, line2] = order.taskDetails.split('\n');
@@ -185,7 +160,7 @@ const genericTasks: WithId<Order>[] = [
       { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60 },
 ];
 
-function GenericTasks() {
+function GenericTasks({ pixelsPerMinute }: { pixelsPerMinute: number }) {
     const getDraggableClassName = (task: Order) => {
         if (task.id === 'generic-travel') return 'bg-yellow-500 text-black';
         if (task.id === 'generic-work') return 'bg-gray-400 text-white';
@@ -205,6 +180,7 @@ function GenericTasks() {
                             key={task.id}
                             order={task}
                             className={getDraggableClassName(task)}
+                            pixelsPerMinute={pixelsPerMinute}
                         />
                     ))}
                 </div>
@@ -213,7 +189,7 @@ function GenericTasks() {
     );
 }
 
-function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date }) {
+function UnassignedTasks({ orders, customers, date, pixelsPerMinute }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date, pixelsPerMinute: number }) {
     const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
     const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
     
@@ -237,6 +213,7 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
                                     key={order.id}
                                     order={order}
                                     customer={getCustomerByCode(order.customerCode)}
+                                    pixelsPerMinute={pixelsPerMinute}
                                 />
                             ))}
                             {orders.length === 0 && (
@@ -252,7 +229,7 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     );
 }
 
-const TimeIndicator = () => {
+const TimeIndicator = ({ pixelsPerMinute }: { pixelsPerMinute: number }) => {
     const [now, setNow] = React.useState<Date | null>(null);
 
     React.useEffect(() => {
@@ -269,7 +246,7 @@ const TimeIndicator = () => {
     if (!isVisible) return null;
     
     const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
-    const leftPosition = minutesToPixels(minutesFromStart);
+    const leftPosition = minutesFromStart * pixelsPerMinute;
 
     return (
         <div
@@ -297,11 +274,50 @@ export function ScheduleView({
   const [isSendingEmail, setIsSendingEmail] = React.useState(false);
 
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
+  const timelineContainerRef = React.useRef<HTMLDivElement>(null);
+  const [pixelsPerMinute, setPixelsPerMinute] = React.useState(1.5);
   
   React.useEffect(() => {
     setIsClient(true);
   }, []);
   
+  React.useEffect(() => {
+    function updatePixelsPerMinute() {
+      if (timelineContainerRef.current) {
+        const containerWidth = timelineContainerRef.current.offsetWidth;
+        const totalMinutes = timelineTotalHours * 60;
+        setPixelsPerMinute(containerWidth / totalMinutes);
+      }
+    }
+
+    updatePixelsPerMinute();
+
+    window.addEventListener('resize', updatePixelsPerMinute);
+    return () => window.removeEventListener('resize', updatePixelsPerMinute);
+  }, []);
+
+  const pixelsToMinutes = (pixels: number) => Math.round(pixels / pixelsPerMinute / 15) * 15;
+
+  const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
+    const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventStart;
+    const end = typeof eventEnd === 'string' ? parseISO(eventEnd) : eventEnd;
+  
+    if (!start || !end || !isValid(start) || !isValid(end)) {
+      return { left: 0, width: 60 * pixelsPerMinute }; 
+    }
+    
+    const startOfDay = new Date(start);
+    startOfDay.setHours(timelineStartHour, 0, 0, 0);
+  
+    const leftInMinutes = differenceInMinutes(start, startOfDay);
+    const widthInMinutes = differenceInMinutes(end, start);
+  
+    return {
+      left: leftInMinutes * pixelsPerMinute,
+      width: (widthInMinutes > 0 ? widthInMinutes : 30) * pixelsPerMinute, 
+    };
+  };
+
   React.useEffect(() => {
     if (!rawOrdersData) return;
     
@@ -445,74 +461,73 @@ export function ScheduleView({
         const isStaffChange = draggedEvent.staffId !== newStaffId;
         const customer = getCustomerByCode(draggedEvent.locationId);
 
-        let optimisticEvents = [...originalEvents];
+        let optimisticEvents = originalEvents;
 
         // Optimistic UI update
         if (draggedEvent.tripId) {
-            const eventsToMove = optimisticEvents.filter(e => e.tripId === draggedEvent.tripId);
-            const taskEventInTrip = eventsToMove.find(e => e.id.endsWith('-task'));
-            if (!taskEventInTrip) return;
-
-            const taskDuration = differenceInMinutes(parseISO(taskEventInTrip.end as string), parseISO(taskEventInTrip.start as string));
-            const travelDuration = eventsToMove.find(e => e.id.endsWith('-travel')) ? differenceInMinutes(parseISO(eventsToMove.find(e => e.id.endsWith('-travel'))!.end as string), parseISO(eventsToMove.find(e => e.id.endsWith('-travel'))!.start as string)) : TRAVEL_TIME_MINUTES;
-
-            let newTaskStart = newStart;
-            if (draggedEvent.id.endsWith('-travel')) {
-                newTaskStart = addMinutes(newStart, travelDuration);
-            }
-            const newTravelStart = subMinutes(newTaskStart, travelDuration);
-
-            optimisticEvents = optimisticEvents.map(e => {
-                if (e.tripId === draggedEvent.tripId) {
-                    if (e.id.endsWith('-task')) {
-                        return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: addMinutes(newTaskStart, taskDuration).toISOString() };
+            const taskDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+            const newEnd = addMinutes(newStart, taskDuration);
+            optimisticEvents = originalEvents.map(e => {
+                if (e.id === draggedEvent.id) {
+                    return { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
+                }
+                if (e.tripId === draggedEvent.tripId && e.id !== draggedEvent.id) {
+                    const isTask = e.id.endsWith('-task');
+                    const isTravel = e.id.endsWith('-travel');
+                    let updatedEvent = { ...e, staffId: newStaffId };
+                    
+                    if(draggedEvent.id.endsWith('-task') && isTravel) {
+                       updatedEvent.start = subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString();
+                       updatedEvent.end = newStart.toISOString();
+                    } else if (draggedEvent.id.endsWith('-travel') && isTask) {
+                       updatedEvent.start = addMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString();
+                       updatedEvent.end = addMinutes(newStart, TRAVEL_TIME_MINUTES + taskDuration).toISOString();
                     }
-                    if (e.id.endsWith('-travel')) {
-                        return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-                    }
+                    return updatedEvent;
                 }
                 return e;
             });
-
         } else { // Generic event
-            const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-            optimisticEvents = optimisticEvents.map(e => e.id === draggedEvent.id ? {...e, staffId: newStaffId, start: newStart.toISOString(), end: addMinutes(newStart, duration).toISOString()} : e);
+          const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+          const newEnd = addMinutes(newStart, duration);
+          optimisticEvents = originalEvents.map(e => e.id === draggedEvent.id ? {...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString()} : e);
         }
         setScheduleEvents(optimisticEvents);
+
 
         // Background Sync
         (async () => {
           try {
               if (draggedEvent.tripId) {
-                  const originalTask = originalEvents.find(e => e.tripId === draggedEvent.tripId && e.id.endsWith('-task'))!;
-                  let newTaskStart = newStart;
-                  if (draggedEvent.id.endsWith('-travel')) {
-                      const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                      newTaskStart = addMinutes(newStart, travelDuration);
-                  }
-                  
-                  // This will handle both staff and time change.
-                  await updateSheetStatus({
-                      gasUrl: ORDER_GAS_URL,
-                      eventTitle: `(ID: ${originalTask.rawOrderId})`,
-                      scheduledTime: newTaskStart.toISOString(),
-                      staffName: newStaff.name,
-                      statusValue: '作業待ち',
-                      timestamp: new Date().toISOString(),
-                  });
-                  
-                  // If staff changed, old calendar events need to be deleted.
-                  if (isStaffChange) {
-                      const originalTripEvents = originalEvents.filter(e => e.tripId === draggedEvent.tripId);
-                      if(oldStaff.calendarId) {
-                          for (const event of originalTripEvents) {
-                              if(event.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: event.calendarEventId });
-                          }
-                      }
-                  }
-                  
-                  await refetchOrders();
-              } else { // Generic Event (no sheet dependency)
+                const originalTripEvents = originalEvents.filter(e => e.tripId === draggedEvent.tripId);
+                const originalTask = originalTripEvents.find(e => e.id.endsWith('-task'))!;
+                const originalTravel = originalTripEvents.find(e => e.id.endsWith('-travel'));
+                
+                let newTaskStart = newStart;
+                if (draggedEvent.id.endsWith('-travel')) {
+                  const travelDuration = originalTravel ? differenceInMinutes(parseISO(originalTravel.end as string), parseISO(originalTravel.start as string)) : TRAVEL_TIME_MINUTES;
+                  newTaskStart = addMinutes(newStart, travelDuration);
+                }
+
+                await updateSheetStatus({
+                    gasUrl: ORDER_GAS_URL,
+                    eventTitle: `(ID: ${originalTask.rawOrderId})`,
+                    scheduledTime: newTaskStart.toISOString(),
+                    staffName: newStaff.name,
+                    statusValue: '作業待ち',
+                    timestamp: new Date().toISOString(),
+                });
+
+                if (isStaffChange) {
+                    if (oldStaff.calendarId) {
+                        if (originalTask.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: originalTask.calendarEventId });
+                        if (originalTravel?.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: originalTravel.calendarEventId });
+                    }
+                    // Re-fetching will create new calendar events if needed.
+                    await refetchOrders();
+                }
+
+              } else { // Generic Event
                  const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                  const newEnd = addMinutes(newStart, duration);
                  if (isStaffChange) {
@@ -521,10 +536,8 @@ export function ScheduleView({
                        const result = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: newStaff.calendarId, title: draggedEvent.title, description: draggedEvent.description, startTime: newStart.toISOString(), endTime: newEnd.toISOString()});
                        setScheduleEvents(prev => prev.map(e => e.id === draggedEvent.id ? {...e, calendarEventId: result.eventId} : e));
                     }
-                 } else { // Just time change
-                    if(newStaff.calendarId && draggedEvent.calendarEventId) {
-                        await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: draggedEvent.calendarEventId, startTime: newStart.toISOString(), endTime: newEnd.toISOString()});
-                    }
+                 } else {
+                    if(newStaff.calendarId && draggedEvent.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: draggedEvent.calendarEventId, startTime: newStart.toISOString(), endTime: newEnd.toISOString()});
                  }
               }
 
@@ -560,25 +573,29 @@ export function ScheduleView({
           try {
               if (isGeneric) {
                   const newEventEnd = addMinutes(taskStart, order.estimatedDuration);
-                  const result = await handleCalendarEvent({ 
-                      gasUrl: ORDER_GAS_URL,
-                      operation: 'create', 
-                      calendarId: staff.calendarId, 
-                      title: order.taskDetails, 
-                      startTime: taskStart.toISOString(), 
-                      endTime: newEventEnd.toISOString() 
-                  });
+                  const result = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: order.taskDetails, startTime: taskStart.toISOString(), endTime: newEventEnd.toISOString() });
                   if (result.status === 'error') throw new Error(result.message);
                   const newEvent: WithId<ScheduleEvent> = { id: `event-${Date.now()}`, title: order.taskDetails, staffId: newStaffId, start: taskStart.toISOString(), end: newEventEnd.toISOString(), calendarEventId: result.eventId };
                   setScheduleEvents(prev => [...prev, newEvent]);
               } else {
-                await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
+                const taskEnd = addMinutes(taskStart, order.estimatedDuration);
+                const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+                const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
+                const travelResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
+                const taskTitle = order.taskDetails;
+                const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
+                const taskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
+                if (taskResult.status === 'error' || travelResult.status === 'error') throw new Error(taskResult.message || travelResult.message);
+                await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString(), taskCalendarEventId: taskResult.eventId, travelCalendarEventId: travelResult.eventId });
+                const tripId = `trip-${order.rawOrderId}`;
+                const travelEvent: WithId<ScheduleEvent> = { id: `${tripId}-travel`, tripId, title: travelTitle, staffId: newStaffId, start: travelStart.toISOString(), end: taskStart.toISOString(), rawOrderId: order.rawOrderId, calendarEventId: travelResult.eventId };
+                const taskEvent: WithId<ScheduleEvent> = { id: `${tripId}-task`, tripId, orderId: order.id, rawOrderId: order.rawOrderId, title: taskTitle, staffId: newStaffId, locationId: order.customerCode, start: taskStart.toISOString(), end: taskEnd.toISOString(), calendarEventId: taskResult.eventId, description: taskDescription };
+                setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
                 toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
-                await refetchOrders(); // Refetch to get new calendar event IDs
               }
           } catch (e: any) {
                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-               setUnassignedOrders(originalUnassigned); // Revert on failure
+               setUnassignedOrders(originalUnassigned);
           }
         })();
     }
@@ -827,8 +844,8 @@ iCalファイルが添付されていますので、カレンダーに取り込�
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
         <div className="space-y-4">
-            <GenericTasks />
-            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+            <GenericTasks pixelsPerMinute={pixelsPerMinute} />
+            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} pixelsPerMinute={pixelsPerMinute} />
 
             <Card>
                 <CardHeader>
@@ -838,12 +855,12 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                     <div className="relative">
                       <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
                           <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
-                          <div className="relative h-8 flex-1">
+                          <div ref={timelineContainerRef} className="relative h-8 flex-1">
                               {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                   <div
                                       key={i}
                                       className="absolute h-full border-l"
-                                      style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                      style={{ left: `${i * 60 * pixelsPerMinute}px` }}
                                   >
                                       <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
                                           {timelineStartHour + i}:00
@@ -853,16 +870,14 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                           </div>
                       </div>
                       <div className="relative">
-                         {isToday(currentDate) && (
-                            <div 
-                                className="absolute top-0 h-full pointer-events-none z-50"
-                                style={{ left: `${STAFF_COL_WIDTH}px`, right: 0 }}
-                            >
-                                <TimeIndicator />
-                            </div>
-                         )}
+                         <div 
+                            className="absolute top-0 h-full pointer-events-none z-50"
+                            style={{ left: `${STAFF_COL_WIDTH}px`, right: 0 }}
+                         >
+                            {isToday(currentDate) && <TimeIndicator pixelsPerMinute={pixelsPerMinute} />}
+                         </div>
                         <ScrollArea className="w-full whitespace-nowrap">
-                          <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
+                          <div className="relative mt-2" style={{ width: `calc(100% - ${STAFF_COL_WIDTH}px)`}}>
                               <div className="relative space-y-2">
                                   {staffData?.map((staff) => {
                                       const events = dailySchedule.filter((e) => e.staffId === staff.id);
@@ -875,6 +890,8 @@ iCalファイルが添付されていますので、カレンダーに取り込�
                                               isOver={currentOverStaffId === staff.id}
                                               onDoubleClickEvent={handleDoubleClickEvent}
                                               onDoubleClickTimeline={handleDoubleClickTimeline}
+                                              pixelsPerMinute={pixelsPerMinute}
+                                              getEventDimensions={getEventDimensions}
                                           />
                                       );
                                   })}
@@ -1012,9 +1029,11 @@ interface StaffRowProps {
   isOver: boolean;
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
+  pixelsPerMinute: number;
+  getEventDimensions: (start: Date | string, end: Date | string) => { left: number; width: number; };
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, pixelsPerMinute, getEventDimensions }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
@@ -1047,6 +1066,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
               staff={staff}
               getCustomerByCode={getCustomerByCode}
               onDoubleClick={() => onDoubleClickEvent(event)}
+              getEventDimensions={getEventDimensions}
             />
           ))}
         </div>
@@ -1060,9 +1080,10 @@ interface DraggableEventProps {
   staff: WithId<Staff>;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   onDoubleClick: () => void;
+  getEventDimensions: (start: Date | string, end: Date | string) => { left: number; width: number; };
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, getEventDimensions }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
