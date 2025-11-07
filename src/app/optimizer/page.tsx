@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
+import { findKey } from '@/lib/utils';
 
 
 function OptimizerPageContent() {
@@ -35,15 +36,55 @@ function OptimizerPageContent() {
     return allStaff.filter(s => selectedIds.has(s.id));
   }, [appliedSelectedStaffIds, allStaff, isStaffLoading]);
   
-  const statuses = React.useMemo(() => {
-    return filteredStaff.map((staff, index) => ({
-        staffId: staff.id,
-        status: '待機中' as const,
-        lastAction: '現在地で待機中',
-        latitude: 35.45 + (index * 0.01), // Demo latitude
-        longitude: 139.63 + (index * 0.01), // Demo longitude
-    }));
-  }, [filteredStaff]);
+  const statuses: StaffStatus[] = React.useMemo(() => {
+    if (!filteredStaff.length || !rawOrders.length) {
+        return filteredStaff.map(sf => ({
+            staffId: sf.id,
+            status: '待機中',
+            lastAction: '現在地情報なし',
+        }));
+    }
+
+    const staffStatusMap = new Map<string, StaffStatus>();
+
+    // Initialize with default status
+    for (const staff of filteredStaff) {
+        staffStatusMap.set(staff.id, {
+            staffId: staff.id,
+            status: '待機中',
+            lastAction: '現在地情報なし',
+        });
+    }
+
+    // Process orders to find the latest status for each staff member
+    for (const order of rawOrders) {
+        const staffName = findKey(order, ['担当']);
+        const staffMember = allStaff.find(s => s.name === staffName);
+        if (!staffMember || !staffStatusMap.has(staffMember.id)) continue;
+
+        const lastUpdateStr = findKey(order, ['最終更新日時']);
+        const lastUpdate = lastUpdateStr ? new Date(lastUpdateStr) : new Date(0);
+
+        const currentStatus = staffStatusMap.get(staffMember.id)!;
+        const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
+
+        if (lastUpdate.getTime() >= currentUpdate.getTime()) {
+            const locationStr: string = findKey(order, ['最終位置情報（緯度,経度）']) || '';
+            const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
+            
+            staffStatusMap.set(staffMember.id, {
+                staffId: staffMember.id,
+                status: findKey(order, ['受注ステータス']) || '待機中',
+                lastAction: `[${findKey(order, ['受注 ID', 'id'])}] ${findKey(order, ['受注ステータス'])}`,
+                latitude: !isNaN(lat) ? lat : undefined,
+                longitude: !isNaN(lon) ? lon : undefined,
+                lastUpdate: lastUpdate.toISOString(),
+            });
+        }
+    }
+    
+    return Array.from(staffStatusMap.values());
+  }, [filteredStaff, rawOrders, allStaff]);
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
     setOptimizedRoute(data);
