@@ -29,7 +29,6 @@ export default function DashboardPage() {
   const { 
     orders: rawOrders, 
     isLoading: isLoadingOrders,
-    scheduleEvents,
   } = useOrder();
   
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -38,7 +37,7 @@ export default function DashboardPage() {
   const { forceMobileView, setForceMobileView } = useAppShell();
   
   const filteredStaff = React.useMemo(() => {
-    if (isProfileLoading || isStaffLoading || !profile) return [];
+    if (isProfileLoading || isStaffLoading || !profile || !allStaff) return [];
 
     const staffToUse = allStaff;
 
@@ -72,7 +71,7 @@ export default function DashboardPage() {
   }, [filteredStaff]);
 
   const selectedStaffNames = React.useMemo(() => {
-    if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
+    if (!allStaff || profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
       return null;
     }
     const staffToUse = allStaff;
@@ -91,14 +90,6 @@ export default function DashboardPage() {
           return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
       });
   };
-
-  const dailySchedule = React.useMemo(() => {
-    if (!scheduleEvents) return [];
-    return scheduleEvents.filter(event => {
-        const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-        return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-    });
-  }, [scheduleEvents, currentDate]);
 
   if (isLoading) {
       return (
@@ -171,7 +162,7 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         {showVerticalView ? (
             <VerticalScheduleView 
-                scheduleData={dailySchedule}
+                scheduleData={[]} // This view is not fully implemented with new data flow
                 staffData={filteredStaff}
             />
         ) : (
