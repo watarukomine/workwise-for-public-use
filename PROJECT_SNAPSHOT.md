@@ -452,10 +452,10 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
 
-  const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
-  const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
+  const [dialogState, setDialogState] = React.useState({ mode: 'closed' });
+  const [editedEventDetails, setEditedEventDetails] = React.useState({ title: '', description: '', startTime: '', endTime: '' });
   
-  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
+  const [unassignedOrders, setUnassignedOrders] = React.useState([]);
   
   React.useEffect(() => {
     if (!rawOrdersData) return;
@@ -479,8 +479,8 @@ export function ScheduleView({
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
-  const [activeItem, setActiveItem] = React.useState<any | null>(null);
-  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
+  const [activeItem, setActiveItem] = React.useState(null);
+  const [currentOverStaffId, setCurrentOverStaffId] = React.useState(null);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActiveItem(event.active.data.current);
@@ -799,14 +799,6 @@ export function ScheduleView({
 
   const { event, staff, customer, title } = getDialogDetails();
 
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleData) return [];
-      return scheduleData.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isToday(eventDate);
-      });
-  }, [scheduleData]);
-
   if (!isClient) {
     return (
       <Card>
@@ -815,8 +807,7 @@ export function ScheduleView({
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
         </CardHeader>
         <CardContent>
-           <div className="flex items-center justify-center h-64">
-             <p>Loading schedule...</p>
+           Loading schedule...</p>
            </div>
         </CardContent>
       </Card>
@@ -825,37 +816,60 @@ export function ScheduleView({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
-      <TooltipProvider>
-        <div className="space-y-4">
-            <GenericTasks />
-            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
+        
+            
+                
+                    汎用タスク
+                
+                
+                             
+                                                   
+                                                            
+                                                                 
+                                                            
+                                                    
+                            
+                
+            
+            
+                
+                    本日の受注タスク
+                    下のタイムラインにタスクをドラッグして割り当てます。タイムラインからここに戻すと未割り当てになります。
+                
+                
+                             
+                                                            
+                                                                   
+                                                                          
+                                                                                 
+                                                                           
+                                                                    
+                                                            
+                                                            
+                                                                本日の未割り当てオーダーはありません。
+                                                            
+                                                     
+                            
+                
+            
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>タイムライン</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                    <div className="relative">
-                      <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                          <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
-                          <div className="relative h-8 flex-1">
-                              {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                  <div
-                                      key={i}
-                                      className="absolute h-full border-l"
-                                      style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                  >
-                                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+            
+                
+                    タイムライン
+                
+                
+                     
+                          
+                              
+                                      
                                           {timelineStartHour + i}:00
-                                      </span>
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
-                      <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="relative mt-2 space-y-2">
+                                      
+                               
+                           
+                      
+                        
                             {staffData?.map((staff) => {
-                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                const events = scheduleData.filter((e) => e.staffId === staff.id);
                                 return (
                                     <StaffRow
                                         key={staff.id}
@@ -868,93 +882,80 @@ export function ScheduleView({
                                     />
                                 );
                             })}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
+                        
+                      
+                    
+                
+            
+        
       
-      <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
-          <DialogContent>
-              <DialogHeader>
-                  <DialogTitle>{title}</DialogTitle>
-                  <DialogDescription>
-                      {dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}
-                  </DialogDescription>
-              </DialogHeader>
-      
-              <div className="grid gap-4 py-4">
-                      {dialogState.mode === 'edit' && (
-                          <div className="text-sm space-y-1">
-                              <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
-                              {customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}
-                          </div>
-                      )}
-                       {dialogState.mode === 'new' && (
-                          <div className="text-sm">
-                              <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
-                          </div>
-                      )}
-                      <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="title" className="text-right">タスク名</Label>
-                          <Input
-                              id="title"
-                              value={editedEventDetails.title}
-                              onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))}
-                              className="col-span-3"
-                              placeholder="例：定期メンテナンス"
-                          />
-                      </div>
-                       <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="description" className="text-right">詳細</Label>
-                          <Textarea
-                              id="description"
-                              value={editedEventDetails.description}
-                              onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))}
-                              className="col-span-3"
-                              placeholder="予定の詳細やメモ"
-                          />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                          <div className="col-span-2 grid gap-2">
-                              <Label htmlFor="start-time">開始時間</Label>
-                              <Input
-                                  id="start-time"
-                                  type="time"
-                                  value={editedEventDetails.startTime}
-                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}
-                              />
-                          </div>
-                          <div className="col-span-2 grid gap-2">
-                              <Label htmlFor="end-time">終了時間</Label>
-                              <Input
-                                  id="end-time"
-                                  type="time"
-                                  value={editedEventDetails.endTime}
-                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}
-                              />
-                          </div>
-                      </div>
-                  </div>
-      
-                  <DialogFooter className="sm:justify-between">
-                      <div className="flex gap-2">
+       
+            
+                
+                    {title}
+                    {dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}
+                
+        
+               
                           {dialogState.mode === 'edit' && (
-                              <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
+                              
+                                   {staff?.name}
+                                  {customer && 顧客: {customer?.storeName || 'N/A'}}
+                              
                           )}
-                      </div>
-                      <div className="flex gap-2 mt-4 sm:mt-0">
-                          <DialogClose asChild>
-                              <Button variant="ghost">キャンセル</Button>
-                          </DialogClose>
-                          <Button onClick={handleSaveEvent}>保存</Button>
-                      </div>
-                  </DialogFooter>
-              </DialogContent>
-          </Dialog>
-      </TooltipProvider>
-    </DndContext>
+                           {dialogState.mode === 'new' && (
+                              
+                                   {staff?.name}
+                              
+                          )}
+                          
+                                  タスク名
+                                  
+                                      title}
+                                      onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))}
+                                      placeholder="例：定期メンテナンス"
+                                  
+                              
+                                  詳細
+                                  
+                                      description}
+                                      onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))}
+                                      placeholder="予定の詳細やメモ"
+                                  
+                              
+                                  
+                                      開始時間
+                                      
+                                          startTime}
+                                          onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}
+                                      
+                                  
+                                  
+                                      終了時間
+                                      
+                                          endTime}
+                                          onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}
+                                      
+                                  
+                              
+                          
+                      
+      
+                      
+                          {dialogState.mode === 'edit' && (
+                               削除
+                          )}
+                          
+                              
+                                  キャンセル
+                              
+                                  保存
+                          
+                      
+                  
+            
+        
+    
   );
 }
 
@@ -978,34 +979,31 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
-        <div className="font-semibold flex items-center gap-2 w-full">
-          <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
-          <span className='truncate flex-1'>{staff.name}</span>
-        </div>
-      </div>
-      <div 
-        id={`staff-row-${staff.id}`}
-        ref={setNodeRef} 
-        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
-        onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
+    
+      
+         
+            
+              
+                {staff.name}
+            
+          
+         
+        
+          {onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
-        <div className="h-full border-t border-b"></div>
-        <div className="absolute top-0 left-0 h-full">
-          {events.map((event) => (
-            <DraggableEvent
-              key={event.id}
-              event={event}
-              staff={staff}
-              getCustomerByCode={getCustomerByCode}
-              onDoubleClick={() => onDoubleClickEvent(event)}
-            />
-          ))}
-        </div>
-      </div>
-    </div>
+        
+        
+           
+                event={event}
+                staff={staff}
+                getCustomerByCode={getCustomerByCode}
+                onDoubleClick={() => onDoubleClickEvent(event)}
+              />
+           
+        
+      
+    
   )
 };
 
@@ -1045,7 +1043,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   if (isTravelEvent) {
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+       const match = backgroundColor.match(/hsl((\d+),\s*(\d+)%,\s*(\d+)%)/);
        if (match) {
          backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
        }
@@ -1069,38 +1067,32 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-        onDoubleClick={handleDoubleClick}
-        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
-        data-event-chip="true"
-      >
-        <div
-          className="w-full h-full rounded-md flex flex-col justify-center p-1"
-          style={{ backgroundColor, color }}
+    
+      
+        
+          {handleDoubleClick(e)}
+          data-event-chip="true"
         >
-          <p className="text-xs font-semibold truncate pointer-events-none">
-            {line1}
-          </p>
-          {line2 && (
-            <p className="text-xs opacity-80 truncate pointer-events-none">
-                {line2}
-            </p>
-          )}
-        </div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
-        {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
-        <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
-        <p className="text-sm">担当: {staff.name}</p>
-        {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
-      </TooltipContent>
-    </Tooltip>
+          
+             
+                {line1}
+            
+            {line2 && (
+               {line2}
+            )}
+          
+        
+      
+       
+        
+            {tooltipTitle || '未定のタスク'}
+           {customer && 顧客: {customer?.storeName || '未定'}}
+           時間: {formatTime(event.start)} - {formatTime(event.end)}
+           担当: {staff.name}
+          {event.description && {event.description}}
+        
+      
+    
   );
 };
 ```
@@ -1113,6 +1105,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 'use client';
 
 import * as React from 'react';
+import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -1129,11 +1122,11 @@ import { useSearchParams } from 'next/navigation';
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
 type StatusValue = StaffStatus['status'];
 
-export default function CheckInPage() {
-  const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
-  const [location, setLocation] = React.useState<{ latitude: number; longitude: number } | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [lastAction, setLastAction] = React.useState<{ action: ActionType; time: string } | null>(null);
+function CheckInClient() {
+  const [isLoading, setIsLoading] = React.useState(null);
+  const [location, setLocation] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const [lastAction, setLastAction] = React.useState(null);
   const [message, setMessage] = React.useState('');
   const { toast } = useToast();
   const { profile } = useUserProfile();
@@ -1306,641 +1299,101 @@ export default function CheckInPage() {
   ];
 
   return (
-    <div className="max-w-md mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>勤怠・作業記録</CardTitle>
-          <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {actionButtons.map(({ action, label, icon: Icon }) => (
-              <Button
-                key={action}
-                size="lg"
-                className={cn(
-                  "h-20 text-base flex-col",
-                  action === 'Wait' && "col-span-2"
-                )}
-                onClick={() => handleAction(action)}
-                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Send Message', 'Wait'].includes(action))}
-              >
-                {isLoading === action ? (
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                ) : (
-                  <>
-                    <Icon className="h-6 w-6 mb-1" />
-                    {label}
-                  </>
-                )}
-              </Button>
-            ))}
-          </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>エラー</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+    
+      
+        
           
-          {!orderId && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>オーダーが選択されていません</AlertTitle>
-              <AlertDescription>
-                勤怠以外の記録を行うには、スケジュール画面からタスクを選択してください。
-              </AlertDescription>
-            </Alert>
-          )}
+            勤怠・作業記録
+            現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}
+          
+          
+            
+              {actionButtons.map(({ action, label, icon: Icon }) => (
+                
+                  {action === 'Wait' && "col-span-2"}
+                  onClick={() => handleAction(action)}
+                  disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Send Message', 'Wait'].includes(action))}
+                >
+                  {isLoading === action ? (
+                    
+                  ) : (
+                    <>
+                      
+                      {label}
+                    </>
+                  )}
+                
+              ))}
+            
 
-          {lastAction && (
-             <Alert>
-              <MapPin className="h-4 w-4" />
-              <AlertTitle>最後の記録</AlertTitle>
-              <AlertDescription>
-                {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
-                {location && !['Clock In', 'Clock Out', 'Send Message'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-
-       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            管理者へ連絡
-          </CardTitle>
-          <CardDescription>緊急の連絡や報告がある場合に使用してください。</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="メッセージを入力..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            disabled={isLoading === 'Send Message'}
-          />
-          <Button
-            className="w-full"
-            onClick={() => handleAction('Send Message')}
-            disabled={!!isLoading}
-          >
-            {isLoading === 'Send Message' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4 mr-2" />
+            {error && (
+              
+                
+                  エラー
+                
+                {error}
+              
             )}
-            メッセージ送信
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+            
+            {!orderId && (
+              
+                
+                  オーダーが選択されていません
+                
+                勤怠以外の記録を行うには、スケジュール画面からタスクを選択してください。
+              
+            )}
+
+            {lastAction && (
+               
+                
+                  最後の記録
+                
+                 @ {lastAction.time}
+                {location && !['Clock In', 'Clock Out', 'Send Message'].includes(lastAction.action) && ({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})}
+              
+            )}
+          
+        
+      
+
+       
+        
+          
+             
+              管理者へ連絡
+            
+            緊急の連絡や報告がある場合に使用してください。
+          
+          
+            
+              placeholder="メッセージを入力..."
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              disabled={isLoading === 'Send Message'}
+            />
+            
+              {isLoading === 'Send Message' ? (
+                
+              ) : (
+                
+              )}
+              メッセージ送信
+            
+          
+        
+      
+    
   );
 }
-```
-
----
-
-## Google Apps Script (GAS)
-
-```javascript
-// ↓↓↓↓【要設定】↓↓↓↓
-// スプレッドシートのID（URLの .../d/【この部分】/edit...）を貼り付けてください
-const SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
-// データを読み書きするシート名を正確に入力してください
-const SHEET_NAME = "受注管理"; 
-// ↓↓↓↓【設定はここまで】↓↓↓↓
-
-/**
- * GET リクエストを処理し、スプレッドシートのデータを JSON で返します
- */
-function doGet(e) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    if (!sheet) throw new Error(`シート '${SHEET_NAME}' が見つかりません。`);
-    
-    const dataRange = sheet.getDataRange();
-    const values = dataRange.getValues();
-    
-    if (values.length < 1) {
-       return ContentService.createTextOutput(JSON.stringify({ data: [] })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    const headers = values.shift();
-    const sheetId = sheet.getSheetId();
-    const spreadsheetId = sheet.getParent().getId();
-
-    const data = values.map((row, rowIndex) => {
-      const obj = {};
-      headers.forEach((header, index) => {
-        obj[header] = (row[index] instanceof Date) ? row[index].toISOString() : row[index];
-      });
-      obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowIndex + 2}`;
-      return obj;
-    });
-
-    return ContentService.createTextOutput(JSON.stringify({ data: data })).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * POST リクエストを処理し、スプレッドシートを更新します
- */
-function doPost(e) {
-  try {
-    console.log("doPost Request received:", JSON.stringify(e));
-    
-    let params;
-    if (e.postData && e.postData.type === "application/json") {
-      try {
-        params = JSON.parse(e.postData.contents);
-        console.log("JSON data parsed:", JSON.stringify(params));
-      } catch (parseError) {
-        console.error("JSON parse error:", parseError.message);
-        return ContentService.createTextOutput(JSON.stringify({
-          status: "error",
-          message: "JSONデータの解析に失敗しました: " + parseError.message
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-    } else {
-      console.error("No JSON data received in request");
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "error",
-        message: "リクエストにJSONデータがありません"
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    if (params.operation) {
-      return handleCalendarEvent(params);
-    } else if (params.eventTitle) {
-      return updateSheetWithOrderInfo(params);
-    } else {
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "error",
-        message: "必要なパラメータ (operation または eventTitle) がありません"
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-  } catch (error) {
-    console.error("Error in doPost:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: "エラーが発生しました: " + error.message
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * 受注IDでシートを検索し、指定された情報で更新する
- */
-function updateSheetWithOrderInfo(params) {
-  const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp } = params;
-  try {
-    console.log("Updating sheet with:", JSON.stringify(params));
-    
-    const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
-    if (!match || !match[1]) {
-      return ContentService.createTextOutput(JSON.stringify({ 
-        status: "success", 
-        message: "汎用タスクのためシート更新はスキップされました。" 
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    const orderId = match[1];
-    console.log("Extracted order ID:", orderId);
-
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    if (!sheet) throw new Error(`シート「${SHEET_NAME}」が見つかりません。`);
-
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    
-    // 更新対象の列インデックスを取得
-    const colIdx = {
-      orderId: headers.indexOf("受注ID"),
-      staffName: headers.indexOf("担当"),
-      status: headers.indexOf("受注ステータス"),
-      lastUpdate: headers.indexOf("最終更新日時"),
-      lastLocation: headers.indexOf("最終位置情報（緯度,経度）"),
-      startTravel: headers.indexOf("移動開始"),
-      arrive: headers.indexOf("現場到着"),
-      startWork: headers.indexOf("作業開始"),
-      finishWork: headers.indexOf("作業終了")
-    };
-
-    if (colIdx.orderId === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
-    
-    // 対象の行を検索
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][colIdx.orderId]) === String(orderId)) {
-        const rowNum = i + 1;
-        console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
-        
-        // 各列の更新
-        if (colIdx.staffName !== -1 && staffName !== undefined) {
-          sheet.getRange(rowNum, colIdx.staffName + 1).setValue(staffName || "");
-        }
-        if (colIdx.status !== -1 && statusValue !== undefined) {
-          sheet.getRange(rowNum, colIdx.status + 1).setValue(statusValue || "");
-        }
-        if (colIdx.lastUpdate !== -1 && timestamp) {
-          sheet.getRange(rowNum, colIdx.lastUpdate + 1).setValue(new Date(timestamp));
-        }
-        if (colIdx.lastLocation !== -1 && latitude !== undefined && longitude !== undefined) {
-          sheet.getRange(rowNum, colIdx.lastLocation + 1).setValue(`${latitude}, ${longitude}`);
-        }
-
-        // アクション別のタイムスタンプを更新
-        if (actionType && actionTimestamp) {
-            const dateValue = new Date(actionTimestamp);
-            switch (actionType) {
-                case 'Start Travel':
-                    if (colIdx.startTravel !== -1) sheet.getRange(rowNum, colIdx.startTravel + 1).setValue(dateValue);
-                    break;
-                case 'Arrive':
-                    if (colIdx.arrive !== -1) sheet.getRange(rowNum, colIdx.arrive + 1).setValue(dateValue);
-                    break;
-                case 'Begin Task':
-                    if (colIdx.startWork !== -1) sheet.getRange(rowNum, colIdx.startWork + 1).setValue(dateValue);
-                    break;
-                case 'Finish Task':
-                    if (colIdx.finishWork !== -1) sheet.getRange(rowNum, colIdx.finishWork + 1).setValue(dateValue);
-                    break;
-            }
-        }
-        
-        return ContentService.createTextOutput(JSON.stringify({
-          status: "success",
-          message: `受注ID: ${orderId} を更新しました。`,
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-    }
-    
-    throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
-    
-  } catch (error) {
-    console.error("Error in updateSheetWithOrderInfo:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: error.message
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-
-/**
- * カレンダーイベントを作成・更新・削除する
- */
-function handleCalendarEvent(params) {
-  try {
-    console.log("handleCalendarEvent called with:", JSON.stringify(params));
-    
-    const { operation, calendarId, eventId, title, description, startTime, endTime } = params;
-    
-    if (!operation || !calendarId) {
-      throw new Error("必須パラメータ 'operation' または 'calendarId' がありません");
-    }
-    
-    const calendar = CalendarApp.getCalendarById(calendarId);
-    if (!calendar) throw new Error(`カレンダーID「${calendarId}」が見つからないか、アクセス権がありません。`);
-
-    let result = {};
-    
-    switch (operation) {
-      case 'create':
-        if (!title || !startTime || !endTime) throw new Error("予定の作成には title, startTime, endTime が必要です。");
-        const newEvent = calendar.createEvent(title, new Date(startTime), new Date(endTime), { description: description || '' });
-        result = { status: "success", message: "カレンダーに予定を作成しました。", eventId: newEvent.getId() };
-        break;
-        
-      case 'update':
-        if (!eventId) throw new Error("予定の更新には eventId が必要です。");
-        const eventToUpdate = calendar.getEventById(eventId);
-        if (!eventToUpdate) throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        if (title) eventToUpdate.setTitle(title);
-        if (startTime && endTime) eventToUpdate.setTime(new Date(startTime), new Date(endTime));
-        if (description !== undefined) eventToUpdate.setDescription(description || "");
-        result = { status: "success", message: "カレンダーの予定を更新しました。", eventId: eventId };
-        break;
-        
-      case 'delete':
-        if (!eventId) throw new Error("予定の削除には eventId が必要です。");
-        const eventToDelete = calendar.getEventById(eventId);
-        if (!eventToDelete) throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        eventToDelete.deleteEvent();
-        result = { status: "success", message: "カレンダーから予定を削除しました。" };
-        break;
-        
-      default:
-        throw new Error(`不明な操作です: ${operation}`);
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    console.error("Error in handleCalendarEvent:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-```
-
----
-
-## `src/app/check-in/page.tsx`
-
-```typescript
-'use client';
-
-import * as React from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { Textarea } from '@/components/ui/textarea';
-import { useUserProfile } from '@/hooks/use-user-profile';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
-import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
-import type { StaffStatus } from '@/lib/types';
-import { cn } from '@/lib/utils';
-import { useSearchParams } from 'next/navigation';
-
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
-type StatusValue = StaffStatus['status'];
 
 export default function CheckInPage() {
-  const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
-  const [location, setLocation] = React.useState<{ latitude: number; longitude: number } | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [lastAction, setLastAction] = React.useState<{ action: ActionType; time: string } | null>(null);
-  const [message, setMessage] = React.useState('');
-  const { toast } = useToast();
-  const { profile } = useUserProfile();
-  const searchParams = useSearchParams();
-  const orderId = searchParams.get('orderId');
-
-
-  const getJapaneseActionName = (action: ActionType) => {
-    const map: Record<ActionType, string> = {
-        'Clock In': '出勤',
-        'Clock Out': '退勤',
-        'Start Travel': '移動開始',
-        'Arrive': '現場到着',
-        'Begin Task': '作業開始',
-        'Finish Task': '作業終了',
-        'Wait': '位置情報更新',
-        'Send Message': 'メッセージ送信'
-    };
-    return map[action];
-  };
-
-  const handleAction = async (action: ActionType) => {
-    setIsLoading(action);
-    setError(null);
-    const now = new Date();
-    
-    // Actions that don't require location or sheet updates
-    if (action === 'Clock In' || action === 'Clock Out') {
-        console.log(`Action: ${action}`);
-        setTimeout(() => {
-          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action, time: currentTime });
-          toast({
-            title: 'アクションを記録しました',
-            description: `${getJapaneseActionName(action)} at ${currentTime}`,
-          });
-          setIsLoading(null);
-        }, 1000);
-        return;
-    }
-    
-    if (action === 'Send Message') {
-        if (!message.trim()) {
-            setError('メッセージを入力してください。');
-            setIsLoading(null);
-            return;
-        }
-        console.log(`Message to admin: ${message}`);
-        setTimeout(() => {
-          toast({
-            title: 'メッセージを送信しました',
-            description: '管理者にメッセージが送信されました。',
-          });
-          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action: 'Send Message', time: currentTime });
-          setMessage('');
-          setIsLoading(null);
-        }, 1000);
-        return;
-    }
-
-    // Map actions to their corresponding status values for the sheet update
-    const statusMap: Partial<Record<ActionType, StatusValue>> = {
-      'Start Travel': '移動中',
-      'Begin Task': '作業中',
-      'Finish Task': '待機中',
-      'Wait': '待機中',
-      'Arrive': '作業待ち',
-    };
-
-    const statusValue = statusMap[action];
-    
-    if (!statusValue) {
-        console.error("No status defined for this action:", action);
-        setIsLoading(null);
-        return;
-    }
-
-    if (!navigator.geolocation) {
-      setError('お使いのブラウザは位置情報取得に対応していません。');
-      setIsLoading(null);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setLocation({ latitude, longitude });
+    return (
         
-        console.log(`Action: ${action}`, { latitude, longitude });
+             
         
-        if (!profile?.name) {
-            setError('ユーザー情報が取得できません。ログインしているか確認してください。');
-            setIsLoading(null);
-            return;
-        }
-
-        try {
-            const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
-            const result = await updateSheetStatus({
-                gasUrl: ORDER_GAS_URL,
-                eventTitle: eventTitleForUpdate,
-                staffName: profile.name,
-                statusValue: statusValue,
-                timestamp: now.toISOString(),
-                latitude: latitude,
-                longitude: longitude,
-                actionType: action,
-                actionTimestamp: now.toISOString()
-            });
-
-            if (result.status === 'error') {
-                throw new Error(result.message);
-            }
-
-            toast({
-                title: 'ステータスを更新しました',
-                description: result.message,
-            });
-
-            const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-            setLastAction({ action, time: currentTime });
-
-        } catch (e: any) {
-            setError(e.message || 'スプレッドシートの更新に失敗しました。');
-            toast({
-                variant: 'destructive',
-                title: '更新エラー',
-                description: e.message || 'スプレッドシートの更新に失敗しました。'
-            });
-        }
-        
-        setIsLoading(null);
-      },
-      (err) => {
-        let message = '';
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            message = '位置情報の利用が許可されていません。ブラウザの設定を確認してください。';
-            break;
-          case err.POSITION_UNAVAILABLE:
-            message = '現在地の取得に失敗しました。';
-            break;
-          case err.TIMEOUT:
-            message = '位置情報の取得がタイムアウトしました。';
-            break;
-          default:
-            message = '不明なエラーが発生しました。';
-            break;
-        }
-        setError(message);
-        setIsLoading(null);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
-  };
-
-  const actionButtons: { action: ActionType; label: string; icon: React.ElementType }[] = [
-    { action: 'Clock In', label: '出勤', icon: LogIn },
-    { action: 'Clock Out', label: '退勤', icon: LogOut },
-    { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
-    { action: 'Arrive', label: '現場到着', icon: MapPin },
-    { action: 'Begin Task', label: '作業開始', icon: Clock },
-    { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
-    { action: 'Wait', label: '位置情報更新', icon: RefreshCw },
-  ];
-
-  return (
-    <div className="max-w-md mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>勤怠・作業記録</CardTitle>
-          <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {actionButtons.map(({ action, label, icon: Icon }) => (
-              <Button
-                key={action}
-                size="lg"
-                className={cn(
-                  "h-20 text-base flex-col",
-                  action === 'Wait' && "col-span-2"
-                )}
-                onClick={() => handleAction(action)}
-                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Send Message', 'Wait'].includes(action))}
-              >
-                {isLoading === action ? (
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                ) : (
-                  <>
-                    <Icon className="h-6 w-6 mb-1" />
-                    {label}
-                  </>
-                )}
-              </Button>
-            ))}
-          </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>エラー</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          {!orderId && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>オーダーが選択されていません</AlertTitle>
-              <AlertDescription>
-                勤怠以外の記録を行うには、スケジュール画面からタスクを選択してください。
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {lastAction && (
-             <Alert>
-              <MapPin className="h-4 w-4" />
-              <AlertTitle>最後の記録</AlertTitle>
-              <AlertDescription>
-                {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
-                {location && !['Clock In', 'Clock Out', 'Send Message'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-
-       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            管理者へ連絡
-          </CardTitle>
-          <CardDescription>緊急の連絡や報告がある場合に使用してください。</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="メッセージを入力..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            disabled={isLoading === 'Send Message'}
-          />
-          <Button
-            className="w-full"
-            onClick={() => handleAction('Send Message')}
-            disabled={!!isLoading}
-          >
-            {isLoading === 'Send Message' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4 mr-2" />
-            )}
-            メッセージ送信
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
+    )
 }
 ```
+
     
