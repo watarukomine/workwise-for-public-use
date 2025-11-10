@@ -1,15 +1,14 @@
 
 'use client';
 
-import './globals.css';
+import '@/app/globals.css';
 import { AppShell, AppShellProvider } from '@/components/app-shell';
 import { Toaster } from '@/components/ui/toaster';
 import React from 'react';
 import { SelectedStaffProvider } from '@/contexts/selected-staff-context';
 import { CustomerProvider } from '@/contexts/customer-context';
 import { OrderProvider } from '@/contexts/order-context';
-import { FirebaseClientProvider } from '@/firebase';
-import { NotificationPermissionManager } from '@/components/NotificationPermissionManager';
+import { UserProfileProvider } from '@/contexts/user-profile-provider';
 
 export default function RootLayout({
   children,
@@ -24,9 +23,10 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
+        <UserProfileProvider>
           <SelectedStaffProvider>
             <CustomerProvider>
               <OrderProvider>
@@ -34,12 +34,11 @@ export default function RootLayout({
                     <AppShell>
                         {children}
                     </AppShell>
-                    <NotificationPermissionManager />
                 </AppShellProvider>
               </OrderProvider>
             </CustomerProvider>
           </SelectedStaffProvider>
-        </FirebaseClientProvider>
+        </UserProfileProvider>
         <Toaster />
       </body>
     </html>

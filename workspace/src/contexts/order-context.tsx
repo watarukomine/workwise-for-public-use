@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
@@ -6,7 +7,7 @@ import { ORDER_GAS_URL } from '@/lib/settings';
 import type { ScheduleEvent, Staff, WithId } from '@/lib/types';
 import { findKey, mapRawToOrder } from '@/lib/utils';
 import { parseISO, isValid, addMinutes, subMinutes } from 'date-fns';
-import { useSelectedStaff } from './selected-staff-context';
+import { useSelectedStaff } from '@/contexts/selected-staff-context';
 
 const TRAVEL_TIME_MINUTES = 30;
 
@@ -77,7 +78,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
                 start: travelStart.toISOString(),
                 end: taskStart.toISOString(),
                 rawOrderId: mappedOrder.rawOrderId,
-                calendarEventId: findKey(order, ['travelCalendarEventId']), 
               };
   
               const taskEvent: WithId<ScheduleEvent> = {
@@ -90,7 +90,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
                 locationId: mappedOrder.customerCode,
                 start: taskStart.toISOString(),
                 end: taskEnd.toISOString(),
-                calendarEventId: findKey(order, ['taskCalendarEventId']),
               };
   
               events.push(travelEvent, taskEvent);
