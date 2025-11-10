@@ -1,6 +1,5 @@
-'use server';
+// src/app/actions/update-sheet-status.ts
+// 注: このファイルは後方互換性のために一時的に存在しています
+// TODO: 将来的にすべてのインポートを @/app/actions/gas-actions に直接変更し、このファイルを削除する
 
-// This file acts as a temporary re-export to bridge the gap during refactoring.
-// It imports the function from its new location and exports it from the old path.
-// This resolves the "Module not found" error without needing to change every import statement immediately.
 export { updateSheetStatus } from './gas-actions';
