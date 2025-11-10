@@ -5,7 +5,7 @@ import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
 import { customerData, staffStatusData } from '@/lib/data';
-import type { Customer, WithId, Staff } from '@/lib/types';
+import type { Customer, WithId, Staff, ScheduleEvent } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';

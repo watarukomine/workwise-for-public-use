@@ -639,14 +639,6 @@ export function ScheduleView({
 
   const { event, staff, customer, title } = getDialogDetails();
 
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleData) return [];
-      return scheduleData.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isToday(eventDate);
-      });
-  }, [scheduleData]);
-
   if (!isClient) {
     return (
       <Card>
@@ -695,7 +687,7 @@ export function ScheduleView({
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative mt-2 space-y-2">
                             {staffData?.map((staff) => {
-                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                const events = scheduleData.filter((e) => e.staffId === staff.id);
                                 return (
                                     <StaffRow
                                         key={staff.id}
