@@ -12,7 +12,7 @@
  * スタッフマスターのデータを取得・更新するためのGoogle Apps ScriptのURL。
  * 主に staff-context.tsx や auth.ts で使用されます。
  */
-export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbw9Irf9pbEMudtlgmNRyJLDiA03sMVmsR_JqO5OXxNLgOQTC7Fn8SIVJqtEbYs19U84/exec';
+export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbyjdlLbXbsqg3bRM-FyHElXqwdBIhB82mKnf8IydWjG_1OgVwmejURN0psdjgmLndhj/exec';
 
 /**
  * 顧客情報（販売店情報）を取得・更新するためのGoogle Apps ScriptのURL。
@@ -24,7 +24,7 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b
  * 受注情報を取得・更新し、カレンダー連携も行うGoogle Apps ScriptのURL。
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
-export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbzGgjLq9caVM02k0eMvA0aL5sOkv-vvsFfFxiCKJGqS8B5oo3NKxm89I8muU__HJdoL/exec';
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwsmrzKKzQ6U_0FNYcuszEm9LtHdWqet2lljc5NkH91KC1tldLt_lLOMENNPAoXNJQ/exec';
 
 
 // --- スプレッドシート本体のURL ---
@@ -45,7 +45,7 @@ export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHX
  * 受注情報が記載されているスプレッドシートのURL。
  * orders/page.tsx のヘッダークリックで開かれます。
  */
-export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU/edit?usp=sharing';
+export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Order sheet URL
 
 
 // --- その他設定 ---
