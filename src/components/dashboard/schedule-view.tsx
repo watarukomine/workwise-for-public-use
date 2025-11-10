@@ -44,7 +44,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -640,6 +640,14 @@ export function ScheduleView({
 
   const { event, staff, customer, title } = getDialogDetails();
 
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleData) return [];
+      return scheduleData.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isToday(eventDate);
+      });
+  }, [scheduleData]);
+
   if (!isClient) {
     return (
       <Card>
@@ -688,7 +696,7 @@ export function ScheduleView({
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative mt-2 space-y-2">
                             {staffData?.map((staff) => {
-                                const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
                                 return (
                                     <StaffRow
                                         key={staff.id}
