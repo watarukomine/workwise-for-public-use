@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -28,6 +29,7 @@ export default function DashboardPage() {
   const { 
     orders: rawOrders, 
     scheduleEvents,
+    setScheduleEvents,
     isLoading: isLoadingOrders,
   } = useOrder();
   
@@ -179,7 +181,8 @@ export default function DashboardPage() {
                 staffData={filteredStaff} 
                 customerData={customers} 
                 rawOrdersData={rawOrders}
-                currentDate={currentDate}
+                scheduleData={dailySchedule}
+                setScheduleData={setScheduleEvents}
             />
         )}
         {isToday(currentDate) && <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />}
