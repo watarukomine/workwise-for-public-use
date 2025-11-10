@@ -1,4 +1,3 @@
-
 /**
  * アプリケーション全体で使用される設定値を管理します。
  * GASのURLなど、環境によって変更される可能性のある値を一元管理します。
@@ -24,7 +23,7 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b
  * 受注情報を取得・更新し、カレンダー連携も行うGoogle Apps ScriptのURL。
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
-export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwsmrzKKzQ6U_0FNYcuszEm9LtHdWqet2lljc5NkH91KC1tldLt_lLOMENNPAoXNJQ/exec';
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbxquWYjMBOVACYRdxvGde-_oaxG2r964XD3OmA8CZ_qp0LA0-dx-qRrUyn9iUgDmyB2/exec';
 
 
 // --- スプレッドシート本体のURL ---
@@ -45,7 +44,7 @@ export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHX
  * 受注情報が記載されているスプレッドシートのURL。
  * orders/page.tsx のヘッダークリックで開かれます。
  */
-export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Order sheet URL
+export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU/edit?usp=sharing';
 
 
 // --- その他設定 ---
