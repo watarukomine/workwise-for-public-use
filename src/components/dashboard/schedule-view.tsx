@@ -110,10 +110,17 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
-    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : ''}`;
-    const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? `：${findKey(rawOrder, ['本数'])}本` : ''}`;
+    
+    const customerName = findKey(rawOrder, ['お取引先名', '取引先']) || '';
+    const scheduledTime = findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : '';
+    const equipment = findKey(rawOrder, ['機材有無']) || '';
+    const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || '';
+
+    const line1 = `${customerName}${scheduledTime}`;
+    const line2 = `${equipment ? `${equipment}：` : ''}${tireSize}`;
+
     let taskDetails = line1;
-    if (line2.trim()) {
+    if (line2.trim() && line2.trim() !== '：') {
         taskDetails += `\n${line2}`;
     }
     
@@ -292,10 +299,10 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
 
-  const [dialogState, setDialogState] = React.useState({ mode: 'closed' });
-  const [editedEventDetails, setEditedEventDetails] = React.useState({ title: '', description: '', startTime: '', endTime: '' });
+  const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
+  const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   
-  const [unassignedOrders, setUnassignedOrders] = React.useState([]);
+  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
   
   React.useEffect(() => {
     if (!rawOrdersData) return;
@@ -319,8 +326,8 @@ export function ScheduleView({
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
-  const [activeItem, setActiveItem] = React.useState(null);
-  const [currentOverStaffId, setCurrentOverStaffId] = React.useState(null);
+  const [activeItem, setActiveItem] = React.useState<any | null>(null);
+  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActiveItem(event.active.data.current);
@@ -503,11 +510,13 @@ export function ScheduleView({
               const tripId = `trip-${Date.now()}`;
               const taskEnd = addMinutes(taskStart, order.estimatedDuration);
               const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+              
+              const customerName = customer?.storeName || order.taskDetails.split('\n')[0].split('：')[0];
 
               const travelEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-travel`,
                   tripId: tripId,
-                  title: `移動: ${customer?.storeName || order.taskDetails}`,
+                  title: `移動：${customerName}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: travelStart.toISOString(),
@@ -519,8 +528,8 @@ export function ScheduleView({
                   tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
-                  title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
+                  title: order.taskDetails, // Keep original details
+                  description: `顧客: ${customerName}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: taskStart.toISOString(),
@@ -647,9 +656,9 @@ export function ScheduleView({
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
         </CardHeader>
         <CardContent>
-           <div className="flex items-center justify-center h-64">
-             <p>Loading schedule...</p>
-           </div>
+          <div className="flex items-center justify-center h-64">
+           <p>Loading schedule...</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -811,7 +820,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
 
   return (
     <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center border-t border-b", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center border-y", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -895,9 +904,24 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       color = 'hsl(var(--foreground))';
   }
   
-  const [line1, ...rest] = (event.title || '').split('\n');
-  const line2 = rest.join('\n');
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
+  let line1 = event.title || '';
+  let line2 = '';
+
+  if (!isTravelEvent && event.rawOrderId) {
+    const orderInRaw = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === event.rawOrderId);
+    if(orderInRaw) {
+        const customerName = customer?.storeName || '';
+        const scheduledTime = formatTime(event.start);
+        const equipment = findKey(orderInRaw, ['機材有無']) || '';
+        const tireSize = findKey(orderInRaw, ['タイヤサイズ', 'サイズ']) || '';
+        line1 = `${customerName}：${scheduledTime}`;
+        line2 = `${equipment ? `${equipment}：` : ''}${tireSize}`;
+    }
+  } else {
+      [line1] = (event.title || '').split('\n');
+  }
+  
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
   return (
