@@ -45,7 +45,6 @@ import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
-import { Badge } from '@/components/ui/badge';
 import * as ics from 'ics';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -434,7 +433,7 @@ export function ScheduleView({
                     if (e.id.endsWith('-travel')) {
                         return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
                     }
-                    return e; // Should not happen
+                    return e;
                 });
 
             } else { // Moving a generic event
@@ -444,7 +443,6 @@ export function ScheduleView({
             }
         });
         
-        // Backend update
         (async () => {
             try {
                 if (draggedEvent.rawOrderId) {
@@ -469,7 +467,6 @@ export function ScheduleView({
             }
         })();
     
-    // --- Adding a new event from unassigned ---
     } else if ('estimatedDuration' in item) {
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
@@ -490,7 +487,6 @@ export function ScheduleView({
              setScheduleEvents(prev => [...prev, newEvent]);
              toast({ title: "汎用タスクを追加しました" });
         } else {
-             // Optimistic UI Update
              const tripId = `trip-${order.rawOrderId}`;
              const customer = getCustomerByCode(order.customerCode);
              const travelEvent: WithId<ScheduleEvent> = {
@@ -509,7 +505,6 @@ export function ScheduleView({
              setScheduleEvents(prev => [...prev.filter(e => e.orderId !== order.id), travelEvent, taskEvent]);
              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
         
-            // Backend update
             (async () => {
                 try {
                     await updateSheetStatus({
@@ -714,7 +709,7 @@ export function ScheduleView({
                                 ))}
                                  {isToday(currentDate) && (
                                   <div 
-                                      className="absolute top-0 h-full pointer-events-none z-40"
+                                      className="absolute top-0 h-full pointer-events-none z-50"
                                       style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
                                   >
                                       <TimeIndicator />
