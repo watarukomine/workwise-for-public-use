@@ -27,7 +27,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, findKey, formatTime, mapRawToOrder } from '@/lib/utils';
+import { cn, findKey, mapRawToOrder } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -67,6 +67,24 @@ const timeStringToDate = (timeStr: string, baseDate: Date) => {
     const [hours, minutes] = timeStr.split(':').map(Number);
     date.setHours(hours, minutes, 0, 0);
     return date;
+};
+
+const formatTime = (date: Date | string) => {
+  const d = typeof date === 'string' ? parseISO(date) : date;
+   if (!d || !isValid(d) || isNaN(d.getTime())) {
+     if (typeof date === 'string') {
+        const today = new Date();
+        const [hours, minutes] = date.split(':');
+        if (hours && minutes) {
+            today.setHours(parseInt(hours, 10), parseInt(minutes, 10));
+            if (isValid(today)) {
+                return format(today, 'HH:mm');
+            }
+        }
+     }
+    return "Invalid time";
+  }
+  return format(d, 'HH:mm');
 };
 
 const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
@@ -615,6 +633,7 @@ export function ScheduleView({
                     eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
                     scheduledTime: newStart.toISOString(),
                     timestamp: new Date().toISOString(),
+                    taskCalendarEventId: dialogState.event.calendarEventId
                 });
                 await refetchOrders();
 
@@ -830,26 +849,28 @@ export function ScheduleView({
       </TooltipProvider>
       <DragOverlay>
         {activeItem ? (
-          'staffId' in activeItem ? (
-            <DraggableEvent
-              isOverlay
-              event={activeItem}
-              staff={getStaffById(activeItem.staffId) || staffData[0]}
-              getCustomerByCode={getCustomerByCode}
-              onDoubleClick={() => {}}
-            />
-          ) : 'taskDetails' in activeItem ? (
-            <DraggableOrder
-              isOverlay
-              order={activeItem}
-              customer={getCustomerByCode(activeItem.customerCode)}
-              className={
-                activeItem.id.startsWith('generic-')
-                  ? getDraggableClassName(activeItem)
-                  : ''
-              }
-            />
-          ) : null
+          <TooltipProvider>
+            {'staffId' in activeItem ? (
+              <DraggableEvent
+                isOverlay
+                event={activeItem}
+                staff={getStaffById(activeItem.staffId) || staffData[0]}
+                getCustomerByCode={getCustomerByCode}
+                onDoubleClick={() => {}}
+              />
+            ) : 'taskDetails' in activeItem ? (
+              <DraggableOrder
+                isOverlay
+                order={activeItem}
+                customer={getCustomerByCode(activeItem.customerCode)}
+                className={
+                  activeItem.id.startsWith('generic-')
+                    ? getDraggableClassName(activeItem)
+                    : ''
+                }
+              />
+            ) : null}
+          </TooltipProvider>
         ) : null}
       </DragOverlay>
     </DndContext>
