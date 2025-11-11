@@ -298,7 +298,7 @@ const TimeIndicator = () => {
     return (
         <div
             className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
-            style={{ left: `${leftPosition}px`, zIndex: 40 }}
+            style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
         </div>
@@ -735,37 +735,39 @@ export function ScheduleView({
                                           </span>
                                       </div>
                                   ))}
-                                   {isToday(currentDate) && (
-                                    <div 
-                                        className="absolute top-0 h-full pointer-events-none"
-                                        style={{ left: `0px`, width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE}px`, zIndex: 50 }}
-                                    >
-                                        <TimeIndicator />
-                                    </div>
-                                   )}
                               </div>
                           </div>
                           <div className="relative">
-                            <div className="relative mt-2" style={{ width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
-                                <div className="relative space-y-2">
-                                  {staffData?.map((staff) => {
-                                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                      const status = statuses.find(s => s.staffId === staff.id);
-                                      return (
-                                          <StaffRow
-                                              key={staff.id}
-                                              staff={staff}
-                                              events={events}
-                                              status={status}
-                                              getCustomerByCode={getCustomerByCode}
-                                              isOver={currentOverStaffId === staff.id}
-                                              onDoubleClickEvent={handleDoubleClickEvent}
-                                              onDoubleClickTimeline={handleDoubleClickTimeline}
-                                          />
-                                      );
-                                  })}
-                                </div>
-                            </div>
+                            <ScrollArea className="w-full whitespace-nowrap">
+                              <div className="relative mt-2" style={{ width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
+                                  <div className="relative space-y-2">
+                                    {staffData?.map((staff) => {
+                                        const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                        const status = statuses.find(s => s.staffId === staff.id);
+                                        return (
+                                            <StaffRow
+                                                key={staff.id}
+                                                staff={staff}
+                                                events={events}
+                                                status={status}
+                                                getCustomerByCode={getCustomerByCode}
+                                                isOver={currentOverStaffId === staff.id}
+                                                onDoubleClickEvent={handleDoubleClickEvent}
+                                                onDoubleClickTimeline={handleDoubleClickTimeline}
+                                            />
+                                        );
+                                    })}
+                                  </div>
+                                  {isToday(currentDate) && (
+                                    <div 
+                                        className="absolute top-0 h-full pointer-events-none"
+                                        style={{ left: `${STAFF_COL_WIDTH}px`, width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE}px`, zIndex: 100 }}
+                                    >
+                                        <TimeIndicator />
+                                    </div>
+                                  )}
+                              </div>
+                            </ScrollArea>
                           </div>
                         </div>
                         {isToday(currentDate) && (
