@@ -863,7 +863,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
 
   return (
     <div className={cn("flex h-16 relative border-t border-b", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center")} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -926,19 +926,20 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isBreakEvent = event.title === '休憩';
 
   let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = isTravelEvent ? 'hsl(var(--foreground))' : '#FFFFFF';
+  let color = '#FFFFFF';
 
   if (isTravelEvent) {
-    const hslMatch = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-    if (hslMatch) {
-      backgroundColor = `hsla(${hslMatch[1]}, ${hslMatch[2]}%, ${hslMatch[3]}%, 0.5)`;
+    if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
+       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+       if (match) {
+         backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+       }
     } else {
-       // Fallback for non-hsl colors, assuming it's a hex or rgb and making it semi-transparent
-       // This part requires a color parsing library for full support, but for now we apply a generic opacity.
-       style.opacity = 0.5;
+       backgroundColor = 'hsla(var(--primary), 0.5)';
     }
+    color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
-     if (backgroundColor.startsWith('hsl')) {
+     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
         const [h, s] = backgroundColor.match(/\d+/g) || ['0', '0'];
         backgroundColor = `hsl(${h}, ${s}%, 90%)`;
       } else {
@@ -987,3 +988,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
