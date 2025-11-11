@@ -672,7 +672,7 @@ export function ScheduleView({
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative mt-2 space-y-2">
                             {staffData?.map((staff) => {
-                                const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                const events = scheduleData?.filter((e) => e.staffId === staff.id) || [];
                                 return (
                                     <StaffRow
                                         key={staff.id}
