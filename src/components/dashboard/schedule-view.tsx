@@ -435,10 +435,16 @@ export function ScheduleView({
 
         try {
             if (draggedEvent.rawOrderId) {
+                const originalTask = scheduleEvents.find(e => e.id === draggedEvent.id && e.id.endsWith('-task')) || scheduleEvents.find(e => e.tripId === draggedEvent.tripId && e.id.endsWith('-task')) || draggedEvent;
+                let taskStart = newStart;
+                if (draggedEvent.id.endsWith('-travel')) {
+                   taskStart = addMinutes(newStart, TRAVEL_TIME_MINUTES);
+                }
+
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                    scheduledTime: newStart.toISOString(),
+                    eventTitle: `(ID: ${originalTask.rawOrderId})`,
+                    scheduledTime: taskStart.toISOString(),
                     staffName: newStaff.name,
                 });
                 
@@ -514,6 +520,12 @@ export function ScheduleView({
   };
 
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
+    const staff = getStaffById(event.staffId);
+    if (!staff || !staff.email) {
+        toast({ variant: 'destructive', title: 'エラー', description: '担当スタッフのメールアドレスが登録されていません。' });
+        return;
+    }
+
     const start = parseISO(event.start as string);
     const end = parseISO(event.end as string);
 
@@ -536,15 +548,10 @@ export function ScheduleView({
             return;
         }
 
-        const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `${event.title.replace(/\s/g, '_')}.ics`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        const base64data = btoa(value);
+        const mailtoLink = `mailto:${staff.email}?subject=${encodeURIComponent(event.title)}&body=${encodeURIComponent('以下のカレンダーファイルをインポートしてください。\n\n')}&attachment=${encodeURIComponent('data:text/calendar;base64,' + base64data + '?name=' + encodeURIComponent(`${event.title.replace(/\s/g, '_')}.ics`))}`;
+        
+        window.location.href = mailtoLink;
     });
   };
   
@@ -821,9 +828,9 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex relative h-16 border-b", areaBgClass)}>
+    <div className={cn("flex relative", areaBgClass)}>
       {/* Staff Name Cell */}
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 px-2 flex items-center border-r", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 px-2 flex items-center border-r h-16", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
             <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
             <span className='truncate flex-1'>{staff.name}</span>
@@ -834,7 +841,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
+        className={cn("relative flex-1 h-16 border-b", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
@@ -852,7 +859,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
       </div>
 
       {/* Status Cell */}
-      <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
+      <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
         {status && isToday(new Date()) && (
           <div className="text-xs text-center font-medium">
              {statusJapanese[status.status]}
@@ -954,3 +961,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
