@@ -46,9 +46,9 @@ import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
-const PIXELS_PER_MINUTE = 2.5;
+const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
-const timelineEndHour = 18;
+const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
@@ -282,8 +282,8 @@ const TimeIndicator = () => {
 
     React.useEffect(() => {
         const updateNow = () => setNow(new Date());
-        updateNow(); // Set immediately
-        const timer = setInterval(updateNow, 60000); // Update every minute
+        updateNow();
+        const timer = setInterval(updateNow, 60000); 
         return () => clearInterval(timer);
     }, []);
 
@@ -292,10 +292,7 @@ const TimeIndicator = () => {
     const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
     if (!isVisible) return null;
     
-    const startOfTimeline = new Date(now);
-    startOfTimeline.setHours(timelineStartHour, 0, 0, 0);
-
-    const minutesFromStart = differenceInMinutes(now, startOfTimeline);
+    const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
     const leftPosition = minutesToPixels(minutesFromStart);
 
     return (
@@ -907,7 +904,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   const isTravelEvent = event.title?.startsWith('移動');
-  const isBreakEvent = event.title === '休憩';
 
   const divStyle: React.CSSProperties = { 
       backgroundColor: staff.color || 'hsl(var(--primary))',
@@ -915,16 +911,28 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let textColorClass = 'text-primary-foreground';
 
   if (isTravelEvent) {
-    if (staff.color && staff.color.startsWith('hsl')) {
-       const match = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-       if (match) {
-         divStyle.backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
-       }
-    } else {
-       // Fallback for non-hsl colors or if match fails
-       divStyle.opacity = 0.5;
-    }
-    textColorClass = 'text-white';
+      divStyle.backgroundColor = 'transparent';
+      if (staff.color && staff.color.startsWith('hsl')) {
+          const match = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/) || staff.color.match(/hsla\((\d+),\s*(\d+)%,\s*(\d+)%,\s*[\d.]+\)/);
+          if (match) {
+            divStyle.backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+          }
+      } else if (staff.color) { // Fallback for non-hsl, like hex
+          let r = 0, g = 0, b = 0;
+          if (staff.color.length === 4) {
+              r = parseInt(staff.color[1] + staff.color[1], 16);
+              g = parseInt(staff.color[2] + staff.color[2], 16);
+              b = parseInt(staff.color[3] + staff.color[3], 16);
+          } else if (staff.color.length === 7) {
+              r = parseInt(staff.color.substring(1, 3), 16);
+              g = parseInt(staff.color.substring(3, 5), 16);
+              b = parseInt(staff.color.substring(5, 7), 16);
+          }
+          divStyle.backgroundColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
+      } else {
+        divStyle.opacity = 0.5;
+      }
+      textColorClass = 'text-white';
   } else {
     const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
     if (staff.name && brightStaff.includes(staff.name)) {
