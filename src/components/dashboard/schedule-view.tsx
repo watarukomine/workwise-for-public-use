@@ -698,7 +698,7 @@ export function ScheduleView({
                           <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
                               <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
                               <div className="relative h-8 flex-1">
-                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                  {Array.from({ length: timelineTotalHours }).map((_, i) => (
                                       <div
                                           key={i}
                                           className="absolute h-full border-l"
@@ -902,7 +902,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 100 : 1,
+    zIndex: isDragging ? 100 : 2,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -913,14 +913,18 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isTravelEvent = event.title?.startsWith('移動');
   const isBreakEvent = event.title === '休憩';
 
-  const divStyle: React.CSSProperties = { 
-      backgroundColor: staff.color || 'hsl(var(--primary))',
-      color: 'hsl(var(--primary-foreground))',
-  };
+  let backgroundColor = staff.color || 'hsl(var(--primary))';
+  let color = 'hsl(var(--primary-foreground))';
 
   if (isTravelEvent) {
-      style.opacity = 0.5;
-      divStyle.color = '#FFFFFF';
+    if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
+       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+       if (match) {
+         const newLightness = (parseInt(match[3]) + 100) / 2;
+         backgroundColor = `hsl(${match[1]}, ${match[2]}%, ${newLightness}%)`;
+         color = 'hsl(var(--foreground))';
+       }
+    }
   } else if (isBreakEvent) {
      divStyle.backgroundColor = `hsl(120, 40%, 85%)`;
      divStyle.color = 'hsl(var(--foreground))';
@@ -929,9 +933,15 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   } else {
     const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
     if (staff.name && brightStaff.includes(staff.name)) {
-        divStyle.color = 'black';
+        color = 'black';
     }
   }
+  
+  const divStyle: React.CSSProperties = { 
+      backgroundColor: backgroundColor,
+      color: color,
+  };
+
 
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
   let line1 = event.title || '';
