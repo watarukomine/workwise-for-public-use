@@ -489,13 +489,13 @@ export function ScheduleView({
             if (draggedEvent.tripId) {
                 const originalTask = scheduleEvents.find(e => e.tripId === draggedEvent.tripId && e.id.endsWith('-task'))!;
                 const taskStartForSheet = updatedEvents.find(e => e.id === originalTask.id)!.start;
-                 await updateSheetStatus({
+                 updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${originalTask.rawOrderId})`,
                     scheduledTime: new Date(taskStartForSheet).toISOString(),
                     staffName: newStaff.name,
                 });
-                await refetchOrders();
+                refetchOrders();
             } else { // Generic event
                 const isStaffChange = draggedEvent.staffId !== newStaffId;
                 if (isStaffChange) {
@@ -998,7 +998,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
-         backgroundColor = `hsl(${match[1]}, ${match[2]}%, 50%)`;
+         backgroundColor = `hsla(${match[1]}, ${match[2]}%, 50%, 0.5)`;
        }
     } else {
        backgroundColor = 'hsla(var(--primary), 0.5)';
