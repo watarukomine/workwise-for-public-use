@@ -672,7 +672,7 @@ export function ScheduleView({
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
         <Card>
-            <CardHeader>
+            <CardContent className="p-4 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div className="md:col-span-3 h-full">
                         <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
@@ -681,8 +681,7 @@ export function ScheduleView({
                         <GenericTasks />
                     </div>
                 </div>
-            </CardHeader>
-            <CardContent className="pt-6">
+
                 <Card className="mt-4">
                     <CardHeader>
                         <CardTitle>タイムライン</CardTitle>
