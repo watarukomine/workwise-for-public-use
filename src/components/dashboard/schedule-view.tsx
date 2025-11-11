@@ -651,9 +651,9 @@ export function ScheduleView({
                     <CardTitle>タイムライン</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 overflow-x-auto">
-                    <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                    <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
                       <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                          <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
+                          <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
                           <div className="relative h-8 flex-1">
                               {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                   <div
@@ -675,7 +675,7 @@ export function ScheduleView({
                                 </div>
                                )}
                           </div>
-                          <div className="flex-shrink-0" style={{ width: `${STATUS_COL_WIDTH}px`}}></div>
+                          <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                       </div>
                       <div className="relative mt-2 space-y-2">
                           {staffData?.map((staff) => {
@@ -802,41 +802,42 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 px-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+    <div className={cn("flex relative h-16 border-b", areaBgClass)}>
+      {/* Staff Name Cell */}
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 px-2 flex items-center border-r", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
             <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
             <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
-      <ScrollArea className="flex-1 whitespace-nowrap">
-        <div 
-          id={`staff-row-${staff.id}`}
-          ref={setNodeRef} 
-          className={cn("relative h-full", isOver && "bg-primary/10")} 
-          onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
-          style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-        >
-          <div className="h-full border-t border-b"></div>
-          <div className="absolute top-0 left-0 h-full w-full">
-            {events.map((event) => (
-              <DraggableEvent
-                key={event.id}
-                event={event}
-                staff={staff}
-                getCustomerByCode={getCustomerByCode}
-                onDoubleClick={() => onDoubleClickEvent(event)}
-              />
-            ))}
-          </div>
+      
+      {/* Timeline Cell */}
+      <div 
+        id={`staff-row-${staff.id}`}
+        ref={setNodeRef} 
+        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
+        onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
+        style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+      >
+        <div className="absolute top-0 left-0 h-full w-full">
+          {events.map((event) => (
+            <DraggableEvent
+              key={event.id}
+              event={event}
+              staff={staff}
+              getCustomerByCode={getCustomerByCode}
+              onDoubleClick={() => onDoubleClickEvent(event)}
+            />
+          ))}
         </div>
-      </ScrollArea>
-      <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
+      </div>
+
+      {/* Status Cell */}
+      <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
         {status && isToday(new Date()) && (
-          <Badge variant="outline" className="flex items-center justify-center gap-2 text-xs flex-shrink-0 w-full">
-            <span className={cn("h-2 w-2 rounded-full", statusColors[status.status])} />
-            <span className="truncate">{statusJapanese[status.status]}</span>
-          </Badge>
+          <div className="text-xs text-center font-medium">
+             {statusJapanese[status.status]}
+          </div>
         )}
       </div>
     </div>
