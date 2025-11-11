@@ -879,17 +879,21 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   if (isTravelEvent) {
-      if (typeof divStyle.backgroundColor === 'string' && divStyle.backgroundColor.startsWith('hsl')) {
-        const match = divStyle.backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-        if (match) {
-            divStyle.backgroundColor = `hsl(${match[1]}, ${match[2]}%, 50%)`;
-        }
-      }
+    if (typeof divStyle.backgroundColor === 'string' && divStyle.backgroundColor.startsWith('hsl')) {
+       const match = divStyle.backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+       if (match) {
+         divStyle.backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+       }
+    } else {
+       divStyle.backgroundColor = 'hsla(var(--primary), 0.5)';
+    }
   }
   
   const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
   let textColorClass = 'text-primary-foreground';
-  if (staff.name && brightStaff.includes(staff.name)) {
+  if (isTravelEvent) {
+    textColorClass = 'text-foreground';
+  } else if (staff.name && brightStaff.includes(staff.name)) {
       textColorClass = 'text-black';
   }
   
