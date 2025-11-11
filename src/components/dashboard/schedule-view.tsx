@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -26,7 +27,7 @@ import {
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid } from 'date-fns';
 import { cn, findKey } from '@/lib/utils';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -41,7 +42,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
-import { Textarea } from '../ui/textarea';
+import { Textarea } from '@/components/ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL } from '@/lib/settings';
@@ -110,18 +111,20 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
 const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
+    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : ''}`;
+    const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? `：${findKey(rawOrder, ['本数'])}本` : ''}`;
+    let taskDetails = line1;
+    if (line2.trim()) {
+        taskDetails += `\n${line2}`;
+    }
     
-    const customerName = findKey(rawOrder, ['お取引先名', '取引先']) || '';
-    const scheduledTime = findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : '';
-
-    const line1 = `${customerName}${scheduledTime}`;
     const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
     const orderId = findKey(rawOrder, idKeys);
 
     return {
         id: String(orderId || `ord-${Math.random()}`),
         customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
-        taskDetails: line1.trim(), // We will now construct details inside the component
+        taskDetails: taskDetails.trim(),
         estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
         raw: rawOrder,
         rawOrderId: String(orderId || '')
@@ -682,25 +685,29 @@ export function ScheduleView({
                                   ))}
                               </div>
                           </div>
-                          <ScrollArea className="w-full whitespace-nowrap">
-                            <div className="relative mt-2 space-y-2">
-                                {staffData?.map((staff) => {
-                                    const events = scheduleData.filter((e) => e.staffId === staff.id);
-                                    return (
-                                        <StaffRow
-                                            key={staff.id}
-                                            staff={staff}
-                                            events={events}
-                                            getCustomerByCode={getCustomerByCode}
-                                            rawOrdersData={rawOrdersData}
-                                            isOver={currentOverStaffId === staff.id}
-                                            onDoubleClickEvent={handleDoubleClickEvent}
-                                            onDoubleClickTimeline={handleDoubleClickTimeline}
-                                        />
-                                    );
-                                })}
-                            </div>
-                          </ScrollArea>
+                          <div className="relative">
+                            <ScrollArea className="w-full whitespace-nowrap">
+                              <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
+                                <div className="relative space-y-2">
+                                  {staffData?.map((staff) => {
+                                      const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                      return (
+                                          <StaffRow
+                                              key={staff.id}
+                                              staff={staff}
+                                              events={events}
+                                              getCustomerByCode={getCustomerByCode}
+                                              rawOrdersData={rawOrdersData}
+                                              isOver={currentOverStaffId === staff.id}
+                                              onDoubleClickEvent={handleDoubleClickEvent}
+                                              onDoubleClickTimeline={handleDoubleClickTimeline}
+                                          />
+                                      );
+                                  })}
+                                </div>
+                              </div>
+                            </ScrollArea>
+                          </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -810,8 +817,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-16 relative border-y", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+    <div className={cn("flex h-16 relative", areaBgClass)}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center border-y", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -820,7 +827,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
+        className={cn("relative flex-1 h-full border-y", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
@@ -881,9 +888,12 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
          backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+       } else {
+         backgroundColor = 'hsla(var(--primary), 0.5)';
        }
     } else {
-       backgroundColor = 'hsla(var(--primary) / 0.5)';
+       // Fallback for non-hsl colors, though less likely with the current setup
+       backgroundColor = 'hsla(var(--primary), 0.5)';
     }
     color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
@@ -906,9 +916,9 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   } else if (event.rawOrderId) {
     const orderInRaw = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === event.rawOrderId);
     if(orderInRaw) {
-        const customerName = customer?.storeName || '';
+        const customerName = findKey(orderInRaw, ['お取引先名', '取引先']) || customer?.storeName || '';
         const scheduledTime = formatTime(event.start);
-        const equipment = findKey(orderInRaw, ['機材有無']) || '';
+        const equipment = findKey(customer, ['機材有無']) || '';
         const tireSize = findKey(orderInRaw, ['タイヤサイズ', 'サイズ']) || '';
         line1 = `${customerName}：${scheduledTime}`;
         line2 = `${equipment ? `${equipment}：` : ''}${tireSize}`;
@@ -918,6 +928,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   }
   
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
+
+  const divStyle: React.CSSProperties = { backgroundColor, color };
 
   return (
     <Tooltip>
@@ -932,7 +944,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       >
         <div
           className="w-full h-full rounded-md flex flex-col justify-center p-1"
-          style={{ backgroundColor, color }}
+          style={divStyle}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
