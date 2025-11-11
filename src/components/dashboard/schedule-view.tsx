@@ -404,10 +404,11 @@ export function ScheduleView({
     
     const newStart = getNewStartFromDrop();
 
-    // --- Optimistic UI Update ---
+    // --- Optimistic UI Update & Backend Update ---
     if ('staffId' in item) { // Moving an existing event
         const draggedEvent = item as WithId<ScheduleEvent>;
         
+        // Optimistic UI update
         setScheduleEvents(prev => {
             const isTripEvent = !!draggedEvent.tripId;
             if (isTripEvent) {
@@ -442,10 +443,40 @@ export function ScheduleView({
                 return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
             }
         });
+        
+        // Backend update
+        (async () => {
+            try {
+                if (draggedEvent.rawOrderId) {
+                    let taskStart = newStart;
+                    if(draggedEvent.id.endsWith('-travel')) {
+                        const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                        taskStart = addMinutes(newStart, travelDuration);
+                    }
+                    const newStaff = getStaffById(newStaffId);
+                    await updateSheetStatus({
+                        gasUrl: ORDER_GAS_URL,
+                        eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+                        staffName: newStaff?.name,
+                        scheduledTime: taskStart.toISOString(),
+                    });
+                }
+                toast({ title: "スケジュールを更新しました" });
+            } catch (e: any) {
+                toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
+            } finally {
+                await refetchOrders();
+            }
+        })();
+
     } else { // Adding a new event from unassigned
         const order = item as WithId<Order>;
+        const staff = getStaffById(newStaffId);
+        if (!staff) return;
+
         const isGeneric = order.id.startsWith('generic-');
 
+        // Optimistic UI update
         if (isGeneric) {
             const newEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}`,
@@ -475,50 +506,28 @@ export function ScheduleView({
              };
              setScheduleEvents(prev => [...prev.filter(e => e.orderId !== order.id), travelEvent, taskEvent]);
         }
-    }
 
-    // --- Backend Update ---
-    (async () => {
-        try {
-            const newStaff = getStaffById(newStaffId);
-            if (!newStaff) throw new Error("Staff not found");
-
-            if ('staffId' in item) { // Moving existing
-                 const draggedEvent = item as WithId<ScheduleEvent>;
-                 if(draggedEvent.rawOrderId) {
-                    let taskStart = newStart;
-                    if(draggedEvent.id.endsWith('-travel')) {
-                        const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                        taskStart = addMinutes(newStart, travelDuration);
-                    }
-                    await updateSheetStatus({
-                        gasUrl: ORDER_GAS_URL,
-                        eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                        staffName: newStaff.name,
-                        scheduledTime: taskStart.toISOString(),
-                    });
-                 }
-                 // Generic event moves don't need backend update unless we store them
-            } else { // Adding new
-                const order = item as WithId<Order>;
-                if (!order.id.startsWith('generic-')) {
+        // Backend update
+        (async () => {
+            try {
+                if (!isGeneric) {
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: `(ID: ${order.rawOrderId})`,
-                        staffName: newStaff.name,
+                        staffName: staff.name,
                         statusValue: '作業待ち',
                         scheduledTime: newStart.toISOString(),
                         timestamp: new Date().toISOString(),
                     });
                 }
+                toast({ title: "タスクを割り当てました" });
+            } catch (e: any) {
+                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+            } finally {
+                await refetchOrders();
             }
-            toast({ title: "スケジュールを更新しました" });
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
-        } finally {
-            await refetchOrders(); // Sync with backend truth
-        }
-    })();
+        })();
+    }
   };
 
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
@@ -550,8 +559,7 @@ export function ScheduleView({
             return;
         }
 
-        const base64data = btoa(value);
-        const mailtoLink = `mailto:${staff.email}?subject=${encodeURIComponent(event.title)}&body=${encodeURIComponent('以下のカレンダーファイルをインポートしてください。\n\n')}&attachment=${encodeURIComponent('data:text/calendar;base64,' + base64data + '?name=' + encodeURIComponent(`${event.title.replace(/\s/g, '_')}.ics`))}`;
+        const mailtoLink = `mailto:${staff.email}?subject=${encodeURIComponent(event.title)}&body=${encodeURIComponent('以下のカレンダーファイルをインポートしてください。\n\n' + value)}`;
         
         window.location.href = mailtoLink;
     });
@@ -672,7 +680,7 @@ export function ScheduleView({
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
         <Card>
-            <CardContent className="p-4 space-y-4">
+            <CardContent className="space-y-4 p-4">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div className="md:col-span-3 h-full">
                         <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
