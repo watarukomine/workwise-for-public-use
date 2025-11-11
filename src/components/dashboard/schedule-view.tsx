@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -263,7 +262,7 @@ const TimeIndicator = () => {
     return (
         <div
             className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
-            style={{ left: `${leftPosition}px` }}
+            style={{ left: `${leftPosition}px`, zIndex: 40 }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
         </div>
@@ -291,6 +290,14 @@ export function ScheduleView({
     setIsClient(true);
   }, []);
   
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleEvents) return [];
+      return scheduleEvents.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+      });
+  }, [scheduleEvents, currentDate]);
+
   React.useEffect(() => {
     if (!rawOrdersData) return;
     
@@ -680,14 +687,6 @@ export function ScheduleView({
     );
   }
 
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-      });
-  }, [scheduleEvents, currentDate]);
-
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
@@ -721,7 +720,7 @@ export function ScheduleView({
                                    {isToday(currentDate) && (
                                     <div 
                                         className="absolute top-0 h-full pointer-events-none z-40"
-                                        style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                        style={{ left: `0px`, width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE}px`}}
                                     >
                                         <TimeIndicator />
                                     </div>
@@ -729,7 +728,7 @@ export function ScheduleView({
                               </div>
                           </div>
                           <div className="relative">
-                            <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
+                            <div className="relative mt-2" style={{ width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
                                 <div className="relative space-y-2">
                                   {staffData?.map((staff) => {
                                       const events = dailySchedule.filter((e) => e.staffId === staff.id);
@@ -998,7 +997,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           )}
         </div>
       </TooltipTrigger>
-      <TooltipContent>
+      <TooltipContent style={{ zIndex: 110 }}>
         <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
         {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
         <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
