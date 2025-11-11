@@ -46,7 +46,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus, handleCalendarEvent, sendIcsViaGmail } from '@/app/actions/gas-actions';
+import { updateSheetStatus, sendIcsViaGmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import * as ics from 'ics';
 import { CalendarPlus, Mail } from 'lucide-react';
@@ -105,7 +105,7 @@ interface DraggableOrderProps {
 const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
-      id: `order-${order.id}`,
+      id: order.id.startsWith('generic-') ? `order-${order.id}` : `order-${order.rawOrderId}`,
       data: order,
     });
 
@@ -984,14 +984,18 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
   
   if (isDragging && transform && dragStartOffset) {
-    style.transform = `translate3d(${transform.x - dragStartOffset.x}px, ${transform.y}px, 0)`;
+    // This is a simplification. For perfect "grab point" tracking, you might need more complex logic
+    // especially if the item can be resized or its container scrolls.
+    // However, for simple translation, this provides a better feel.
+    style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
   }
 
 
   const handleClick = (e: React.MouseEvent) => {
-    // This stops the click from bubbling up and triggering the timeline's double click or drag events
     e.stopPropagation();
-    onClick();
+    if (!isDragging) {
+      onClick();
+    }
   };
   
   const isTravelEvent = event.title?.startsWith('移動');
