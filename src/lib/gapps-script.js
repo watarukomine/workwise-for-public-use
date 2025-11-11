@@ -6,7 +6,7 @@ const ORDER_SHEET_NAME = "受注管理";
 
 // 「スタッフマスタ」シートがあるスプレッドシートのIDを貼り付けてください
 const STAFF_SPREADSHEET_ID = "1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60";
-const STAFF_SHEET_NAME = "スタッフマスタ"; // 実際のシート名に合わせて変更してください
+const STAFF_SHEET_NAME = "Sheet1"; // 実際のシート名に合わせて変更してください
 // ↓↓↓↓【設定はここまで】↓↓↓↓
 
 
