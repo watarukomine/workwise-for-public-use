@@ -5,8 +5,8 @@ const ORDER_SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU";
 const ORDER_SHEET_NAME = "受注管理"; 
 
 // 「スタッフマスタ」シートがあるスプレッドシートのIDを貼り付けてください
-const STAFF_SPREADSHEET_ID = "1Rd57UtLhhRigtOuMAkIfLnuQmuxwS9Mglr2_2feg4CE";
-const STAFF_SHEET_NAME = "スタッフマスタ";
+const STAFF_SPREADSHEET_ID = "1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60";
+const STAFF_SHEET_NAME = "Sheet1"; // 実際のシート名に合わせて変更してください
 // ↓↓↓↓【設定はここまで】↓↓↓↓
 
 
@@ -294,7 +294,7 @@ function updateSheetWithOrderInfo(params) {
         
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
-      message: `アクション「${actionType}」を記録しました。`,
+      message: `受注ID: ${orderId} を更新しました。`,
     })).setMimeType(ContentService.MimeType.JSON);
     
   } catch (error) {
