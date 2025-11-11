@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -297,7 +298,7 @@ const TimeIndicator = () => {
 
     return (
         <div
-            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
+            className="absolute top-0 h-full w-0.5 bg-red-500"
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -843,8 +844,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-16 relative")}>
-      <div className={cn("sticky left-0 z-20 flex-shrink-0 pr-2 flex items-center border-y", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+    <div className={cn("flex h-16 relative", areaBgClass)}>
+      <div className={cn("sticky left-0 z-20 flex-shrink-0 pr-2 flex items-center border-y")} style={{ width: `${STAFF_COL_WIDTH}px`, backgroundColor: 'inherit' }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -853,7 +854,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-full", areaBgClass, isOver && "bg-primary/10")} 
+        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
@@ -912,10 +913,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   if (isTravelEvent) {
       if (staff.color && staff.color.startsWith('hsl')) {
-          const match = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/) || staff.color.match(/hsla\((\d+),\s*(\d+)%,\s*(\d+)%,\s*[\d.]+\)/);
-          if (match) {
-            divStyle.backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
-          }
+          divStyle.backgroundColor = staff.color.replace(')', ', 0.5)').replace('hsl', 'hsla');
       } else if (staff.color) { // Fallback for non-hsl, like hex
           let r = 0, g = 0, b = 0;
           if (staff.color.length === 4) { // #RGB
