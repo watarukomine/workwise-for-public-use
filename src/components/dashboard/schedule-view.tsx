@@ -527,7 +527,8 @@ export function ScheduleView({
         }
     }
   };
-  const handleEventClick = (event: WithId<ScheduleEvent>) => {
+
+  const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
     setEditedEventDetails({
         title: event.title || '',
         description: event.description || '',
@@ -741,7 +742,7 @@ export function ScheduleView({
                                         status={status}
                                         getCustomerByCode={getCustomerByCode}
                                         isOver={currentOverStaffId === staff.id}
-                                        onEventClick={handleEventClick}
+                                        onDoubleClickEvent={handleDoubleClickEvent}
                                         onDoubleClickTimeline={handleDoubleClickTimeline}
                                     />
                                 );
@@ -845,11 +846,11 @@ interface StaffRowProps {
   status?: StaffStatus;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   isOver: boolean;
-  onEventClick: (event: WithId<ScheduleEvent>) => void;
+  onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onEventClick, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
@@ -884,7 +885,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
               event={event}
               staff={staff}
               getCustomerByCode={getCustomerByCode}
-              onClick={() => onEventClick(event)}
+              onDoubleClick={() => onDoubleClickEvent(event)}
             />
           ))}
         </div>
@@ -906,10 +907,10 @@ interface DraggableEventProps {
   event: WithId<ScheduleEvent>;
   staff: WithId<Staff>;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
-  onClick: () => void;
+  onDoubleClick: () => void;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onClick }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
@@ -922,6 +923,11 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); 
+    onDoubleClick();
   };
   
   const isTravelEvent = event.title?.startsWith('移動');
@@ -960,7 +966,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         style={style}
         {...listeners}
         {...attributes}
-        onClick={onClick}
+        onDoubleClick={handleDoubleClick}
         className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
         data-event-chip="true"
       >
