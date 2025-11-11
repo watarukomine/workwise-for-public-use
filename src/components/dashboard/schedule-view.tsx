@@ -694,6 +694,14 @@ export function ScheduleView({
                                           </span>
                                       </div>
                                   ))}
+                                  {isToday(currentDate) && (
+                                    <div 
+                                        className="absolute top-0 h-full pointer-events-none"
+                                        style={{ left: `0px`, width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE}px`, zIndex: 50 }}
+                                    >
+                                        <TimeIndicator />
+                                    </div>
+                                  )}
                               </div>
                           </div>
                           <div className="relative">
@@ -717,14 +725,7 @@ export function ScheduleView({
                                         );
                                     })}
                                   </div>
-                                  {isToday(currentDate) && (
-                                    <div 
-                                        className="absolute top-0 h-full pointer-events-none"
-                                        style={{ left: `${STAFF_COL_WIDTH}px`, width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE}px`, zIndex: 50 }}
-                                    >
-                                        <TimeIndicator />
-                                    </div>
-                                  )}
+                                  
                               </div>
                             </ScrollArea>
                           </div>
@@ -957,11 +958,12 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   if (isTravelEvent) {
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-      const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-      if (match) {
-        const [h, s] = match.slice(1).map(Number);
-        backgroundColor = `hsl(${h}, ${s}%, 50%)`;
-      }
+       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+       if (match) {
+         backgroundColor = `hsl(${match[1]}, ${match[2]}%, 50%)`;
+       }
+    } else {
+       backgroundColor = 'hsla(var(--primary), 0.5)';
     }
   } else if (event.title === '休憩') {
      backgroundColor = `hsl(120, 40%, 90%)`;
