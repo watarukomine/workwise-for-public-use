@@ -230,11 +230,11 @@ export default function DashboardPage() {
             />
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div className="md:col-span-3">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="md:w-3/5">
                 <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
               </div>
-              <div className="md:col-span-2">
+              <div className="md:w-2/5">
                 <GenericTasks />
               </div>
             </div>
@@ -250,4 +250,3 @@ export default function DashboardPage() {
     </TooltipProvider>
   );
 }
-

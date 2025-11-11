@@ -202,7 +202,7 @@ export function GenericTasks() {
     };
 
     return (
-        <Card>
+        <Card className="h-full">
             <CardHeader>
                 <CardTitle className="text-lg">汎用タスク</CardTitle>
                  <CardDescription>休憩や移動など、受注以外のタスクです。</CardDescription>
@@ -231,7 +231,7 @@ export function UnassignedTasks({ orders, customers, date }: { orders: WithId<Or
     return (
         <Card 
             ref={setNodeRef}
-            className={cn("transition-colors", isOver && "bg-primary/10 border-primary/50")}
+            className={cn("transition-colors h-full", isOver && "bg-primary/10 border-primary/50")}
         >
             <CardHeader>
                 <CardTitle className="text-lg">{titleText}</CardTitle>
@@ -309,7 +309,7 @@ export function ScheduleView({
 
   const [activeItem, setActiveItem] = React.useState<any | null>(null);
   const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
-
+  
   const dailySchedule = React.useMemo(() => {
     if (!scheduleEvents) return [];
     return scheduleEvents.filter(event => {
