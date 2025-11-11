@@ -8,6 +8,9 @@ import {
   type DragEndEvent,
   type DragStartEvent,
   type DragOverEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import type { ScheduleEvent, Staff, Customer, Order, WithId, StaffStatus } from '@/lib/types';
@@ -285,7 +288,16 @@ export function ScheduleView({
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
+  const [dragStartOffset, setDragStartOffset] = React.useState<{ x: number; y: number } | null>(null);
   
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
   const dailySchedule = React.useMemo(() => {
       if (!scheduleEvents) return [];
       return scheduleEvents.filter(event => {
@@ -330,7 +342,19 @@ export function ScheduleView({
   }, []);
   
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveItem(event.active.data.current);
+    const { active, sensorEvent } = event;
+    setActiveItem(active.data.current);
+
+    if (sensorEvent instanceof MouseEvent || sensorEvent instanceof TouchEvent) {
+      const { clientX, clientY } = 'touches' in sensorEvent ? sensorEvent.touches[0] : sensorEvent;
+      const initialRect = active.rect.current.initial;
+      if (initialRect) {
+        setDragStartOffset({
+          x: clientX - initialRect.left,
+          y: clientY - initialRect.top,
+        });
+      }
+    }
   };
   
   const handleDragOver = (event: DragOverEvent) => {
@@ -371,7 +395,7 @@ export function ScheduleView({
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
-
+    setDragStartOffset(null);
     setActiveItem(null);
     setCurrentOverStaffId(null);
     
@@ -716,7 +740,7 @@ export function ScheduleView({
   }
 
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver} sensors={sensors}>
       <TooltipProvider>
         <div className="relative">
           <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-sm -mx-4 sm:-mx-8 px-4 sm:px-8 py-4 mb-4 border-b">
@@ -773,6 +797,7 @@ export function ScheduleView({
                                         isOver={currentOverStaffId === staff.id}
                                         onEventClick={handleEventClick}
                                         onDoubleClickTimeline={handleDoubleClickTimeline}
+                                        dragStartOffset={dragStartOffset}
                                     />
                                 );
                             })}
@@ -878,9 +903,10 @@ interface StaffRowProps {
   isOver: boolean;
   onEventClick: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
+  dragStartOffset: { x: number; y: number } | null;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onEventClick, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onEventClick, onDoubleClickTimeline, dragStartOffset }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
@@ -916,6 +942,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
               staff={staff}
               getCustomerByCode={getCustomerByCode}
               onClick={() => onEventClick(event)}
+              dragStartOffset={dragStartOffset}
             />
           ))}
         </div>
@@ -938,9 +965,10 @@ interface DraggableEventProps {
   staff: WithId<Staff>;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   onClick: () => void;
+  dragStartOffset: { x: number; y: number } | null;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onClick }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onClick, dragStartOffset }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
@@ -954,14 +982,15 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
   };
+  
+  if (isDragging && transform && dragStartOffset) {
+    style.transform = `translate3d(${transform.x - dragStartOffset.x}px, ${transform.y}px, 0)`;
+  }
+
 
   const handleClick = (e: React.MouseEvent) => {
-    // This stops the click from propagating to the timeline's onDoubleClick
     e.stopPropagation();
-    // A quick check to see if it's likely a drag, not a click
-    if (transform && transform.x === 0 && transform.y === 0) {
-      onClick();
-    }
+    onClick();
   };
   
   const isTravelEvent = event.title?.startsWith('移動');
