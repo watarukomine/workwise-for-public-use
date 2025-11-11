@@ -45,7 +45,6 @@ import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
-import * as ics from 'ics';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -525,39 +524,15 @@ export function ScheduleView({
         }
     }
   };
+  
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
-    const staff = getStaffById(event.staffId);
-    if (!staff || !staff.email) {
-        toast({ variant: 'destructive', title: 'エラー', description: '担当スタッフのメールアドレスが登録されていません。' });
-        return;
-    }
-
-    const start = parseISO(event.start as string);
-    const end = parseISO(event.end as string);
-
-    if (!isValid(start) || !isValid(end)) {
-        toast({ variant: 'destructive', title: 'エラー', description: '無効なイベント時間です。' });
-        return;
-    }
-    
-    const icsEvent: ics.EventAttributes = {
-        start: [start.getFullYear(), start.getMonth() + 1, start.getDate(), start.getHours(), start.getMinutes()],
-        end: [end.getFullYear(), end.getMonth() + 1, end.getDate(), end.getHours(), end.getMinutes()],
-        title: event.title,
-        description: event.description,
-    };
-
-    ics.createEvent(icsEvent, (error, value) => {
-        if (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: 'iCal作成エラー', description: error.message });
-            return;
-        }
-
-        const mailtoLink = `mailto:${staff.email}?subject=${encodeURIComponent(event.title)}&body=${encodeURIComponent('以下のカレンダーファイルをインポートしてください。\n\n' + value)}`;
-        
-        window.location.href = mailtoLink;
+    setEditedEventDetails({
+        title: event.title || '',
+        description: event.description || '',
+        startTime: formatTime(event.start),
+        endTime: formatTime(event.end),
     });
+    setDialogState({ mode: 'edit', event });
   };
   
   const handleDoubleClickTimeline = (staffId: string, e: React.MouseEvent) => {
@@ -707,18 +682,11 @@ export function ScheduleView({
                                         </span>
                                     </div>
                                 ))}
+                                {isToday(currentDate) && <TimeIndicator />}
                             </div>
                             <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                         </div>
                         <div className="relative mt-2 space-y-2">
-                            {isToday(currentDate) && (
-                                <div 
-                                    className="absolute top-0 h-full pointer-events-none z-30"
-                                    style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                                >
-                                    <TimeIndicator />
-                                </div>
-                            )}
                             {staffData?.map((staff) => {
                                 const events = dailySchedule.filter((e) => e.staffId === staff.id);
                                 const status = statuses.find(s => s.staffId === staff.id);
