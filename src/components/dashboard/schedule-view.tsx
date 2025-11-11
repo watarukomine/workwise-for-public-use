@@ -413,7 +413,7 @@ export function ScheduleView({
     
     if (!item || !over) return;
     
-    if (over?.id === active.data.current?.staffId && delta.x === 0 && delta.y === 0) {
+    if (active.id === over.id && delta.x === 0 && delta.y === 0) {
       return;
     }
 
@@ -453,7 +453,6 @@ export function ScheduleView({
         if (!newStaff || !oldStaff) return;
         
         const newStart = getNewStartFromDrop();
-        const isStaffChange = draggedEvent.staffId !== newStaffId;
         const previousState = [...scheduleEvents];
 
         // Optimistic UI Update
@@ -496,10 +495,9 @@ export function ScheduleView({
                     scheduledTime: new Date(taskStartForSheet).toISOString(),
                     staffName: newStaff.name,
                 });
-                if (isStaffChange) {
-                    await refetchOrders(); // Refetch all if staff changes to recreate calendar events
-                }
+                await refetchOrders();
             } else { // Generic event
+                const isStaffChange = draggedEvent.staffId !== newStaffId;
                 if (isStaffChange) {
                   if (oldStaff.calendarId && draggedEvent.calendarEventId) {
                     await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: draggedEvent.calendarEventId });
@@ -533,7 +531,7 @@ export function ScheduleView({
         const previousUnassigned = [...unassignedOrders];
         const previousSchedule = [...scheduleEvents];
         
-        // Optimistic UI for generic tasks
+        // Optimistic UI update
         if (isGeneric) {
           const newEventEnd = addMinutes(taskStart, order.estimatedDuration);
           const tempId = `event-temp-${Date.now()}`;
@@ -566,20 +564,6 @@ export function ScheduleView({
                 // Update temporary event with real calendar ID
                 setScheduleEvents(prev => prev.map(e => e.id.startsWith('event-temp-') ? { ...e, id: `event-${Date.now()}`, calendarEventId: result.eventId } : e));
             } else {
-              const taskEnd = addMinutes(taskStart, order.estimatedDuration);
-              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-              
-              const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
-              const travelResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
-              
-              const taskTitle = order.taskDetails;
-              const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
-              const taskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
-
-              if (taskResult.status === 'error' || travelResult.status === 'error') {
-                  throw new Error(taskResult.message || travelResult.message);
-              }
-
               await updateSheetStatus({
                   gasUrl: ORDER_GAS_URL,
                   eventTitle: `(ID: ${order.rawOrderId})`,
@@ -587,8 +571,6 @@ export function ScheduleView({
                   statusValue: '作業待ち',
                   scheduledTime: taskStart.toISOString(),
                   timestamp: new Date().toISOString(),
-                  taskCalendarEventId: taskResult.eventId,
-                  travelCalendarEventId: travelResult.eventId,
               });
               
               toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
@@ -755,8 +737,8 @@ export function ScheduleView({
                                   ))}
                                    {isToday(currentDate) && (
                                     <div 
-                                        className="absolute top-0 h-full pointer-events-none z-40"
-                                        style={{ left: `0px`, width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE}px`}}
+                                        className="absolute top-0 h-full pointer-events-none"
+                                        style={{ left: `0px`, width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE}px`, zIndex: 50 }}
                                     >
                                         <TimeIndicator />
                                     </div>
@@ -897,16 +879,18 @@ export function ScheduleView({
                 />
               </TooltipProvider>
             ) : 'taskDetails' in activeItem ? (
-              <DraggableOrder
-                isOverlay
-                order={activeItem}
-                customer={getCustomerByCode(activeItem.customerCode)}
-                className={
-                  activeItem.id.startsWith('generic-')
-                    ? getDraggableClassName(activeItem)
-                    : ''
-                }
-              />
+              <TooltipProvider>
+                <DraggableOrder
+                  isOverlay
+                  order={activeItem}
+                  customer={getCustomerByCode(activeItem.customerCode)}
+                  className={
+                    activeItem.id.startsWith('generic-')
+                      ? getDraggableClassName(activeItem)
+                      : ''
+                  }
+                />
+              </TooltipProvider>
             ) : null
         ) : null}
       </DragOverlay>
@@ -1014,8 +998,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
-         const newLightness = Math.round((parseInt(match[3]) + 100) / 2);
-         backgroundColor = `hsl(${match[1]}, ${match[2]}%, ${newLightness}%)`;
+         backgroundColor = `hsl(${match[1]}, ${match[2]}%, 50%)`;
        }
     } else {
        backgroundColor = 'hsla(var(--primary), 0.5)';
