@@ -956,8 +956,10 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   const handleClick = (e: React.MouseEvent) => {
+    // This stops the click from propagating to the timeline's onDoubleClick
     e.stopPropagation();
-    if (!isDragging) {
+    // A quick check to see if it's likely a drag, not a click
+    if (transform && transform.x === 0 && transform.y === 0) {
       onClick();
     }
   };
