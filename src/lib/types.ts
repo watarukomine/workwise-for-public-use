@@ -8,7 +8,6 @@ export type Staff = {
   name: string;
   email: string | null;
   photoURL?: string | null;
-  calendarId?: string; 
   avatarUrl?: string; 
   color?: string; 
   role: 'admin' | 'staff';
@@ -58,7 +57,6 @@ export type ScheduleEvent = {
   status?: string;
   allDay?: boolean;
   resource?: any;
-  calendarEventId?: string;
 };
 
 export type StaffStatus = {
