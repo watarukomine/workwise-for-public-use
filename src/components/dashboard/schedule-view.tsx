@@ -288,7 +288,7 @@ const TimeIndicator = () => {
         return () => clearInterval(timer);
     }, []);
 
-    if (!now || !isToday(now)) return null; 
+    if (!now) return null; 
     
     const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
     if (!isVisible) return null;
@@ -714,7 +714,7 @@ export function ScheduleView({
                           <div className="relative">
                             <ScrollArea className="w-full whitespace-nowrap">
                               <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
-                                <div className="relative space-y-2 z-10">
+                                <div className="relative z-10 space-y-2">
                                   {staffData?.map((staff) => {
                                       const events = scheduleData.filter((e) => e.staffId === staff.id);
                                       return (
@@ -844,8 +844,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className="sticky left-0 z-20 flex-shrink-0 pr-2 flex items-center" style={{ width: `${STAFF_COL_WIDTH}px`, backgroundColor: 'inherit' }}>
+    <div className={cn("flex border-t border-b", areaBgClass)}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center")} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -854,11 +854,10 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
+        className={cn("relative flex-1 h-16", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
-        <div className="h-full border-t border-b"></div>
         <div className="absolute top-0 left-0 h-full w-full z-10">
           {events.map((event) => (
             <DraggableEvent
@@ -909,11 +908,22 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const divStyle: React.CSSProperties = { 
       backgroundColor: staff.color || 'hsl(var(--primary))',
   };
-  let textColorClass = 'text-primary-foreground';
+  let textColorClass = 'text-white';
 
   if (isTravelEvent) {
-    divStyle.backgroundColor = `rgba(from ${staff.color || 'hsl(var(--primary))'} r g b / 0.5)`;
-    textColorClass = 'text-white';
+    // This is the part that makes the color semi-transparent
+    if (staff.color?.startsWith('hsl')) {
+       const match = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+       if (match) {
+         divStyle.backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+       }
+    } else {
+       // Fallback for non-hsl colors, assuming it's a hex or named color
+       // This part requires converting hex to rgba, which is more complex.
+       // For now, we'll use a simpler opacity property, but the hsla approach is better if colors are consistent.
+       style.opacity = 0.5;
+    }
+     textColorClass = 'text-white';
   } else {
     const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
     if (staff.name && brightStaff.includes(staff.name)) {
