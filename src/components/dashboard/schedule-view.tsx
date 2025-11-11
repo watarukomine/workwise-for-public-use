@@ -427,7 +427,6 @@ export function ScheduleView({
                 const originalTask = originalTripEvents.find(e => e.id.endsWith('-task'))!;
                 const originalTravel = originalTripEvents.find(e => e.id.endsWith('-travel'));
                 
-                const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
                 let travelDuration = TRAVEL_TIME_MINUTES;
                 if (originalTravel) {
                   travelDuration = differenceInMinutes(parseISO(originalTravel.end as string), parseISO(originalTravel.start as string));
@@ -943,7 +942,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
-         backgroundColor = `hsl(${match[1]}, ${parseInt(match[2]) * 0.8}%, ${(parseInt(match[3]) + 100) / 2}%)`;
+         backgroundColor = `hsl(${match[1]}, ${parseInt(match[2])}%, ${Math.min(90, (parseInt(match[3]) + 100) / 2)}%)`;
        }
     } else {
        backgroundColor = 'hsla(var(--primary), 0.5)';
