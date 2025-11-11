@@ -302,15 +302,23 @@ export function ScheduleView({
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
-  
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
   const [activeItem, setActiveItem] = React.useState<any | null>(null);
   const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
+
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleEvents) return [];
+      return scheduleEvents.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+      });
+  }, [scheduleEvents, currentDate]);
+
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActiveItem(event.active.data.current);
@@ -597,17 +605,8 @@ export function ScheduleView({
     );
   }
 
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-      });
-  }, [scheduleEvents, currentDate]);
-
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
-      <TooltipProvider>
             <Card>
                 <CardHeader>
                     <CardTitle>タイムライン</CardTitle>
@@ -744,7 +743,6 @@ export function ScheduleView({
                   </DialogFooter>
               </DialogContent>
           </Dialog>
-      </TooltipProvider>
     </DndContext>
   );
 }
