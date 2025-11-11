@@ -348,7 +348,7 @@ export function ScheduleView({
     }).map(mapRawToOrder);
 
     setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, currentDate]);
+  }, [rawOrdersData, currentDate, scheduleEvents]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -489,15 +489,23 @@ export function ScheduleView({
             const isStaffChange = draggedEvent.staffId !== newStaffId;
             
             if (draggedEvent.tripId) {
-                const originalTask = scheduleEvents.find(e => e.tripId === draggedEvent.tripId && e.id.endsWith('-task'))!;
-                const taskStartForSheet = updatedEvents.find(e => e.id === originalTask.id)!.start;
+                const updatedTask = updatedEvents.find(e => e.tripId === draggedEvent.tripId && e.id.endsWith('-task'))!;
                 
                 updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${originalTask.rawOrderId})`,
-                    scheduledTime: new Date(taskStartForSheet).toISOString(),
+                    eventTitle: `(ID: ${updatedTask.rawOrderId})`,
+                    scheduledTime: new Date(updatedTask.start).toISOString(),
                     staffName: newStaff.name,
-                }).then(() => refetchOrders());
+                }).then(async (result) => {
+                    if (result.status === 'error') {
+                        throw new Error(result.message);
+                    }
+                    await refetchOrders();
+                    toast({ title: "スケジュールを更新しました" });
+                }).catch(e => {
+                    setScheduleEvents(previousState);
+                    toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+                });
                 
             } else { // Generic event
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
@@ -514,8 +522,8 @@ export function ScheduleView({
                 } else if (newStaff.calendarId && draggedEvent.calendarEventId) {
                    await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: newStaff.calendarId, eventId: draggedEvent.calendarEventId, startTime: newStart.toISOString(), endTime: newEnd.toISOString()});
                 }
+                toast({ title: "スケジュールを更新しました" });
             }
-            toast({ title: "スケジュールを更新しました" });
         } catch(e: any) {
             setScheduleEvents(previousState); // Revert on failure
             toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
@@ -1106,3 +1114,4 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   );
 };
 
+    
