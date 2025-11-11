@@ -55,7 +55,7 @@ const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
 const STAFF_COL_WIDTH = 144; 
-const STATUS_COL_WIDTH = 80;
+const STATUS_COL_WIDTH = 120;
 
 
 const statusColors: Record<StaffStatus['status'], string> = {
@@ -442,15 +442,17 @@ export function ScheduleView({
         }
 
         try {
-            await updateSheetStatus({
-                gasUrl: ORDER_GAS_URL,
-                eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                scheduledTime: newStart.toISOString(),
-                staffName: newStaff.name,
-            });
-            
-            await refetchOrders(); // Refetch to confirm and get latest data
-            toast({ title: "スケジュールを更新しました" });
+            if (draggedEvent.rawOrderId) {
+                await updateSheetStatus({
+                    gasUrl: ORDER_GAS_URL,
+                    eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+                    scheduledTime: newStart.toISOString(),
+                    staffName: newStaff.name,
+                });
+                
+                await refetchOrders(); // Refetch to confirm and get latest data
+                toast({ title: "スケジュールを更新しました" });
+            }
 
         } catch(e: any) {
             toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
