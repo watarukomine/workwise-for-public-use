@@ -298,7 +298,7 @@ export function ScheduleView({
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
   
   React.useEffect(() => {
-    if (!rawOrdersData) return;
+    if (!rawOrdersData || !scheduleData) return;
     const allMappedOrders = rawOrdersData.map(mapRawToOrder);
     const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
     
@@ -841,7 +841,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   const { left, width } = getEventDimensions(event.start, event.end);
 
-  const style = {
+  const style: React.CSSProperties = {
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
@@ -855,25 +855,32 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   const isTravelEvent = event.title?.startsWith('移動');
-
-  let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = 'white';
+  
+  const divStyle: React.CSSProperties = {
+      backgroundColor: staff.color || 'hsl(var(--primary))',
+  };
 
   if (isTravelEvent) {
-    if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-       if (match) {
-         backgroundColor = `hsl(${match[1]}, ${match[2]}%, 50%)`;
-       }
-    } else {
-       backgroundColor = 'hsla(var(--primary), 0.5)';
-    }
-    color = 'hsl(var(--primary-foreground))';
-  } else if (event.title === '休憩') {
-    backgroundColor = `hsl(120, 40%, 85%)`;
-    color = 'hsl(var(--foreground))';
+      if (typeof divStyle.backgroundColor === 'string' && divStyle.backgroundColor.startsWith('hsl')) {
+        const match = divStyle.backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+        if (match) {
+            divStyle.backgroundColor = `hsl(${match[1]}, ${match[2]}%, 50%)`;
+        }
+      }
   }
   
+  const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
+  let textColorClass = 'text-primary-foreground';
+  if (staff.name && brightStaff.includes(staff.name)) {
+      textColorClass = 'text-black';
+  }
+  
+  if (event.title === '業務') {
+    divStyle.backgroundColor = 'rgb(156 163 175)';
+  } else if (event.title === '休憩') {
+    divStyle.backgroundColor = 'rgb(34 197 94)';
+  }
+
   const [line1, ...rest] = (event.title || '').split('\n');
   const line2 = rest.join('\n');
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
@@ -891,8 +898,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         data-event-chip="true"
       >
         <div
-          className="w-full h-full rounded-md flex flex-col justify-center p-1"
-          style={{ backgroundColor, color }}
+          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)}
+          style={divStyle}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
