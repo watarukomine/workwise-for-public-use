@@ -277,6 +277,35 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
     );
 }
 
+const TimeIndicator = () => {
+    const [now, setNow] = React.useState<Date | null>(null);
+
+    React.useEffect(() => {
+        setNow(new Date());
+        const timer = setInterval(() => {
+            setNow(new Date());
+        }, 60000); 
+        return () => clearInterval(timer);
+    }, []);
+
+    if (!now) return null; 
+    
+    const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
+    if (!isVisible) return null;
+    
+    const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
+    const leftPosition = minutesToPixels(minutesFromStart);
+
+    return (
+        <div
+            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
+            style={{ left: `${leftPosition}px` }}
+        >
+            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
+        </div>
+    );
+};
+
 export function ScheduleView({ 
     staffData, 
     customerData,
@@ -680,6 +709,14 @@ export function ScheduleView({
                                           </span>
                                       </div>
                                   ))}
+                                  {isToday(new Date()) && (
+                                    <div 
+                                        className="absolute top-0 h-full pointer-events-none z-40"
+                                        style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                    >
+                                        <TimeIndicator />
+                                    </div>
+                                  )}
                               </div>
                           </div>
                           <div className="relative">
