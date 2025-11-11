@@ -102,34 +102,29 @@ function OptimizerPageContent() {
   const baseIsLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
 
   const mapLocations = React.useMemo(() => {
-      const staffLocs = filteredStaffFromSelection
-          .map(staffMember => {
-              const status = statuses.find(s => s.staffId === staffMember.id);
-              return status && status.latitude && status.longitude ? { ...staffMember, ...status } : null;
-          })
-          .filter((s): s is Staff & StaffStatus => s !== null);
+    const staffLocs = filteredStaffFromSelection
+      .map(staffMember => {
+        const status = statuses.find(s => s.staffId === staffMember.id);
+        return status && status.latitude && status.longitude ? { ...staffMember, ...status } : null;
+      })
+      .filter((s): s is Staff & StaffStatus => s !== null);
 
-      if (!optimizedRoute?.optimizedRoute) {
-          return { staff: staffLocs, customers: allCustomers || [], route: [] };
-      }
+    if (!optimizedRoute?.optimizedRoute || optimizedRoute.optimizedRoute.length === 0) {
+      return { staff: staffLocs, customers: allCustomers || [], route: [], custom: [] };
+    }
 
-      const routeIds = new Set(optimizedRoute.optimizedRoute.map(r => r.id));
-      
-      const routeCustomers = (allCustomers || []).filter(c => {
-          const userCode = c.id;
-          return userCode && routeIds.has(String(userCode));
-      });
+    const routeIds = new Set(optimizedRoute.optimizedRoute.map(r => r.id));
+    
+    const routeCustomers = (allCustomers || []).filter(c => {
+        const userCode = String(c.userCode || c.id);
+        return userCode && routeIds.has(userCode);
+    });
 
-      const routeStaff = filteredStaffFromSelection
-          .filter(s => routeIds.has(s.id))
-          .map(staffMember => {
-              const status = statuses.find(s => s.staffId === staffMember.id);
-              return status ? { ...staffMember, ...status } : staffMember;
-          });
-      
-      const customLocations: Location[] = optimizedRoute.optimizedRoute.filter(r => r.type === 'custom');
+    const routeStaff = staffLocs.filter(s => routeIds.has(s.id));
+    
+    const customLocations: Location[] = optimizedRoute.optimizedRoute.filter(r => r.type === 'custom');
 
-      return { staff: routeStaff, customers: routeCustomers, route: optimizedRoute.optimizedRoute, custom: customLocations };
+    return { staff: routeStaff, customers: routeCustomers, route: optimizedRoute.optimizedRoute, custom: customLocations };
 
   }, [filteredStaffFromSelection, allCustomers, statuses, optimizedRoute]);
 
