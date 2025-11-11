@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -47,9 +46,9 @@ import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
-const PIXELS_PER_MINUTE = 1.5;
+const PIXELS_PER_MINUTE = 2.5;
 const timelineStartHour = 9;
-const timelineEndHour = 19;
+const timelineEndHour = 18;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
@@ -282,10 +281,9 @@ const TimeIndicator = () => {
     const [now, setNow] = React.useState<Date | null>(null);
 
     React.useEffect(() => {
-        setNow(new Date());
-        const timer = setInterval(() => {
-            setNow(new Date());
-        }, 60000); 
+        const updateNow = () => setNow(new Date());
+        updateNow(); // Set immediately
+        const timer = setInterval(updateNow, 60000); // Update every minute
         return () => clearInterval(timer);
     }, []);
 
@@ -303,7 +301,7 @@ const TimeIndicator = () => {
     return (
         <div
             className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
-            style={{ left: `${leftPosition}px`, zIndex: 50 }}
+            style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
         </div>
@@ -735,7 +733,7 @@ export function ScheduleView({
                                       );
                                   })}
                                 </div>
-                                <TimeIndicator />
+                                {isToday(new Date()) && <TimeIndicator />}
                               </div>
                             </ScrollArea>
                           </div>
@@ -849,7 +847,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
 
   return (
     <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center border-y", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+      <div className={cn("sticky left-0 z-20 flex-shrink-0 pr-2 flex items-center border-y", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -917,7 +915,15 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let textColorClass = 'text-primary-foreground';
 
   if (isTravelEvent) {
-    divStyle.backgroundColor = `hsla(${staff.color?.match(/\d+/g)?.[0] || '217'}, 91%, 60%, 0.5)`;
+    if (staff.color && staff.color.startsWith('hsl')) {
+       const match = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+       if (match) {
+         divStyle.backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+       }
+    } else {
+       // Fallback for non-hsl colors or if match fails
+       divStyle.opacity = 0.5;
+    }
     textColorClass = 'text-white';
   } else {
     const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
