@@ -1,3 +1,4 @@
+
 'use client';
 import type { StaffStatus, Staff, WithId } from '@/lib/types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -30,15 +31,37 @@ const statusJapanese: Record<StaffStatus['status'], string> = {
 interface StatusUpdatesProps {
     staffData: WithId<Staff>[];
     statuses: StaffStatus[];
+    simple?: boolean;
 }
 
-export function StatusUpdates({ staffData, statuses }: StatusUpdatesProps) {
+export function StatusUpdates({ staffData, statuses, simple }: StatusUpdatesProps) {
   
   const getStatus = (staffId: string): StaffStatus | undefined => {
     return statuses?.find(s => s.staffId === staffId);
   };
   
   const isLoading = !statuses || !staffData;
+
+  if (simple) {
+    const staff = staffData[0];
+    const status = getStatus(staff.id);
+    if (!status) return <div className="h-full w-full"></div>;
+    return (
+        <div className="flex items-center gap-3 w-full">
+            <Avatar className="h-9 w-9 border">
+              <AvatarImage src={staff.avatarUrl} alt={staff.name} data-ai-hint="person" />
+              <AvatarFallback>{staff.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 space-y-1">
+                <Badge variant="outline" className="flex items-center gap-2 text-xs">
+                  <span className={cn("h-2 w-2 rounded-full", statusColors[status.status])} />
+                  {statusJapanese[status.status]}
+                </Badge>
+              <p className="text-xs text-muted-foreground truncate">{status.lastAction}</p>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <Card>

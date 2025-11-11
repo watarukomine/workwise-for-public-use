@@ -5,7 +5,7 @@ import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
 import { customerData, staffStatusData } from '@/lib/data';
-import type { Customer, WithId, Staff, ScheduleEvent } from '@/lib/types';
+import type { Customer, WithId, Staff } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -28,8 +28,6 @@ export default function DashboardPage() {
   
   const { 
     orders: rawOrders, 
-    scheduleEvents,
-    setScheduleEvents,
     isLoading: isLoadingOrders,
   } = useOrder();
   
@@ -92,15 +90,6 @@ export default function DashboardPage() {
           return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
       });
   };
-  
-  const dailySchedule = React.useMemo(() => {
-    if (!scheduleEvents) return [];
-    return scheduleEvents.filter(event => {
-        const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-        return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-    });
-}, [scheduleEvents, currentDate]);
-
 
   if (isLoading) {
       return (
@@ -170,29 +159,20 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-8">
-        <div className="flex-grow lg:w-2/3">
-          {showVerticalView ? (
-              <VerticalScheduleView 
-                  scheduleData={dailySchedule}
-                  staffData={filteredStaff}
-              />
-          ) : (
-              <ScheduleView 
-                  staffData={filteredStaff} 
-                  customerData={customers} 
-                  rawOrdersData={rawOrders}
-                  scheduleData={dailySchedule}
-                  setScheduleData={setScheduleEvents}
-              />
-          )}
-        </div>
-        {isToday(currentDate) && !showVerticalView && (
-          <div className="lg:w-1/3">
-            <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />
-          </div>
-        )}
-      </div>
+      {showVerticalView ? (
+          <VerticalScheduleView 
+              scheduleData={[]}
+              staffData={filteredStaff}
+          />
+      ) : (
+          <ScheduleView 
+              staffData={filteredStaff} 
+              customerData={customers} 
+              rawOrdersData={rawOrders}
+              currentDate={currentDate}
+              statuses={filteredStatuses}
+          />
+      )}
     </div>
   );
 }
