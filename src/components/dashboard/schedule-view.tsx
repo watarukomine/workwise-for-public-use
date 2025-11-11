@@ -43,10 +43,10 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { updateSheetStatus, handleCalendarEvent, sendIcsViaGmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import * as ics from 'ics';
-import { CalendarPlus } from 'lucide-react';
+import { CalendarPlus, Mail } from 'lucide-react';
 
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -517,6 +517,7 @@ export function ScheduleView({
                         scheduledTime: newStart.toISOString(),
                         timestamp: new Date().toISOString(),
                     });
+                    handleEventClick(taskEvent);
                     toast({ title: "タスクを割り当てました" });
                 } catch (e: any) {
                     toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
@@ -616,6 +617,35 @@ export function ScheduleView({
 
     setDialogState({ mode: 'closed' });
   };
+
+    const handleSendIcalMail = async () => {
+        if (dialogState.mode !== 'edit') return;
+        const { event } = dialogState;
+        const staff = getStaffById(event.staffId);
+        const customer = getCustomerByCode(event.locationId);
+
+        if (!staff || !staff.email) {
+            toast({ variant: 'destructive', title: '送信エラー', description: '担当スタッフにメールアドレスが設定されていません。' });
+            return;
+        }
+
+        try {
+            const result = await sendIcsViaGmail({
+                gasUrl: ORDER_GAS_URL,
+                recipient: staff.email,
+                title: event.title,
+                description: event.description,
+                startTime: (event.start as Date | string).toString(),
+                endTime: (event.end as Date | string).toString(),
+                location: customer?.address,
+            });
+             if (result.status === 'error') throw new Error(result.message);
+            toast({ title: 'iCalメールを送信しました', description: `${staff.name}宛に予定を送信しました。` });
+
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: '送信エラー', description: `iCalメールの送信に失敗しました: ${e.message}` });
+        }
+    }
   
     const handleSendIcal = () => {
     if (dialogState.mode !== 'edit') return;
@@ -725,7 +755,7 @@ export function ScheduleView({
                         </div>
                         <div className="relative mt-2 space-y-2">
                              <div 
-                                className="absolute top-0 h-full pointer-events-none z-[101]"
+                                className="absolute top-0 h-full pointer-events-none z-[30]"
                                 style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
                             >
                                {isToday(currentDate) && <TimeIndicator />}
@@ -820,7 +850,8 @@ export function ScheduleView({
                       <div className="flex gap-2">
                           {dialogState.mode === 'edit' && (
                             <>
-                              <Button variant="outline" onClick={handleSendIcal}><CalendarPlus className="mr-2 h-4 w-4" /> iCal送信</Button>
+                              <Button variant="outline" onClick={handleSendIcal}><CalendarPlus className="mr-2 h-4 w-4" /> iCalDL</Button>
+                              <Button variant="outline" onClick={handleSendIcalMail}><Mail className="mr-2 h-4 w-4" /> iCal送信</Button>
                               <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
                             </>
                           )}
@@ -925,8 +956,10 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); 
-    onClick();
+    e.stopPropagation();
+    if (!isDragging) {
+      onClick();
+    }
   };
   
   const isTravelEvent = event.title?.startsWith('移動');
