@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -914,6 +915,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 2,
+    opacity: isDragging ? 0.8 : 1,
     position: 'absolute',
   };
 
@@ -932,10 +934,9 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
-         backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+         const newLuminance = Math.min(90, parseInt(match[3]) + 30);
+         backgroundColor = `hsl(${match[1]}, ${match[2]}%, ${newLuminance}%)`;
        }
-    } else {
-       backgroundColor = 'hsla(var(--primary), 0.5)';
     }
     color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
