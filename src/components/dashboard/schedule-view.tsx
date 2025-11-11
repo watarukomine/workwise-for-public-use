@@ -44,7 +44,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { Badge } from '@/components/ui/badge';
 
@@ -359,7 +359,7 @@ export function ScheduleView({
         toast({ title: 'タスクを未割り当てに戻しました' });
       } catch(e: any) {
           console.error("Unassignment failed:", e);
-          toast({ variant: 'destructive', title: '更新エラー', description: `シートまたはカレンダーの更新に失敗しました: ${e.message}` });
+          toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
       }
   };
 
@@ -879,14 +879,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   if (isTravelEvent) {
-    if (typeof divStyle.backgroundColor === 'string' && divStyle.backgroundColor.startsWith('hsl')) {
-       const match = divStyle.backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-       if (match) {
-         divStyle.backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
-       }
-    } else {
-       divStyle.backgroundColor = 'hsla(var(--primary), 0.5)';
-    }
+    style.opacity = 0.5;
   }
   
   const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
