@@ -201,8 +201,6 @@ import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
-import { Badge } from '@/components/ui/badge';
-import * as ics from 'ics';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -683,38 +681,13 @@ export function ScheduleView({
     }
   };
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
-    const staff = getStaffById(event.staffId);
-    if (!staff || !staff.email) {
-        toast({ variant: 'destructive', title: 'エラー', description: '担当スタッフのメールアドレスが登録されていません。' });
-        return;
-    }
-
-    const start = parseISO(event.start as string);
-    const end = parseISO(event.end as string);
-
-    if (!isValid(start) || !isValid(end)) {
-        toast({ variant: 'destructive', title: 'エラー', description: '無効なイベント時間です。' });
-        return;
-    }
-    
-    const icsEvent: ics.EventAttributes = {
-        start: [start.getFullYear(), start.getMonth() + 1, start.getDate(), start.getHours(), start.getMinutes()],
-        end: [end.getFullYear(), end.getMonth() + 1, end.getDate(), end.getHours(), end.getMinutes()],
-        title: event.title,
-        description: event.description,
-    };
-
-    ics.createEvent(icsEvent, (error, value) => {
-        if (error) {
-            console.error(error);
-            toast({ variant: 'destructive', title: 'iCal作成エラー', description: error.message });
-            return;
-        }
-
-        const mailtoLink = `mailto:${staff.email}?subject=${encodeURIComponent(event.title)}&body=${encodeURIComponent('以下のカレンダーファイルをインポートしてください。\n\n' + value)}`;
-        
-        window.location.href = mailtoLink;
+    setEditedEventDetails({
+        title: event.title || '',
+        description: event.description || '',
+        startTime: formatTime(event.start),
+        endTime: formatTime(event.end),
     });
+    setDialogState({ mode: 'edit', event });
   };
   
   const handleDoubleClickTimeline = (staffId: string, e: React.MouseEvent) => {
@@ -832,71 +805,72 @@ export function ScheduleView({
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
-        <Card>
-            <CardContent className="p-4 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div className="md:col-span-3">
-                        <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
-                    </div>
-                    <div className="md:col-span-2">
-                        <GenericTasks />
-                    </div>
-                </div>
-
-                <div className="mt-4">
-                    <CardHeader className="p-0 mb-4">
-                        <CardTitle>タイムライン</CardTitle>
-                    </CardHeader>
-                    <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                          <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                              <div className="relative h-8 flex-1">
-                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                      <div
-                                          key={i}
-                                          className="absolute h-full border-l"
-                                          style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                      >
-                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                              {timelineStartHour + i}:00
-                                          </span>
-                                      </div>
-                                  ))}
-                                   {isToday(currentDate) && (
-                                    <div 
-                                        className="absolute top-0 h-full pointer-events-none z-40"
-                                        style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+        <div className="relative">
+          <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-sm -mx-4 sm:-mx-8 px-4 sm:px-8 py-4 mb-4 border-b">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="md:col-span-3">
+                      <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+                  </div>
+                  <div className="md:col-span-2">
+                      <GenericTasks />
+                  </div>
+              </div>
+          </div>
+          <Card className="pt-8">
+              <CardHeader className='absolute top-0 left-6'>
+                  <CardTitle>タイムライン</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                  <ScrollArea className="w-full whitespace-nowrap">
+                      <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                        <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                            <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                            <div className="relative h-8 flex-1">
+                                {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className="absolute h-full border-l"
+                                        style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
                                     >
-                                        <TimeIndicator />
+                                        <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                            {timelineStartHour + i}:00
+                                        </span>
                                     </div>
-                                   )}
-                              </div>
-                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
-                          </div>
-                          <div className="relative mt-2 space-y-2">
-                              {staffData?.map((staff) => {
-                                  const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                  const status = statuses.find(s => s.staffId === staff.id);
-                                  return (
-                                      <StaffRow
-                                          key={staff.id}
-                                          staff={staff}
-                                          events={events}
-                                          status={status}
-                                          getCustomerByCode={getCustomerByCode}
-                                          isOver={currentOverStaffId === staff.id}
-                                          onDoubleClickEvent={handleDoubleClickEvent}
-                                          onDoubleClickTimeline={handleDoubleClickTimeline}
-                                      />
-                                  );
-                              })}
-                          </div>
+                                ))}
+                            </div>
+                            <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                         </div>
-                    </ScrollArea>
-                </div>
-            </CardContent>
-        </Card>
+                        <div className="relative mt-2 space-y-2">
+                            {isToday(currentDate) && (
+                            <div 
+                                className="absolute top-0 h-full pointer-events-none z-[101]"
+                                style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                            >
+                                <TimeIndicator />
+                            </div>
+                            )}
+                            {staffData?.map((staff) => {
+                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                const status = statuses.find(s => s.staffId === staff.id);
+                                return (
+                                    <StaffRow
+                                        key={staff.id}
+                                        staff={staff}
+                                        events={events}
+                                        status={status}
+                                        getCustomerByCode={getCustomerByCode}
+                                        isOver={currentOverStaffId === staff.id}
+                                        onDoubleClickEvent={handleDoubleClickEvent}
+                                        onDoubleClickTimeline={handleDoubleClickTimeline}
+                                    />
+                                );
+                            })}
+                        </div>
+                      </div>
+                  </ScrollArea>
+              </CardContent>
+          </Card>
+        </div>
       
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
           <DialogContent>
@@ -1101,40 +1075,38 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger
-          ref={setNodeRef}
-          style={style}
-          {...listeners}
-          {...attributes}
-          onDoubleClick={handleDoubleClick}
-          className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
-          data-event-chip="true"
+    <Tooltip>
+      <TooltipTrigger
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
+        onDoubleClick={handleDoubleClick}
+        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
+        data-event-chip="true"
+      >
+        <div
+          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && "opacity-80")}
+          style={divStyle}
         >
-          <div
-            className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && "opacity-80")}
-            style={divStyle}
-          >
-            <p className="text-xs font-semibold truncate pointer-events-none">
-              {line1}
+          <p className="text-xs font-semibold truncate pointer-events-none">
+            {line1}
+          </p>
+          {line2 && (
+            <p className="text-xs opacity-80 truncate pointer-events-none">
+                {line2}
             </p>
-            {line2 && (
-              <p className="text-xs opacity-80 truncate pointer-events-none">
-                  {line2}
-              </p>
-            )}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
-          {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
-          <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
-          <p className="text-sm">担当: {staff.name}</p>
-          {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          )}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
+        {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
+        <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
+        <p className="text-sm">担当: {staff.name}</p>
+        {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
+      </TooltipContent>
+    </Tooltip>
   );
 };
 ```
@@ -1485,6 +1457,7 @@ function doGet(e) {
       const obj = {};
       headers.forEach((header, index) => {
         const cellValue = row[index];
+        // Check if the cell value is a valid Date object before calling toISOString
         if (cellValue && cellValue instanceof Date && !isNaN(cellValue)) {
           obj[header] = cellValue.toISOString();
         } else {
