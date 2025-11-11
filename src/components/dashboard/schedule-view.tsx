@@ -703,6 +703,7 @@ export function ScheduleView({
                                             staff={staff}
                                             events={events}
                                             getCustomerByCode={getCustomerByCode}
+                                            rawOrdersData={rawOrdersData}
                                             isOver={currentOverStaffId === staff.id}
                                             onDoubleClickEvent={handleDoubleClickEvent}
                                             onDoubleClickTimeline={handleDoubleClickTimeline}
@@ -792,8 +793,8 @@ export function ScheduleView({
                               <Button onClick={handleSaveEvent}>保存</Button>
                           </div>
                       </DialogFooter>
-                  </DialogContent>
-              </Dialog>
+              </DialogContent>
+          </Dialog>
         </TooltipProvider>
     </DndContext>
   );
@@ -803,12 +804,13 @@ interface StaffRowProps {
   staff: WithId<Staff>;
   events: WithId<ScheduleEvent>[];
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
+  rawOrdersData: any[];
   isOver: boolean;
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, rawOrdersData, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
@@ -841,6 +843,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
               event={event}
               staff={staff}
               getCustomerByCode={getCustomerByCode}
+              rawOrdersData={rawOrdersData}
               onDoubleClick={() => onDoubleClickEvent(event)}
             />
           ))}
@@ -854,10 +857,11 @@ interface DraggableEventProps {
   event: WithId<ScheduleEvent>;
   staff: WithId<Staff>;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
+  rawOrdersData: any[];
   onDoubleClick: () => void;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, rawOrdersData, onDoubleClick }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
@@ -908,7 +912,10 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let line1 = event.title || '';
   let line2 = '';
 
-  if (!isTravelEvent && event.rawOrderId) {
+  if (isTravelEvent) {
+      const parts = event.title.split('：');
+      line1 = `移動：${parts[1] || ''}`;
+  } else if (event.rawOrderId) {
     const orderInRaw = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === event.rawOrderId);
     if(orderInRaw) {
         const customerName = customer?.storeName || '';
