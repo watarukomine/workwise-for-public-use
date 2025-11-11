@@ -109,22 +109,14 @@ function OptimizerPageContent() {
       })
       .filter((s): s is Staff & StaffStatus => s !== null);
 
-    if (!optimizedRoute?.optimizedRoute || optimizedRoute.optimizedRoute.length === 0) {
-      return { staff: staffLocs, customers: allCustomers || [], route: [], custom: [] };
-    }
+    const customLocationsInRoute = optimizedRoute?.optimizedRoute.filter(r => r.type === 'custom') || [];
 
-    const routeIds = new Set(optimizedRoute.optimizedRoute.map(r => r.id));
-    
-    const routeCustomers = (allCustomers || []).filter(c => {
-        const userCode = String(c.userCode || c.id);
-        return userCode && routeIds.has(userCode);
-    });
-
-    const routeStaff = staffLocs.filter(s => routeIds.has(s.id));
-    
-    const customLocations: Location[] = optimizedRoute.optimizedRoute.filter(r => r.type === 'custom');
-
-    return { staff: routeStaff, customers: routeCustomers, route: optimizedRoute.optimizedRoute, custom: customLocations };
+    return { 
+        staff: staffLocs, 
+        customers: allCustomers || [], 
+        route: optimizedRoute?.optimizedRoute || [], 
+        custom: customLocationsInRoute
+    };
 
   }, [filteredStaffFromSelection, allCustomers, statuses, optimizedRoute]);
 
