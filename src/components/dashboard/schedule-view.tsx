@@ -21,6 +21,7 @@ import {
 import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
@@ -122,28 +123,30 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   );
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-      >
-        <div
-          className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          ref={setNodeRef}
+          style={style}
+          {...listeners}
+          {...attributes}
         >
-          <p className="text-xs font-semibold truncate pointer-events-none">
-            {line1}
-          </p>
-          {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
-            {line2}
-          </p>}
-        </div>
-      </TooltipTrigger>
-       <TooltipContent>
-        {tooltipContent}
-      </TooltipContent>
-    </Tooltip>
+          <div
+            className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
+          >
+            <p className="text-xs font-semibold truncate pointer-events-none">
+              {line1}
+            </p>
+            {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
+              {line2}
+            </p>}
+          </div>
+        </TooltipTrigger>
+         <TooltipContent>
+          {tooltipContent}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 
@@ -182,7 +185,7 @@ function GenericTasks() {
 
     return (
         <Card className="h-full">
-            <CardHeader>
+            <CardHeader className='pb-4'>
                 <CardTitle className="text-lg">汎用タスク</CardTitle>
                  <CardDescription>休憩や移動など、受注以外のタスクです。</CardDescription>
             </CardHeader>
@@ -212,7 +215,7 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
             ref={setNodeRef}
             className={cn("transition-colors h-full", isOver && "bg-primary/10 border-primary/50")}
         >
-            <CardHeader>
+            <CardHeader className='pb-4'>
                 <CardTitle className="text-lg">{titleText}</CardTitle>
                 <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。</CardDescription>
             </CardHeader>
@@ -477,7 +480,7 @@ export function ScheduleView({
         const isGeneric = order.id.startsWith('generic-');
 
         if (isGeneric) {
-            const newEvent: WithId<ScheduleEvent> = {
+             const newEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}`,
                 title: order.taskDetails,
                 description: '',
@@ -485,9 +488,9 @@ export function ScheduleView({
                 locationId: '',
                 start: newStart.toISOString(),
                 end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-            };
-            setScheduleEvents(prev => [...prev, newEvent]);
-            toast({ title: "汎用タスクを追加しました" });
+             };
+             setScheduleEvents(prev => [...prev, newEvent]);
+             toast({ title: "汎用タスクを追加しました" });
         } else {
              // Optimistic UI Update
              const tripId = `trip-${order.rawOrderId}`;
@@ -678,73 +681,74 @@ export function ScheduleView({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
-      <Card>
-          <CardContent className="p-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <div className="md:col-span-3 h-full">
-                      <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
-                  </div>
-                  <div className="md:col-span-2 h-full">
-                      <GenericTasks />
-                  </div>
-              </div>
+      <TooltipProvider>
+        <Card>
+            <CardContent className="p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div className="md:col-span-3">
+                        <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+                    </div>
+                    <div className="md:col-span-2">
+                        <GenericTasks />
+                    </div>
+                </div>
 
-              <Card className="mt-4">
-                  <CardHeader>
-                      <CardTitle>タイムライン</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                      <ScrollArea className="w-full whitespace-nowrap">
-                          <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                            <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                                <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                                <div className="relative h-8 flex-1">
-                                    {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                        <div
-                                            key={i}
-                                            className="absolute h-full border-l"
-                                            style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                <Card className="mt-4">
+                    <CardHeader>
+                        <CardTitle>タイムライン</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <ScrollArea className="w-full whitespace-nowrap">
+                            <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                              <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                                  <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                                  <div className="relative h-8 flex-1">
+                                      {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                          <div
+                                              key={i}
+                                              className="absolute h-full border-l"
+                                              style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                          >
+                                              <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                                  {timelineStartHour + i}:00
+                                              </span>
+                                          </div>
+                                      ))}
+                                       {isToday(currentDate) && (
+                                        <div 
+                                            className="absolute top-0 h-full pointer-events-none z-40"
+                                            style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
                                         >
-                                            <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                                {timelineStartHour + i}:00
-                                            </span>
+                                            <TimeIndicator />
                                         </div>
-                                    ))}
-                                     {isToday(currentDate) && (
-                                      <div 
-                                          className="absolute top-0 h-full pointer-events-none z-40"
-                                          style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                                      >
-                                          <TimeIndicator />
-                                      </div>
-                                     )}
-                                </div>
-                                <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                                       )}
+                                  </div>
+                                  <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                              </div>
+                              <div className="relative mt-2 space-y-2">
+                                  {staffData?.map((staff) => {
+                                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                      const status = statuses.find(s => s.staffId === staff.id);
+                                      return (
+                                          <StaffRow
+                                              key={staff.id}
+                                              staff={staff}
+                                              events={events}
+                                              status={status}
+                                              getCustomerByCode={getCustomerByCode}
+                                              isOver={currentOverStaffId === staff.id}
+                                              onDoubleClickEvent={handleDoubleClickEvent}
+                                              onDoubleClickTimeline={handleDoubleClickTimeline}
+                                          />
+                                      );
+                                  })}
+                              </div>
                             </div>
-                            <div className="relative mt-2 space-y-2">
-                                {staffData?.map((staff) => {
-                                    const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                    const status = statuses.find(s => s.staffId === staff.id);
-                                    return (
-                                        <StaffRow
-                                            key={staff.id}
-                                            staff={staff}
-                                            events={events}
-                                            status={status}
-                                            getCustomerByCode={getCustomerByCode}
-                                            isOver={currentOverStaffId === staff.id}
-                                            onDoubleClickEvent={handleDoubleClickEvent}
-                                            onDoubleClickTimeline={handleDoubleClickTimeline}
-                                        />
-                                    );
-                                })}
-                            </div>
-                          </div>
-                      </ScrollArea>
-                  </CardContent>
-              </Card>
-          </CardContent>
-      </Card>
+                        </ScrollArea>
+                    </CardContent>
+                </Card>
+            </CardContent>
+        </Card>
       
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
           <DialogContent>
@@ -824,6 +828,7 @@ export function ScheduleView({
                   </DialogFooter>
               </DialogContent>
           </Dialog>
+      </TooltipProvider>
     </DndContext>
   );
 }
@@ -948,37 +953,39 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-        onDoubleClick={handleDoubleClick}
-        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
-        data-event-chip="true"
-      >
-        <div
-          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && "opacity-80")}
-          style={divStyle}
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          ref={setNodeRef}
+          style={style}
+          {...listeners}
+          {...attributes}
+          onDoubleClick={handleDoubleClick}
+          className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
+          data-event-chip="true"
         >
-          <p className="text-xs font-semibold truncate pointer-events-none">
-            {line1}
-          </p>
-          {line2 && (
-            <p className="text-xs opacity-80 truncate pointer-events-none">
-                {line2}
+          <div
+            className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && "opacity-80")}
+            style={divStyle}
+          >
+            <p className="text-xs font-semibold truncate pointer-events-none">
+              {line1}
             </p>
-          )}
-        </div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
-        {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
-        <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
-        <p className="text-sm">担当: {staff.name}</p>
-        {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
-      </TooltipContent>
-    </Tooltip>
+            {line2 && (
+              <p className="text-xs opacity-80 truncate pointer-events-none">
+                  {line2}
+              </p>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
+          {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
+          <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
+          <p className="text-sm">担当: {staff.name}</p>
+          {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
