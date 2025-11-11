@@ -54,28 +54,8 @@ const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
-const STAFF_COL_WIDTH = 144; 
+const STAFF_COL_WIDTH = 144;
 const STATUS_COL_WIDTH = 120;
-
-
-const statusColors: Record<StaffStatus['status'], string> = {
-  '待機中': 'bg-gray-400',
-  '移動中': 'bg-yellow-500',
-  '作業待ち': 'bg-blue-500',
-  '作業中': 'bg-green-500',
-  '作業完了': 'bg-purple-500',
-  '未割当': 'bg-red-500',
-};
-
-const statusJapanese: Record<StaffStatus['status'], string> = {
-  '待機中': '待機中',
-  '移動中': '移動中',
-  '作業待ち': '作業待ち',
-  '作業中': '作業中',
-  '作業完了': '作業完了',
-  '未割当': '未割当',
-};
-
 
 const timeStringToDate = (timeStr: string, baseDate: Date) => {
     if (!/^\d{2}:\d{2}$/.test(timeStr)) {
@@ -596,9 +576,6 @@ export function ScheduleView({
             setScheduleEvents(prev => [...prev, newEvent]);
 
         } else if (dialogState.mode === 'edit') {
-            const staff = getStaffById(dialogState.event.staffId);
-            if (!staff) throw new Error("担当スタッフが見つかりません。");
-            
             if (dialogState.event.rawOrderId) { // Sheet-based event
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
@@ -857,7 +834,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
       <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
         {status && isToday(new Date()) && (
           <div className="text-xs text-center font-medium">
-             {statusJapanese[status.status]}
+             {status.status}
           </div>
         )}
       </div>
