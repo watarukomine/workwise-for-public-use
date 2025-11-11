@@ -513,7 +513,7 @@ export function ScheduleView({
              setScheduleEvents(prev => [...prev, newEvent]);
              toast({ title: "汎用タスクを追加しました" });
         } else {
-             const tripId = `trip-${order.rawOrderId}`;
+             const tripId = `trip-${Date.now()}`;
              const customer = getCustomerByCode(order.customerCode);
              const travelEvent: WithId<ScheduleEvent> = {
                 id: `${tripId}-travel`, tripId,
@@ -989,6 +989,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
 
   const handleClick = (e: React.MouseEvent) => {
+    // This stops the click from bubbling up and triggering the timeline's double click or drag events
     e.stopPropagation();
     onClick();
   };
