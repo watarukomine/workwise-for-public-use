@@ -3,7 +3,7 @@
 import * as React from 'react';
 import type { ScheduleEvent, Staff, Customer, WithId } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isEqual, startOfDay, isValid } from 'date-fns';
 import { Clock, MapPin, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCustomer } from '@/contexts/customer-context';
@@ -12,6 +12,7 @@ import Link from 'next/link';
 interface VerticalScheduleViewProps {
   scheduleData: WithId<ScheduleEvent>[];
   staffData: WithId<Staff>[];
+  currentDate: Date;
 }
 
 const formatTime = (date: Date | string | undefined) => {
@@ -21,7 +22,7 @@ const formatTime = (date: Date | string | undefined) => {
   return format(d, 'HH:mm');
 };
 
-export function VerticalScheduleView({ scheduleData, staffData }: VerticalScheduleViewProps) {
+export function VerticalScheduleView({ scheduleData, staffData, currentDate }: VerticalScheduleViewProps) {
     const { customers } = useCustomer();
     const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => {
         if (!id) return undefined;
@@ -29,10 +30,16 @@ export function VerticalScheduleView({ scheduleData, staffData }: VerticalSchedu
         return customers.find(c => c.id === id || c.userCode === id);
     };
     
-    // Filter for events assigned to the currently displayed staff and sort by start time
+    // Filter for events assigned to the currently displayed staff for the current date and sort by start time
     const staffIds = new Set(staffData.map(s => s.id));
     const relevantEvents = scheduleData
-        .filter(event => event.staffId && staffIds.has(event.staffId))
+        .filter(event => {
+            const eventDate = parseISO(event.start as string);
+            return event.staffId && 
+                   staffIds.has(event.staffId) &&
+                   isValid(eventDate) &&
+                   isEqual(startOfDay(eventDate), startOfDay(currentDate));
+        })
         .sort((a, b) => {
             const startA = typeof a.start === 'string' ? parseISO(a.start) : a.start;
             const startB = typeof b.start === 'string' ? parseISO(b.start) : b.start;

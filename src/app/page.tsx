@@ -195,6 +195,7 @@ export default function DashboardPage() {
             <VerticalScheduleView 
                 scheduleData={scheduleEvents}
                 staffData={filteredStaff}
+                currentDate={currentDate}
             />
         ) : (
           <ScheduleView 
