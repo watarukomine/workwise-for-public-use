@@ -887,15 +887,21 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
-         backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+         const [, h, s, l] = match;
+         // Increase lightness to make the color paler. Adjust the 90 to be closer to 100 for lighter, or closer to l for less effect.
+         const newL = Math.min(100, parseInt(l, 10) + (100 - parseInt(l, 10)) * 0.5); 
+         backgroundColor = `hsl(${h}, ${s}%, ${newL}%)`;
+         color = 'hsl(var(--foreground))';
        } else {
+         // Fallback for non-matching HSL strings
          backgroundColor = 'hsla(var(--primary), 0.5)';
+         color = 'hsl(var(--foreground))';
        }
     } else {
-       // Fallback for non-hsl colors, though less likely with the current setup
+       // Fallback for non-HSL colors, maybe could be improved
        backgroundColor = 'hsla(var(--primary), 0.5)';
+       color = 'hsl(var(--foreground))';
     }
-    color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
      if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
         const [h, s] = backgroundColor.match(/\d+/g) || ['0', '0'];
