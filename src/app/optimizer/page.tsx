@@ -27,7 +27,7 @@ function OptimizerPageContent() {
   const [avoidHighways, setAvoidHighways] = React.useState(false);
   const placesLibrary = useMapsLibrary("places");
 
-  const filteredStaff = React.useMemo(() => {
+  const filteredStaffFromSelection = React.useMemo(() => {
     if (isStaffLoading || !allStaff) return [];
     if (appliedSelectedStaffIds.length === 0) {
       return allStaff;
@@ -37,8 +37,8 @@ function OptimizerPageContent() {
   }, [appliedSelectedStaffIds, allStaff, isStaffLoading]);
   
   const statuses: StaffStatus[] = React.useMemo(() => {
-    if (!filteredStaff.length || !rawOrders.length) {
-        return filteredStaff.map(sf => ({
+    if (!filteredStaffFromSelection.length || !rawOrders.length) {
+        return filteredStaffFromSelection.map(sf => ({
             staffId: sf.id,
             status: '待機中',
             lastAction: '現在地情報なし',
@@ -48,7 +48,7 @@ function OptimizerPageContent() {
     const staffStatusMap = new Map<string, StaffStatus>();
 
     // Initialize with default status
-    for (const staff of filteredStaff) {
+    for (const staff of filteredStaffFromSelection) {
         staffStatusMap.set(staff.id, {
             staffId: staff.id,
             status: '待機中',
@@ -84,7 +84,15 @@ function OptimizerPageContent() {
     }
     
     return Array.from(staffStatusMap.values());
-  }, [filteredStaff, rawOrders, allStaff]);
+  }, [filteredStaffFromSelection, rawOrders, allStaff]);
+
+  const staffWithLocation = React.useMemo(() => {
+      return filteredStaffFromSelection.filter(staffMember => {
+          const status = statuses.find(s => s.staffId === staffMember.id);
+          return status && status.latitude && status.longitude;
+      });
+  }, [filteredStaffFromSelection, statuses]);
+
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
     setOptimizedRoute(data);
@@ -94,7 +102,7 @@ function OptimizerPageContent() {
   const baseIsLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
 
   const mapLocations = React.useMemo(() => {
-      const staffLocs = filteredStaff
+      const staffLocs = filteredStaffFromSelection
           .map(staffMember => {
               const status = statuses.find(s => s.staffId === staffMember.id);
               return status && status.latitude && status.longitude ? { ...staffMember, ...status } : null;
@@ -112,7 +120,7 @@ function OptimizerPageContent() {
           return userCode && routeIds.has(String(userCode));
       });
 
-      const routeStaff = filteredStaff
+      const routeStaff = filteredStaffFromSelection
           .filter(s => routeIds.has(s.id))
           .map(staffMember => {
               const status = statuses.find(s => s.staffId === staffMember.id);
@@ -123,7 +131,7 @@ function OptimizerPageContent() {
 
       return { staff: routeStaff, customers: routeCustomers, route: optimizedRoute.optimizedRoute, custom: customLocations };
 
-  }, [filteredStaff, allCustomers, statuses, optimizedRoute]);
+  }, [filteredStaffFromSelection, allCustomers, statuses, optimizedRoute]);
 
   if (baseIsLoading) {
     return (
@@ -167,7 +175,7 @@ function OptimizerPageContent() {
             ) : (
                 <RouteOptimizer 
                     onRouteOptimized={handleRouteOptimized}
-                    staff={filteredStaff}
+                    staff={staffWithLocation}
                     staffStatus={statuses}
                     allCustomers={allCustomers || []}
                     placesLibraryReady={!!placesLibrary}
