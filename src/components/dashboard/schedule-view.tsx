@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -1031,8 +1030,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
        if (match) {
          backgroundColor = `hsl(${match[1]}, ${match[2]}%, 50%)`;
        }
-    } else {
-       backgroundColor = 'hsl(var(--primary))';
     }
   } else if (event.title === '休憩') {
      backgroundColor = `hsl(120, 40%, 90%)`;
