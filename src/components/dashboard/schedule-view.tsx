@@ -845,7 +845,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
 
   return (
     <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-20 flex-shrink-0 pr-2 flex items-center border-y")} style={{ width: `${STAFF_COL_WIDTH}px`, backgroundColor: 'inherit' }}>
+      <div className="sticky left-0 z-20 flex-shrink-0 pr-2 flex items-center" style={{ width: `${STAFF_COL_WIDTH}px`, backgroundColor: 'inherit' }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -912,24 +912,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let textColorClass = 'text-primary-foreground';
 
   if (isTravelEvent) {
-      if (staff.color && staff.color.startsWith('hsl')) {
-          divStyle.backgroundColor = staff.color.replace(')', ', 0.5)').replace('hsl', 'hsla');
-      } else if (staff.color) { // Fallback for non-hsl, like hex
-          let r = 0, g = 0, b = 0;
-          if (staff.color.length === 4) { // #RGB
-              r = parseInt(staff.color[1] + staff.color[1], 16);
-              g = parseInt(staff.color[2] + staff.color[2], 16);
-              b = parseInt(staff.color[3] + staff.color[3], 16);
-          } else if (staff.color.length === 7) { // #RRGGBB
-              r = parseInt(staff.color.substring(1, 3), 16);
-              g = parseInt(staff.color.substring(3, 5), 16);
-              b = parseInt(staff.color.substring(5, 7), 16);
-          }
-          divStyle.backgroundColor = `rgba(${r}, ${g}, ${b}, 0.5)`;
-      } else {
-        divStyle.opacity = 0.5;
-      }
-      textColorClass = 'text-white';
+    divStyle.backgroundColor = `rgba(from ${staff.color || 'hsl(var(--primary))'} r g b / 0.5)`;
+    textColorClass = 'text-white';
   } else {
     const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
     if (staff.name && brightStaff.includes(staff.name)) {
