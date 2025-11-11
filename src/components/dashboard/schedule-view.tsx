@@ -719,28 +719,26 @@ export function ScheduleView({
                                   )}
                               </div>
                           </div>
-                          <div className="relative">
-                            <ScrollArea className="w-full whitespace-nowrap">
-                              <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
-                                <div className="relative space-y-2">
-                                  {staffData?.map((staff) => {
-                                      const events = scheduleData.filter((e) => e.staffId === staff.id);
-                                      return (
-                                          <StaffRow
-                                              key={staff.id}
-                                              staff={staff}
-                                              events={events}
-                                              getCustomerByCode={getCustomerByCode}
-                                              rawOrdersData={rawOrdersData}
-                                              isOver={currentOverStaffId === staff.id}
-                                              onDoubleClickEvent={handleDoubleClickEvent}
-                                              onDoubleClickTimeline={handleDoubleClickTimeline}
-                                          />
-                                      );
-                                  })}
-                                </div>
+                          <div className="relative overflow-x-auto">
+                            <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
+                              <div className="relative space-y-2">
+                                {staffData?.map((staff) => {
+                                    const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                    return (
+                                        <StaffRow
+                                            key={staff.id}
+                                            staff={staff}
+                                            events={events}
+                                            getCustomerByCode={getCustomerByCode}
+                                            rawOrdersData={rawOrdersData}
+                                            isOver={currentOverStaffId === staff.id}
+                                            onDoubleClickEvent={handleDoubleClickEvent}
+                                            onDoubleClickTimeline={handleDoubleClickTimeline}
+                                        />
+                                    );
+                                })}
                               </div>
-                            </ScrollArea>
+                            </div>
                           </div>
                         </div>
                     </CardContent>
@@ -926,10 +924,10 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
        }
     }
   } else if (isBreakEvent) {
-     divStyle.backgroundColor = `hsl(120, 40%, 85%)`;
-     divStyle.color = 'hsl(var(--foreground))';
+     backgroundColor = `hsl(120, 40%, 85%)`;
+     color = 'hsl(var(--foreground))';
   } else if (event.title === '業務') {
-    divStyle.backgroundColor = 'rgb(156 163 175)';
+    backgroundColor = 'rgb(156 163 175)';
   } else {
     const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
     if (staff.name && brightStaff.includes(staff.name)) {
@@ -978,7 +976,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         data-event-chip="true"
       >
         <div
-          className="w-full h-full rounded-md flex flex-col justify-center p-1"
+          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1")}
           style={divStyle}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
