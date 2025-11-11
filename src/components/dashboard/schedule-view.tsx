@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid } from 'date-fns';
 import { cn, findKey } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -42,9 +42,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
-import { Textarea } from '@/components/ui/textarea';
+import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -277,6 +277,35 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
         </Card>
     );
 }
+
+const TimeIndicator = () => {
+    const [now, setNow] = React.useState<Date | null>(null);
+
+    React.useEffect(() => {
+        setNow(new Date());
+        const timer = setInterval(() => {
+            setNow(new Date());
+        }, 60000); 
+        return () => clearInterval(timer);
+    }, []);
+
+    if (!now) return null; 
+    
+    const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
+    if (!isVisible) return null;
+    
+    const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
+    const leftPosition = minutesToPixels(minutesFromStart);
+
+    return (
+        <div
+            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
+            style={{ left: `${leftPosition}px` }}
+        >
+            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
+        </div>
+    );
+};
 
 export function ScheduleView({ 
     staffData, 
@@ -681,6 +710,14 @@ export function ScheduleView({
                                           </span>
                                       </div>
                                   ))}
+                                  {isToday(new Date()) && (
+                                      <div 
+                                          className="absolute top-0 h-full pointer-events-none z-40"
+                                          style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                      >
+                                          <TimeIndicator />
+                                      </div>
+                                  )}
                               </div>
                           </div>
                           <div className="relative">
@@ -825,10 +862,11 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-full border-y", isOver && "bg-primary/10")} 
+        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
+        <div className="h-full border-t border-b"></div>
         <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (
             <DraggableEvent
@@ -875,26 +913,27 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   const isTravelEvent = event.title?.startsWith('移動');
-  const isBreakEvent = event.title === '休憩';
 
   const divStyle: React.CSSProperties = { 
       backgroundColor: staff.color || 'hsl(var(--primary))',
-      color: 'hsl(var(--primary-foreground))',
   };
+  let textColorClass = 'text-primary-foreground';
 
   if (isTravelEvent) {
       style.opacity = 0.5;
       divStyle.color = '#FFFFFF';
-  } else if (isBreakEvent) {
-     divStyle.backgroundColor = `hsl(120, 40%, 85%)`;
-     divStyle.color = 'hsl(var(--foreground))';
-  } else if (event.title === '業務') {
-    divStyle.backgroundColor = 'rgb(156 163 175)';
+      textColorClass = 'text-white';
   } else {
     const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
     if (staff.name && brightStaff.includes(staff.name)) {
-        divStyle.color = 'black';
+        textColorClass = 'text-black';
     }
+  }
+
+  if (event.title === '業務') {
+    divStyle.backgroundColor = 'rgb(156 163 175)';
+  } else if (event.title === '休憩') {
+    divStyle.backgroundColor = 'rgb(34 197 94)';
   }
 
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
@@ -932,7 +971,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         data-event-chip="true"
       >
         <div
-          className="w-full h-full rounded-md flex flex-col justify-center p-1"
+          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)}
           style={divStyle}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
