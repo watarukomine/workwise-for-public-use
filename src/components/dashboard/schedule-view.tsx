@@ -277,35 +277,6 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
     );
 }
 
-const TimeIndicator = () => {
-    const [now, setNow] = React.useState<Date | null>(null);
-
-    React.useEffect(() => {
-        setNow(new Date());
-        const timer = setInterval(() => {
-            setNow(new Date());
-        }, 60000); 
-        return () => clearInterval(timer);
-    }, []);
-
-    if (!now) return null; 
-    
-    const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
-    if (!isVisible) return null;
-    
-    const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
-    const leftPosition = minutesToPixels(minutesFromStart);
-
-    return (
-        <div
-            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none z-40"
-            style={{ left: `${leftPosition}px` }}
-        >
-            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
-        </div>
-    );
-};
-
 export function ScheduleView({ 
     staffData, 
     customerData,
@@ -709,37 +680,31 @@ export function ScheduleView({
                                           </span>
                                       </div>
                                   ))}
-                                  {isToday(new Date()) && (
-                                    <div 
-                                        className="absolute top-0 h-full pointer-events-none z-40"
-                                        style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                                    >
-                                        <TimeIndicator />
-                                    </div>
-                                  )}
                               </div>
                           </div>
-                          <ScrollArea className="w-full whitespace-nowrap">
-                            <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
-                              <div className="relative space-y-2">
-                                {staffData?.map((staff) => {
-                                    const events = scheduleData.filter((e) => e.staffId === staff.id);
-                                    return (
-                                        <StaffRow
-                                            key={staff.id}
-                                            staff={staff}
-                                            events={events}
-                                            getCustomerByCode={getCustomerByCode}
-                                            rawOrdersData={rawOrdersData}
-                                            isOver={currentOverStaffId === staff.id}
-                                            onDoubleClickEvent={handleDoubleClickEvent}
-                                            onDoubleClickTimeline={handleDoubleClickTimeline}
-                                        />
-                                    );
-                                })}
+                          <div className="relative">
+                            <ScrollArea className="w-full whitespace-nowrap">
+                              <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
+                                <div className="relative space-y-2">
+                                  {staffData?.map((staff) => {
+                                      const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                      return (
+                                          <StaffRow
+                                              key={staff.id}
+                                              staff={staff}
+                                              events={events}
+                                              getCustomerByCode={getCustomerByCode}
+                                              rawOrdersData={rawOrdersData}
+                                              isOver={currentOverStaffId === staff.id}
+                                              onDoubleClickEvent={handleDoubleClickEvent}
+                                              onDoubleClickTimeline={handleDoubleClickTimeline}
+                                          />
+                                      );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          </ScrollArea>
+                            </ScrollArea>
+                          </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -918,14 +883,14 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
-         backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${parseInt(match[3]) * 0.5}%, 0.5)`;
+         backgroundColor = `hsl(${match[1]}, ${match[2]}%, ${(parseInt(match[3]) + 100) / 2}%)`;
        }
     } else {
        backgroundColor = 'hsla(var(--primary), 0.5)';
     }
-    color = '#FFFFFF';
+    color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
-     backgroundColor = `hsl(120, 40%, 85%)`;
+     backgroundColor = `hsl(120, 40%, 90%)`;
      color = 'hsl(var(--foreground))';
   } else if (event.title === '業務') {
     backgroundColor = 'rgb(156 163 175)';

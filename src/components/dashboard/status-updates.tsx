@@ -1,19 +1,13 @@
 'use client';
 import type { StaffStatus, Staff, WithId } from '@/lib/types';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Separator } from '../ui/separator';
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '../ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 
 const statusColors: Record<StaffStatus['status'], string> = {
   '待機中': 'bg-gray-400',

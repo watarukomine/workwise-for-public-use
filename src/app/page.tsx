@@ -170,22 +170,28 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-8">
-        {showVerticalView ? (
-            <VerticalScheduleView 
-                scheduleData={dailySchedule}
-                staffData={filteredStaff}
-            />
-        ) : (
-            <ScheduleView 
-                staffData={filteredStaff} 
-                customerData={customers} 
-                rawOrdersData={rawOrders}
-                scheduleData={dailySchedule}
-                setScheduleData={setScheduleEvents}
-            />
+      <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex-grow lg:w-2/3">
+          {showVerticalView ? (
+              <VerticalScheduleView 
+                  scheduleData={dailySchedule}
+                  staffData={filteredStaff}
+              />
+          ) : (
+              <ScheduleView 
+                  staffData={filteredStaff} 
+                  customerData={customers} 
+                  rawOrdersData={rawOrders}
+                  scheduleData={dailySchedule}
+                  setScheduleData={setScheduleEvents}
+              />
+          )}
+        </div>
+        {isToday(currentDate) && !showVerticalView && (
+          <div className="lg:w-1/3">
+            <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />
+          </div>
         )}
-        {isToday(currentDate) && <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />}
       </div>
     </div>
   );
