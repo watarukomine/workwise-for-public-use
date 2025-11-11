@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -957,13 +958,12 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let color = 'hsl(var(--primary-foreground))';
 
   if (isTravelEvent) {
-      if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-          const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-          if (match) {
-              const [h, s] = match.slice(1);
-              backgroundColor = `hsl(${h}, ${s}%, 50%)`; // Set lightness to 50%
-          }
-      }
+    if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
+       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+       if (match) {
+         backgroundColor = `hsl(${match[1]}, ${match[2]}%, 50%)`;
+       }
+    }
   } else if (event.title === '休憩') {
      backgroundColor = `hsl(120, 40%, 90%)`;
      color = 'hsl(var(--foreground))';
@@ -1043,3 +1043,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
