@@ -43,7 +43,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -292,10 +292,10 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
 
-  const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
-  const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
+  const [dialogState, setDialogState] = React.useState({ mode: 'closed' });
+  const [editedEventDetails, setEditedEventDetails] = React.useState({ title: '', description: '', startTime: '', endTime: '' });
   
-  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
+  const [unassignedOrders, setUnassignedOrders] = React.useState([]);
   
   React.useEffect(() => {
     if (!rawOrdersData) return;
@@ -319,8 +319,8 @@ export function ScheduleView({
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
-  const [activeItem, setActiveItem] = React.useState<any | null>(null);
-  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
+  const [activeItem, setActiveItem] = React.useState(null);
+  const [currentOverStaffId, setCurrentOverStaffId] = React.useState(null);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActiveItem(event.active.data.current);
@@ -657,135 +657,135 @@ export function ScheduleView({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
-      <TooltipProvider>
-        <div className="space-y-4">
-            <GenericTasks />
-            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
+        <TooltipProvider>
+            <div className="space-y-4">
+                <GenericTasks />
+                <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>タイムライン</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                    <div className="relative">
-                      <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                          <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
-                          <div className="relative h-8 flex-1">
-                              {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                  <div
-                                      key={i}
-                                      className="absolute h-full border-l"
-                                      style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                  >
-                                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                          {timelineStartHour + i}:00
-                                      </span>
-                                  </div>
-                              ))}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>タイムライン</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                        <div className="relative">
+                          <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                              <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
+                              <div className="relative h-8 flex-1">
+                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                      <div
+                                          key={i}
+                                          className="absolute h-full border-l"
+                                          style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                      >
+                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                              {timelineStartHour + i}:00
+                                          </span>
+                                      </div>
+                                  ))}
+                              </div>
                           </div>
-                      </div>
-                      <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="relative mt-2 space-y-2">
-                            {staffData?.map((staff) => {
-                                const events = scheduleData.filter((e) => e.staffId === staff.id);
-                                return (
-                                    <StaffRow
-                                        key={staff.id}
-                                        staff={staff}
-                                        events={events}
-                                        getCustomerByCode={getCustomerByCode}
-                                        isOver={currentOverStaffId === staff.id}
-                                        onDoubleClickEvent={handleDoubleClickEvent}
-                                        onDoubleClickTimeline={handleDoubleClickTimeline}
-                                    />
-                                );
-                            })}
+                          <ScrollArea className="w-full whitespace-nowrap">
+                            <div className="relative mt-2 space-y-2">
+                                {staffData?.map((staff) => {
+                                    const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                    return (
+                                        <StaffRow
+                                            key={staff.id}
+                                            staff={staff}
+                                            events={events}
+                                            getCustomerByCode={getCustomerByCode}
+                                            isOver={currentOverStaffId === staff.id}
+                                            onDoubleClickEvent={handleDoubleClickEvent}
+                                            onDoubleClickTimeline={handleDoubleClickTimeline}
+                                        />
+                                    );
+                                })}
+                            </div>
+                          </ScrollArea>
                         </div>
-                      </ScrollArea>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-      
-      <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
-          <DialogContent>
-              <DialogHeader>
-                  <DialogTitle>{title}</DialogTitle>
-                  <DialogDescription>
-                      {dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}
-                  </DialogDescription>
-              </DialogHeader>
-      
-              <div className="grid gap-4 py-4">
-                      {dialogState.mode === 'edit' && (
-                          <div className="text-sm space-y-1">
-                              <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
-                              {customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}
-                          </div>
-                      )}
-                       {dialogState.mode === 'new' && (
-                          <div className="text-sm">
-                              <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
-                          </div>
-                      )}
-                      <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="title" className="text-right">タスク名</Label>
-                          <Input
-                              id="title"
-                              value={editedEventDetails.title}
-                              onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))}
-                              className="col-span-3"
-                              placeholder="例：定期メンテナンス"
-                          />
-                      </div>
-                       <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="description" className="text-right">詳細</Label>
-                          <Textarea
-                              id="description"
-                              value={editedEventDetails.description}
-                              onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))}
-                              className="col-span-3"
-                              placeholder="予定の詳細やメモ"
-                          />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                          <div className="col-span-2 grid gap-2">
-                              <Label htmlFor="start-time">開始時間</Label>
-                              <Input
-                                  id="start-time"
-                                  type="time"
-                                  value={editedEventDetails.startTime}
-                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}
-                              />
-                          </div>
-                          <div className="col-span-2 grid gap-2">
-                              <Label htmlFor="end-time">終了時間</Label>
-                              <Input
-                                  id="end-time"
-                                  type="time"
-                                  value={editedEventDetails.endTime}
-                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}
-                              />
-                          </div>
-                      </div>
-                  </div>
-      
-                  <DialogFooter className="sm:justify-between">
-                      <div className="flex gap-2">
+                    </CardContent>
+                </Card>
+            </div>
+          
+          <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
+              <DialogContent>
+                  <DialogHeader>
+                      <DialogTitle>{title}</DialogTitle>
+                      <DialogDescription>
+                          {dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}
+                      </DialogDescription>
+                  </DialogHeader>
+          
+                  <div className="grid gap-4 py-4">
                           {dialogState.mode === 'edit' && (
-                              <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
+                              <div className="text-sm space-y-1">
+                                  <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
+                                  {customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}
+                              </div>
                           )}
+                           {dialogState.mode === 'new' && (
+                              <div className="text-sm">
+                                  <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
+                              </div>
+                          )}
+                          <div className="grid grid-cols-4 items-center gap-4">
+                              <Label htmlFor="title" className="text-right">タスク名</Label>
+                              <Input
+                                  id="title"
+                                  value={editedEventDetails.title}
+                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))}
+                                  className="col-span-3"
+                                  placeholder="例：定期メンテナンス"
+                              />
+                          </div>
+                           <div className="grid grid-cols-4 items-center gap-4">
+                              <Label htmlFor="description" className="text-right">詳細</Label>
+                              <Textarea
+                                  id="description"
+                                  value={editedEventDetails.description}
+                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))}
+                                  className="col-span-3"
+                                  placeholder="予定の詳細やメモ"
+                              />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                              <div className="col-span-2 grid gap-2">
+                                  <Label htmlFor="start-time">開始時間</Label>
+                                  <Input
+                                      id="start-time"
+                                      type="time"
+                                      value={editedEventDetails.startTime}
+                                      onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}
+                                  />
+                              </div>
+                              <div className="col-span-2 grid gap-2">
+                                  <Label htmlFor="end-time">終了時間</Label>
+                                  <Input
+                                      id="end-time"
+                                      type="time"
+                                      value={editedEventDetails.endTime}
+                                      onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}
+                                  />
+                              </div>
+                          </div>
                       </div>
-                      <div className="flex gap-2 mt-4 sm:mt-0">
-                          <DialogClose asChild>
-                              <Button variant="ghost">キャンセル</Button>
-                          </DialogClose>
-                          <Button onClick={handleSaveEvent}>保存</Button>
-                      </div>
-                  </DialogFooter>
-              </DialogContent>
-          </Dialog>
-      </TooltipProvider>
+          
+                      <DialogFooter className="sm:justify-between">
+                          <div className="flex gap-2">
+                              {dialogState.mode === 'edit' && (
+                                  <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
+                              )}
+                          </div>
+                          <div className="flex gap-2 mt-4 sm:mt-0">
+                              <DialogClose asChild>
+                                  <Button variant="ghost">キャンセル</Button>
+                              </DialogClose>
+                              <Button onClick={handleSaveEvent}>保存</Button>
+                          </div>
+                      </DialogFooter>
+                  </DialogContent>
+              </Dialog>
+        </TooltipProvider>
     </DndContext>
   );
 }
@@ -811,7 +811,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
 
   return (
     <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center border-t border-b", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
