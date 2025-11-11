@@ -54,8 +54,8 @@ const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
-const STAFF_COL_WIDTH = 220; // Increased width to accommodate status
-const STATUS_COL_WIDTH = 120;
+const STAFF_COL_WIDTH = 144; 
+const STATUS_COL_WIDTH = 80;
 
 
 const statusColors: Record<StaffStatus['status'], string> = {
@@ -311,12 +311,13 @@ export function ScheduleView({
   const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
 
   const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-      });
+    if (!scheduleEvents) return [];
+    return scheduleEvents.filter(event => {
+        const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+        return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+    });
   }, [scheduleEvents, currentDate]);
+
 
   React.useEffect(() => {
     setIsClient(true);
@@ -649,11 +650,11 @@ export function ScheduleView({
                 <CardHeader>
                     <CardTitle>タイムライン</CardTitle>
                 </CardHeader>
-                <CardContent className="pt-6">
-                    <div className="relative">
+                <CardContent className="pt-6 overflow-x-auto">
+                    <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
                       <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
                           <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
-                          <div className="relative h-8 flex-1" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                          <div className="relative h-8 flex-1">
                               {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                   <div
                                       key={i}
@@ -674,30 +675,25 @@ export function ScheduleView({
                                 </div>
                                )}
                           </div>
+                          <div className="flex-shrink-0" style={{ width: `${STATUS_COL_WIDTH}px`}}></div>
                       </div>
-                      <div className="relative">
-                        <ScrollArea className="w-full whitespace-nowrap">
-                          <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
-                              <div className="relative space-y-2">
-                                  {staffData?.map((staff) => {
-                                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                      const status = statuses.find(s => s.staffId === staff.id);
-                                      return (
-                                          <StaffRow
-                                              key={staff.id}
-                                              staff={staff}
-                                              events={events}
-                                              status={status}
-                                              getCustomerByCode={getCustomerByCode}
-                                              isOver={currentOverStaffId === staff.id}
-                                              onDoubleClickEvent={handleDoubleClickEvent}
-                                              onDoubleClickTimeline={handleDoubleClickTimeline}
-                                          />
-                                      );
-                                  })}
-                              </div>
-                          </div>
-                        </ScrollArea>
+                      <div className="relative mt-2 space-y-2">
+                          {staffData?.map((staff) => {
+                              const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                              const status = statuses.find(s => s.staffId === staff.id);
+                              return (
+                                  <StaffRow
+                                      key={staff.id}
+                                      staff={staff}
+                                      events={events}
+                                      status={status}
+                                      getCustomerByCode={getCustomerByCode}
+                                      isOver={currentOverStaffId === staff.id}
+                                      onDoubleClickEvent={handleDoubleClickEvent}
+                                      onDoubleClickTimeline={handleDoubleClickTimeline}
+                                  />
+                              );
+                          })}
                       </div>
                     </div>
                 </CardContent>
@@ -808,38 +804,40 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
   return (
     <div className={cn("flex h-16 relative", areaBgClass)}>
       <div className={cn("sticky left-0 z-10 flex-shrink-0 px-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
-        <div className="font-semibold flex items-center justify-between gap-2 w-full truncate">
-            <div className="flex items-center gap-2 truncate">
-                <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
-                <span className='truncate flex-1'>{staff.name}</span>
-            </div>
-             {status && isToday(new Date()) && (
-              <Badge variant="outline" className="flex items-center gap-2 text-xs flex-shrink-0">
-                <span className={cn("h-2 w-2 rounded-full", statusColors[status.status])} />
-                {statusJapanese[status.status]}
-              </Badge>
-            )}
+        <div className="font-semibold flex items-center gap-2 w-full truncate">
+            <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
+            <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
-      <div 
-        id={`staff-row-${staff.id}`}
-        ref={setNodeRef} 
-        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
-        onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
-        style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-      >
-        <div className="h-full border-t border-b"></div>
-        <div className="absolute top-0 left-0 h-full w-full">
-          {events.map((event) => (
-            <DraggableEvent
-              key={event.id}
-              event={event}
-              staff={staff}
-              getCustomerByCode={getCustomerByCode}
-              onDoubleClick={() => onDoubleClickEvent(event)}
-            />
-          ))}
+      <ScrollArea className="flex-1 whitespace-nowrap">
+        <div 
+          id={`staff-row-${staff.id}`}
+          ref={setNodeRef} 
+          className={cn("relative h-full", isOver && "bg-primary/10")} 
+          onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
+          style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+        >
+          <div className="h-full border-t border-b"></div>
+          <div className="absolute top-0 left-0 h-full w-full">
+            {events.map((event) => (
+              <DraggableEvent
+                key={event.id}
+                event={event}
+                staff={staff}
+                getCustomerByCode={getCustomerByCode}
+                onDoubleClick={() => onDoubleClickEvent(event)}
+              />
+            ))}
+          </div>
         </div>
+      </ScrollArea>
+      <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
+        {status && isToday(new Date()) && (
+          <Badge variant="outline" className="flex items-center justify-center gap-2 text-xs flex-shrink-0 w-full">
+            <span className={cn("h-2 w-2 rounded-full", statusColors[status.status])} />
+            <span className="truncate">{statusJapanese[status.status]}</span>
+          </Badge>
+        )}
       </div>
     </div>
   )
