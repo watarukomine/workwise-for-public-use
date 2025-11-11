@@ -32,7 +32,7 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b
  * 受注情報を取得・更新し、カレンダー連携も行うGoogle Apps ScriptのURL。
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
-export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbxquWYjMBOVACYRdxvGde-_oaxG2r964XD3OmA8CZ_qp0LA0-dx-qRrUyn9iUgDmyB2/exec';
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbx-X3zK_YBrqdnUXV2r85h-OnPU-O6WIFQ_nlqU6kI8feEldAGJ3WcUACCgpAPegX3O/exec';
 
 
 // --- スプレッドシート本体のURL ---
@@ -66,49 +66,32 @@ export const STATUS_COLUMN_NAME = '受注ステータス';
 
 ---
 
-## `src/app/actions/update-sheet-status.ts`
+## `src/app/actions/gas-actions.ts`
 
 ```typescript
 'use server';
 
-interface UpdateSheetStatusArgs {
+interface GasApiArgs {
     gasUrl: string;
-    eventTitle?: string | null;
-    staffName?: string | null;
-    statusValue?: string | null;
-    timestamp?: string | null;
-    latitude?: number | null;
-    longitude?: number | null;
-    actionType?: string | null; // e.g., 'Start Travel', 'Arrive'
-    actionTimestamp?: string | null; // The timestamp for the specific action
+    [key: string]: any;
 }
 
 interface GasResponse {
     status: 'success' | 'error';
     message: string;
     data?: any;
+    eventId?: string;
 }
 
-export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<GasResponse> {
-    const { gasUrl, eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp } = args;
+async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
+    const { gasUrl, ...bodyPayload } = args;
 
     if (!gasUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
     try {
-        const bodyPayload = {
-            eventTitle,
-            staffName,
-            statusValue,
-            timestamp,
-            latitude,
-            longitude,
-            actionType,
-            actionTimestamp
-        };
-
-        console.log("Sending update request to GAS with body:", bodyPayload);
+        console.log("Sending request to GAS with body:", bodyPayload);
 
         const response = await fetch(gasUrl, {
             method: 'POST',
@@ -135,21 +118,34 @@ export async function updateSheetStatus(args: UpdateSheetStatusArgs): Promise<Ga
         console.log("GAS response:", result);
         
         if (result.status === 'error' || result.error) {
-            const errorMessage = result.message || 'GASスクリプトでシート更新エラーが発生しました。';
-            if (errorMessage.includes('doPost Error') || errorMessage.includes('データ解析エラー')) {
-                 throw new Error(errorMessage);
-            }
+            const errorMessage = result.message || 'GASスクリプトでエラーが発生しました。';
             throw new Error(`GASスクリプトエラー: ${errorMessage}`);
         }
 
         return result;
     } catch (error: any) {
-        console.error('Failed to call GAS for sheet update:', error);
+        console.error('Failed to call GAS API:', error);
         return {
             status: 'error',
-            message: `シート更新用のGAS呼び出しに失敗しました: ${error.message}`,
+            message: `GAS呼び出しに失敗しました: ${error.message}`,
         };
     }
+}
+
+
+export async function updateSheetStatus(args: {
+    gasUrl: string;
+    eventTitle?: string | null;
+    staffName?: string | null;
+    statusValue?: string | null;
+    timestamp?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    actionType?: string | null;
+    actionTimestamp?: string | null;
+    scheduledTime?: string | null;
+}): Promise<GasResponse> {
+    return callGasApi(args);
 }
 ```
 
@@ -170,7 +166,7 @@ import {
   type DragOverEvent,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import type { ScheduleEvent, Staff, Customer, Order, WithId } from '@/lib/types';
+import type { ScheduleEvent, Staff, Customer, Order, WithId, StaffStatus } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -184,8 +180,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid } from 'date-fns';
-import { cn, findKey } from '@/lib/utils';
+import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
+import { cn, findKey, formatTime, mapRawToOrder } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -203,8 +199,10 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
+import { Badge } from '@/components/ui/badge';
+import * as ics from 'ics';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -213,35 +211,17 @@ const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
 const STAFF_COL_WIDTH = 144;
+const STATUS_COL_WIDTH = 120;
 
-
-const timeStringToDate = (timeStr: string) => {
+const timeStringToDate = (timeStr: string, baseDate: Date) => {
     if (!/^\d{2}:\d{2}$/.test(timeStr)) {
         console.error("Invalid time string format:", timeStr);
         return new Date(NaN);
     }
-    const today = new Date();
+    const date = new Date(baseDate);
     const [hours, minutes] = timeStr.split(':').map(Number);
-    today.setHours(hours, minutes, 0, 0);
-    return today;
-};
-
-const formatTime = (date: Date | string) => {
-  const d = typeof date === 'string' ? parseISO(date) : date;
-   if (!d || !isValid(d) || isNaN(d.getTime())) {
-     if (typeof date === 'string') {
-        const today = new Date();
-        const [hours, minutes] = date.split(':');
-        if (hours && minutes) {
-            today.setHours(parseInt(hours, 10), parseInt(minutes, 10));
-            if (isValid(today)) {
-                return format(today, 'HH:mm');
-            }
-        }
-     }
-    return "Invalid time";
-  }
-  return format(d, 'HH:mm');
+    date.setHours(hours, minutes, 0, 0);
+    return date;
 };
 
 const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
@@ -266,28 +246,6 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
     left: minutesToPixels(leftInMinutes),
     width: minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30), 
   };
-};
-
-const mapRawToOrder = (rawOrder: any): WithId<Order> => {
-    const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
-    const line1 = `${findKey(rawOrder, ['お取引先名', '取引先']) || ''}${findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : ''}`;
-    const line2 = `${findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || ''}${findKey(rawOrder, ['本数']) ? `：${findKey(rawOrder, ['本数'])}本` : ''}`;
-    let taskDetails = line1;
-    if (line2.trim()) {
-        taskDetails += `\n${line2}`;
-    }
-    
-    const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
-    const orderId = findKey(rawOrder, idKeys);
-
-    return {
-        id: String(orderId || `ord-${Math.random()}`),
-        customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
-        taskDetails: taskDetails.trim(),
-        estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
-        raw: rawOrder,
-        rawOrderId: String(orderId || '')
-    };
 };
 
 interface DraggableOrderProps {
@@ -321,28 +279,28 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   );
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-      >
-        <div
-          className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
+      <Tooltip>
+        <TooltipTrigger
+          ref={setNodeRef}
+          style={style}
+          {...listeners}
+          {...attributes}
         >
-          <p className="text-xs font-semibold truncate pointer-events-none">
-            {line1}
-          </p>
-          <p className="text-xs opacity-80 truncate pointer-events-none">
-            {line2}
-          </p>
-        </div>
-      </TooltipTrigger>
-       <TooltipContent>
-        {tooltipContent}
-      </TooltipContent>
-    </Tooltip>
+          <div
+            className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
+          >
+            <p className="text-xs font-semibold truncate pointer-events-none">
+              {line1}
+            </p>
+            {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
+              {line2}
+            </p>}
+          </div>
+        </TooltipTrigger>
+         <TooltipContent>
+          {tooltipContent}
+        </TooltipContent>
+      </Tooltip>
   );
 };
 
@@ -360,10 +318,9 @@ type EditedEventDetails = {
 
 interface ScheduleViewProps {
     staffData: WithId<Staff>[];
-    customerData: WithId<Customer>[];
-    scheduleData: WithId<ScheduleEvent>[];
     rawOrdersData: any[]; 
-    setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
+    currentDate: Date;
+    statuses: StaffStatus[];
 }
 
 const genericTasks: WithId<Order>[] = [
@@ -381,9 +338,10 @@ function GenericTasks() {
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="text-base">汎用タスク</CardTitle>
+        <Card className="h-full">
+            <CardHeader className='pb-4'>
+                <CardTitle className="text-lg">汎用タスク</CardTitle>
+                 <CardDescription>休憩や移動など、受注以外のタスクです。</CardDescription>
             </CardHeader>
             <CardContent>
                  <div className="flex flex-wrap gap-2">
@@ -400,18 +358,20 @@ function GenericTasks() {
     );
 }
 
-function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], customers: WithId<Customer>[] }) {
+function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date }) {
     const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
     const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
+    
+    const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
 
     return (
         <Card 
             ref={setNodeRef}
-            className={cn("transition-colors", isOver && "bg-primary/10 border-primary/50")}
+            className={cn("transition-colors h-full", isOver && "bg-primary/10 border-primary/50")}
         >
-            <CardHeader>
-                <CardTitle className="text-lg">本日の受注タスク</CardTitle>
-                <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。タイムラインからここに戻すと未割り当てになります。</CardDescription>
+            <CardHeader className='pb-4'>
+                <CardTitle className="text-lg">{titleText}</CardTitle>
+                <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。</CardDescription>
             </CardHeader>
             <CardContent>
                 <ScrollArea className="w-full whitespace-nowrap">
@@ -426,7 +386,7 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
                             ))}
                             {orders.length === 0 && (
                                 <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
-                                    <p>本日の未割り当てオーダーはありません。</p>
+                                    <p>未割り当てオーダーはありません。</p>
                                 </div>
                             )}
                         </div>
@@ -437,50 +397,92 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
     );
 }
 
+const TimeIndicator = () => {
+    const [now, setNow] = React.useState<Date | null>(null);
+
+    React.useEffect(() => {
+        setNow(new Date());
+        const timer = setInterval(() => {
+            setNow(new Date());
+        }, 60000); 
+        return () => clearInterval(timer);
+    }, []);
+
+    if (!now) return null; 
+    
+    const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
+    if (!isVisible) return null;
+    
+    const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
+    const leftPosition = minutesToPixels(minutesFromStart);
+
+    return (
+        <div
+            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
+            style={{ left: `${leftPosition}px` }}
+        >
+            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
+        </div>
+    );
+};
+
 export function ScheduleView({ 
     staffData, 
-    customerData,
-    scheduleData, 
     rawOrdersData,
-    setScheduleData,
+    currentDate,
+    statuses,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
-  
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
+  const { scheduleEvents, setScheduleEvents, refetchOrders } = useOrder();
+  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   
-  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
-  
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleEvents) return [];
+      return scheduleEvents.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+      });
+  }, [scheduleEvents, currentDate]);
+
   React.useEffect(() => {
     if (!rawOrdersData) return;
-    const allMappedOrders = rawOrdersData.map(mapRawToOrder);
-    const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
     
-    const newUnassignedOrders = allMappedOrders.filter(order => {
-        if (!order.rawOrderId) return false;
+    const scheduledRawOrderIds = new Set(scheduleEvents.map(e => e.rawOrderId).filter(Boolean));
+    
+    const newUnassignedOrders = rawOrdersData.filter(order => {
+        const staffName = findKey(order, ['担当']);
+        const scheduledTime = findKey(order, ['チップ配置作業予定']);
+        const orderId = findKey(order, ['受注 ID', '受注id', '受注ID', 'id']);
         
-        if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
+        if (scheduledRawOrderIds.has(orderId)) return false;
         
-        const scheduledDateKey = findKey(order.raw, ['作業予定日']);
-        if (!scheduledDateKey) return false;
+        const isAssigned = staffName && scheduledTime;
+        if (isAssigned) return false;
 
-        const scheduledDate = parseISO(scheduledDateKey);
-        return isValid(scheduledDate) && isToday(scheduledDate);
-    });
+        const workDate = findKey(order, ['作業予定日']);
+        if (!workDate) return false;
+
+        const scheduledDate = parseISO(workDate);
+        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
+    }).map(mapRawToOrder);
+
     setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, scheduleData]);
+  }, [rawOrdersData, currentDate, scheduleEvents]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
   const [activeItem, setActiveItem] = React.useState<any | null>(null);
   const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
+  
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActiveItem(event.active.data.current);
@@ -499,50 +501,43 @@ export function ScheduleView({
 
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
       if (!eventToUnassign.rawOrderId) return;
+      
+      setScheduleEvents(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
+
       try {
-        const result = await updateSheetStatus({
+        await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
             staffName: "",
             statusValue: "未割当",
+            scheduledTime: "",
             timestamp: new Date().toISOString(),
         });
-
-          if (result.status === 'error') throw new Error(result.message);
-          
-          const originalOrder = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
-          if (originalOrder) {
-            const orderToAddBack = mapRawToOrder(originalOrder);
-             setUnassignedOrders(prev => {
-              if (!prev.some(o => o.id === orderToAddBack.id)) {
-                return [...prev, orderToAddBack];
-              }
-              return prev;
-            });
-          }
-      
-          setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
-          toast({ title: 'タスクを未割り当てに戻しました' });
+        
+        toast({ title: 'タスクを未割り当てに戻しました' });
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+      } finally {
+          await refetchOrders();
       }
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    const item = active.data.current;
+    const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
 
     setActiveItem(null);
     setCurrentOverStaffId(null);
     
     if (!item || !over) return;
     
+    // --- Dropping back to unassigned area ---
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         if (item.rawOrderId) {
           await unassignTask(item);
         } else {
-           setScheduleData(prev => prev.filter(e => e.id !== item.id && e.tripId !== item.tripId));
+           setScheduleEvents(prev => prev.filter(e => e.id !== item.id));
            toast({ title: '汎用タスクを削除しました' });
         }
         return;
@@ -554,85 +549,88 @@ export function ScheduleView({
     if (!staffRowElement) return;
     
     const timelineRect = staffRowElement.getBoundingClientRect();
-    const startOfDay = new Date();
-    startOfDay.setHours(timelineStartHour, 0, 0, 0);
+    const startOfTimelineDay = new Date(currentDate);
+    startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
 
     const getNewStartFromDrop = () => {
       const dropX = (active.rect.current.translated?.left ?? 0) - timelineRect.left;
       const newStartMinutes = pixelsToMinutes(dropX);
-      return addMinutes(startOfDay, newStartMinutes);
+      return addMinutes(startOfTimelineDay, newStartMinutes);
     };
+    
+    const newStart = getNewStartFromDrop();
 
-    if ('staffId' in item) { // Moving an existing event
+    // --- Moving an existing event ---
+    if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
-        const staffMember = getStaffById(newStaffId);
-        if (!staffMember) return;
         
-        try {
-            if (draggedEvent.staffId !== newStaffId && draggedEvent.rawOrderId) {
-                const customer = getCustomerByCode(draggedEvent.locationId);
-                const result = await updateSheetStatus({
-                    gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                    staffName: staffMember.name,
-                    statusValue: '作業待ち',
-                    timestamp: new Date().toISOString(),
-                });
-
-                if (result.status === 'error') throw new Error(result.message);
+        // Optimistic UI update
+        setScheduleEvents(prev => {
+            const isTripEvent = !!draggedEvent.tripId;
+            if (isTripEvent) {
+                const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
+                const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
+                const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
                 
-                toast({
-                  title: `${staffMember.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
-                });
-            }
+                const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
+                const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
 
-            const newStart = getNewStartFromDrop();
-
-            setScheduleData(prev => {
-                const eventsToMove = prev.filter(e => e.tripId === draggedEvent.tripId);
-                if (eventsToMove.length > 0) {
-                    const originalTask = eventsToMove.find(e => e.id.endsWith('-task')) || draggedEvent;
-                    const originalTravel = eventsToMove.find(e => e.id.endsWith('-travel'));
-                    const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
-                    
-                    let newTaskStart = newStart;
-                    if (originalTravel && draggedEvent.id === originalTravel.id) {
-                        newTaskStart = addMinutes(newStart, TRAVEL_TIME_MINUTES);
-                    }
-                    
-                    const newTaskEnd = addMinutes(newTaskStart, taskDuration);
-                    const newTravelStart = subMinutes(newTaskStart, TRAVEL_TIME_MINUTES);
-
-                    return prev.map(e => {
-                        if (e.tripId !== draggedEvent.tripId) return e;
-                        if (e.id.endsWith('-task')) {
-                            return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-                        }
-                        if (e.id.endsWith('-travel')) {
-                            return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-                        }
-                        return e;
-                    });
-                } else {
-                     const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                     const newEnd = addMinutes(newStart, duration);
-                     return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+                let newTaskStart = newStart;
+                if (draggedEvent.id.endsWith('-travel') && travelEvent) {
+                    newTaskStart = addMinutes(newStart, travelDuration);
                 }
-            });
+                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
+                const newTravelStart = subMinutes(newTaskStart, travelDuration);
+                
+                return prev.map(e => {
+                    if (e.tripId !== draggedEvent.tripId) return e;
+                    if (e.id.endsWith('-task')) {
+                        return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+                    }
+                    if (e.id.endsWith('-travel')) {
+                        return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                    }
+                    return e;
+                });
 
-        } catch(e: any) {
-            toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
-        }
-    } else if ('estimatedDuration' in item) { // Adding a new event from orders
+            } else { // Moving a generic event
+                const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                const newEnd = addMinutes(newStart, duration);
+                return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+            }
+        });
+        
+        (async () => {
+            try {
+                if (draggedEvent.rawOrderId) {
+                    let taskStart = newStart;
+                    if(draggedEvent.id.endsWith('-travel')) {
+                        const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                        taskStart = addMinutes(newStart, travelDuration);
+                    }
+                    const newStaff = getStaffById(newStaffId);
+                    await updateSheetStatus({
+                        gasUrl: ORDER_GAS_URL,
+                        eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+                        staffName: newStaff?.name,
+                        scheduledTime: taskStart.toISOString(),
+                    });
+                }
+                toast({ title: "スケジュールを更新しました" });
+            } catch (e: any) {
+                toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
+            } finally {
+                await refetchOrders();
+            }
+        })();
+    
+    } else if ('estimatedDuration' in item) {
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
-        const taskStart = getNewStartFromDrop();
-        
-        const customer = getCustomerByCode(order.customerCode);
         const isGeneric = order.id.startsWith('generic-');
-
+        
         if (isGeneric) {
              const newEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}`,
@@ -640,71 +638,83 @@ export function ScheduleView({
                 description: '',
                 staffId: newStaffId,
                 locationId: '',
-                start: taskStart.toISOString(),
-                end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
+                start: newStart.toISOString(),
+                end: addMinutes(newStart, order.estimatedDuration).toISOString(),
              };
-             setScheduleData(prev => [...prev, newEvent]);
+             setScheduleEvents(prev => [...prev, newEvent]);
+             toast({ title: "汎用タスクを追加しました" });
         } else {
-            try {
-              const result = await updateSheetStatus({
-                  gasUrl: ORDER_GAS_URL,
-                  eventTitle: `(ID: ${order.rawOrderId})`,
-                  staffName: staff.name,
-                  statusValue: '作業待ち',
-                  timestamp: new Date().toISOString(),
-              });
-
-              if (result.status === 'error') throw new Error(result.message);
-              
-              toast({
-                title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
-              });
-              
-              const tripId = `trip-${Date.now()}`;
-              const taskEnd = addMinutes(taskStart, order.estimatedDuration);
-              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-
-              const travelEvent: WithId<ScheduleEvent> = {
-                  id: `event-${Date.now()}-travel`,
-                  tripId: tripId,
-                  title: `移動: ${customer?.storeName || order.taskDetails}`,
-                  staffId: newStaffId,
-                  locationId: customer?.id || '',
-                  start: travelStart.toISOString(),
-                  end: taskStart.toISOString(),
-              };
-
-              const taskEvent: WithId<ScheduleEvent> = {
-                  id: `event-${Date.now()}-task`,
-                  tripId: tripId,
-                  orderId: order.id,
-                  rawOrderId: order.rawOrderId,
-                  title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
-                  staffId: newStaffId,
-                  locationId: customer?.id || '',
-                  start: taskStart.toISOString(),
-                  end: taskEnd.toISOString(),
-              };
-              
-              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-              setScheduleData(prev => [...prev, travelEvent, taskEvent]);
-              
-            } catch (e: any) {
-                 toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-            }
+             const tripId = `trip-${order.rawOrderId}`;
+             const customer = getCustomerByCode(order.customerCode);
+             const travelEvent: WithId<ScheduleEvent> = {
+                id: `${tripId}-travel`, tripId,
+                title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
+                staffId: newStaffId, locationId: customer?.id || '',
+                start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString(),
+                rawOrderId: order.rawOrderId,
+             };
+             const taskEvent: WithId<ScheduleEvent> = {
+                id: `${tripId}-task`, tripId, orderId: order.id, rawOrderId: order.rawOrderId,
+                title: order.taskDetails,
+                staffId: newStaffId, locationId: customer?.id || '',
+                start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(),
+             };
+             setScheduleEvents(prev => [...prev.filter(e => e.orderId !== order.id), travelEvent, taskEvent]);
+             setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
+        
+            (async () => {
+                try {
+                    await updateSheetStatus({
+                        gasUrl: ORDER_GAS_URL,
+                        eventTitle: `(ID: ${order.rawOrderId})`,
+                        staffName: staff.name,
+                        statusValue: '作業待ち',
+                        scheduledTime: newStart.toISOString(),
+                        timestamp: new Date().toISOString(),
+                    });
+                    toast({ title: "タスクを割り当てました" });
+                } catch (e: any) {
+                    toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+                } finally {
+                    await refetchOrders();
+                }
+            })();
         }
     }
   };
-
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
-    setEditedEventDetails({
-        title: event.title || '',
-        description: event.description || '',
-        startTime: formatTime(event.start),
-        endTime: formatTime(event.end),
+    const staff = getStaffById(event.staffId);
+    if (!staff || !staff.email) {
+        toast({ variant: 'destructive', title: 'エラー', description: '担当スタッフのメールアドレスが登録されていません。' });
+        return;
+    }
+
+    const start = parseISO(event.start as string);
+    const end = parseISO(event.end as string);
+
+    if (!isValid(start) || !isValid(end)) {
+        toast({ variant: 'destructive', title: 'エラー', description: '無効なイベント時間です。' });
+        return;
+    }
+    
+    const icsEvent: ics.EventAttributes = {
+        start: [start.getFullYear(), start.getMonth() + 1, start.getDate(), start.getHours(), start.getMinutes()],
+        end: [end.getFullYear(), end.getMonth() + 1, end.getDate(), end.getHours(), end.getMinutes()],
+        title: event.title,
+        description: event.description,
+    };
+
+    ics.createEvent(icsEvent, (error, value) => {
+        if (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: 'iCal作成エラー', description: error.message });
+            return;
+        }
+
+        const mailtoLink = `mailto:${staff.email}?subject=${encodeURIComponent(event.title)}&body=${encodeURIComponent('以下のカレンダーファイルをインポートしてください。\n\n' + value)}`;
+        
+        window.location.href = mailtoLink;
     });
-    setDialogState({ mode: 'edit', event });
   };
   
   const handleDoubleClickTimeline = (staffId: string, e: React.MouseEvent) => {
@@ -716,8 +726,7 @@ export function ScheduleView({
     const clickX = e.clientX - timelineRect.left;
     const clickMinutes = pixelsToMinutes(clickX);
     
-    const today = new Date();
-    const startOfDay = new Date(today);
+    const startOfDay = new Date(currentDate);
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
     const newStart = addMinutes(startOfDay, clickMinutes);
 
@@ -728,8 +737,8 @@ export function ScheduleView({
   const handleSaveEvent = async () => {
     if (dialogState.mode === 'closed') return;
     
-    const newStart = timeStringToDate(editedEventDetails.startTime);
-    const newEnd = timeStringToDate(editedEventDetails.endTime);
+    const newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
+    const newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
 
     if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
         toast({ variant: 'destructive', title: 'エラー', description: '無効な時間形式です。' });
@@ -738,35 +747,40 @@ export function ScheduleView({
     
     const { title, description } = editedEventDetails;
 
-    if (dialogState.mode === 'new') {
-        const staff = getStaffById(dialogState.staffId);
-        if (!staff) return;
+    try {
+        if (dialogState.mode === 'new') {
+            const staff = getStaffById(dialogState.staffId);
+            if (!staff) throw new Error("担当スタッフが見つかりません。");
+            
+            const newEvent: WithId<ScheduleEvent> = {
+                id: `event-${Date.now()}`,
+                title, description,
+                staffId: dialogState.staffId,
+                locationId: '',
+                start: newStart.toISOString(),
+                end: newEnd.toISOString(),
+            };
+            setScheduleEvents(prev => [...prev, newEvent]);
 
-        const newEvent: WithId<ScheduleEvent> = {
-            id: `event-${Date.now()}`,
-            title,
-            description,
-            staffId: dialogState.staffId,
-            locationId: '',
-            start: newStart.toISOString(),
-            end: newEnd.toISOString(),
-        };
-        setScheduleData(prev => [...prev, newEvent]);
+        } else if (dialogState.mode === 'edit') {
+            if (dialogState.event.rawOrderId) { // Sheet-based event
+                await updateSheetStatus({
+                    gasUrl: ORDER_GAS_URL,
+                    eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
+                    scheduledTime: newStart.toISOString(),
+                    timestamp: new Date().toISOString(),
+                });
+                await refetchOrders();
 
-    } else if (dialogState.mode === 'edit') {
-        const staff = getStaffById(dialogState.event.staffId);
-        if (!staff) return;
-
-        const updatedEvent = {
-            ...dialogState.event,
-            title,
-            description,
-            start: newStart.toISOString(),
-            end: newEnd.toISOString(),
-        };
-        setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+            } else { // Generic event
+                const updatedEvent = { ...dialogState.event, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
+                setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+            }
+        }
+        setDialogState({ mode: 'closed' });
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });
     }
-    setDialogState({ mode: 'closed' });
   };
 
   const handleDeleteEvent = async () => {
@@ -776,7 +790,7 @@ export function ScheduleView({
     if (eventToDelete.rawOrderId) {
         await unassignTask(eventToDelete);
     } else {
-        setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id && e.tripId !== eventToDelete.tripId));
+        setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
         toast({ title: '予定を削除しました' });
     }
 
@@ -799,19 +813,11 @@ export function ScheduleView({
 
   const { event, staff, customer, title } = getDialogDetails();
 
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleData) return [];
-      return scheduleData.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isToday(eventDate);
-      });
-  }, [scheduleData]);
-
   if (!isClient) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>本日のスケジュール</CardTitle>
+          <CardTitle>スケジュール</CardTitle>
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
         </CardHeader>
         <CardContent>
@@ -826,54 +832,71 @@ export function ScheduleView({
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
-        <div className="space-y-4">
-            <GenericTasks />
-            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>タイムライン</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                    <div className="relative">
-                      <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                          <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
-                          <div className="relative h-8 flex-1">
-                              {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                  <div
-                                      key={i}
-                                      className="absolute h-full border-l"
-                                      style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                  >
-                                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                          {timelineStartHour + i}:00
-                                      </span>
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
-                      <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="relative mt-2 space-y-2">
-                            {staffData?.map((staff) => {
-                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                return (
-                                    <StaffRow
-                                        key={staff.id}
-                                        staff={staff}
-                                        events={events}
-                                        getCustomerByCode={getCustomerByCode}
-                                        isOver={currentOverStaffId === staff.id}
-                                        onDoubleClickEvent={handleDoubleClickEvent}
-                                        onDoubleClickTimeline={handleDoubleClickTimeline}
-                                    />
-                                );
-                            })}
-                        </div>
-                      </ScrollArea>
+        <Card>
+            <CardContent className="p-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div className="md:col-span-3">
+                        <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
                     </div>
-                </CardContent>
-            </Card>
-        </div>
+                    <div className="md:col-span-2">
+                        <GenericTasks />
+                    </div>
+                </div>
+
+                <div className="mt-4">
+                    <CardHeader className="p-0 mb-4">
+                        <CardTitle>タイムライン</CardTitle>
+                    </CardHeader>
+                    <ScrollArea className="w-full whitespace-nowrap">
+                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                          <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                              <div className="relative h-8 flex-1">
+                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                      <div
+                                          key={i}
+                                          className="absolute h-full border-l"
+                                          style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                      >
+                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                              {timelineStartHour + i}:00
+                                          </span>
+                                      </div>
+                                  ))}
+                                   {isToday(currentDate) && (
+                                    <div 
+                                        className="absolute top-0 h-full pointer-events-none z-40"
+                                        style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                    >
+                                        <TimeIndicator />
+                                    </div>
+                                   )}
+                              </div>
+                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                          </div>
+                          <div className="relative mt-2 space-y-2">
+                              {staffData?.map((staff) => {
+                                  const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                  const status = statuses.find(s => s.staffId === staff.id);
+                                  return (
+                                      <StaffRow
+                                          key={staff.id}
+                                          staff={staff}
+                                          events={events}
+                                          status={status}
+                                          getCustomerByCode={getCustomerByCode}
+                                          isOver={currentOverStaffId === staff.id}
+                                          onDoubleClickEvent={handleDoubleClickEvent}
+                                          onDoubleClickTimeline={handleDoubleClickTimeline}
+                                      />
+                                  );
+                              })}
+                          </div>
+                        </div>
+                    </ScrollArea>
+                </div>
+            </CardContent>
+        </Card>
       
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
           <DialogContent>
@@ -961,13 +984,14 @@ export function ScheduleView({
 interface StaffRowProps {
   staff: WithId<Staff>;
   events: WithId<ScheduleEvent>[];
+  status?: StaffStatus;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   isOver: boolean;
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
@@ -978,22 +1002,24 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
-        <div className="font-semibold flex items-center gap-2 w-full">
-          <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
-          <span className='truncate flex-1'>{staff.name}</span>
+    <div className={cn("flex relative", areaBgClass)}>
+      {/* Staff Name Cell */}
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 px-2 flex items-center border-r h-16", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+        <div className="font-semibold flex items-center gap-2 w-full truncate">
+            <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
+            <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
+      
+      {/* Timeline Cell */}
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
+        className={cn("relative flex-1 h-16 border-b", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
-        <div className="h-full border-t border-b"></div>
-        <div className="absolute top-0 left-0 h-full">
+        <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
@@ -1004,6 +1030,15 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
             />
           ))}
         </div>
+      </div>
+
+      {/* Status Cell */}
+      <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
+        {status && isToday(new Date()) && (
+          <div className="text-xs text-center font-medium">
+             {status.status}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -1024,83 +1059,82 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   const { left, width } = getEventDimensions(event.start, event.end);
 
-  const style = {
+  const style: React.CSSProperties = {
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
-    opacity: isDragging ? 0.8 : 1,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation(); 
     onDoubleClick();
   };
-
+  
   const isTravelEvent = event.title?.startsWith('移動');
-  const isBreakEvent = event.title === '休憩';
-
-  let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = 'white';
+  
+  const divStyle: React.CSSProperties = {
+      backgroundColor: staff.color || 'hsl(var(--primary))',
+  };
 
   if (isTravelEvent) {
-    if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-       if (match) {
-         backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
-       }
-    } else {
-       backgroundColor = 'hsla(var(--primary), 0.5)';
-    }
-    color = 'hsl(var(--foreground))';
-  } else if (isBreakEvent) {
-     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-        const [h, s] = backgroundColor.match(/\d+/g) || ['0', '0'];
-        backgroundColor = `hsl(${h}, ${s}%, 90%)`;
-      } else {
-        backgroundColor = `hsl(120, 40%, 85%)`;
-      }
-      color = 'hsl(var(--foreground))';
+    style.opacity = 0.5;
   }
   
+  const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
+  let textColorClass = 'text-primary-foreground';
+  if (isTravelEvent) {
+    textColorClass = 'text-foreground';
+  } else if (staff.name && brightStaff.includes(staff.name)) {
+      textColorClass = 'text-black';
+  }
+  
+  if (event.title === '業務') {
+    divStyle.backgroundColor = 'rgb(156 163 175)';
+  } else if (event.title === '休憩') {
+    divStyle.backgroundColor = 'rgb(34 197 94)';
+  }
+
   const [line1, ...rest] = (event.title || '').split('\n');
   const line2 = rest.join('\n');
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-        onDoubleClick={handleDoubleClick}
-        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
-        data-event-chip="true"
-      >
-        <div
-          className="w-full h-full rounded-md flex flex-col justify-center p-1"
-          style={{ backgroundColor, color }}
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          ref={setNodeRef}
+          style={style}
+          {...listeners}
+          {...attributes}
+          onDoubleClick={handleDoubleClick}
+          className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
+          data-event-chip="true"
         >
-          <p className="text-xs font-semibold truncate pointer-events-none">
-            {line1}
-          </p>
-          {line2 && (
-            <p className="text-xs opacity-80 truncate pointer-events-none">
-                {line2}
+          <div
+            className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && "opacity-80")}
+            style={divStyle}
+          >
+            <p className="text-xs font-semibold truncate pointer-events-none">
+              {line1}
             </p>
-          )}
-        </div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
-        {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
-        <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
-        <p className="text-sm">担当: {staff.name}</p>
-        {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
-      </TooltipContent>
-    </Tooltip>
+            {line2 && (
+              <p className="text-xs opacity-80 truncate pointer-events-none">
+                  {line2}
+              </p>
+            )}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
+          {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
+          <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
+          <p className="text-sm">担当: {staff.name}</p>
+          {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 ```
@@ -1113,6 +1147,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 'use client';
 
 import * as React from 'react';
+import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -1129,11 +1164,11 @@ import { useSearchParams } from 'next/navigation';
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
 type StatusValue = StaffStatus['status'];
 
-export default function CheckInPage() {
+function CheckInClient() {
   const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
-  const [location, setLocation] = React.useState<{ latitude: number; longitude: number } | null>(null);
+  const [location, setLocation] = React.useState<{ latitude: number, longitude: number } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [lastAction, setLastAction] = React.useState<{ action: ActionType; time: string } | null>(null);
+  const [lastAction, setLastAction] = React.useState<{ action: ActionType, time: string } | null>(null);
   const [message, setMessage] = React.useState('');
   const { toast } = useToast();
   const { profile } = useUserProfile();
@@ -1400,27 +1435,40 @@ export default function CheckInPage() {
     </div>
   );
 }
+
+export default function CheckInPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+            <CheckInClient />
+        </Suspense>
+    )
+}
 ```
 
 ---
 
-## Google Apps Script (GAS)
+## Google Apps Script (GAS) `src/lib/gapps-script.js`
 
 ```javascript
 // ↓↓↓↓【要設定】↓↓↓↓
-// スプレッドシートのID（URLの .../d/【この部分】/edit...）を貼り付けてください
-const SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
-// データを読み書きするシート名を正確に入力してください
-const SHEET_NAME = "受注管理"; 
+// 「受注管理」シートがあるスプレッドシートのIDを貼り付けてください
+const ORDER_SPREADSHEET_ID = "1Q3i81tz-j8GahLBRtdMJfnUjsx_VmM8fN7gn--j85JU"; 
+const ORDER_SHEET_NAME = "受注管理"; 
+
+// 「スタッフマスタ」シートがあるスプレッドシートのIDを貼り付けてください
+const STAFF_SPREADSHEET_ID = "1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60";
+const STAFF_SHEET_NAME = "スタッフマスタ";
 // ↓↓↓↓【設定はここまで】↓↓↓↓
+
 
 /**
  * GET リクエストを処理し、スプレッドシートのデータを JSON で返します
  */
 function doGet(e) {
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    if (!sheet) throw new Error(`シート '${SHEET_NAME}' が見つかりません。`);
+    const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
+    if (!sheet) throw new Error(`シート '${ORDER_SHEET_NAME}' がスプレッドシートID '${ORDER_SPREADSHEET_ID}' 内に見つかりません。`);
     
     const dataRange = sheet.getDataRange();
     const values = dataRange.getValues();
@@ -1436,7 +1484,12 @@ function doGet(e) {
     const data = values.map((row, rowIndex) => {
       const obj = {};
       headers.forEach((header, index) => {
-        obj[header] = (row[index] instanceof Date) ? row[index].toISOString() : row[index];
+        const cellValue = row[index];
+        if (cellValue && cellValue instanceof Date && !isNaN(cellValue)) {
+          obj[header] = cellValue.toISOString();
+        } else {
+          obj[header] = cellValue;
+        }
       });
       obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowIndex + 2}`;
       return obj;
@@ -1444,6 +1497,7 @@ function doGet(e) {
 
     return ContentService.createTextOutput(JSON.stringify({ data: data })).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
+    console.error("GAS doGet Error:", error.message, error.stack);
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -1475,14 +1529,12 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
-    if (params.operation) {
-      return handleCalendarEvent(params);
-    } else if (params.eventTitle) {
+    if (params.eventTitle) { // Update sheet from app
       return updateSheetWithOrderInfo(params);
     } else {
       return ContentService.createTextOutput(JSON.stringify({
         status: "error",
-        message: "必要なパラメータ (operation または eventTitle) がありません"
+        message: "必要なパラメータ (eventTitle) がありません"
       })).setMimeType(ContentService.MimeType.JSON);
     }
   } catch (error) {
@@ -1498,12 +1550,16 @@ function doPost(e) {
  * 受注IDでシートを検索し、指定された情報で更新する
  */
 function updateSheetWithOrderInfo(params) {
-  const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp } = params;
+  const { 
+      eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, 
+      actionTimestamp, scheduledTime
+  } = params;
+
   try {
     console.log("Updating sheet with:", JSON.stringify(params));
     
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
-    if (!match || !match[1] || match[1] === 'N/A') {
+    if (!match || !match[1] || match[1].toUpperCase() === 'N/A') {
       return ContentService.createTextOutput(JSON.stringify({ 
         status: "success", 
         message: "汎用タスクまたはIDなしタスクのためシート更新はスキップされました。" 
@@ -1512,80 +1568,65 @@ function updateSheetWithOrderInfo(params) {
     
     const orderId = match[1];
     console.log("Extracted order ID:", orderId);
-
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-    if (!sheet) throw new Error(`シート「${SHEET_NAME}」が見つかりません。`);
+    
+    const orderSpreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+    const sheet = orderSpreadsheet.getSheetByName(ORDER_SHEET_NAME);
+    if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」がスプレッドシートID '${ORDER_SPREADSHEET_ID}' 内に見つかりません。`);
 
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
     
-    // 更新対象の列インデックスを取得
-    const colIdx = {
-      orderId: headers.indexOf("受注ID"),
-      staffName: headers.indexOf("担当"),
-      status: headers.indexOf("受注ステータス"),
-      lastUpdate: headers.indexOf("最終更新日時"),
-      lastLocation: headers.indexOf("最終位置情報（緯度,経度）"),
-      startTravel: headers.indexOf("移動開始"),
-      arrive: headers.indexOf("現場到着"),
-      startWork: headers.indexOf("作業開始"),
-      finishWork: headers.indexOf("作業終了")
-    };
-
-    if (colIdx.orderId === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
+    const orderIdCol = headers.indexOf("受注ID");
+    if (orderIdCol === -1) throw new Error("スプレッドシートに「受注ID」列が見つかりません。");
     
-    // 対象の行を検索
+    let rowNum = -1;
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][colIdx.orderId]) === String(orderId)) {
-        const rowNum = i + 1;
-        console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
-        
-        // 各列の更新
-        if (colIdx.staffName !== -1 && staffName !== undefined) {
-          sheet.getRange(rowNum, colIdx.staffName + 1).setValue(staffName || "");
-        }
-        if (colIdx.status !== -1 && statusValue !== undefined) {
-          sheet.getRange(rowNum, colIdx.status + 1).setValue(statusValue || "");
-        }
-        if (colIdx.lastUpdate !== -1 && timestamp) {
-          sheet.getRange(rowNum, colIdx.lastUpdate + 1).setValue(new Date(timestamp));
-        }
-        if (colIdx.lastLocation !== -1 && latitude !== undefined && longitude !== undefined) {
-          sheet.getRange(rowNum, colIdx.lastLocation + 1).setValue(`${latitude}, ${longitude}`);
-        }
-
-        // アクション別のタイムスタンプを更新
-        if (actionType && actionTimestamp) {
-            const dateValue = new Date(actionTimestamp);
-            switch (actionType) {
-                case 'Start Travel':
-                    if (colIdx.startTravel !== -1) sheet.getRange(rowNum, colIdx.startTravel + 1).setValue(dateValue);
-                    break;
-                case 'Arrive':
-                    if (colIdx.arrive !== -1) sheet.getRange(rowNum, colIdx.arrive + 1).setValue(dateValue);
-                    break;
-                case 'Begin Task':
-                    if (colIdx.startWork !== -1) sheet.getRange(rowNum, colIdx.startWork + 1).setValue(dateValue);
-                    break;
-                case 'Finish Task':
-                    if (colIdx.finishWork !== -1) sheet.getRange(rowNum, colIdx.finishWork + 1).setValue(dateValue);
-                    break;
-                case 'Update Location':
-                case 'Wait':
-                    // These actions just update location and lastUpdate, handled above.
-                    // No specific column for these action types.
-                    break;
-            }
-        }
-        
-        return ContentService.createTextOutput(JSON.stringify({
-          status: "success",
-          message: `受注ID: ${orderId} を更新しました。`,
-        })).setMimeType(ContentService.MimeType.JSON);
+      if (String(data[i][orderIdCol]) === String(orderId)) {
+        rowNum = i + 1;
+        break;
       }
     }
+    if (rowNum === -1) {
+      throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
+    }
     
-    throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
+    console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
+    
+    const updateColumn = (colName, value) => {
+      if (value !== undefined) {
+        const colIdx = headers.indexOf(colName);
+        if (colIdx !== -1) {
+          sheet.getRange(rowNum, colIdx + 1).setValue(value);
+          console.log(`Updated column '${colName}' with value: ${value}`);
+        }
+      }
+    };
+
+    updateColumn("担当", staffName);
+    updateColumn("受注ステータス", statusValue);
+    updateColumn("最終更新日時", timestamp ? new Date(timestamp) : undefined);
+    if(latitude !== undefined && longitude !== undefined) {
+      updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
+    }
+    updateColumn("チップ配置作業予定", scheduledTime ? new Date(scheduledTime) : (scheduledTime === "" ? "" : undefined)); 
+    
+    if (actionType && actionTimestamp) {
+        const dateValue = new Date(actionTimestamp);
+        const actionColMap = {
+            'Start Travel': "移動開始", 
+            'Arrive': "現場到着",
+            'Begin Task': "作業開始", 
+            'Finish Task': "作業終了",
+        };
+        if(actionColMap[actionType]) {
+            updateColumn(actionColMap[actionType], dateValue);
+        }
+    }
+        
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      message: `受注ID: ${orderId} を更新しました。`,
+    })).setMimeType(ContentService.MimeType.JSON);
     
   } catch (error) {
     console.error("Error in updateSheetWithOrderInfo:", error.message, error.stack);
@@ -1594,357 +1635,5 @@ function updateSheetWithOrderInfo(params) {
       message: error.message
     })).setMimeType(ContentService.MimeType.JSON);
   }
-}
-
-
-/**
- * カレンダーイベントを作成・更新・削除する
- */
-function handleCalendarEvent(params) {
-  try {
-    console.log("handleCalendarEvent called with:", JSON.stringify(params));
-    
-    const { operation, calendarId, eventId, title, description, startTime, endTime } = params;
-    
-    if (!operation || !calendarId) {
-      throw new Error("必須パラメータ 'operation' または 'calendarId' がありません");
-    }
-    
-    const calendar = CalendarApp.getCalendarById(calendarId);
-    if (!calendar) throw new Error(`カレンダーID「${calendarId}」が見つからないか、アクセス権がありません。`);
-
-    let result = {};
-    
-    switch (operation) {
-      case 'create':
-        if (!title || !startTime || !endTime) throw new Error("予定の作成には title, startTime, endTime が必要です。");
-        const newEvent = calendar.createEvent(title, new Date(startTime), new Date(endTime), { description: description || '' });
-        result = { status: "success", message: "カレンダーに予定を作成しました。", eventId: newEvent.getId() };
-        break;
-        
-      case 'update':
-        if (!eventId) throw new Error("予定の更新には eventId が必要です。");
-        const eventToUpdate = calendar.getEventById(eventId);
-        if (!eventToUpdate) throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        if (title) eventToUpdate.setTitle(title);
-        if (startTime && endTime) eventToUpdate.setTime(new Date(startTime), new Date(endTime));
-        if (description !== undefined) eventToUpdate.setDescription(description || "");
-        result = { status: "success", message: "カレンダーの予定を更新しました。", eventId: eventId };
-        break;
-        
-      case 'delete':
-        if (!eventId) throw new Error("予定の削除には eventId が必要です。");
-        const eventToDelete = calendar.getEventById(eventId);
-        if (!eventToDelete) throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        eventToDelete.deleteEvent();
-        result = { status: "success", message: "カレンダーから予定を削除しました。" };
-        break;
-        
-      default:
-        throw new Error(`不明な操作です: ${operation}`);
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    console.error("Error in handleCalendarEvent:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-```
-
----
-
-## `src/app/check-in/page.tsx`
-
-```typescript
-'use client';
-
-import * as React from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { Textarea } from '@/components/ui/textarea';
-import { useUserProfile } from '@/hooks/use-user-profile';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
-import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
-import type { StaffStatus } from '@/lib/types';
-import { cn } from '@/lib/utils';
-import { useSearchParams } from 'next/navigation';
-
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Update Location' | 'Send Message';
-type StatusValue = StaffStatus['status'];
-
-export default function CheckInPage() {
-  const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
-  const [location, setLocation] = React.useState<{ latitude: number; longitude: number } | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
-  const [lastAction, setLastAction] = React.useState<{ action: ActionType; time: string } | null>(null);
-  const [message, setMessage] = React.useState('');
-  const { toast } = useToast();
-  const { profile } = useUserProfile();
-  const searchParams = useSearchParams();
-  const orderId = searchParams.get('orderId');
-
-
-  const getJapaneseActionName = (action: ActionType) => {
-    const map: Record<ActionType, string> = {
-        'Clock In': '出勤',
-        'Clock Out': '退勤',
-        'Start Travel': '移動開始',
-        'Arrive': '現場到着',
-        'Begin Task': '作業開始',
-        'Finish Task': '作業終了',
-        'Update Location': '位置情報更新',
-        'Send Message': 'メッセージ送信'
-    };
-    return map[action];
-  };
-
-  const handleAction = async (action: ActionType) => {
-    setIsLoading(action);
-    setError(null);
-    const now = new Date();
-    
-    // Actions that don't require location or sheet updates
-    if (action === 'Clock In' || action === 'Clock Out') {
-        console.log(`Action: ${action}`);
-        setTimeout(() => {
-          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action, time: currentTime });
-          toast({
-            title: 'アクションを記録しました',
-            description: `${getJapaneseActionName(action)} at ${currentTime}`,
-          });
-          setIsLoading(null);
-        }, 1000);
-        return;
-    }
-    
-    if (action === 'Send Message') {
-        if (!message.trim()) {
-            setError('メッセージを入力してください。');
-            setIsLoading(null);
-            return;
-        }
-        console.log(`Message to admin: ${message}`);
-        setTimeout(() => {
-          toast({
-            title: 'メッセージを送信しました',
-            description: '管理者にメッセージが送信されました。',
-          });
-          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action: 'Send Message', time: currentTime });
-          setMessage('');
-          setIsLoading(null);
-        }, 1000);
-        return;
-    }
-
-    // Map actions to their corresponding status values for the sheet update
-    const statusMap: Partial<Record<ActionType, StatusValue>> = {
-      'Start Travel': '移動中',
-      'Begin Task': '作業中',
-      'Finish Task': '待機中',
-      'Update Location': '待機中',
-      'Arrive': '作業待ち',
-    };
-
-    const statusValue = statusMap[action];
-    
-    if (!statusValue) {
-        console.error("No status defined for this action:", action);
-        setIsLoading(null);
-        return;
-    }
-
-    if (!navigator.geolocation) {
-      setError('お使いのブラウザは位置情報取得に対応していません。');
-      setIsLoading(null);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude } = position.coords;
-        setLocation({ latitude, longitude });
-        
-        console.log(`Action: ${action}`, { latitude, longitude });
-        
-        if (!profile?.name) {
-            setError('ユーザー情報が取得できません。ログインしているか確認してください。');
-            setIsLoading(null);
-            return;
-        }
-
-        try {
-            const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
-            const result = await updateSheetStatus({
-                gasUrl: ORDER_GAS_URL,
-                eventTitle: eventTitleForUpdate,
-                staffName: profile.name,
-                statusValue: statusValue,
-                timestamp: now.toISOString(),
-                latitude: latitude,
-                longitude: longitude,
-                actionType: action,
-                actionTimestamp: now.toISOString()
-            });
-
-            if (result.status === 'error') {
-                throw new Error(result.message);
-            }
-
-            toast({
-                title: 'ステータスを更新しました',
-                description: result.message,
-            });
-
-            const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-            setLastAction({ action, time: currentTime });
-
-        } catch (e: any) {
-            setError(e.message || 'スプレッドシートの更新に失敗しました。');
-            toast({
-                variant: 'destructive',
-                title: '更新エラー',
-                description: e.message || 'スプレッドシートの更新に失敗しました。'
-            });
-        }
-        
-        setIsLoading(null);
-      },
-      (err) => {
-        let message = '';
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            message = '位置情報の利用が許可されていません。ブラウザの設定を確認してください。';
-            break;
-          case err.POSITION_UNAVAILABLE:
-            message = '現在地の取得に失敗しました。';
-            break;
-          case err.TIMEOUT:
-            message = '位置情報の取得がタイムアウトしました。';
-            break;
-          default:
-            message = '不明なエラーが発生しました。';
-            break;
-        }
-        setError(message);
-        setIsLoading(null);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
-  };
-
-  const actionButtons: { action: ActionType; label: string; icon: React.ElementType }[] = [
-    { action: 'Clock In', label: '出勤', icon: LogIn },
-    { action: 'Clock Out', label: '退勤', icon: LogOut },
-    { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
-    { action: 'Arrive', label: '現場到着', icon: MapPin },
-    { action: 'Begin Task', label: '作業開始', icon: Clock },
-    { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
-    { action: 'Update Location', label: '位置情報更新', icon: RefreshCw },
-  ];
-
-  return (
-    <div className="max-w-md mx-auto space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>勤怠・作業記録</CardTitle>
-          <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {actionButtons.map(({ action, label, icon: Icon }) => (
-              <Button
-                key={action}
-                size="lg"
-                className={cn(
-                  "h-20 text-base flex-col",
-                  action === 'Update Location' && "col-span-2"
-                )}
-                onClick={() => handleAction(action)}
-                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Send Message', 'Update Location'].includes(action))}
-              >
-                {isLoading === action ? (
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                ) : (
-                  <>
-                    <Icon className="h-6 w-6 mb-1" />
-                    {label}
-                  </>
-                )}
-              </Button>
-            ))}
-          </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>エラー</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          
-          {!orderId && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>オーダーが選択されていません</AlertTitle>
-              <AlertDescription>
-                勤怠以外の記録を行うには、スケジュール画面からタスクを選択してください。
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {lastAction && (
-             <Alert>
-              <MapPin className="h-4 w-4" />
-              <AlertTitle>最後の記録</AlertTitle>
-              <AlertDescription>
-                {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
-                {location && !['Clock In', 'Clock Out', 'Send Message'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-
-       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            管理者へ連絡
-          </CardTitle>
-          <CardDescription>緊急の連絡や報告がある場合に使用してください。</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="メッセージを入力..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            disabled={isLoading === 'Send Message'}
-          />
-          <Button
-            className="w-full"
-            onClick={() => handleAction('Send Message')}
-            disabled={!!isLoading}
-          >
-            {isLoading === 'Send Message' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4 mr-2" />
-            )}
-            メッセージ送信
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
-  );
 }
 ```
