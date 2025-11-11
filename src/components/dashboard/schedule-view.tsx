@@ -298,7 +298,7 @@ const TimeIndicator = () => {
 
     return (
         <div
-            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
+            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none z-40"
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -698,7 +698,7 @@ export function ScheduleView({
                           <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
                               <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
                               <div className="relative h-8 flex-1">
-                                  {Array.from({ length: timelineTotalHours }).map((_, i) => (
+                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                       <div
                                           key={i}
                                           className="absolute h-full border-l"
@@ -719,7 +719,7 @@ export function ScheduleView({
                                   )}
                               </div>
                           </div>
-                          <div className="relative overflow-x-auto">
+                          <ScrollArea className="w-full whitespace-nowrap">
                             <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
                               <div className="relative space-y-2">
                                 {staffData?.map((staff) => {
@@ -739,7 +739,7 @@ export function ScheduleView({
                                 })}
                               </div>
                             </div>
-                          </div>
+                          </ScrollArea>
                         </div>
                     </CardContent>
                 </Card>
