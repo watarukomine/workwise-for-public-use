@@ -289,7 +289,7 @@ const TimeIndicator = () => {
         return () => clearInterval(timer);
     }, []);
 
-    if (!now) return null; 
+    if (!now || !isToday(now)) return null; 
     
     const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
     if (!isVisible) return null;
@@ -300,7 +300,7 @@ const TimeIndicator = () => {
     return (
         <div
             className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
-            style={{ left: `${leftPosition}px` }}
+            style={{ left: `${leftPosition}px`, zIndex: 50 }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
         </div>
@@ -710,20 +710,13 @@ export function ScheduleView({
                                           </span>
                                       </div>
                                   ))}
-                                  {isToday(new Date()) && (
-                                      <div 
-                                          className="absolute top-0 h-full pointer-events-none z-40"
-                                          style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                                      >
-                                          <TimeIndicator />
-                                      </div>
-                                  )}
+                                  
                               </div>
                           </div>
                           <div className="relative">
                             <ScrollArea className="w-full whitespace-nowrap">
                               <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
-                                <div className="relative space-y-2">
+                                <div className="relative space-y-2 z-10">
                                   {staffData?.map((staff) => {
                                       const events = scheduleData.filter((e) => e.staffId === staff.id);
                                       return (
@@ -740,6 +733,7 @@ export function ScheduleView({
                                       );
                                   })}
                                 </div>
+                                <TimeIndicator />
                               </div>
                             </ScrollArea>
                           </div>
@@ -921,7 +915,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   if (isTravelEvent) {
       style.opacity = 0.5;
-      divStyle.color = '#FFFFFF';
       textColorClass = 'text-white';
   } else {
     const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
