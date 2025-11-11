@@ -707,18 +707,18 @@ export function ScheduleView({
                                         </span>
                                     </div>
                                 ))}
-                                 {isToday(currentDate) && (
-                                  <div 
-                                      className="absolute top-0 h-full pointer-events-none z-50"
-                                      style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                                  >
-                                      <TimeIndicator />
-                                  </div>
-                                 )}
                             </div>
                             <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                         </div>
                         <div className="relative mt-2 space-y-2">
+                            {isToday(currentDate) && (
+                                <div 
+                                    className="absolute top-0 h-full pointer-events-none z-30"
+                                    style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                >
+                                    <TimeIndicator />
+                                </div>
+                            )}
                             {staffData?.map((staff) => {
                                 const events = dailySchedule.filter((e) => e.staffId === staff.id);
                                 const status = statuses.find(s => s.staffId === staff.id);
