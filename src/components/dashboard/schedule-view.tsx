@@ -144,28 +144,41 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
     </>
   );
 
+  const innerContent = (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+    >
+      <div
+        className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
+      >
+        <p className="text-xs font-semibold truncate pointer-events-none">
+          {line1}
+        </p>
+        {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
+          {line2}
+        </p>}
+      </div>
+    </div>
+  );
+
+  if (isOverlay) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{innerContent}</TooltipTrigger>
+          <TooltipContent>{tooltipContent}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+
   return (
     <Tooltip>
-      <TooltipTrigger
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-      >
-        <div
-          className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
-        >
-          <p className="text-xs font-semibold truncate pointer-events-none">
-            {line1}
-          </p>
-          {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
-            {line2}
-          </p>}
-        </div>
-      </TooltipTrigger>
-       <TooltipContent>
-        {tooltipContent}
-      </TooltipContent>
+      <TooltipTrigger asChild>{innerContent}</TooltipTrigger>
+      <TooltipContent>{tooltipContent}</TooltipContent>
     </Tooltip>
   );
 };
@@ -480,7 +493,7 @@ export function ScheduleView({
                  await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${originalTask.rawOrderId})`,
-                    scheduledTime: (taskStartForSheet as Date).toISOString(),
+                    scheduledTime: new Date(taskStartForSheet).toISOString(),
                     staffName: newStaff.name,
                 });
                 if (isStaffChange) {
@@ -520,6 +533,24 @@ export function ScheduleView({
         const previousUnassigned = [...unassignedOrders];
         const previousSchedule = [...scheduleEvents];
         
+        // Optimistic UI for generic tasks
+        if (isGeneric) {
+          const newEventEnd = addMinutes(taskStart, order.estimatedDuration);
+          const tempId = `event-temp-${Date.now()}`;
+          const newEvent: WithId<ScheduleEvent> = {
+              id: tempId,
+              title: order.taskDetails,
+              description: '',
+              staffId: newStaffId,
+              locationId: '',
+              start: taskStart.toISOString(),
+              end: newEventEnd.toISOString(),
+           };
+           setScheduleEvents(prev => [...prev, newEvent]);
+        } else {
+            setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
+        }
+        
         try {
             if (isGeneric) {
                 const newEventEnd = addMinutes(taskStart, order.estimatedDuration);
@@ -531,37 +562,33 @@ export function ScheduleView({
                     startTime: taskStart.toISOString(), 
                     endTime: newEventEnd.toISOString() 
                 });
-
                 if (result.status === 'error') throw new Error(result.message);
-
-                const newEvent: WithId<ScheduleEvent> = {
-                    id: `event-${Date.now()}`,
-                    title: order.taskDetails,
-                    description: '',
-                    staffId: newStaffId,
-                    locationId: '',
-                    start: taskStart.toISOString(),
-                    end: newEventEnd.toISOString(),
-                    calendarEventId: result.eventId
-                 };
-                 setScheduleEvents(prev => [...prev, newEvent]);
-
+                // Update temporary event with real calendar ID
+                setScheduleEvents(prev => prev.map(e => e.id.startsWith('event-temp-') ? { ...e, id: `event-${Date.now()}`, calendarEventId: result.eventId } : e));
             } else {
-                setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-                const tripId = `trip-${Date.now()}`;
-                const taskEnd = addMinutes(taskStart, order.estimatedDuration);
-                const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-                const travelEvent: WithId<ScheduleEvent> = { id: `event-${Date.now()}-travel`, tripId, title: `移動: ${customer?.storeName || order.taskDetails}`, staffId: newStaffId, locationId: customer?.id || '', start: travelStart.toISOString(), end: taskStart.toISOString() };
-                const taskEvent: WithId<ScheduleEvent> = { id: `event-${Date.now()}-task`, tripId, orderId: order.id, rawOrderId: order.rawOrderId, title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`, description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`, staffId: newStaffId, locationId: customer?.id || '', start: taskStart.toISOString(), end: taskEnd.toISOString() };
-                setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
+              const taskEnd = addMinutes(taskStart, order.estimatedDuration);
+              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
               
-                await updateSheetStatus({
+              const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
+              const travelResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
+              
+              const taskTitle = order.taskDetails;
+              const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
+              const taskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
+
+              if (taskResult.status === 'error' || travelResult.status === 'error') {
+                  throw new Error(taskResult.message || travelResult.message);
+              }
+
+              await updateSheetStatus({
                   gasUrl: ORDER_GAS_URL,
                   eventTitle: `(ID: ${order.rawOrderId})`,
                   staffName: staff.name,
                   statusValue: '作業待ち',
                   scheduledTime: taskStart.toISOString(),
                   timestamp: new Date().toISOString(),
+                  taskCalendarEventId: taskResult.eventId,
+                  travelCalendarEventId: travelResult.eventId,
               });
               
               toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
@@ -859,15 +886,16 @@ export function ScheduleView({
       </TooltipProvider>
       <DragOverlay>
         {activeItem ? (
-          <TooltipProvider>
-            {'staffId' in activeItem ? (
-              <DraggableEvent
-                isOverlay
-                event={activeItem}
-                staff={getStaffById(activeItem.staffId) || staffData[0]}
-                getCustomerByCode={getCustomerByCode}
-                onDoubleClick={() => {}}
-              />
+            'staffId' in activeItem ? (
+              <TooltipProvider>
+                <DraggableEvent
+                  isOverlay
+                  event={activeItem}
+                  staff={getStaffById(activeItem.staffId) || staffData[0]}
+                  getCustomerByCode={getCustomerByCode}
+                  onDoubleClick={() => {}}
+                />
+              </TooltipProvider>
             ) : 'taskDetails' in activeItem ? (
               <DraggableOrder
                 isOverlay
@@ -879,8 +907,7 @@ export function ScheduleView({
                     : ''
                 }
               />
-            ) : null}
-          </TooltipProvider>
+            ) : null
         ) : null}
       </DragOverlay>
     </DndContext>
@@ -1017,31 +1044,52 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const line2 = rest.join('\n');
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
+  const innerContent = (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      onDoubleClick={handleDoubleClick}
+      className={cn("absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center", !isOverlay && "cursor-move")}
+      data-event-chip="true"
+    >
+      <div
+        className={cn("w-full h-full rounded-md flex flex-col justify-center p-1")}
+        style={divStyle}
+      >
+        <p className="text-xs font-semibold truncate pointer-events-none">
+          {line1}
+        </p>
+        {line2 && (
+          <p className="text-xs opacity-80 truncate pointer-events-none">
+              {line2}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
+  if (isOverlay) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{innerContent}</TooltipTrigger>
+          <TooltipContent style={{ zIndex: 110 }}>
+            <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
+            {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
+            <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
+            <p className="text-sm">担当: {staff.name}</p>
+            {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
   return (
     <Tooltip>
-      <TooltipTrigger
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-        onDoubleClick={handleDoubleClick}
-        className={cn("absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center", !isOverlay && "cursor-move")}
-        data-event-chip="true"
-      >
-        <div
-          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1")}
-          style={divStyle}
-        >
-          <p className="text-xs font-semibold truncate pointer-events-none">
-            {line1}
-          </p>
-          {line2 && (
-            <p className="text-xs opacity-80 truncate pointer-events-none">
-                {line2}
-            </p>
-          )}
-        </div>
-      </TooltipTrigger>
+      <TooltipTrigger asChild>{innerContent}</TooltipTrigger>
       <TooltipContent style={{ zIndex: 110 }}>
         <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
         {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
