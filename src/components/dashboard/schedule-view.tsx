@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -404,8 +403,8 @@ export function ScheduleView({
     
     const newStart = getNewStartFromDrop();
 
-    // --- Optimistic UI Update & Backend Update ---
-    if ('staffId' in item) { // Moving an existing event
+    // --- Moving an existing event ---
+    if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
         
         // Optimistic UI update
@@ -468,15 +467,15 @@ export function ScheduleView({
                 await refetchOrders();
             }
         })();
-
-    } else { // Adding a new event from unassigned
+    
+    // --- Adding a new event from unassigned ---
+    } else if ('estimatedDuration' in item) {
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
         const isGeneric = order.id.startsWith('generic-');
 
-        // Optimistic UI update
         if (isGeneric) {
             const newEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}`,
@@ -486,9 +485,11 @@ export function ScheduleView({
                 locationId: '',
                 start: newStart.toISOString(),
                 end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-             };
-             setScheduleEvents(prev => [...prev, newEvent]);
+            };
+            setScheduleEvents(prev => [...prev, newEvent]);
+            toast({ title: "汎用タスクを追加しました" });
         } else {
+             // Optimistic UI Update
              const tripId = `trip-${order.rawOrderId}`;
              const customer = getCustomerByCode(order.customerCode);
              const travelEvent: WithId<ScheduleEvent> = {
@@ -505,12 +506,11 @@ export function ScheduleView({
                 start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(),
              };
              setScheduleEvents(prev => [...prev.filter(e => e.orderId !== order.id), travelEvent, taskEvent]);
-        }
-
-        // Backend update
-        (async () => {
-            try {
-                if (!isGeneric) {
+             setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
+        
+            // Backend update
+            (async () => {
+                try {
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: `(ID: ${order.rawOrderId})`,
@@ -519,17 +519,16 @@ export function ScheduleView({
                         scheduledTime: newStart.toISOString(),
                         timestamp: new Date().toISOString(),
                     });
+                    toast({ title: "タスクを割り当てました" });
+                } catch (e: any) {
+                    toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+                } finally {
+                    await refetchOrders();
                 }
-                toast({ title: "タスクを割り当てました" });
-            } catch (e: any) {
-                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-            } finally {
-                await refetchOrders();
-            }
-        })();
+            })();
+        }
     }
   };
-
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
     const staff = getStaffById(event.staffId);
     if (!staff || !staff.email) {
@@ -679,73 +678,73 @@ export function ScheduleView({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
-        <Card>
-            <CardContent className="space-y-4 p-4">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div className="md:col-span-3 h-full">
-                        <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
-                    </div>
-                    <div className="md:col-span-2 h-full">
-                        <GenericTasks />
-                    </div>
-                </div>
+      <Card>
+          <CardContent className="p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="md:col-span-3 h-full">
+                      <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+                  </div>
+                  <div className="md:col-span-2 h-full">
+                      <GenericTasks />
+                  </div>
+              </div>
 
-                <Card className="mt-4">
-                    <CardHeader>
-                        <CardTitle>タイムライン</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                        <ScrollArea className="w-full whitespace-nowrap">
-                            <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                              <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                                  <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                                  <div className="relative h-8 flex-1">
-                                      {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                          <div
-                                              key={i}
-                                              className="absolute h-full border-l"
-                                              style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                          >
-                                              <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                                  {timelineStartHour + i}:00
-                                              </span>
-                                          </div>
-                                      ))}
-                                       {isToday(currentDate) && (
-                                        <div 
-                                            className="absolute top-0 h-full pointer-events-none z-40"
-                                            style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+              <Card className="mt-4">
+                  <CardHeader>
+                      <CardTitle>タイムライン</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                      <ScrollArea className="w-full whitespace-nowrap">
+                          <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                            <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                                <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                                <div className="relative h-8 flex-1">
+                                    {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                        <div
+                                            key={i}
+                                            className="absolute h-full border-l"
+                                            style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
                                         >
-                                            <TimeIndicator />
+                                            <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                                {timelineStartHour + i}:00
+                                            </span>
                                         </div>
-                                       )}
-                                  </div>
-                                  <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
-                              </div>
-                              <div className="relative mt-2 space-y-2">
-                                  {staffData?.map((staff) => {
-                                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                      const status = statuses.find(s => s.staffId === staff.id);
-                                      return (
-                                          <StaffRow
-                                              key={staff.id}
-                                              staff={staff}
-                                              events={events}
-                                              status={status}
-                                              getCustomerByCode={getCustomerByCode}
-                                              isOver={currentOverStaffId === staff.id}
-                                              onDoubleClickEvent={handleDoubleClickEvent}
-                                              onDoubleClickTimeline={handleDoubleClickTimeline}
-                                          />
-                                      );
-                                  })}
-                              </div>
+                                    ))}
+                                     {isToday(currentDate) && (
+                                      <div 
+                                          className="absolute top-0 h-full pointer-events-none z-40"
+                                          style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                      >
+                                          <TimeIndicator />
+                                      </div>
+                                     )}
+                                </div>
+                                <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                             </div>
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-            </CardContent>
-        </Card>
+                            <div className="relative mt-2 space-y-2">
+                                {staffData?.map((staff) => {
+                                    const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                    const status = statuses.find(s => s.staffId === staff.id);
+                                    return (
+                                        <StaffRow
+                                            key={staff.id}
+                                            staff={staff}
+                                            events={events}
+                                            status={status}
+                                            getCustomerByCode={getCustomerByCode}
+                                            isOver={currentOverStaffId === staff.id}
+                                            onDoubleClickEvent={handleDoubleClickEvent}
+                                            onDoubleClickTimeline={handleDoubleClickTimeline}
+                                        />
+                                    );
+                                })}
+                            </div>
+                          </div>
+                      </ScrollArea>
+                  </CardContent>
+              </Card>
+          </CardContent>
+      </Card>
       
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
           <DialogContent>

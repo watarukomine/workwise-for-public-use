@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -20,7 +19,6 @@ import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
 import { findKey, mapRawToOrder } from '@/lib/utils';
 import { useCustomer } from '@/contexts/customer-context';
-import { TooltipProvider } from '@/components/ui/tooltip';
 
 
 export default function DashboardPage() {
@@ -152,7 +150,6 @@ export default function DashboardPage() {
   const showVerticalView = forceMobileView || (isMobile && profile.role !== 'admin');
 
   return (
-    <TooltipProvider>
       <div className="space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-1">
@@ -208,6 +205,5 @@ export default function DashboardPage() {
           />
         )}
       </div>
-    </TooltipProvider>
   );
 }
