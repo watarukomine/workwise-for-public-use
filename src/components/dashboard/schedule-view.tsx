@@ -392,7 +392,7 @@ export function ScheduleView({
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
+    const { active, over, delta } = event;
     const item = active.data.current;
 
     setActiveItem(null);
@@ -400,6 +400,11 @@ export function ScheduleView({
     
     if (!item || !over) return;
     
+    // If it's a click without moving, do nothing
+    if (over?.id === active.data.current?.staffId && delta.x === 0 && delta.y === 0) {
+      return;
+    }
+
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         if (item.rawOrderId) {
           await unassignTask(item);
@@ -457,6 +462,7 @@ export function ScheduleView({
                  const newTaskEnd = addMinutes(newTaskStart, taskDuration);
                  const newTravelStart = subMinutes(newTaskStart, travelDuration);
                 
+                // Optimistic UI Update
                 setScheduleEvents(prev => prev.map(e => {
                     if (e.tripId !== draggedEvent.tripId) return e;
                     if (e.id.endsWith('-task')) {
