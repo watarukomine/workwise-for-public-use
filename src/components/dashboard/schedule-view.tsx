@@ -524,8 +524,9 @@ export function ScheduleView({
         }
     }
   };
-  
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
+    // This functionality is currently disabled to simplify the calendar logic.
+    // If needed, it can be re-enabled. For now, it opens the edit dialog.
     setEditedEventDetails({
         title: event.title || '',
         description: event.description || '',
@@ -682,7 +683,14 @@ export function ScheduleView({
                                         </span>
                                     </div>
                                 ))}
-                                {isToday(currentDate) && <TimeIndicator />}
+                                {isToday(currentDate) && (
+                                <div 
+                                    className="absolute top-0 h-full pointer-events-none z-[101]"
+                                    style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                >
+                                    <TimeIndicator />
+                                </div>
+                               )}
                             </div>
                             <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                         </div>
