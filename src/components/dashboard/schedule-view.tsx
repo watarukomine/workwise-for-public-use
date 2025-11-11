@@ -9,6 +9,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
   type DragOverEvent,
+  DragOverlay,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import type { ScheduleEvent, Staff, Customer, Order, WithId, StaffStatus } from '@/lib/types';
@@ -96,19 +97,22 @@ interface DraggableOrderProps {
   order: WithId<Order>;
   customer?: WithId<Customer>;
   className?: string;
+  isOverlay?: boolean;
 }
 
-const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className }) => {
+const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className, isOverlay }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: `order-${order.id}`,
       data: order,
     });
 
-  const style = {
+  const style = isOverlay ? {
+    width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
+  } : {
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
-    opacity: isDragging ? 0.8 : 1,
+    opacity: isDragging ? 0.3 : 1,
     width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
   };
   
@@ -423,6 +427,7 @@ export function ScheduleView({
                 const originalTask = originalTripEvents.find(e => e.id.endsWith('-task'))!;
                 const originalTravel = originalTripEvents.find(e => e.id.endsWith('-travel'));
                 
+                const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
                 let travelDuration = TRAVEL_TIME_MINUTES;
                 if (originalTravel) {
                   travelDuration = differenceInMinutes(parseISO(originalTravel.end as string), parseISO(originalTravel.start as string));
@@ -432,7 +437,21 @@ export function ScheduleView({
                 if (draggedEvent.id.endsWith('-travel')) {
                     newTaskStart = addMinutes(newStart, travelDuration);
                 }
+                 const newTaskEnd = addMinutes(newTaskStart, taskDuration);
+                 const newTravelStart = subMinutes(newTaskStart, travelDuration);
                 
+                // Optimistic UI update
+                setScheduleEvents(prev => prev.map(e => {
+                    if (e.tripId !== draggedEvent.tripId) return e;
+                    if (e.id.endsWith('-task')) {
+                        return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+                    }
+                    if (e.id.endsWith('-travel')) {
+                        return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                    }
+                    return e;
+                }));
+
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${originalTask.rawOrderId})`,
@@ -445,9 +464,9 @@ export function ScheduleView({
                 if (isStaffChange) {
                      if(oldStaff.calendarId && originalTask.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: originalTask.calendarEventId });
                      if(oldStaff.calendarId && originalTravel?.calendarEventId) await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: originalTravel.calendarEventId });
+                     await refetchOrders();
                 }
 
-                await refetchOrders();
             } else { // Generic event without tripId
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                 const newEnd = addMinutes(newStart, duration);
@@ -470,6 +489,7 @@ export function ScheduleView({
             toast({ title: "スケジュールを更新しました" });
         } catch(e: any) {
             toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
+            await refetchOrders();
         }
     } else if ('estimatedDuration' in item) { // Adding a new event from orders
         const order = item as WithId<Order>;
@@ -511,20 +531,6 @@ export function ScheduleView({
                  setScheduleEvents(prev => [...prev, newEvent]);
 
             } else {
-              const taskEnd = addMinutes(taskStart, order.estimatedDuration);
-              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-              
-              const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
-              const travelResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
-              
-              const taskTitle = order.taskDetails;
-              const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
-              const taskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
-
-              if (taskResult.status === 'error' || travelResult.status === 'error') {
-                  throw new Error(taskResult.message || travelResult.message);
-              }
-
               await updateSheetStatus({
                   gasUrl: ORDER_GAS_URL,
                   eventTitle: `(ID: ${order.rawOrderId})`,
@@ -532,8 +538,6 @@ export function ScheduleView({
                   statusValue: '作業待ち',
                   scheduledTime: taskStart.toISOString(),
                   timestamp: new Date().toISOString(),
-                  taskCalendarEventId: taskResult.eventId,
-                  travelCalendarEventId: travelResult.eventId,
               });
               
               toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
@@ -827,10 +831,39 @@ export function ScheduleView({
               </DialogContent>
           </Dialog>
       </TooltipProvider>
+      <DragOverlay>
+        {activeItem ? (
+          'staffId' in activeItem ? (
+            <DraggableEvent
+              isOverlay
+              event={activeItem}
+              staff={getStaffById(activeItem.staffId) || staffData[0]}
+              getCustomerByCode={getCustomerByCode}
+              onDoubleClick={() => {}}
+            />
+          ) : 'taskDetails' in activeItem ? (
+            <DraggableOrder
+              isOverlay
+              order={activeItem}
+              customer={getCustomerByCode(activeItem.customerCode)}
+              className={
+                activeItem.id.startsWith('generic-')
+                  ? getDraggableClassName(activeItem)
+                  : ''
+              }
+            />
+          ) : null
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
-
+function getDraggableClassName(task: Order) {
+    if (task.id === 'generic-travel') return 'bg-yellow-500 text-black';
+    if (task.id === 'generic-work') return 'bg-gray-400 text-white';
+    if (task.id === 'generic-break') return 'bg-green-500 text-white';
+    return 'bg-primary text-primary-foreground';
+};
 interface StaffRowProps {
   staff: WithId<Staff>;
   events: WithId<ScheduleEvent>[];
@@ -891,9 +924,10 @@ interface DraggableEventProps {
   staff: WithId<Staff>;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   onDoubleClick: () => void;
+  isOverlay?: boolean;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, isOverlay }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
@@ -901,11 +935,14 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   const { left, width } = getEventDimensions(event.start, event.end);
 
-  const style: React.CSSProperties = {
+  const style: React.CSSProperties = isOverlay ? {
+    width: `${width}px`,
+  } : {
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 2,
+    opacity: isDragging ? 0.3 : 1,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -960,7 +997,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         {...listeners}
         {...attributes}
         onDoubleClick={handleDoubleClick}
-        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
+        className={cn("absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center", !isOverlay && "cursor-move")}
         data-event-chip="true"
       >
         <div
@@ -987,5 +1024,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-    
