@@ -742,7 +742,6 @@ export function ScheduleView({
                                           onDoubleClickEvent={handleDoubleClickEvent}
                                           onDoubleClickTimeline={handleDoubleClickTimeline}
                                           getEventDimensions={getEventDimensions}
-                                          pixelsPerMinute={pixelsPerMinute}
                                       />
                                   );
                               })}
@@ -851,10 +850,9 @@ interface StaffRowProps {
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
   getEventDimensions: (start: Date | string, end: Date | string) => { left: number; width: number };
-  pixelsPerMinute: number;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, getEventDimensions, pixelsPerMinute }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, getEventDimensions }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
@@ -877,9 +875,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, i
         ref={setNodeRef} 
         className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
-        style={{ width: `${timelineTotalHours * 60 * pixelsPerMinute}px`}}
       >
-        <div className="absolute top-0 left-0 h-full">
+        <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
