@@ -47,9 +47,9 @@ import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
-const PIXELS_PER_MINUTE = 1.5;
+const PIXELS_PER_MINUTE = 1.2;
 const timelineStartHour = 9;
-const timelineEndHour = 18;
+const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
@@ -906,7 +906,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isBreakEvent = event.title === '休憩';
 
   let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = 'white';
+  let color = '#FFFFFF'; // Default to white
 
   if (isTravelEvent) {
     if (typeof backgroundColor === 'string' && (backgroundColor.startsWith('hsl(') || backgroundColor.startsWith('hsla('))) {
