@@ -123,7 +123,6 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   );
 
   return (
-    <TooltipProvider>
       <Tooltip>
         <TooltipTrigger
           ref={setNodeRef}
@@ -146,7 +145,6 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
           {tooltipContent}
         </TooltipContent>
       </Tooltip>
-    </TooltipProvider>
   );
 };
 
@@ -478,7 +476,7 @@ export function ScheduleView({
         if (!staff) return;
 
         const isGeneric = order.id.startsWith('generic-');
-
+        
         if (isGeneric) {
              const newEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}`,
@@ -682,73 +680,72 @@ export function ScheduleView({
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
-        <Card>
-            <CardContent className="p-4 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div className="md:col-span-3">
-                        <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
-                    </div>
-                    <div className="md:col-span-2">
-                        <GenericTasks />
-                    </div>
-                </div>
-
-                <Card className="mt-4">
-                    <CardHeader>
-                        <CardTitle>タイムライン</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <ScrollArea className="w-full whitespace-nowrap">
-                            <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                              <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                                  <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                                  <div className="relative h-8 flex-1">
-                                      {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                          <div
-                                              key={i}
-                                              className="absolute h-full border-l"
-                                              style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                          >
-                                              <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                                  {timelineStartHour + i}:00
-                                              </span>
-                                          </div>
-                                      ))}
-                                       {isToday(currentDate) && (
-                                        <div 
-                                            className="absolute top-0 h-full pointer-events-none z-40"
-                                            style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                                        >
-                                            <TimeIndicator />
-                                        </div>
-                                       )}
+        <div className="relative">
+          <div className="sticky top-16 z-30 bg-background/95 backdrop-blur-sm -mx-4 sm:-mx-8 px-4 sm:px-8 py-4 mb-4 border-b">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                  <div className="md:col-span-3">
+                      <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+                  </div>
+                  <div className="md:col-span-2">
+                      <GenericTasks />
+                  </div>
+              </div>
+          </div>
+          <Card className="pt-8">
+              <CardHeader className='absolute top-0 left-6'>
+                  <CardTitle>タイムライン</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                  <ScrollArea className="w-full whitespace-nowrap">
+                      <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                        <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                            <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                            <div className="relative h-8 flex-1">
+                                {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                    <div
+                                        key={i}
+                                        className="absolute h-full border-l"
+                                        style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                    >
+                                        <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                            {timelineStartHour + i}:00
+                                        </span>
+                                    </div>
+                                ))}
+                                 {isToday(currentDate) && (
+                                  <div 
+                                      className="absolute top-0 h-full pointer-events-none z-40"
+                                      style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                  >
+                                      <TimeIndicator />
                                   </div>
-                                  <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
-                              </div>
-                              <div className="relative mt-2 space-y-2">
-                                  {staffData?.map((staff) => {
-                                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                      const status = statuses.find(s => s.staffId === staff.id);
-                                      return (
-                                          <StaffRow
-                                              key={staff.id}
-                                              staff={staff}
-                                              events={events}
-                                              status={status}
-                                              getCustomerByCode={getCustomerByCode}
-                                              isOver={currentOverStaffId === staff.id}
-                                              onDoubleClickEvent={handleDoubleClickEvent}
-                                              onDoubleClickTimeline={handleDoubleClickTimeline}
-                                          />
-                                      );
-                                  })}
-                              </div>
+                                 )}
                             </div>
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-            </CardContent>
-        </Card>
+                            <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                        </div>
+                        <div className="relative mt-2 space-y-2">
+                            {staffData?.map((staff) => {
+                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                const status = statuses.find(s => s.staffId === staff.id);
+                                return (
+                                    <StaffRow
+                                        key={staff.id}
+                                        staff={staff}
+                                        events={events}
+                                        status={status}
+                                        getCustomerByCode={getCustomerByCode}
+                                        isOver={currentOverStaffId === staff.id}
+                                        onDoubleClickEvent={handleDoubleClickEvent}
+                                        onDoubleClickTimeline={handleDoubleClickTimeline}
+                                    />
+                                );
+                            })}
+                        </div>
+                      </div>
+                  </ScrollArea>
+              </CardContent>
+          </Card>
+        </div>
       
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
           <DialogContent>
@@ -953,39 +950,37 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger
-          ref={setNodeRef}
-          style={style}
-          {...listeners}
-          {...attributes}
-          onDoubleClick={handleDoubleClick}
-          className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
-          data-event-chip="true"
+    <Tooltip>
+      <TooltipTrigger
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
+        onDoubleClick={handleDoubleClick}
+        className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
+        data-event-chip="true"
+      >
+        <div
+          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && "opacity-80")}
+          style={divStyle}
         >
-          <div
-            className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && "opacity-80")}
-            style={divStyle}
-          >
-            <p className="text-xs font-semibold truncate pointer-events-none">
-              {line1}
+          <p className="text-xs font-semibold truncate pointer-events-none">
+            {line1}
+          </p>
+          {line2 && (
+            <p className="text-xs opacity-80 truncate pointer-events-none">
+                {line2}
             </p>
-            {line2 && (
-              <p className="text-xs opacity-80 truncate pointer-events-none">
-                  {line2}
-              </p>
-            )}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
-          {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
-          <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
-          <p className="text-sm">担当: {staff.name}</p>
-          {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          )}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
+        {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
+        <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
+        <p className="text-sm">担当: {staff.name}</p>
+        {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
+      </TooltipContent>
+    </Tooltip>
   );
 };
