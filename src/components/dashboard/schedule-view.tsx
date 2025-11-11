@@ -934,11 +934,10 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
-         const newLuminance = Math.min(90, parseInt(match[3]) + 30);
+         const newLuminance = parseInt(match[3]) * 0.5;
          backgroundColor = `hsl(${match[1]}, ${match[2]}%, ${newLuminance}%)`;
        }
     }
-    color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
      if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
         const [h, s] = backgroundColor.match(/\d+/g) || ['0', '0'];
