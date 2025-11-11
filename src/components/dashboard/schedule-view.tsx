@@ -49,7 +49,7 @@ import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
-const timelineEndHour = 19;
+const timelineEndHour = 18;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
@@ -676,7 +676,9 @@ export function ScheduleView({
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
         </CardHeader>
         <CardContent>
-           <p>Loading schedule...</p>
+           <div className="flex items-center justify-center h-64">
+             <p>Loading schedule...</p>
+           </div>
         </CardContent>
       </Card>
     );
@@ -684,141 +686,140 @@ export function ScheduleView({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
-        <TooltipProvider>
-            <div className="space-y-4">
-                <GenericTasks />
-                <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
+      <TooltipProvider>
+        <div className="space-y-4">
+            <GenericTasks />
+            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>タイムライン</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                        <div className="relative">
-                          <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                              <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
-                              <div className="relative h-8 flex-1">
-                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                      <div
-                                          key={i}
-                                          className="absolute h-full border-l"
-                                          style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                      >
-                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                              {timelineStartHour + i}:00
-                                          </span>
-                                      </div>
-                                  ))}
-                              </div>
-                          </div>
-                          <div className="relative">
-                            <ScrollArea className="w-full whitespace-nowrap">
-                              <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
-                                <div className="relative z-10 space-y-2">
-                                  {staffData?.map((staff) => {
-                                      const events = scheduleData.filter((e) => e.staffId === staff.id);
-                                      return (
-                                          <StaffRow
-                                              key={staff.id}
-                                              staff={staff}
-                                              events={events}
-                                              getCustomerByCode={getCustomerByCode}
-                                              rawOrdersData={rawOrdersData}
-                                              isOver={currentOverStaffId === staff.id}
-                                              onDoubleClickEvent={handleDoubleClickEvent}
-                                              onDoubleClickTimeline={handleDoubleClickTimeline}
-                                          />
-                                      );
-                                  })}
-                                </div>
-                                {isToday(new Date()) && <div className='absolute inset-0 z-20 pointer-events-none'><TimeIndicator /></div>}
-                              </div>
-                            </ScrollArea>
-                          </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-          
-          <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
-              <DialogContent>
-                  <DialogHeader>
-                      <DialogTitle>{title}</DialogTitle>
-                      <DialogDescription>
-                          {dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}
-                      </DialogDescription>
-                  </DialogHeader>
-          
-                  <div className="grid gap-4 py-4">
-                          {dialogState.mode === 'edit' && (
-                              <div className="text-sm space-y-1">
-                                  <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
-                                  {customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}
-                              </div>
-                          )}
-                           {dialogState.mode === 'new' && (
-                              <div className="text-sm">
-                                  <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
-                              </div>
-                          )}
-                          <div className="grid grid-cols-4 items-center gap-4">
-                              <Label htmlFor="title" className="text-right">タスク名</Label>
-                              <Input
-                                  id="title"
-                                  value={editedEventDetails.title}
-                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))}
-                                  className="col-span-3"
-                                  placeholder="例：定期メンテナンス"
-                              />
-                          </div>
-                           <div className="grid grid-cols-4 items-center gap-4">
-                              <Label htmlFor="description" className="text-right">詳細</Label>
-                              <Textarea
-                                  id="description"
-                                  value={editedEventDetails.description}
-                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))}
-                                  className="col-span-3"
-                                  placeholder="予定の詳細やメモ"
-                              />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                              <div className="col-span-2 grid gap-2">
-                                  <Label htmlFor="start-time">開始時間</Label>
-                                  <Input
-                                      id="start-time"
-                                      type="time"
-                                      value={editedEventDetails.startTime}
-                                      onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}
-                                  />
-                              </div>
-                              <div className="col-span-2 grid gap-2">
-                                  <Label htmlFor="end-time">終了時間</Label>
-                                  <Input
-                                      id="end-time"
-                                      type="time"
-                                      value={editedEventDetails.endTime}
-                                      onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}
-                                  />
-                              </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle>タイムライン</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    <div className="relative">
+                      <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                          <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
+                          <div className="relative h-8 flex-1">
+                              {Array.from({ length: timelineTotalHours }).map((_, i) => (
+                                  <div
+                                      key={i}
+                                      className="absolute h-full border-l"
+                                      style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                  >
+                                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                          {timelineStartHour + i}:00
+                                      </span>
+                                  </div>
+                              ))}
                           </div>
                       </div>
-          
-                      <DialogFooter className="sm:justify-between">
-                          <div className="flex gap-2">
-                              {dialogState.mode === 'edit' && (
-                                  <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
-                              )}
+                      <div className="relative">
+                        <ScrollArea className="w-full whitespace-nowrap">
+                          <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
+                            <div className="relative z-0 space-y-2">
+                              {staffData?.map((staff) => {
+                                  const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                  return (
+                                      <StaffRow
+                                          key={staff.id}
+                                          staff={staff}
+                                          events={events}
+                                          getCustomerByCode={getCustomerByCode}
+                                          isOver={currentOverStaffId === staff.id}
+                                          onDoubleClickEvent={handleDoubleClickEvent}
+                                          onDoubleClickTimeline={handleDoubleClickTimeline}
+                                      />
+                                  );
+                              })}
+                            </div>
+                            {isToday(new Date()) && <div className='absolute inset-0 z-10 pointer-events-none'><TimeIndicator /></div>}
                           </div>
-                          <div className="flex gap-2 mt-4 sm:mt-0">
-                              <DialogClose asChild>
-                                  <Button variant="ghost">キャンセル</Button>
-                              </DialogClose>
-                              <Button onClick={handleSaveEvent}>保存</Button>
+                        </ScrollArea>
+                      </div>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+      
+      <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>{title}</DialogTitle>
+                  <DialogDescription>
+                      {dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}
+                  </DialogDescription>
+              </DialogHeader>
+      
+              <div className="grid gap-4 py-4">
+                      {dialogState.mode === 'edit' && (
+                          <div className="text-sm space-y-1">
+                              <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
+                              {customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}
                           </div>
-                      </DialogFooter>
+                      )}
+                       {dialogState.mode === 'new' && (
+                          <div className="text-sm">
+                              <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
+                          </div>
+                      )}
+                      <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="title" className="text-right">タスク名</Label>
+                          <Input
+                              id="title"
+                              value={editedEventDetails.title}
+                              onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))}
+                              className="col-span-3"
+                              placeholder="例：定期メンテナンス"
+                          />
+                      </div>
+                       <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="description" className="text-right">詳細</Label>
+                          <Textarea
+                              id="description"
+                              value={editedEventDetails.description}
+                              onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))}
+                              className="col-span-3"
+                              placeholder="予定の詳細やメモ"
+                          />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                          <div className="col-span-2 grid gap-2">
+                              <Label htmlFor="start-time">開始時間</Label>
+                              <Input
+                                  id="start-time"
+                                  type="time"
+                                  value={editedEventDetails.startTime}
+                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}
+                              />
+                          </div>
+                          <div className="col-span-2 grid gap-2">
+                              <Label htmlFor="end-time">終了時間</Label>
+                              <Input
+                                  id="end-time"
+                                  type="time"
+                                  value={editedEventDetails.endTime}
+                                  onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}
+                              />
+                          </div>
+                      </div>
+                  </div>
+      
+                  <DialogFooter className="sm:justify-between">
+                      <div className="flex gap-2">
+                          {dialogState.mode === 'edit' && (
+                              <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
+                          )}
+                      </div>
+                      <div className="flex gap-2 mt-4 sm:mt-0">
+                          <DialogClose asChild>
+                              <Button variant="ghost">キャンセル</Button>
+                          </DialogClose>
+                          <Button onClick={handleSaveEvent}>保存</Button>
+                      </div>
+                  </DialogFooter>
               </DialogContent>
           </Dialog>
-        </TooltipProvider>
+      </TooltipProvider>
     </DndContext>
   );
 }
@@ -827,13 +828,12 @@ interface StaffRowProps {
   staff: WithId<Staff>;
   events: WithId<ScheduleEvent>[];
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
-  rawOrdersData: any[];
   isOver: boolean;
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, rawOrdersData, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
@@ -844,8 +844,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex border-t border-b", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center")} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+    <div className={cn("flex h-16 relative border-t border-b", areaBgClass)}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -854,18 +854,18 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-16", isOver && "bg-primary/10")} 
+        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
-        <div className="absolute top-0 left-0 h-full w-full z-10">
+        <div className="h-full border-t border-b"></div>
+        <div className="absolute top-0 left-0 h-full">
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
               event={event}
               staff={staff}
               getCustomerByCode={getCustomerByCode}
-              rawOrdersData={rawOrdersData}
               onDoubleClick={() => onDoubleClickEvent(event)}
             />
           ))}
@@ -879,11 +879,10 @@ interface DraggableEventProps {
   event: WithId<ScheduleEvent>;
   staff: WithId<Staff>;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
-  rawOrdersData: any[];
   onDoubleClick: () => void;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, rawOrdersData, onDoubleClick }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
@@ -895,7 +894,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 100 : 1,
+    zIndex: isDragging ? 100 : 2,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -904,60 +903,34 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   const isTravelEvent = event.title?.startsWith('移動');
+  const isBreakEvent = event.title === '休憩';
 
-  const divStyle: React.CSSProperties = { 
-      backgroundColor: staff.color || 'hsl(var(--primary))',
-  };
-  let textColorClass = 'text-white';
+  let backgroundColor = staff.color || 'hsl(var(--primary))';
+  let color = 'white';
 
   if (isTravelEvent) {
-    // This is the part that makes the color semi-transparent
-    if (staff.color?.startsWith('hsl')) {
-       const match = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
+    if (typeof backgroundColor === 'string' && (backgroundColor.startsWith('hsl(') || backgroundColor.startsWith('hsla('))) {
+       const match = backgroundColor.match(/hsl(a)?\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
-         divStyle.backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
+         backgroundColor = `hsla(${match[2]}, ${match[3]}%, ${match[4]}%, 0.5)`;
        }
     } else {
-       // Fallback for non-hsl colors, assuming it's a hex or named color
-       // This part requires converting hex to rgba, which is more complex.
-       // For now, we'll use a simpler opacity property, but the hsla approach is better if colors are consistent.
-       style.opacity = 0.5;
+       backgroundColor = 'hsla(var(--primary), 0.5)';
     }
-     textColorClass = 'text-white';
-  } else {
-    const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
-    if (staff.name && brightStaff.includes(staff.name)) {
-        textColorClass = 'text-black';
-    }
-  }
-
-  if (event.title === '業務') {
-    divStyle.backgroundColor = 'rgb(156 163 175)';
-  } else if (event.title === '休憩') {
-    divStyle.backgroundColor = 'rgb(34 197 94)';
-  }
-
-  const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
-  let line1 = event.title || '';
-  let line2 = '';
-
-  if (isTravelEvent) {
-      const customerName = customer?.storeName || event.title.split('：')[1] || '';
-      line1 = `移動：${customerName}`;
-  } else if (event.rawOrderId) {
-    const orderInRaw = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === event.rawOrderId);
-    if(orderInRaw) {
-        const customerName = findKey(orderInRaw, ['お取引先名', '取引先']) || customer?.storeName || '';
-        const scheduledTime = formatTime(event.start);
-        const equipment = findKey(customer, ['機材有無']) || '';
-        const tireSize = findKey(orderInRaw, ['タイヤサイズ', 'サイズ']) || '';
-        line1 = `${customerName}：${scheduledTime}`;
-        line2 = `${equipment ? `${equipment}：` : ''}${tireSize}`;
-    }
-  } else {
-      [line1] = (event.title || '').split('\n');
+    color = '#FFFFFF';
+  } else if (isBreakEvent) {
+     if (typeof backgroundColor === 'string' && (backgroundColor.startsWith('hsl(') || backgroundColor.startsWith('hsla('))) {
+        const [h, s] = backgroundColor.match(/\d+/g) || ['0', '0'];
+        backgroundColor = `hsl(${h}, ${s}%, 90%)`;
+      } else {
+        backgroundColor = `hsl(120, 40%, 85%)`;
+      }
+      color = 'hsl(var(--foreground))';
   }
   
+  const [line1, ...rest] = (event.title || '').split('\n');
+  const line2 = rest.join('\n');
+  const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
   return (
@@ -972,8 +945,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         data-event-chip="true"
       >
         <div
-          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)}
-          style={divStyle}
+          className="w-full h-full rounded-md flex flex-col justify-center p-1"
+          style={{ backgroundColor, color }}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
