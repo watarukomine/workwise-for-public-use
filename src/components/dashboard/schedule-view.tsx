@@ -113,24 +113,15 @@ const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     
     const customerName = findKey(rawOrder, ['お取引先名', '取引先']) || '';
     const scheduledTime = findKey(rawOrder, ['予定時間']) ? `：${formatTime(findKey(rawOrder, ['予定時間']))}` : '';
-    const equipment = findKey(rawOrder, ['機材有無']) || '';
-    const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || '';
 
     const line1 = `${customerName}${scheduledTime}`;
-    const line2 = `${equipment ? `${equipment}：` : ''}${tireSize}`;
-
-    let taskDetails = line1;
-    if (line2.trim() && line2.trim() !== '：') {
-        taskDetails += `\n${line2}`;
-    }
-    
     const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
     const orderId = findKey(rawOrder, idKeys);
 
     return {
         id: String(orderId || `ord-${Math.random()}`),
         customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
-        taskDetails: taskDetails.trim(),
+        taskDetails: line1.trim(), // We will now construct details inside the component
         estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
         raw: rawOrder,
         rawOrderId: String(orderId || '')
@@ -510,13 +501,11 @@ export function ScheduleView({
               const tripId = `trip-${Date.now()}`;
               const taskEnd = addMinutes(taskStart, order.estimatedDuration);
               const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-              
-              const customerName = customer?.storeName || order.taskDetails.split('\n')[0].split('：')[0];
 
               const travelEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-travel`,
                   tripId: tripId,
-                  title: `移動：${customerName}`,
+                  title: `移動: ${customer?.storeName || order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: travelStart.toISOString(),
@@ -528,8 +517,8 @@ export function ScheduleView({
                   tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
-                  title: order.taskDetails, // Keep original details
-                  description: `顧客: ${customerName}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
+                  title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`,
+                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: taskStart.toISOString(),
@@ -821,8 +810,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center border-y", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+    <div className={cn("flex h-16 relative border-y", areaBgClass)}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -835,8 +824,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
-        <div className="h-full border-t border-b"></div>
-        <div className="absolute top-0 left-0 h-full">
+        <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
@@ -886,7 +874,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isBreakEvent = event.title === '休憩';
 
   let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = 'white';
+  let color = 'hsl(var(--primary-foreground))';
 
   if (isTravelEvent) {
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
@@ -895,7 +883,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
          backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
        }
     } else {
-       backgroundColor = 'hsla(var(--primary), 0.5)';
+       backgroundColor = 'hsla(var(--primary) / 0.5)';
     }
     color = 'hsl(var(--foreground))';
   } else if (isBreakEvent) {
@@ -913,8 +901,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let line2 = '';
 
   if (isTravelEvent) {
-      const parts = event.title.split('：');
-      line1 = `移動：${parts[1] || ''}`;
+      const customerName = customer?.storeName || event.title.split('：')[1] || '';
+      line1 = `移動：${customerName}`;
   } else if (event.rawOrderId) {
     const orderInRaw = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === event.rawOrderId);
     if(orderInRaw) {
