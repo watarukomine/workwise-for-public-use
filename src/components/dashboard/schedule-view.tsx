@@ -730,7 +730,7 @@ export function ScheduleView({
                                       );
                                   })}
                                 </div>
-                                {isToday(new Date()) && <TimeIndicator />}
+                                {isToday(new Date()) && <div className='absolute inset-0 z-20 pointer-events-none'><TimeIndicator /></div>}
                               </div>
                             </ScrollArea>
                           </div>
@@ -843,7 +843,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex h-16 relative", areaBgClass)}>
+    <div className={cn("flex h-16 relative")}>
       <div className={cn("sticky left-0 z-20 flex-shrink-0 pr-2 flex items-center border-y", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full">
           <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
@@ -853,7 +853,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
+        className={cn("relative flex-1 h-full", areaBgClass, isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
@@ -911,7 +911,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let textColorClass = 'text-primary-foreground';
 
   if (isTravelEvent) {
-      divStyle.backgroundColor = 'transparent';
       if (staff.color && staff.color.startsWith('hsl')) {
           const match = staff.color.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/) || staff.color.match(/hsla\((\d+),\s*(\d+)%,\s*(\d+)%,\s*[\d.]+\)/);
           if (match) {
@@ -919,11 +918,11 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           }
       } else if (staff.color) { // Fallback for non-hsl, like hex
           let r = 0, g = 0, b = 0;
-          if (staff.color.length === 4) {
+          if (staff.color.length === 4) { // #RGB
               r = parseInt(staff.color[1] + staff.color[1], 16);
               g = parseInt(staff.color[2] + staff.color[2], 16);
               b = parseInt(staff.color[3] + staff.color[3], 16);
-          } else if (staff.color.length === 7) {
+          } else if (staff.color.length === 7) { // #RRGGBB
               r = parseInt(staff.color.substring(1, 3), 16);
               g = parseInt(staff.color.substring(3, 5), 16);
               b = parseInt(staff.color.substring(5, 7), 16);
