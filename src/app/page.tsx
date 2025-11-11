@@ -29,6 +29,8 @@ export default function DashboardPage() {
   const { 
     orders: rawOrders, 
     isLoading: isLoadingOrders,
+    scheduleEvents,
+    setScheduleEvents
   } = useOrder();
   
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -161,17 +163,24 @@ export default function DashboardPage() {
 
       {showVerticalView ? (
           <VerticalScheduleView 
-              scheduleData={[]}
+              scheduleData={scheduleEvents}
               staffData={filteredStaff}
           />
       ) : (
-          <ScheduleView 
-              staffData={filteredStaff} 
-              customerData={customers} 
-              rawOrdersData={rawOrders}
-              currentDate={currentDate}
-              statuses={filteredStatuses}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <ScheduleView 
+                staffData={filteredStaff} 
+                customerData={customers} 
+                rawOrdersData={rawOrders}
+                scheduleData={scheduleEvents}
+                setScheduleData={setScheduleEvents}
+            />
+          </div>
+          <div className="lg:col-span-1">
+            <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />
+          </div>
+        </div>
       )}
     </div>
   );
