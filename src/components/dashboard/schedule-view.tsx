@@ -648,9 +648,7 @@ export function ScheduleView({
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-64">
            <p>Loading schedule...</p>
-          </div>
         </CardContent>
       </Card>
     );
@@ -869,7 +867,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
-    opacity: isDragging ? 0.8 : 1,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -884,23 +881,20 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let color = 'hsl(var(--primary-foreground))';
 
   if (isTravelEvent) {
-    if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
-       if (match) {
-         const [, h, s, l] = match;
-         // Increase lightness to make the color paler. Adjust the 90 to be closer to 100 for lighter, or closer to l for less effect.
-         const newL = Math.min(100, parseInt(l, 10) + (100 - parseInt(l, 10)) * 0.5); 
-         backgroundColor = `hsl(${h}, ${s}%, ${newL}%)`;
-         color = 'hsl(var(--foreground))';
-       } else {
-         // Fallback for non-matching HSL strings
-         backgroundColor = 'hsla(var(--primary), 0.5)';
-         color = 'hsl(var(--foreground))';
-       }
+    if (typeof backgroundColor === 'string' && (backgroundColor.startsWith('hsl(') || backgroundColor.startsWith('hsla('))) {
+      const match = backgroundColor.match(/hsla?\((\d+),\s*(\d+)%,\s*(\d+)%/);
+      if (match) {
+        const [, h, s, l] = match;
+        const newL = Math.min(100, parseInt(l, 10) + (100 - parseInt(l, 10)) * 0.7);
+        backgroundColor = `hsl(${h}, ${s}%, ${newL}%)`;
+        color = 'hsl(var(--foreground))';
+      } else {
+        backgroundColor = 'hsla(var(--primary), 0.2)';
+        color = 'hsl(var(--foreground))';
+      }
     } else {
-       // Fallback for non-HSL colors, maybe could be improved
-       backgroundColor = 'hsla(var(--primary), 0.5)';
-       color = 'hsl(var(--foreground))';
+      backgroundColor = 'hsla(var(--primary), 0.2)';
+      color = 'hsl(var(--foreground))';
     }
   } else if (isBreakEvent) {
      if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
