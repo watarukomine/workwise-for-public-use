@@ -2,10 +2,10 @@
 'use client';
 
 import * as React from 'react';
-import { ScheduleView } from '@/components/dashboard/schedule-view';
+import { ScheduleView, UnassignedTasks, GenericTasks } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
 import { customerData, staffStatusData } from '@/lib/data';
-import type { Customer, WithId, Staff } from '@/lib/types';
+import type { Customer, WithId, Staff, StaffStatus } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -20,10 +20,11 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
+import { findKey, mapRawToOrder } from '@/lib/utils';
+import { useCustomer } from '@/contexts/customer-context';
 
 
 export default function DashboardPage() {
-  const [customers] = React.useState<WithId<Customer>[]>(customerData);
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
   
   const { 
@@ -33,12 +34,15 @@ export default function DashboardPage() {
     setScheduleEvents
   } = useOrder();
   
+  const { customers: allCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
   const { forceMobileView, setForceMobileView } = useAppShell();
   
-  const filteredStaff = React.useMemo(() => {
+    const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
+
+    const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || isStaffLoading || !profile || !allStaff) return [];
 
     const staffToUse = allStaff;
@@ -66,23 +70,80 @@ export default function DashboardPage() {
 
   }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
   
-  const filteredStatuses = React.useMemo(() => {
-    if (!staffStatusData || !filteredStaff) return [];
-    const selectedIds = new Set(filteredStaff.map(s => s.id));
-    return staffStatusData.filter(status => selectedIds.has(status.staffId));
-  }, [filteredStaff]);
+  const statuses: StaffStatus[] = React.useMemo(() => {
+    if (!filteredStaff.length || !rawOrders.length) {
+        return filteredStaff.map(sf => ({
+            staffId: sf.id,
+            status: '待機中',
+            lastAction: '現在地情報なし',
+        }));
+    }
 
-  const selectedStaffNames = React.useMemo(() => {
-    if (!allStaff || profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
-      return null;
+    const staffStatusMap = new Map<string, StaffStatus>();
+
+    for (const staff of filteredStaff) {
+        staffStatusMap.set(staff.id, {
+            staffId: staff.id,
+            status: '待機中',
+            lastAction: '現在地情報なし',
+        });
     }
-    const staffToUse = allStaff;
-    if (appliedSelectedStaffIds.length === staffToUse.length) {
-      return "全スタッフ";
+
+    for (const order of rawOrders) {
+        const staffName = findKey(order, ['担当']);
+        const staffMember = allStaff.find(s => s.name === staffName);
+        if (!staffMember || !staffStatusMap.has(staffMember.id)) continue;
+
+        const lastUpdateStr = findKey(order, ['最終更新日時']);
+        const lastUpdate = lastUpdateStr ? new Date(lastUpdateStr) : new Date(0);
+
+        const currentStatus = staffStatusMap.get(staffMember.id)!;
+        const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
+
+        if (lastUpdate.getTime() >= currentUpdate.getTime()) {
+            const locationStr: string = findKey(order, ['最終位置情報（緯度,経度）']) || '';
+            const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
+            
+            staffStatusMap.set(staffMember.id, {
+                staffId: staffMember.id,
+                status: findKey(order, ['受注ステータス']) || '待機中',
+                lastAction: `[${findKey(order, ['受注 ID', 'id'])}] ${findKey(order, ['受注ステータス'])}`,
+                latitude: !isNaN(lat) ? lat : undefined,
+                longitude: !isNaN(lon) ? lon : undefined,
+                lastUpdate: lastUpdate.toISOString(),
+            });
+        }
     }
-    const selectedStaff = staffToUse.filter(s => appliedSelectedStaffIds.includes(s.id));
-    return selectedStaff.map(s => s.name).join('、');
-  }, [allStaff, appliedSelectedStaffIds, profile]);
+    
+    return Array.from(staffStatusMap.values());
+  }, [filteredStaff, rawOrders, allStaff]);
+
+
+  React.useEffect(() => {
+    if (!rawOrders || !scheduleEvents) return;
+    
+    const scheduledRawOrderIds = new Set(scheduleEvents.map(e => e.rawOrderId).filter(Boolean));
+    
+    const newUnassignedOrders = rawOrders.filter(order => {
+        const staffName = findKey(order, ['担当']);
+        const scheduledTime = findKey(order, ['チップ配置作業予定']);
+        const orderId = findKey(order, ['受注 ID', '受注id', '受注ID', 'id']);
+        
+        if (scheduledRawOrderIds.has(orderId)) return false;
+        
+        const isAssigned = staffName && scheduledTime;
+        if (isAssigned) return false;
+
+        const workDate = findKey(order, ['作業予定日']);
+        if (!workDate) return false;
+
+        const scheduledDate = parseISO(workDate);
+        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
+    }).map(mapRawToOrder);
+
+    setUnassignedOrders(newUnassignedOrders);
+  }, [rawOrders, currentDate, scheduleEvents]);
+
 
   const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading;
 
@@ -153,10 +214,11 @@ export default function DashboardPage() {
           </div>
       </div>
       
-       {selectedStaffNames && (
+       {profile.role === 'admin' && appliedSelectedStaffIds.length > 0 && (
         <div className="rounded-lg bg-muted p-3">
             <p className="text-sm font-medium text-muted-foreground">
-              <span className="font-semibold text-foreground">表示中のスタッフ:</span> {selectedStaffNames}
+              <span className="font-semibold text-foreground">表示中のスタッフ:</span>{' '}
+              {appliedSelectedStaffIds.length === allStaff.length ? "全スタッフ" : allStaff.filter(s => appliedSelectedStaffIds.includes(s.id)).map(s => s.name).join('、')}
             </p>
         </div>
       )}
@@ -167,21 +229,20 @@ export default function DashboardPage() {
               staffData={filteredStaff}
           />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <ScheduleView 
-                staffData={filteredStaff} 
-                customerData={customers} 
-                rawOrdersData={rawOrders}
-                scheduleData={scheduleEvents}
-                setScheduleData={setScheduleEvents}
-            />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+            <GenericTasks />
           </div>
-          <div className="lg:col-span-1">
-            <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />
-          </div>
+          <ScheduleView 
+              staffData={filteredStaff} 
+              rawOrdersData={rawOrders}
+              currentDate={currentDate}
+              statuses={statuses}
+          />
         </div>
       )}
     </div>
   );
 }
+
