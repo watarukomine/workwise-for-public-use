@@ -486,17 +486,20 @@ export function ScheduleView({
         
         // Backend Update
         try {
+            const isStaffChange = draggedEvent.staffId !== newStaffId;
+            
             if (draggedEvent.tripId) {
                 const originalTask = scheduleEvents.find(e => e.tripId === draggedEvent.tripId && e.id.endsWith('-task'))!;
                 const taskStartForSheet = updatedEvents.find(e => e.id === originalTask.id)!.start;
+                
                 updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${originalTask.rawOrderId})`,
                     scheduledTime: new Date(taskStartForSheet).toISOString(),
                     staffName: newStaff.name,
                 }).then(() => refetchOrders());
+                
             } else { // Generic event
-                const isStaffChange = draggedEvent.staffId !== newStaffId;
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                 const newEnd = addMinutes(newStart, duration);
 
@@ -566,6 +569,20 @@ export function ScheduleView({
                 // Update temporary event with real calendar ID
                 setScheduleEvents(prev => prev.map(e => e.id.startsWith('event-temp-') ? { ...e, id: `event-${Date.now()}`, calendarEventId: result.eventId } : e));
             } else {
+              const taskEnd = addMinutes(taskStart, order.estimatedDuration);
+              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+              
+              const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
+              const travelResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: taskStart.toISOString() });
+              
+              const taskTitle = order.taskDetails;
+              const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
+              const taskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: taskStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
+
+              if (taskResult.status === 'error' || travelResult.status === 'error') {
+                  throw new Error(taskResult.message || travelResult.message);
+              }
+
               await updateSheetStatus({
                   gasUrl: ORDER_GAS_URL,
                   eventTitle: `(ID: ${order.rawOrderId})`,
@@ -573,6 +590,8 @@ export function ScheduleView({
                   statusValue: '作業待ち',
                   scheduledTime: taskStart.toISOString(),
                   timestamp: new Date().toISOString(),
+                  taskCalendarEventId: taskResult.eventId,
+                  travelCalendarEventId: travelResult.eventId,
               });
               
               toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
@@ -1007,7 +1026,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     } else {
        backgroundColor = 'hsl(var(--primary))';
     }
-    color = 'hsl(var(--primary-foreground))';
   } else if (event.title === '休憩') {
      backgroundColor = `hsl(120, 40%, 90%)`;
      color = 'hsl(var(--foreground))';
