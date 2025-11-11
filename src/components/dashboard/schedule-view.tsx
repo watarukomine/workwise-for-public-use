@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -748,7 +747,11 @@ export function ScheduleView({
                                   );
                               })}
                             </div>
-                            {isToday(new Date()) && <div className='absolute inset-0 z-10 pointer-events-none'><TimeIndicator pixelsPerMinute={pixelsPerMinute} /></div>}
+                            {isToday(new Date()) && (
+                              <div className='absolute inset-0 z-10 pointer-events-none' style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * pixelsPerMinute}px`}}>
+                                <TimeIndicator pixelsPerMinute={pixelsPerMinute} />
+                              </div>
+                            )}
                           </div>
                         </ScrollArea>
                       </div>
@@ -988,5 +991,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-    
