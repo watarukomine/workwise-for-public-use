@@ -54,7 +54,7 @@ const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
-const STAFF_COL_WIDTH = 180;
+const STAFF_COL_WIDTH = 220; // Increased width to accommodate status
 const STATUS_COL_WIDTH = 120;
 
 
@@ -674,11 +674,10 @@ export function ScheduleView({
                                 </div>
                                )}
                           </div>
-                           <div className="flex-shrink-0" style={{ width: `${STATUS_COL_WIDTH}px` }}></div>
                       </div>
                       <div className="relative">
                         <ScrollArea className="w-full whitespace-nowrap">
-                          <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH + STATUS_COL_WIDTH}px`}}>
+                          <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
                               <div className="relative space-y-2">
                                   {staffData?.map((staff) => {
                                       const events = dailySchedule.filter((e) => e.staffId === staff.id);
@@ -808,10 +807,18 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
 
   return (
     <div className={cn("flex h-16 relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
-        <div className="font-semibold flex items-center gap-2 w-full truncate">
-            <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
-            <span className='truncate flex-1'>{staff.name}</span>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 px-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+        <div className="font-semibold flex items-center justify-between gap-2 w-full truncate">
+            <div className="flex items-center gap-2 truncate">
+                <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
+                <span className='truncate flex-1'>{staff.name}</span>
+            </div>
+             {status && isToday(new Date()) && (
+              <Badge variant="outline" className="flex items-center gap-2 text-xs flex-shrink-0">
+                <span className={cn("h-2 w-2 rounded-full", statusColors[status.status])} />
+                {statusJapanese[status.status]}
+              </Badge>
+            )}
         </div>
       </div>
       <div 
@@ -834,14 +841,6 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
           ))}
         </div>
       </div>
-       <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px` }}>
-            {status && isToday(new Date()) && (
-              <Badge variant="outline" className="flex items-center gap-2 text-xs">
-                <span className={cn("h-2 w-2 rounded-full", statusColors[status.status])} />
-                {statusJapanese[status.status]}
-              </Badge>
-            )}
-        </div>
     </div>
   )
 };
