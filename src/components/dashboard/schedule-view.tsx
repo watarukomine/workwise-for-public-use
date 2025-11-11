@@ -276,6 +276,7 @@ export function ScheduleView({
     currentDate,
     statuses
 }: ScheduleViewProps) {
+  const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
   const { scheduleEvents, setScheduleEvents, refetchOrders } = useOrder();
@@ -319,6 +320,10 @@ export function ScheduleView({
 
   const [activeItem, setActiveItem] = React.useState<any | null>(null);
   const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActiveItem(event.active.data.current);
@@ -535,8 +540,8 @@ export function ScheduleView({
                   travelCalendarEventId: travelResult.eventId,
               });
               
-              toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
               await refetchOrders();
+              toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
             }
         } catch (e: any) {
              toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
@@ -664,6 +669,22 @@ export function ScheduleView({
   };
 
   const { event, staff, customer, title } = getDialogDetails();
+
+  if (!isClient) {
+      return (
+          <Card>
+              <CardHeader>
+                  <CardTitle>スケジュール</CardTitle>
+                  <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <div className="flex items-center justify-center h-64">
+                      <p>Loading schedule...</p>
+                  </div>
+              </CardContent>
+          </Card>
+      );
+  }
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
@@ -921,7 +942,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
-         backgroundColor = `hsl(${match[1]}, ${parseInt(match[2])}%, ${Math.min(90, (parseInt(match[3]) + 100) / 2)}%)`;
+         const newLightness = Math.round((parseInt(match[3]) + 100) / 2);
+         backgroundColor = `hsl(${match[1]}, ${match[2]}%, ${newLightness}%)`;
        }
     } else {
        backgroundColor = 'hsla(var(--primary), 0.5)';
