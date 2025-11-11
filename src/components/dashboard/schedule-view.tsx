@@ -694,52 +694,54 @@ export function ScheduleView({
                     <CardHeader>
                         <CardTitle>タイムライン</CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-6 overflow-x-auto">
-                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                          <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                              <div className="relative h-8 flex-1">
-                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                      <div
-                                          key={i}
-                                          className="absolute h-full border-l"
-                                          style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                      >
-                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                              {timelineStartHour + i}:00
-                                          </span>
-                                      </div>
-                                  ))}
-                                   {isToday(currentDate) && (
-                                    <div 
-                                        className="absolute top-0 h-full pointer-events-none z-40"
-                                        style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                                    >
-                                        <TimeIndicator />
-                                    </div>
-                                   )}
+                    <CardContent className="pt-6">
+                        <ScrollArea className="w-full whitespace-nowrap">
+                            <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                              <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                                  <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                                  <div className="relative h-8 flex-1">
+                                      {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                          <div
+                                              key={i}
+                                              className="absolute h-full border-l"
+                                              style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                          >
+                                              <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                                  {timelineStartHour + i}:00
+                                              </span>
+                                          </div>
+                                      ))}
+                                       {isToday(currentDate) && (
+                                        <div 
+                                            className="absolute top-0 h-full pointer-events-none z-40"
+                                            style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                        >
+                                            <TimeIndicator />
+                                        </div>
+                                       )}
+                                  </div>
+                                  <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                               </div>
-                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
-                          </div>
-                          <div className="relative mt-2 space-y-2">
-                              {staffData?.map((staff) => {
-                                  const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                  const status = statuses.find(s => s.staffId === staff.id);
-                                  return (
-                                      <StaffRow
-                                          key={staff.id}
-                                          staff={staff}
-                                          events={events}
-                                          status={status}
-                                          getCustomerByCode={getCustomerByCode}
-                                          isOver={currentOverStaffId === staff.id}
-                                          onDoubleClickEvent={handleDoubleClickEvent}
-                                          onDoubleClickTimeline={handleDoubleClickTimeline}
-                                      />
-                                  );
-                              })}
-                          </div>
-                        </div>
+                              <div className="relative mt-2 space-y-2">
+                                  {staffData?.map((staff) => {
+                                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                      const status = statuses.find(s => s.staffId === staff.id);
+                                      return (
+                                          <StaffRow
+                                              key={staff.id}
+                                              staff={staff}
+                                              events={events}
+                                              status={status}
+                                              getCustomerByCode={getCustomerByCode}
+                                              isOver={currentOverStaffId === staff.id}
+                                              onDoubleClickEvent={handleDoubleClickEvent}
+                                              onDoubleClickTimeline={handleDoubleClickTimeline}
+                                          />
+                                      );
+                                  })}
+                              </div>
+                            </div>
+                        </ScrollArea>
                     </CardContent>
                 </Card>
             </CardContent>
