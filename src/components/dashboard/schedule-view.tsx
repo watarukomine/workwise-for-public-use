@@ -294,7 +294,10 @@ const TimeIndicator = () => {
     const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
     if (!isVisible) return null;
     
-    const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
+    const startOfTimeline = new Date(now);
+    startOfTimeline.setHours(timelineStartHour, 0, 0, 0);
+
+    const minutesFromStart = differenceInMinutes(now, startOfTimeline);
     const leftPosition = minutesToPixels(minutesFromStart);
 
     return (
@@ -710,7 +713,6 @@ export function ScheduleView({
                                           </span>
                                       </div>
                                   ))}
-                                  
                               </div>
                           </div>
                           <div className="relative">
@@ -861,7 +863,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, r
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
         <div className="h-full border-t border-b"></div>
-        <div className="absolute top-0 left-0 h-full w-full">
+        <div className="absolute top-0 left-0 h-full w-full z-10">
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
@@ -907,6 +909,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   const isTravelEvent = event.title?.startsWith('移動');
+  const isBreakEvent = event.title === '休憩';
 
   const divStyle: React.CSSProperties = { 
       backgroundColor: staff.color || 'hsl(var(--primary))',
@@ -914,8 +917,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let textColorClass = 'text-primary-foreground';
 
   if (isTravelEvent) {
-      style.opacity = 0.5;
-      textColorClass = 'text-white';
+    divStyle.backgroundColor = `hsla(${staff.color?.match(/\d+/g)?.[0] || '217'}, 91%, 60%, 0.5)`;
+    textColorClass = 'text-white';
   } else {
     const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
     if (staff.name && brightStaff.includes(staff.name)) {
