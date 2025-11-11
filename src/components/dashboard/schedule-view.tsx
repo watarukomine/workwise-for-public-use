@@ -404,6 +404,42 @@ export function ScheduleView({
         
         const newStart = getNewStartFromDrop();
         
+        // Optimistically update UI first
+        if (draggedEvent.tripId) {
+            setScheduleEvents(prev => {
+                const eventsToMove = prev.filter(e => e.tripId === draggedEvent.tripId);
+                if (eventsToMove.length > 0) {
+                    const originalTask = eventsToMove.find(e => e.id.endsWith('-task')) || draggedEvent;
+                    const originalTravel = eventsToMove.find(e => e.id.endsWith('-travel'));
+                    const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
+                    
+                    let newTaskStart = newStart;
+                    if (originalTravel && draggedEvent.id === originalTravel.id) {
+                        newTaskStart = addMinutes(newStart, TRAVEL_TIME_MINUTES);
+                    }
+                    
+                    const newTaskEnd = addMinutes(newTaskStart, taskDuration);
+                    const newTravelStart = subMinutes(newTaskStart, TRAVEL_TIME_MINUTES);
+
+                    return prev.map(e => {
+                        if (e.tripId !== draggedEvent.tripId) return e;
+                        if (e.id.endsWith('-task')) {
+                            return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+                        }
+                        if (e.id.endsWith('-travel')) {
+                            return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                        }
+                        return e;
+                    });
+                }
+                return prev;
+            });
+        } else {
+            const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+            const newEnd = addMinutes(newStart, duration);
+            setScheduleEvents(prev => prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e));
+        }
+
         try {
             await updateSheetStatus({
                 gasUrl: ORDER_GAS_URL,
@@ -412,12 +448,12 @@ export function ScheduleView({
                 staffName: newStaff.name,
             });
             
-            await refetchOrders();
+            await refetchOrders(); // Refetch to confirm and get latest data
             toast({ title: "スケジュールを更新しました" });
 
         } catch(e: any) {
             toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
-            await refetchOrders();
+            await refetchOrders(); // Revert UI by refetching
         }
 
     } else if ('estimatedDuration' in item) { // Adding a new event from orders
@@ -617,7 +653,7 @@ export function ScheduleView({
                     <div className="relative">
                       <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
                           <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
-                          <div className="relative h-8 flex-1">
+                          <div className="relative h-8 flex-1" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
                               {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                   <div
                                       key={i}
