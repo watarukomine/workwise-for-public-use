@@ -934,7 +934,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
        const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
-         backgroundColor = `hsl(${match[1]}, ${parseInt(match[2]) * 0.8}%, 90%)`;
+         backgroundColor = `hsl(${match[1]}, ${parseInt(match[2]) * 0.8}%, ${ (parseInt(match[3]) + 100) / 2 }%)`;
        }
     } else {
        backgroundColor = 'hsl(var(--muted))';
