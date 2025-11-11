@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Location } from './route-optimizer';
-import { User, Building2 } from 'lucide-react';
+import { User, Building2, MapPin } from 'lucide-react';
 
 type StaffWithLocation = Staff & Partial<StaffStatus>;
 
@@ -171,8 +171,10 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
                   }}
                 >
                   <Tooltip>
-                    <TooltipTrigger>
-                      <div className="w-4 h-4 rounded-full bg-purple-500 border-2 border-white shadow-md" />
+                    <TooltipTrigger asChild>
+                       <div className="w-8 h-8 rounded-full bg-purple-600 border-2 border-white shadow-md flex items-center justify-center">
+                          <MapPin className="w-5 h-5 text-white" />
+                        </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="font-bold">{l.name}</p>
