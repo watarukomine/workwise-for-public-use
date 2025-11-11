@@ -276,7 +276,6 @@ export function ScheduleView({
     currentDate,
     statuses
 }: ScheduleViewProps) {
-  const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
   const { scheduleEvents, setScheduleEvents, refetchOrders } = useOrder();
@@ -285,10 +284,6 @@ export function ScheduleView({
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
-  
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
   
   const dailySchedule = React.useMemo(() => {
       if (!scheduleEvents) return [];
@@ -317,7 +312,7 @@ export function ScheduleView({
     }).map(mapRawToOrder);
 
     setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, currentDate, scheduleEvents]);
+  }, [rawOrdersData, currentDate]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -568,9 +563,9 @@ export function ScheduleView({
     const clickX = e.clientX - timelineRect.left;
     const clickMinutes = pixelsToMinutes(clickX);
     
-    const startOfDay = new Date(currentDate);
-    startOfDay.setHours(timelineStartHour, 0, 0, 0);
-    const newStart = addMinutes(startOfDay, clickMinutes);
+    const startOfTimelineDay = new Date(currentDate);
+    startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
+    const newStart = addMinutes(startOfTimelineDay, clickMinutes);
 
     setEditedEventDetails({ title: '', description: '', startTime: formatTime(newStart), endTime: formatTime(addMinutes(newStart, 60)) });
     setDialogState({ mode: 'new', staffId, start: newStart });
@@ -669,22 +664,6 @@ export function ScheduleView({
   };
 
   const { event, staff, customer, title } = getDialogDetails();
-
-  if (!isClient) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>スケジュール</CardTitle>
-          <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
-        </CardHeader>
-        <CardContent>
-           <div className="flex items-center justify-center h-64">
-             <p>Loading schedule...</p>
-           </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
