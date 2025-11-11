@@ -44,7 +44,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -862,7 +862,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   const { left, width } = getEventDimensions(event.start, event.end);
 
-  const style = {
+  const style: React.CSSProperties = {
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
@@ -877,33 +877,19 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isTravelEvent = event.title?.startsWith('移動');
   const isBreakEvent = event.title === '休憩';
 
-  let backgroundColor = staff.color || 'hsl(var(--primary))';
-  let color = 'hsl(var(--primary-foreground))';
+  const divStyle: React.CSSProperties = { 
+    backgroundColor: staff.color || 'hsl(var(--primary))',
+    color: 'hsl(var(--primary-foreground))',
+  };
 
   if (isTravelEvent) {
-    if (typeof backgroundColor === 'string' && (backgroundColor.startsWith('hsl(') || backgroundColor.startsWith('hsla('))) {
-      const match = backgroundColor.match(/hsla?\((\d+),\s*(\d+)%,\s*(\d+)%/);
-      if (match) {
-        const [, h, s, l] = match;
-        const newL = Math.min(100, parseInt(l, 10) + (100 - parseInt(l, 10)) * 0.7);
-        backgroundColor = `hsl(${h}, ${s}%, ${newL}%)`;
-        color = 'hsl(var(--foreground))';
-      } else {
-        backgroundColor = 'hsla(var(--primary), 0.2)';
-        color = 'hsl(var(--foreground))';
-      }
-    } else {
-      backgroundColor = 'hsla(var(--primary), 0.2)';
-      color = 'hsl(var(--foreground))';
-    }
-  } else if (isBreakEvent) {
-     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-        const [h, s] = backgroundColor.match(/\d+/g) || ['0', '0'];
-        backgroundColor = `hsl(${h}, ${s}%, 90%)`;
-      } else {
-        backgroundColor = `hsl(120, 40%, 85%)`;
-      }
-      color = 'hsl(var(--foreground))';
+    style.opacity = 0.5;
+  }
+  if (isBreakEvent) {
+     divStyle.backgroundColor = `hsl(120, 40%, 85%)`;
+     divStyle.color = 'hsl(var(--foreground))';
+  } else if (event.title === '業務') {
+    divStyle.backgroundColor = 'rgb(156 163 175)';
   }
   
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
@@ -928,8 +914,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   }
   
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
-
-  const divStyle: React.CSSProperties = { backgroundColor, color };
 
   return (
     <Tooltip>
