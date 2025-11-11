@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { ScheduleView, UnassignedTasks, GenericTasks } from '@/components/dashboard/schedule-view';
+import { ScheduleView } from '@/components/dashboard/schedule-view';
 import type { Customer, WithId, Staff, StaffStatus, Order } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -39,8 +39,6 @@ export default function DashboardPage() {
   const isMobile = useIsMobile();
   const { forceMobileView, setForceMobileView } = useAppShell();
   
-    const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
-
     const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || isStaffLoading || !profile || !allStaff) return [];
 
@@ -116,33 +114,6 @@ export default function DashboardPage() {
     
     return Array.from(staffStatusMap.values());
   }, [filteredStaff, rawOrders, allStaff]);
-
-
-  React.useEffect(() => {
-    if (!rawOrders || !scheduleEvents) return;
-    
-    const scheduledRawOrderIds = new Set(scheduleEvents.map(e => e.rawOrderId).filter(Boolean));
-    
-    const newUnassignedOrders = rawOrders.filter(order => {
-        const staffName = findKey(order, ['担当']);
-        const scheduledTime = findKey(order, ['チップ配置作業予定']);
-        const orderId = findKey(order, ['受注 ID', '受注id', '受注ID', 'id']);
-        
-        if (scheduledRawOrderIds.has(orderId)) return false;
-        
-        const isAssigned = staffName && scheduledTime;
-        if (isAssigned) return false;
-
-        const workDate = findKey(order, ['作業予定日']);
-        if (!workDate) return false;
-
-        const scheduledDate = parseISO(workDate);
-        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
-    }).map(mapRawToOrder);
-
-    setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrders, currentDate, scheduleEvents]);
-
 
   const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading;
 
@@ -229,22 +200,12 @@ export default function DashboardPage() {
                 staffData={filteredStaff}
             />
         ) : (
-          <div className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
-                <div className="md:w-3/5">
-                    <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
-                </div>
-                <div className="md:w-2/5">
-                    <GenericTasks />
-                </div>
-            </div>
-            <ScheduleView 
-                staffData={filteredStaff} 
-                rawOrdersData={rawOrders}
-                currentDate={currentDate}
-                statuses={statuses}
-            />
-          </div>
+          <ScheduleView 
+              staffData={filteredStaff} 
+              rawOrdersData={rawOrders}
+              currentDate={currentDate}
+              statuses={statuses}
+          />
         )}
       </div>
     </TooltipProvider>
