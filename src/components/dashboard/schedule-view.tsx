@@ -878,20 +878,25 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isBreakEvent = event.title === '休憩';
 
   const divStyle: React.CSSProperties = { 
-    backgroundColor: staff.color || 'hsl(var(--primary))',
-    color: 'hsl(var(--primary-foreground))',
+      backgroundColor: staff.color || 'hsl(var(--primary))',
+      color: 'hsl(var(--primary-foreground))',
   };
 
   if (isTravelEvent) {
-    style.opacity = 0.5;
-  }
-  if (isBreakEvent) {
+      style.opacity = 0.5;
+      divStyle.color = '#FFFFFF';
+  } else if (isBreakEvent) {
      divStyle.backgroundColor = `hsl(120, 40%, 85%)`;
      divStyle.color = 'hsl(var(--foreground))';
   } else if (event.title === '業務') {
     divStyle.backgroundColor = 'rgb(156 163 175)';
+  } else {
+    const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
+    if (staff.name && brightStaff.includes(staff.name)) {
+        divStyle.color = 'black';
+    }
   }
-  
+
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
   let line1 = event.title || '';
   let line2 = '';
