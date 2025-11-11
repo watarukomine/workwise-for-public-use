@@ -782,7 +782,7 @@ export function ScheduleView({
                                   {isToday(currentDate) && (
                                     <div 
                                         className="absolute top-0 h-full pointer-events-none"
-                                        style={{ left: `${STAFF_COL_WIDTH}px`, width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE}px`, zIndex: 30 }}
+                                        style={{ left: `${STAFF_COL_WIDTH}px`, width: `${(timelineTotalHours + 1) * 60 * PIXELS_PER_MINUTE}px`, zIndex: 50 }}
                                     >
                                         <TimeIndicator />
                                     </div>
@@ -1003,7 +1003,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 100 : 2,
+    zIndex: isDragging ? 20 : 2,
     opacity: isDragging ? 0.3 : 1,
   };
 
@@ -1105,3 +1105,4 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
