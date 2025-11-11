@@ -45,6 +45,9 @@ import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
+import * as ics from 'ics';
+import { CalendarPlus } from 'lucide-react';
+
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -524,7 +527,7 @@ export function ScheduleView({
         }
     }
   };
-  const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
+  const handleEventClick = (event: WithId<ScheduleEvent>) => {
     setEditedEventDetails({
         title: event.title || '',
         description: event.description || '',
@@ -613,6 +616,42 @@ export function ScheduleView({
 
     setDialogState({ mode: 'closed' });
   };
+  
+    const handleSendIcal = () => {
+    if (dialogState.mode !== 'edit') return;
+    const { event } = dialogState;
+    const customer = getCustomerByCode(event.locationId);
+
+    const start = parseISO(event.start as string);
+    const end = parseISO(event.end as string);
+
+    const icsEvent: ics.EventAttributes = {
+      title: event.title,
+      description: event.description,
+      start: [start.getFullYear(), start.getMonth() + 1, start.getDate(), start.getHours(), start.getMinutes()],
+      end: [end.getFullYear(), end.getMonth() + 1, end.getDate(), end.getHours(), end.getMinutes()],
+      location: customer?.address,
+      status: 'CONFIRMED',
+      organizer: { name: 'WorkWise', email: 'noreply@workwise.app' },
+    };
+
+    ics.createEvent(icsEvent, (error, value) => {
+      if (error) {
+        toast({ variant: 'destructive', title: 'iCal作成エラー', description: error.message });
+        return;
+      }
+
+      const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${event.title.replace(/ /g, '_')}.ics`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast({ title: 'iCalファイルをダウンロードしました' });
+    });
+  };
+
 
   const getDialogDetails = () => {
     if (dialogState.mode === 'edit') {
@@ -685,14 +724,12 @@ export function ScheduleView({
                             <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                         </div>
                         <div className="relative mt-2 space-y-2">
-                            {isToday(currentDate) && (
-                            <div 
+                             <div 
                                 className="absolute top-0 h-full pointer-events-none z-[101]"
                                 style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
                             >
-                                <TimeIndicator />
+                               {isToday(currentDate) && <TimeIndicator />}
                             </div>
-                            )}
                             {staffData?.map((staff) => {
                                 const events = dailySchedule.filter((e) => e.staffId === staff.id);
                                 const status = statuses.find(s => s.staffId === staff.id);
@@ -704,7 +741,7 @@ export function ScheduleView({
                                         status={status}
                                         getCustomerByCode={getCustomerByCode}
                                         isOver={currentOverStaffId === staff.id}
-                                        onDoubleClickEvent={handleDoubleClickEvent}
+                                        onEventClick={handleEventClick}
                                         onDoubleClickTimeline={handleDoubleClickTimeline}
                                     />
                                 );
@@ -782,7 +819,10 @@ export function ScheduleView({
                   <DialogFooter className="sm:justify-between">
                       <div className="flex gap-2">
                           {dialogState.mode === 'edit' && (
+                            <>
+                              <Button variant="outline" onClick={handleSendIcal}><CalendarPlus className="mr-2 h-4 w-4" /> iCal送信</Button>
                               <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
+                            </>
                           )}
                       </div>
                       <div className="flex gap-2 mt-4 sm:mt-0">
@@ -805,11 +845,11 @@ interface StaffRowProps {
   status?: StaffStatus;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   isOver: boolean;
-  onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
+  onEventClick: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onEventClick, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = {
@@ -844,7 +884,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
               event={event}
               staff={staff}
               getCustomerByCode={getCustomerByCode}
-              onDoubleClick={() => onDoubleClickEvent(event)}
+              onClick={() => onEventClick(event)}
             />
           ))}
         </div>
@@ -866,10 +906,10 @@ interface DraggableEventProps {
   event: WithId<ScheduleEvent>;
   staff: WithId<Staff>;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
-  onDoubleClick: () => void;
+  onClick: () => void;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onClick }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
@@ -882,11 +922,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 1,
-  };
-
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); 
-    onDoubleClick();
   };
   
   const isTravelEvent = event.title?.startsWith('移動');
@@ -925,7 +960,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         style={style}
         {...listeners}
         {...attributes}
-        onDoubleClick={handleDoubleClick}
+        onClick={onClick}
         className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move"
         data-event-chip="true"
       >

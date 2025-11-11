@@ -21,7 +21,7 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "types": ["node", "@types/papaparse", "@types/google.maps"]
+    "types": ["node", "@types/papaparse", "@types/google.maps", "@types/ics"]
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules"]
