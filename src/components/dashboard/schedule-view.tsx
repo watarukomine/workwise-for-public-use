@@ -22,7 +22,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
@@ -44,9 +43,10 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { Badge } from '@/components/ui/badge';
+import * as ics from 'ics';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -339,11 +339,6 @@ export function ScheduleView({
 
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
       if (!eventToUnassign.rawOrderId) return;
-      const staff = getStaffById(eventToUnassign.staffId);
-      if (!staff) {
-          toast({ variant: 'destructive', title: 'エラー', description: '担当スタッフが見つかりません。' });
-          return;
-      }
 
       try {
         await updateSheetStatus({
@@ -360,6 +355,7 @@ export function ScheduleView({
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+          await refetchOrders();
       }
   };
 
@@ -408,31 +404,28 @@ export function ScheduleView({
         if (draggedEvent.tripId) {
             setScheduleEvents(prev => {
                 const eventsToMove = prev.filter(e => e.tripId === draggedEvent.tripId);
-                if (eventsToMove.length > 0) {
-                    const originalTask = eventsToMove.find(e => e.id.endsWith('-task')) || draggedEvent;
-                    const originalTravel = eventsToMove.find(e => e.id.endsWith('-travel'));
-                    const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
-                    
-                    let newTaskStart = newStart;
-                    if (originalTravel && draggedEvent.id === originalTravel.id) {
-                        newTaskStart = addMinutes(newStart, TRAVEL_TIME_MINUTES);
-                    }
-                    
-                    const newTaskEnd = addMinutes(newTaskStart, taskDuration);
-                    const newTravelStart = subMinutes(newTaskStart, TRAVEL_TIME_MINUTES);
-
-                    return prev.map(e => {
-                        if (e.tripId !== draggedEvent.tripId) return e;
-                        if (e.id.endsWith('-task')) {
-                            return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-                        }
-                        if (e.id.endsWith('-travel')) {
-                            return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-                        }
-                        return e;
-                    });
+                const originalTask = eventsToMove.find(e => e.id.endsWith('-task')) || draggedEvent;
+                const originalTravel = eventsToMove.find(e => e.id.endsWith('-travel'));
+                const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
+                
+                let newTaskStart = newStart;
+                if (originalTravel && draggedEvent.id === originalTravel.id) {
+                    newTaskStart = addMinutes(newStart, TRAVEL_TIME_MINUTES);
                 }
-                return prev;
+                
+                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
+                const newTravelStart = subMinutes(newTaskStart, TRAVEL_TIME_MINUTES);
+
+                return prev.map(e => {
+                    if (e.tripId !== draggedEvent.tripId) return e;
+                    if (e.id.endsWith('-task')) {
+                        return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+                    }
+                    if (e.id.endsWith('-travel')) {
+                        return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                    }
+                    return e;
+                });
             });
         } else {
             const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
@@ -521,13 +514,38 @@ export function ScheduleView({
   };
 
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
-    setEditedEventDetails({
-        title: event.title || '',
-        description: event.description || '',
-        startTime: formatTime(event.start),
-        endTime: formatTime(event.end),
+    const start = parseISO(event.start as string);
+    const end = parseISO(event.end as string);
+
+    if (!isValid(start) || !isValid(end)) {
+        toast({ variant: 'destructive', title: 'エラー', description: '無効なイベント時間です。' });
+        return;
+    }
+    
+    const icsEvent: ics.EventAttributes = {
+        start: [start.getFullYear(), start.getMonth() + 1, start.getDate(), start.getHours(), start.getMinutes()],
+        end: [end.getFullYear(), end.getMonth() + 1, end.getDate(), end.getHours(), end.getMinutes()],
+        title: event.title,
+        description: event.description,
+    };
+
+    ics.createEvent(icsEvent, (error, value) => {
+        if (error) {
+            console.error(error);
+            toast({ variant: 'destructive', title: 'iCal作成エラー', description: error.message });
+            return;
+        }
+
+        const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${event.title.replace(/\s/g, '_')}.ics`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     });
-    setDialogState({ mode: 'edit', event });
   };
   
   const handleDoubleClickTimeline = (staffId: string, e: React.MouseEvent) => {
