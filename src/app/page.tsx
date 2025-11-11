@@ -3,9 +3,7 @@
 
 import * as React from 'react';
 import { ScheduleView, UnassignedTasks, GenericTasks } from '@/components/dashboard/schedule-view';
-import { StatusUpdates } from '@/components/dashboard/status-updates';
-import { customerData, staffStatusData } from '@/lib/data';
-import type { Customer, WithId, Staff, StaffStatus } from '@/lib/types';
+import type { Customer, WithId, Staff, StaffStatus, Order } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -22,6 +20,7 @@ import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
 import { findKey, mapRawToOrder } from '@/lib/utils';
 import { useCustomer } from '@/contexts/customer-context';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 
 export default function DashboardPage() {
@@ -182,67 +181,68 @@ export default function DashboardPage() {
   const showVerticalView = forceMobileView || (isMobile && profile.role !== 'admin');
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight">
-                {isToday(currentDate) ? "本日の予定" : format(currentDate, "M月d日 (E)")}
-            </h1>
-            <p className="text-muted-foreground">
-              スタッフのスケジュールと現在の状況を一覧で確認できます。
-            </p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}>
-                    <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" onClick={() => handleDateChange('today')} disabled={isToday(currentDate)}>今日</Button>
-                <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}>
-                    <ChevronRight className="h-4 w-4" />
-                </Button>
+    <TooltipProvider>
+      <div className="space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                  {isToday(currentDate) ? "本日の予定" : format(currentDate, "M月d日 (E)")}
+              </h1>
+              <p className="text-muted-foreground">
+                スタッフのスケジュールと現在の状況を一覧で確認できます。
+              </p>
             </div>
-             <div className="flex items-center space-x-2">
-                <Smartphone className="h-5 w-5" />
-                <Switch
-                    id="mobile-view-switch"
-                    checked={forceMobileView}
-                    onCheckedChange={setForceMobileView}
-                />
-                <Label htmlFor="mobile-view-switch" className="hidden sm:inline">モバイル表示</Label>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                  <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}>
+                      <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" onClick={() => handleDateChange('today')} disabled={isToday(currentDate)}>今日</Button>
+                  <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}>
+                      <ChevronRight className="h-4 w-4" />
+                  </Button>
+              </div>
+               <div className="flex items-center space-x-2">
+                  <Smartphone className="h-5 w-5" />
+                  <Switch
+                      id="mobile-view-switch"
+                      checked={forceMobileView}
+                      onCheckedChange={setForceMobileView}
+                  />
+                  <Label htmlFor="mobile-view-switch" className="hidden sm:inline">モバイル表示</Label>
+              </div>
             </div>
-          </div>
-      </div>
-      
-       {profile.role === 'admin' && appliedSelectedStaffIds.length > 0 && (
-        <div className="rounded-lg bg-muted p-3">
-            <p className="text-sm font-medium text-muted-foreground">
-              <span className="font-semibold text-foreground">表示中のスタッフ:</span>{' '}
-              {appliedSelectedStaffIds.length === allStaff.length ? "全スタッフ" : allStaff.filter(s => appliedSelectedStaffIds.includes(s.id)).map(s => s.name).join('、')}
-            </p>
         </div>
-      )}
+        
+         {profile.role === 'admin' && appliedSelectedStaffIds.length > 0 && (
+          <div className="rounded-lg bg-muted p-3">
+              <p className="text-sm font-medium text-muted-foreground">
+                <span className="font-semibold text-foreground">表示中のスタッフ:</span>{' '}
+                {appliedSelectedStaffIds.length === allStaff.length ? "全スタッフ" : allStaff.filter(s => appliedSelectedStaffIds.includes(s.id)).map(s => s.name).join('、')}
+              </p>
+          </div>
+        )}
 
-      {showVerticalView ? (
-          <VerticalScheduleView 
-              scheduleData={scheduleEvents}
-              staffData={filteredStaff}
-          />
-      ) : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
-            <GenericTasks />
+        {showVerticalView ? (
+            <VerticalScheduleView 
+                scheduleData={scheduleEvents}
+                staffData={filteredStaff}
+            />
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+              <GenericTasks />
+            </div>
+            <ScheduleView 
+                staffData={filteredStaff} 
+                rawOrdersData={rawOrders}
+                currentDate={currentDate}
+                statuses={statuses}
+            />
           </div>
-          <ScheduleView 
-              staffData={filteredStaff} 
-              rawOrdersData={rawOrders}
-              currentDate={currentDate}
-              statuses={statuses}
-          />
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </TooltipProvider>
   );
 }
-
