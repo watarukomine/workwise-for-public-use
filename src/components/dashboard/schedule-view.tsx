@@ -297,7 +297,7 @@ const TimeIndicator = () => {
 
     return (
         <div
-            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
+            className="absolute top-0 h-full w-0.5 bg-red-500"
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -494,8 +494,7 @@ export function ScheduleView({
                     eventTitle: `(ID: ${originalTask.rawOrderId})`,
                     scheduledTime: new Date(taskStartForSheet).toISOString(),
                     staffName: newStaff.name,
-                });
-                refetchOrders();
+                }).then(() => refetchOrders());
             } else { // Generic event
                 const isStaffChange = draggedEvent.staffId !== newStaffId;
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
@@ -1008,6 +1007,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     } else {
        backgroundColor = 'hsl(var(--primary))';
     }
+    color = 'hsl(var(--primary-foreground))';
   } else if (event.title === '休憩') {
      backgroundColor = `hsl(120, 40%, 90%)`;
      color = 'hsl(var(--foreground))';
