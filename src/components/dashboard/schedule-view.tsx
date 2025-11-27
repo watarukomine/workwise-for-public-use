@@ -29,7 +29,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, getContrastingTextColor, formatTime, findKey } from '@/lib/utils';
+import { cn, getContrastingTextColor, formatTime } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
