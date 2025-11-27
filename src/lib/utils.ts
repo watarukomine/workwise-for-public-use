@@ -1,4 +1,3 @@
-
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { isValid, format, parseISO } from 'date-fns';
@@ -83,3 +82,16 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
         rawOrderId: String(orderId || '')
     };
 };
+
+export function getContrastingTextColor(hexColor: string): string {
+    if (!hexColor) return '#000000';
+
+    const cleanHex = hexColor.startsWith('#') ? hexColor.slice(1) : hexColor;
+    const r = parseInt(cleanHex.substring(0, 2), 16);
+    const g = parseInt(cleanHex.substring(2, 4), 16);
+    const b = parseInt(cleanHex.substring(4, 6), 16);
+
+    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+
+    return (yiq >= 128) ? '#000000' : '#FFFFFF';
+}

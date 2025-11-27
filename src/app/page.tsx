@@ -4,7 +4,7 @@ import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
 import { customerData, staffStatusData } from '@/lib/data';
-import type { Customer, WithId, Staff } from '@/lib/types';
+import type { Customer, WithId, Staff, Order } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
+import { mapRawToOrder } from '@/lib/utils';
 
 
 export default function DashboardPage() {
@@ -68,6 +69,11 @@ export default function DashboardPage() {
     const selectedIds = new Set(filteredStaff.map(s => s.id));
     return staffStatusData.filter(status => selectedIds.has(status.staffId));
   }, [filteredStaff]);
+
+  const mappedOrders = React.useMemo(() => {
+    if (!rawOrders) return [];
+    return rawOrders.map(mapRawToOrder);
+  }, [rawOrders]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
@@ -163,11 +169,12 @@ export default function DashboardPage() {
             <VerticalScheduleView 
                 scheduleData={[]} // This view is not fully implemented with new data flow
                 staffData={filteredStaff}
+                currentDate={currentDate}
             />
         ) : (
             <ScheduleView 
                 staffData={filteredStaff} 
-                rawOrdersData={rawOrders}
+                orders={mappedOrders}
                 currentDate={currentDate}
                 statuses={filteredStatuses}
             />
