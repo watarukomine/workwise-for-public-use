@@ -387,7 +387,7 @@ export function ScheduleView({
         });
         
         toast({ title: 'タスクを未割り当てに戻しました' });
-        refetchOrders(); // Re-fetch all data to ensure consistency
+        await refetchOrders(); // Re-fetch all data to ensure consistency
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
