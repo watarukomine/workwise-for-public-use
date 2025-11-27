@@ -51,8 +51,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
 
     setIsLoading(true);
-    // Don't set error to null here, to avoid UI flicker on refetch
-    // setErrorState(null);
 
     try {
       const result = await fetchGasData(orderGasUrl);
@@ -155,7 +153,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } catch (e: any) {
       console.error("Failed to fetch or process order data from GAS:", e);
       setErrorState(`受注データの取得または処理に失敗しました: ${e.message}`);
-      // Clear data on error
+      // Only clear data on error to prevent flicker on successful refetch
       setUnassignedOrders([]);
       setScheduleEvents([]);
       setStatuses([]);
