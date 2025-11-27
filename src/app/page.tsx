@@ -167,9 +167,9 @@ export default function DashboardPage() {
         ) : (
             <ScheduleView 
                 staffData={filteredStaff} 
-                customerData={customers} 
                 rawOrdersData={rawOrders}
                 currentDate={currentDate}
+                statuses={filteredStatuses}
             />
         )}
         {isToday(currentDate) && <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />}
