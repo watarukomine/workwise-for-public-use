@@ -1,17 +1,18 @@
+
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import type { Order, ScheduleEvent, StaffStatus, WithId } from '@/lib/types';
-import { mapRawToOrder } from '@/lib/utils';
+import { findKey, mapRawToOrder } from '@/lib/utils';
 import { addMinutes, subMinutes, parseISO, isValid } from 'date-fns';
 import { useSelectedStaff } from './selected-staff-context';
 
 const TRAVEL_TIME_MINUTES = 30;
 
 interface OrderContextType {
-  rawOrdersData: any[];
+  orders: any[];
   setOrders: React.Dispatch<React.SetStateAction<any[]>>;
   unassignedOrders: WithId<Order>[];
   setUnassignedOrders: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
@@ -28,7 +29,7 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export function OrderProvider({ children }: { children: ReactNode }) {
-  const [rawOrdersData, setOrders] = useState<any[]>([]);
+  const [orders, setOrdersState] = useState<any[]>([]);
   const [unassignedOrders, setUnassignedOrders] = useState<WithId<Order>[]>([]);
   const [scheduleEvents, setScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
   const [statuses, setStatuses] = useState<StaffStatus[]>([]);
@@ -122,12 +123,32 @@ export function OrderProvider({ children }: { children: ReactNode }) {
               newUnassignedOrders.push(mappedOrder);
           }
           
-          // Status update logic here
+          if (staffMember) {
+              const lastUpdateStr = findKey(rawOrder, ['最終更新日時']);
+              const lastUpdate = lastUpdateStr ? new Date(lastUpdateStr) : new Date(0);
+
+              const currentStatus = staffStatusMap.get(staffMember.id)!;
+              const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
+              
+              if (lastUpdate.getTime() >= currentUpdate.getTime()) {
+                  const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）']) || '';
+                  const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
+                  
+                  staffStatusMap.set(staffMember.id, {
+                      staffId: staffMember.id,
+                      status: findKey(rawOrder, ['受注ステータス']) || '待機中',
+                      lastAction: `[${findKey(rawOrder, ['受注 ID', 'id'])}] ${findKey(rawOrder, ['受注ステータス'])}`,
+                      latitude: !isNaN(lat) ? lat : undefined,
+                      longitude: !isNaN(lon) ? lon : undefined,
+                      lastUpdate: lastUpdate.toISOString(),
+                  });
+              }
+          }
         });
       }
       
       setErrorState(null);
-      setOrders(newRawOrderData);
+      setOrdersState(newRawOrderData);
       setScheduleEvents(newScheduleEvents);
       setUnassignedOrders(newUnassignedOrders);
       setStatuses(Array.from(staffStatusMap.values()));
@@ -135,16 +156,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } catch (e: any) {
       console.error("Failed to fetch or process order data from GAS:", e);
       setErrorState(`受注データの取得または処理に失敗しました: ${e.message}`);
-      if (!rawOrdersData || rawOrdersData.length === 0) {
-        setOrders([]);
-        setUnassignedOrders([]);
-        setScheduleEvents([]);
-        setStatuses([]);
-      }
+      setOrdersState([]);
+      setUnassignedOrders([]);
+      setScheduleEvents([]);
+      setStatuses([]);
     } finally {
       setIsLoading(false);
     }
-  }, [orderGasUrl, allStaff, isStaffLoading, rawOrdersData]);
+  }, [orderGasUrl, allStaff, isStaffLoading]);
 
 
   useEffect(() => {
@@ -154,8 +173,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, [fetchAndProcessData, isStaffLoading]);
 
   const value = {
-    rawOrdersData,
-    setOrders,
+    orders,
+    setOrders: setOrdersState,
     unassignedOrders,
     setUnassignedOrders,
     scheduleEvents,
