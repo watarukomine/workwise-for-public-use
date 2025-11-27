@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -126,12 +125,12 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     '作業予定日': formatDate,
     '受付日': formatDate,
     '予定時間': formatTime,
-    'チップ配置作業予定': formatTime,
-    '移動開始': formatTime,
-    '現場到着': formatTime,
-    '作業開始': formatTime,
-    '作業完了': formatTime,
-    '作業終了': formatTime,
+    'チップ配置作業予定': formatDateTime,
+    '移動開始': formatDateTime,
+    '現場到着': formatDateTime,
+    '作業開始': formatDateTime,
+    '作業完了': formatDateTime,
+    '作業終了': formatDateTime,
     '最終更新日時': formatDateTime,
   };
   
@@ -200,14 +199,16 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
         <div className="rounded-md border overflow-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                {headers.map(header => 
-                  <TableHead key={header} className="h-40 p-2 text-left">
-                    <div className="[writing-mode:vertical-rl]">
-                        {header.split('\n').map((line, index) => <div key={index}>{line}</div>)}
+              <TableRow className="h-48">
+                {headers.map(header => (
+                  <TableHead key={header} className="p-0">
+                    <div className="relative w-8 h-full">
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[270deg] whitespace-nowrap">
+                         {header.split('\n').map((line, index) => <div key={index}>{line}</div>)}
+                      </div>
                     </div>
                   </TableHead>
-                )}
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -228,7 +229,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     >
                       {headers.map(header => {
                         const cellContent = getFormattedValue(order, header);
-                        return <TableCell key={header} className="whitespace-nowrap">{cellContent}</TableCell>
+                        return <TableCell key={header} className="whitespace-nowrap px-2 py-1 text-xs">{cellContent}</TableCell>
                       })}
                     </TableRow>
                   )
