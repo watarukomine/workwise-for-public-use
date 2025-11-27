@@ -48,7 +48,7 @@ import { Textarea } from '../ui/textarea';
 import { updateSheetStatus, sendIcsViaGmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { useOrder } from '@/contexts/order-context';
-import { CalendarPlus, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 
 const PIXELS_PER_MINUTE = 1.2;
 const timelineStartHour = 9;
@@ -483,10 +483,10 @@ export function ScheduleView({
                     });
                 }
                 toast({ title: "スケジュールを更新しました" });
-                refetchOrders();
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
-                refetchOrders(); // Revert on failure
+            } finally {
+                await refetchOrders();
             }
         })();
     
@@ -552,10 +552,9 @@ export function ScheduleView({
                         timestamp: new Date().toISOString(),
                     });
                     toast({ title: "タスクを割り当てました" });
-                    await refetchOrders(); // Fetch to get latest state including calendarEventIds if any
                 } catch (e: any) {
                     toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                    // Revert UI on failure by refetching
+                } finally {
                     await refetchOrders();
                 }
             })();
@@ -860,7 +859,8 @@ export function ScheduleView({
                               />
                           </div>
                           <div className="col-span-2 grid gap-2">
-                              <Label htmlFor="end-time">終了時間</Label>                              <Input
+                              <Label htmlFor="end-time">終了時間</Label>
+                              <Input
                                   id="end-time"
                                   type="time"
                                   value={editedEventDetails.endTime}
@@ -988,7 +988,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, onClick, 
     left: isOverlay ? undefined : `${left}px`,
     width: `${width}px`,
     transform: transform && !isOverlay ? CSS.Translate.toString(transform) : undefined,
-    zIndex: isDragging ? 100 : 1,
+    zIndex: isDragging ? 100 : 20, // ensure events are above the timeline grid but below overlay
   };
   
   const handleClick = (e: React.MouseEvent) => {
@@ -1049,6 +1049,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, onClick, 
         <div className="flex h-full w-1.5 flex-shrink-0 rounded-full bg-current mr-2" style={{ backgroundColor: staff.color }}></div>
         <div
           className="w-full h-full rounded-md flex flex-col justify-center"
+          style={{ backgroundColor: 'transparent' }} // Let the parent handle the color
         >
           <p className="text-xs font-semibold truncate pointer-events-none" style={{ color: divStyle.color }}>
             {line1}
