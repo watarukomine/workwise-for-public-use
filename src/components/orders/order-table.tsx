@@ -185,7 +185,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
               <TableRow>
                 {headers.map(header => 
                   <TableHead key={header} className="h-64 p-2 text-center">
-                    <div className="[writing-mode:vertical-rl] transform rotate-180 whitespace-nowrap">
+                    <div className="[writing-mode:vertical-rl] whitespace-nowrap">
                       {header}
                     </div>
                   </TableHead>
