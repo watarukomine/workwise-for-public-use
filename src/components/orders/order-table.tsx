@@ -86,6 +86,31 @@ const formatDateTime = (dateTimeString: string) => {
     }
 };
 
+const VerticalHeader = ({ children }: { children: React.ReactNode }) => {
+    if (typeof children !== 'string') {
+        return <>{children}</>;
+    }
+    // Handle special case for multi-line headers
+    if (children.includes('\n')) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full">
+                {children.split('\n').map((line, index) => (
+                    <div key={index} className="flex">
+                        {line.split('').map((char, i) => <div key={i}>{char}</div>)}
+                    </div>
+                ))}
+            </div>
+        )
+    }
+
+    return (
+        <div className="flex flex-col items-center justify-center h-full">
+            {children.split('').map((char, index) => <div key={index}>{char}</div>)}
+        </div>
+    );
+};
+
+
 export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -120,11 +145,9 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
   const headers = [
     '受注ID', 'ユーザーコード', 'お取引先名', '作業予定日', '予定時間', 'ご担当者様', '作業場所',
-    '受注No(ﾘﾏｰｸ1 8ｹﾀ)', '任意コメント(ﾘﾏｰｸ2 10ｹﾀ)', '車名', '登録ナンバー(下４桁)',
-    '入庫状況', 'タイヤ品番', 'タイヤサイズ', '品名', '作業内容', '本数', '空気圧センサー',
-    'パッキン交換', 'タイヤ手配状況', '廃タイヤ処分', '連絡先', '受注ステータス', '担当',
-    '最終更新日時', '最終位置情報（緯度,経度）', 'チップ配置作業予定', '移動開始', '現場到着',
-    '作業開始', '作業完了', '作業所要時間', '退勤ボタン', '緊急連絡'
+    '受注No(ﾘﾏｰｸ1 8ｹﾀ)', '任意コメント(ﾘﾏｰｸ2\n10ｹﾀ)', '車名', '登録ナンバー(下４桁)',
+    '入庫状況', 'タイヤ品番', 'タイヤサイズ', '品名', '作業内容', '本数', '空気圧センサー\nパッキン交換',
+    'タイヤ手配状況', '廃タイヤ処分', '連絡先', '受注ステータス'
   ];
     
   const handleRowClick = (order: any) => {
@@ -147,16 +170,34 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   };
   
   const getFormattedValue = (order: any, header: string) => {
-      const durationKeys = ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間'];
-      if (durationKeys.some(key => key.toLowerCase() === header.toLowerCase())) {
-          const durationValue = findKey(order, durationKeys);
-          if (durationValue !== undefined && durationValue !== null && durationValue !== '') {
-              return formatDurationFromMinutes(durationValue);
-          }
-          return '';
-      }
-  
-      const value = order[header];
+      const dbKeys: Record<string, string[]> = {
+          '受注ID': ['受注ID', 'id'],
+          'ユーザーコード': ['ユーザーコード'],
+          'お取引先名': ['お取引先名'],
+          '作業予定日': ['作業予定日'],
+          '予定時間': ['予定時間'],
+          'ご担当者様': ['ご担当者様'],
+          '作業場所': ['作業場所'],
+          '受注No(ﾘﾏｰｸ1 8ｹﾀ)': ['受注No(ﾘﾏｰｸ1 8ｹﾀ)'],
+          '任意コメント(ﾘﾏｰｸ2\n10ｹﾀ)': ['任意コメント(ﾘﾏｰｸ2 10ｹﾀ)'],
+          '車名': ['車名'],
+          '登録ナンバー(下４桁)': ['登録ナンバー(下４桁)'],
+          '入庫状況': ['入庫状況'],
+          'タイヤ品番': ['タイヤ品番'],
+          'タイヤサイズ': ['タイヤサイズ'],
+          '品名': ['品名'],
+          '作業内容': ['作業内容'],
+          '本数': ['本数'],
+          '空気圧センサー\nパッキン交換': ['空気圧センサー', 'パッキン交換'],
+      'タイヤ手配状況': ['タイヤ手配状況'],
+      '廃タイヤ処分': ['廃タイヤ処分'],
+      '連絡先': ['連絡先'],
+      '受注ステータス': ['受注ステータス']
+    };
+
+    const keys = dbKeys[header] || [header];
+    const value = findKey(order, keys);
+    
       if (headersToFormat[header]) {
         return headersToFormat[header](value);
       }
@@ -184,10 +225,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
             <TableHeader>
               <TableRow>
                 {headers.map(header => 
-                  <TableHead key={header} className="h-64 p-2 text-center">
-                    <div className="[writing-mode:vertical-rl] whitespace-nowrap">
-                      {header}
-                    </div>
+                  <TableHead key={header} className="h-40 p-2 text-center align-middle">
+                     <VerticalHeader>{header}</VerticalHeader>
                   </TableHead>
                 )}
               </TableRow>
@@ -210,7 +249,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     >
                       {headers.map(header => {
                         const cellContent = getFormattedValue(order, header);
-                        return <TableCell key={header} className="whitespace-nowrap">{cellContent}</TableCell>
+                        return <TableCell key={header} className="text-center align-middle whitespace-pre-line">{cellContent}</TableCell>
                       })}
                     </TableRow>
                   )
