@@ -12,6 +12,7 @@ const TRAVEL_TIME_MINUTES = 30;
 
 interface OrderContextType {
   rawOrdersData: any[];
+  orders: WithId<Order>[];
   scheduleEvents: WithId<ScheduleEvent>[];
   setScheduleEvents: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
   statuses: StaffStatus[];
@@ -26,6 +27,7 @@ const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export function OrderProvider({ children }: { children: ReactNode }) {
   const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
+  const [orders, setOrders] = useState<WithId<Order>[]>([]);
   const [scheduleEvents, setScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
   const [statuses, setStatuses] = useState<StaffStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,6 +82,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     const newScheduleEvents: WithId<ScheduleEvent>[] = [];
     const staffStatusMap = new Map<string, StaffStatus>();
+    const mappedOrders: WithId<Order>[] = rawOrdersData.map(o => mapRawToOrder(o));
+    setOrders(mappedOrders);
 
     allStaff.forEach(sf => {
       staffStatusMap.set(sf.id, {
@@ -163,6 +167,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   const value = {
     rawOrdersData,
+    orders,
     scheduleEvents,
     setScheduleEvents,
     statuses,
