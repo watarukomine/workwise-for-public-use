@@ -150,6 +150,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } catch (e: any) {
       console.error("Failed to fetch or process order data from GAS:", e);
       setErrorState(`受注データの取得または処理に失敗しました: ${e.message}`);
+      // Clear data on error
       setUnassignedOrders([]);
       setScheduleEvents([]);
       setStatuses([]);
