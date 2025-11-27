@@ -4,7 +4,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { ORDER_GAS_URL } from '@/lib/settings';
-import type { ScheduleEvent, Staff, WithId } from '@/lib/types';
+import type { Order, ScheduleEvent, Staff, WithId } from '@/lib/types';
 import { findKey, mapRawToOrder } from '@/lib/utils';
 import { parseISO, isValid, addMinutes, subMinutes } from 'date-fns';
 import { useSelectedStaff } from './selected-staff-context';
@@ -12,7 +12,7 @@ import { useSelectedStaff } from './selected-staff-context';
 const TRAVEL_TIME_MINUTES = 30;
 
 interface OrderContextType {
-  orders: any[];
+  orders: WithId<Order>[];
   scheduleEvents: WithId<ScheduleEvent>[];
   setScheduleEvents: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
   refetchOrders: () => Promise<void>;
@@ -25,12 +25,12 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export function OrderProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrdersState] = useState<any[]>([]);
+  const [orders, setOrdersState] = useState<WithId<Order>[]>([]);
   const [scheduleEvents, setScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
   const [error, setErrorState] = useState<string | null>(null);
-  const { allStaff, isLoading: isStaffLoading } = useSelectedStaff(); // Staff data to map names to IDs
+  const { allStaff, isLoading: isStaffLoading } = useSelectedStaff();
 
   const setOrderGasUrl = (url: string) => {
     setOrderGasUrlState(url);
@@ -50,49 +50,50 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       const result = await fetchGasData(orderGasUrl);
       if (result.error && result.message) throw new Error(result.message);
       
-      const orderData = result.data || (Array.isArray(result) ? result : []);
-      setOrdersState(orderData);
+      const rawOrderData = result.data || (Array.isArray(result) ? result : []);
+      const mappedOrders = rawOrderData.map(mapRawToOrder);
+      setOrdersState(mappedOrders);
 
       const events: WithId<ScheduleEvent>[] = [];
       if (allStaff.length > 0) {
-        orderData.forEach((order: any) => {
-          const staffName = findKey(order, ['担当']);
-          const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
-          const scheduledTimeStr = findKey(order, ['チップ配置作業予定']);
+        mappedOrders.forEach((order: WithId<Order>) => {
+          const staffMember = order.staffName ? allStaff.find(s => s.name === order.staffName) : undefined;
+          const scheduledTimeStr = order.scheduledTime;
           
           if (staffMember && scheduledTimeStr) {
-            const scheduledTime = parseISO(scheduledTimeStr);
-            if (isValid(scheduledTime)) {
-              const mappedOrder = mapRawToOrder(order);
-              const duration = mappedOrder.estimatedDuration;
-              const tripId = `trip-${mappedOrder.rawOrderId}`;
-              const taskStart = scheduledTime;
-              const taskEnd = addMinutes(taskStart, duration);
-              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-              
-              const travelEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-travel`,
-                tripId,
-                title: `移動: ${mappedOrder.taskDetails.split('\n')[0]}`,
-                staffId: staffMember.id, // Use staff ID
-                start: travelStart.toISOString(),
-                end: taskStart.toISOString(),
-                rawOrderId: mappedOrder.rawOrderId,
-              };
-  
-              const taskEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-task`,
-                tripId,
-                orderId: mappedOrder.id,
-                rawOrderId: mappedOrder.rawOrderId,
-                title: mappedOrder.taskDetails,
-                staffId: staffMember.id, // Use staff ID
-                locationId: mappedOrder.customerCode,
-                start: taskStart.toISOString(),
-                end: taskEnd.toISOString(),
-              };
-  
-              events.push(travelEvent, taskEvent);
+            try {
+                const scheduledTime = parseISO(scheduledTimeStr);
+                if (isValid(scheduledTime)) {
+                  const duration = order.estimatedDuration;
+                  const tripId = `trip-${order.rawOrderId}`;
+                  const taskStart = scheduledTime;
+                  const taskEnd = addMinutes(taskStart, duration);
+                  const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+                  
+                  const travelEvent: WithId<ScheduleEvent> = {
+                    ...order,
+                    id: `${tripId}-travel`,
+                    tripId,
+                    title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
+                    staffId: staffMember.id,
+                    start: travelStart.toISOString(),
+                    end: taskStart.toISOString(),
+                  };
+      
+                  const taskEvent: WithId<ScheduleEvent> = {
+                    ...order,
+                    id: `${tripId}-task`,
+                    tripId,
+                    title: order.taskDetails,
+                    staffId: staffMember.id,
+                    start: taskStart.toISOString(),
+                    end: taskEnd.toISOString(),
+                  };
+      
+                  events.push(travelEvent, taskEvent);
+                }
+            } catch (e) {
+                // Could not parse date or other error, treat as unassigned
             }
           }
         });
@@ -111,14 +112,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-    if (!isStaffLoading && allStaff.length > 0) {
+    if (!isStaffLoading) {
       fetchAndProcessData();
-    } else if (!isStaffLoading && allStaff.length === 0) {
-      // If there are no staff, there's no point in trying to process orders.
-      // This can happen if the staff sheet fails to load.
-      setIsLoading(false);
     }
-  }, [fetchAndProcessData, allStaff, isStaffLoading]);
+  }, [fetchAndProcessData, isStaffLoading]);
 
   const value = {
     orders,
