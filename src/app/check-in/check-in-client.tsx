@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -19,9 +20,9 @@ type StatusValue = StaffStatus['status'];
 
 export function CheckInClient() {
   const [isLoading, setIsLoading] = React.useState<ActionType | null>(null);
-  const [location, setLocation] = React.useState<{ latitude: number; longitude: number } | null>(null);
+  const [location, setLocation] = React.useState<{ latitude: number, longitude: number } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [lastAction, setLastAction] = React.useState<{ action: ActionType; time: string } | null>(null);
+  const [lastAction, setLastAction] = React.useState<{ action: ActionType, time: string } | null>(null);
   const [message, setMessage] = React.useState('');
   const { toast } = useToast();
   const { profile } = useUserProfile();
