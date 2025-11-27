@@ -183,7 +183,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                {headers.map(header => <TableHead key={header} className="[writing-mode:vertical-rl] text-center h-40">
+                {headers.map(header => <TableHead key={header} className="[writing-mode:vertical-rl] text-center h-48">
                   {header}
                 </TableHead>)}
               </TableRow>
