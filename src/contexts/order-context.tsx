@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
@@ -12,7 +13,9 @@ const TRAVEL_TIME_MINUTES = 30;
 
 interface OrderContextType {
   unassignedOrders: WithId<Order>[];
+  setUnassignedOrders: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
   scheduleEvents: WithId<ScheduleEvent>[];
+  setScheduleEvents: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
   statuses: StaffStatus[];
   refetchOrders: () => Promise<void>;
   isLoading: boolean;
@@ -48,7 +51,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
 
     setIsLoading(true);
-    setErrorState(null);
+    // Don't set error to null here, to avoid UI flicker on refetch
+    // setErrorState(null);
 
     try {
       const result = await fetchGasData(orderGasUrl);
@@ -142,7 +146,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           }
         });
       }
-
+      
+      setErrorState(null); // Clear previous errors on successful fetch
       setScheduleEvents(newScheduleEvents);
       setUnassignedOrders(newUnassignedOrders);
       setStatuses(Array.from(staffStatusMap.values()));
@@ -168,7 +173,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   const value = {
     unassignedOrders,
+    setUnassignedOrders,
     scheduleEvents,
+    setScheduleEvents,
     statuses,
     refetchOrders: fetchAndProcessData,
     isLoading,

@@ -1,9 +1,10 @@
+
 'use client';
 
 import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
-import type { Customer, WithId, Staff, Order, StaffStatus, ScheduleEvent } from '@/lib/types';
+import type { WithId, Staff } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -11,21 +12,22 @@ import { AlertCircle, ChevronLeft, ChevronRight, Monitor, Smartphone } from 'luc
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay, parseISO, isValid, addMinutes, subMinutes } from 'date-fns';
+import { format, startOfToday, addDays, subDays, isToday } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { VerticalScheduleView } from '@/components/dashboard/vertical-schedule-view';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
-import { findKey } from '@/lib/utils';
 
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
   
   const { 
     unassignedOrders, 
+    setUnassignedOrders,
     scheduleEvents,
+    setScheduleEvents,
     statuses,
     isLoading: isLoadingOrders,
   } = useOrder();
@@ -162,8 +164,10 @@ export default function DashboardPage() {
         ) : (
             <ScheduleView 
                 staffData={filteredStaff} 
-                orders={unassignedOrders}
+                unassignedOrders={unassignedOrders}
+                setUnassignedOrders={setUnassignedOrders}
                 scheduleEvents={scheduleEvents}
+                setScheduleEvents={setScheduleEvents}
                 currentDate={currentDate}
                 statuses={statuses}
             />
