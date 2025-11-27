@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -24,12 +23,9 @@ export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
   
   const { 
-    unassignedOrders, 
-    setUnassignedOrders,
-    scheduleEvents,
-    setScheduleEvents,
-    statuses,
     isLoading: isLoadingOrders,
+    statuses,
+    scheduleEvents,
   } = useOrder();
   
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -164,12 +160,7 @@ export default function DashboardPage() {
         ) : (
             <ScheduleView 
                 staffData={filteredStaff} 
-                unassignedOrders={unassignedOrders}
-                setUnassignedOrders={setUnassignedOrders}
-                scheduleEvents={scheduleEvents}
-                setScheduleEvents={setScheduleEvents}
                 currentDate={currentDate}
-                statuses={statuses}
             />
         )}
         {isToday(currentDate) && <StatusUpdates staffData={filteredStaff} statuses={statuses} />}

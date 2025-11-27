@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -46,7 +45,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
-import { updateSheetStatus, sendIcsViaGmail } from '@/app/actions/gas-actions';
+import { updateSheetStatus, sendIcsViaGmail, handleCalendarEvent } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { useOrder } from '@/contexts/order-context';
 import { Mail } from 'lucide-react';
@@ -188,12 +187,7 @@ type EditedEventDetails = {
 
 interface ScheduleViewProps {
     staffData: WithId<Staff>[];
-    unassignedOrders: WithId<Order>[];
-    setUnassignedOrders: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
-    scheduleEvents: WithId<ScheduleEvent>[];
-    setScheduleEvents: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
     currentDate: Date;
-    statuses: StaffStatus[];
 }
 
 const genericTasks: WithId<Order>[] = [
@@ -316,16 +310,18 @@ const TimeIndicator = () => {
 
 export function ScheduleView({ 
     staffData, 
+    currentDate,
+}: ScheduleViewProps) {
+  const [isClient, setIsClient] = React.useState(false);
+  const { toast } = useToast();
+  const { 
     unassignedOrders,
     setUnassignedOrders,
     scheduleEvents,
     setScheduleEvents,
-    currentDate,
+    refetchOrders,
     statuses,
-}: ScheduleViewProps) {
-  const [isClient, setIsClient] = React.useState(false);
-  const { toast } = useToast();
-  const { refetchOrders } = useOrder();
+   } = useOrder();
   
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
@@ -497,7 +493,7 @@ export function ScheduleView({
                 end: newStart.toISOString(),
              };
              
-             setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
+             setScheduleEvents(prev => [...prev.filter(e => e.orderId !== order.id), travelEvent, taskEvent]);
              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
         }
         
@@ -519,7 +515,7 @@ export function ScheduleView({
                 }
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                // Revert optimistic update on failure
+            } finally {
                 await refetchOrders();
             }
         })();
@@ -593,19 +589,47 @@ export function ScheduleView({
             setScheduleEvents(prev => [...prev, newEvent]);
 
         } else if (dialogState.mode === 'edit') {
-            if (dialogState.event.rawOrderId && !dialogState.event.rawOrderId.startsWith('generic-')) { 
-                await updateSheetStatus({
-                    gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
-                    scheduledTime: newStart.toISOString(),
-                    timestamp: new Date().toISOString(),
-                });
-                await refetchOrders();
+            const { event: originalEvent } = dialogState;
+            const staff = getStaffById(originalEvent.staffId);
+            if (!staff) throw new Error("担当スタッフが見つかりません。");
 
-            } else { 
-                const updatedEvent = { ...dialogState.event, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
-                setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
-            }
+            // Optimistic UI Update
+            setScheduleEvents(prevEvents => prevEvents.map(e => {
+                if (e.id === originalEvent.id) {
+                    return { ...e, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
+                }
+                if (e.tripId === originalEvent.tripId && e.id.endsWith('-travel')) {
+                     const travelDuration = differenceInMinutes(parseISO(e.end as string), parseISO(e.start as string));
+                     return {...e, start: subMinutes(newStart, travelDuration).toISOString(), end: newStart.toISOString()}
+                }
+                return e;
+            }));
+            setDialogState({ mode: 'closed' });
+
+            // Backend Update
+            (async () => {
+                try {
+                    if (originalEvent.rawOrderId && !originalEvent.rawOrderId.startsWith('generic-')) {
+                        await updateSheetStatus({
+                            gasUrl: ORDER_GAS_URL,
+                            eventTitle: `(ID: ${originalEvent.rawOrderId})`,
+                            scheduledTime: newStart.toISOString(),
+                            timestamp: new Date().toISOString(),
+                        });
+                    } else if (originalEvent.calendarEventId && staff.calendarId) {
+                        await handleCalendarEvent({
+                            gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: staff.calendarId,
+                            eventId: originalEvent.calendarEventId, title, description,
+                            startTime: newStart.toISOString(), endTime: newEnd.toISOString()
+                        });
+                    }
+                    toast({ title: '予定を更新しました' });
+                } catch (e: any) {
+                    toast({ variant: 'destructive', title: '更新エラー', description: `予定の更新に失敗しました: ${e.message}` });
+                    await refetchOrders(); // Revert on error
+                }
+            })();
+            return;
         }
         setDialogState({ mode: 'closed' });
     } catch (e: any) {
