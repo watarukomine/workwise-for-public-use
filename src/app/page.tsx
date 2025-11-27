@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -21,13 +20,13 @@ import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
 import { findKey } from '@/lib/utils';
 
-const TRAVEL_TIME_MINUTES = 30;
-
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
   
   const { 
-    orders, 
+    unassignedOrders, 
+    scheduleEvents,
+    statuses,
     isLoading: isLoadingOrders,
   } = useOrder();
   
@@ -63,102 +62,6 @@ export default function DashboardPage() {
     });
 
   }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
-  
-  const { scheduleEvents, unassignedOrders, statuses } = React.useMemo(() => {
-      const newScheduleEvents: WithId<ScheduleEvent>[] = [];
-      const newUnassignedOrders: WithId<Order>[] = [];
-      const staffStatusMap = new Map<string, StaffStatus>();
-
-      // Initialize statuses for all filtered staff
-      filteredStaff.forEach(sf => {
-          staffStatusMap.set(sf.id, {
-              staffId: sf.id,
-              status: '待機中',
-              lastAction: '情報なし',
-          });
-      });
-
-      if (allStaff.length > 0) {
-        orders.forEach((order: WithId<Order>) => {
-          const staff = order.staffName ? allStaff.find(s => s.name === order.staffName) : undefined;
-          const scheduledTimeStr = order.scheduledTime;
-          
-          let isAssigned = false;
-          if (staff && scheduledTimeStr) {
-            try {
-              const scheduledTime = parseISO(scheduledTimeStr);
-
-              if (isValid(scheduledTime)) {
-                  const tripId = `trip-${order.rawOrderId}`;
-
-                  const taskEvent: WithId<ScheduleEvent> = {
-                      ...order,
-                      id: `${tripId}-task`,
-                      tripId,
-                      orderId: order.id,
-                      title: order.taskDetails,
-                      staffId: staff.id,
-                      locationId: order.customerCode || '',
-                      start: scheduledTime.toISOString(),
-                      end: addMinutes(scheduledTime, order.estimatedDuration).toISOString(),
-                  };
-
-                  const travelEvent: WithId<ScheduleEvent> = {
-                      ...order,
-                      id: `${tripId}-travel`,
-                      tripId,
-                      orderId: order.id,
-                      title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
-                      staffId: staff.id,
-                      locationId: order.customerCode || '',
-                      start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
-                      end: scheduledTime.toISOString(),
-                  };
-                  newScheduleEvents.push(travelEvent, taskEvent);
-                  isAssigned = true;
-              }
-            } catch(e) {
-              console.error("Error parsing schedule time for order:", order.id, e);
-            }
-          }
-          
-          if (!isAssigned) {
-              newUnassignedOrders.push(order);
-          }
-
-          // Update staff status based on the latest order info
-          if (staff && staffStatusMap.has(staff.id)) {
-            const lastUpdateStr = findKey(order.raw, ['最終更新日時']);
-            if (lastUpdateStr) {
-                const lastUpdate = parseISO(lastUpdateStr);
-                const currentStatus = staffStatusMap.get(staff.id)!;
-                const currentUpdate = currentStatus.lastUpdate ? parseISO(currentStatus.lastUpdate) : new Date(0);
-
-                if (isValid(lastUpdate) && lastUpdate.getTime() >= currentUpdate.getTime()) {
-                    const locationStr: string = findKey(order.raw, ['最終位置情報（緯度,経度）']) || '';
-                    const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
-                    
-                    staffStatusMap.set(staff.id, {
-                        staffId: staff.id,
-                        status: (findKey(order.raw, ['受注ステータス']) || '待機中') as StaffStatus['status'],
-                        lastAction: `[${order.rawOrderId}] ${findKey(order.raw, ['受注ステータス'])}`,
-                        latitude: !isNaN(lat) ? lat : undefined,
-                        longitude: !isNaN(lon) ? lon : undefined,
-                        lastUpdate: lastUpdate.toISOString(),
-                    });
-                }
-            }
-          }
-        });
-      }
-      
-      return { 
-        scheduleEvents: newScheduleEvents, 
-        unassignedOrders: newUnassignedOrders, 
-        statuses: Array.from(staffStatusMap.values()) 
-      };
-  }, [orders, allStaff, filteredStaff]);
-
 
   const selectedStaffNames = React.useMemo(() => {
     if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {

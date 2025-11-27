@@ -49,6 +49,8 @@ import { updateSheetStatus, sendIcsViaGmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { useOrder } from '@/contexts/order-context';
 import { Mail } from 'lucide-react';
+import { useCustomer } from '@/contexts/customer-context';
+
 
 const PIXELS_PER_MINUTE = 1.2;
 const timelineStartHour = 9;
@@ -319,6 +321,7 @@ export function ScheduleView({
   const [isClient, setIsClient] = React.useState(false);
   const { toast } = useToast();
   const { refetchOrders } = useOrder();
+  const { customers: allCustomers } = useCustomer();
   
   const [scheduleEvents, setScheduleEvents] = React.useState<WithId<ScheduleEvent>[]>(initialScheduleEvents);
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>(orders);
@@ -395,7 +398,7 @@ export function ScheduleView({
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
+    const { active, over, delta } = event;
     const item = active.data.current as (WithId<Order> & {isOrder?: boolean}) | WithId<ScheduleEvent>;
 
     setActiveItem(null);
@@ -427,7 +430,7 @@ export function ScheduleView({
       const newStartMinutes = pixelsToMinutes(dropX);
       return addMinutes(startOfTimelineDay, newStartMinutes);
     };
-    
+
     const newStart = getNewStartFromDrop();
 
     if ('staffId' in item) {
@@ -435,51 +438,50 @@ export function ScheduleView({
         
         // Optimistic UI update
         const isTripEvent = !!draggedEvent.tripId;
-        let newEvents;
-        if (isTripEvent) {
-            newEvents = scheduleEvents.map(e => {
-                if (e.tripId !== draggedEvent.tripId) return e;
+        
+        setScheduleEvents(prev => {
+            return prev.map(e => {
+                if (isTripEvent && e.tripId === draggedEvent.tripId) {
+                    const taskDuration = differenceInMinutes(parseISO(e.end as string), parseISO(e.start as string));
+                    let newTaskStart;
+                    if (draggedEvent.id.endsWith('-task')) {
+                      newTaskStart = addMinutes(parseISO(e.start as string), delta.x / PIXELS_PER_MINUTE);
+                    } else { // Ends with -travel
+                      const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                      const originalTravelStart = addMinutes(parseISO(e.start as string), delta.x / PIXELS_PER_MINUTE);
+                      newTaskStart = addMinutes(originalTravelStart, travelDuration);
+                    }
 
-                const taskDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                const travelDuration = e.id.endsWith('-travel') ? differenceInMinutes(parseISO(e.end as string), parseISO(e.start as string)) : TRAVEL_TIME_MINUTES;
-
-                let newTaskStart = newStart;
-                if (draggedEvent.id.endsWith('-travel')) {
-                    newTaskStart = addMinutes(newStart, travelDuration);
-                }
-                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
-                const newTravelStart = subMinutes(newTaskStart, travelDuration);
-
-                if (e.id.endsWith('-task')) {
-                    return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-                }
-                if (e.id.endsWith('-travel')) {
-                    return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                    const roundedNewTaskStart = addMinutes(startOfTimelineDay, pixelsToMinutes(differenceInMinutes(newTaskStart, startOfTimelineDay)));
+                    const newTaskEnd = addMinutes(roundedNewTaskStart, taskDuration);
+                    
+                    if(e.id.endsWith('-task')){
+                      return { ...e, staffId: newStaffId, start: roundedNewTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+                    } else { // travel event
+                      const travelDuration = differenceInMinutes(parseISO(e.end as string), parseISO(e.start as string));
+                      return { ...e, staffId: newStaffId, start: subMinutes(roundedNewTaskStart, travelDuration).toISOString(), end: roundedNewTaskStart.toISOString() };
+                    }
+                } else if (!isTripEvent && e.id === draggedEvent.id) {
+                    const duration = differenceInMinutes(parseISO(e.end as string), parseISO(e.start as string));
+                    const eventStart = addMinutes(parseISO(e.start as string), delta.x / PIXELS_PER_MINUTE);
+                    const roundedNewStart = addMinutes(startOfTimelineDay, pixelsToMinutes(differenceInMinutes(eventStart, startOfTimelineDay)));
+                    const newEnd = addMinutes(roundedNewStart, duration);
+                    return { ...e, staffId: newStaffId, start: roundedNewStart.toISOString(), end: newEnd.toISOString() };
                 }
                 return e;
             });
-        } else { // Generic event
-            const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-            const newEnd = addMinutes(newStart, duration);
-            newEvents = scheduleEvents.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
-        }
-        setScheduleEvents(newEvents);
+        });
         
         // Backend update
         (async () => {
             try {
                 if (draggedEvent.rawOrderId && !draggedEvent.rawOrderId.startsWith('generic-')) {
-                    let taskStart = newStart;
-                    if(draggedEvent.id.endsWith('-travel')) {
-                        const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                        taskStart = addMinutes(newStart, travelDuration);
-                    }
                     const newStaff = getStaffById(newStaffId);
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
                         staffName: newStaff?.name,
-                        scheduledTime: taskStart.toISOString(),
+                        scheduledTime: newStart.toISOString(),
                     });
                 }
                 toast({ title: "スケジュールを更新しました" });
