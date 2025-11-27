@@ -222,9 +222,10 @@ function GenericTasks() {
     };
 
     return (
-        <Card>
+        <Card className="h-full">
             <CardHeader>
-                <CardTitle className="text-base">汎用タスク</CardTitle>
+                <CardTitle className="text-lg">汎用タスク</CardTitle>
+                <CardDescription>休憩や移動など、受注以外のタスクです。</CardDescription>
             </CardHeader>
             <CardContent>
                  <div className="flex flex-wrap gap-2">
@@ -248,7 +249,7 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
     return (
         <Card 
             ref={setNodeRef}
-            className={cn("transition-colors", isOver && "bg-primary/10 border-primary/50")}
+            className={cn("transition-colors h-full", isOver && "bg-primary/10 border-primary/50")}
         >
             <CardHeader>
                 <CardTitle className="text-lg">本日の受注タスク</CardTitle>
@@ -257,20 +258,21 @@ function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], custo
             <CardContent>
                 <ScrollArea className="w-full whitespace-nowrap">
                     <div className="pr-4 min-h-[6rem]">
-                        <div className="flex flex-wrap gap-2">
-                            {orders.map((order) => (
-                                <DraggableOrder
-                                    key={order.id}
-                                    order={order}
-                                    customer={getCustomerByCode(order.customerCode)}
-                                />
-                            ))}
-                            {orders.length === 0 && (
-                                <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
-                                    <p>本日の未割り当てオーダーはありません。</p>
-                                </div>
-                            )}
-                        </div>
+                        {orders.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                                {orders.map((order) => (
+                                    <DraggableOrder
+                                        key={order.id}
+                                        order={order}
+                                        customer={getCustomerByCode(order.customerCode)}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
+                                <p>本日の未割り当てオーダーはありません。</p>
+                            </div>
+                        )}
                     </div>
                 </ScrollArea>
             </CardContent>
@@ -286,10 +288,6 @@ export function ScheduleView({
     setScheduleData,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
-  
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
   const { refetchOrders } = useOrder();
@@ -299,10 +297,23 @@ export function ScheduleView({
   
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
   
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleData) return [];
+      return scheduleData.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isToday(eventDate);
+      });
+  }, [scheduleData]);
+
   React.useEffect(() => {
-    if (!rawOrdersData) return;
+    setIsClient(true);
+  }, []);
+  
+  React.useEffect(() => {
+    if (!rawOrdersData || !staffData) return;
+    
     const allMappedOrders = rawOrdersData.map(mapRawToOrder);
-    const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
+    const scheduledRawOrderIds = new Set(dailySchedule.map(e => e.rawOrderId).filter(Boolean));
     
     const newUnassignedOrders = allMappedOrders.filter(order => {
         if (!order.rawOrderId) return false;
@@ -316,7 +327,7 @@ export function ScheduleView({
         return isValid(scheduledDate) && isToday(scheduledDate);
     });
     setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, scheduleData]);
+  }, [rawOrdersData, dailySchedule, staffData]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -348,7 +359,7 @@ export function ScheduleView({
             staffName: "",
             statusValue: "未割当",
             timestamp: new Date().toISOString(),
-            scheduledTime: "",
+            scheduledTime: ""
         });
 
           if (result.status === 'error') throw new Error(result.message);
@@ -403,7 +414,7 @@ export function ScheduleView({
         try {
             const newStart = getNewStartFromDrop();
             
-            if (draggedEvent.rawOrderId) {
+            if (draggedEvent.rawOrderId) { // Sheet-based event
               await updateSheetStatus({
                   gasUrl: ORDER_GAS_URL,
                   eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
@@ -412,8 +423,7 @@ export function ScheduleView({
               });
               await refetchOrders();
               toast({ title: "スケジュールを更新しました" });
-            } else {
-                // Handle generic event move if needed
+            } else { // Generic event, not from sheet
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                 const newEnd = addMinutes(newStart, duration);
                 const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
@@ -422,14 +432,12 @@ export function ScheduleView({
         } catch(e: any) {
             toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
         }
-    } else if ('estimatedDuration' in item) { // Adding a new event from orders
+    } else if ('estimatedDuration' in item) { // Adding a new event from orders/generic
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
         const taskStart = getNewStartFromDrop();
-        
-        const customer = getCustomerByCode(order.customerCode);
         const isGeneric = order.id.startsWith('generic-');
 
         if (isGeneric) {
@@ -443,7 +451,8 @@ export function ScheduleView({
                 end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
              };
              setScheduleData(prev => [...prev, newEvent]);
-        } else {
+        } else { // Order from sheet
+            const customer = getCustomerByCode(order.customerCode);
             try {
               const result = await updateSheetStatus({
                   gasUrl: ORDER_GAS_URL,
@@ -528,14 +537,14 @@ export function ScheduleView({
         const staff = getStaffById(dialogState.event.staffId);
         if (!staff) return;
         
-        if (dialogState.event.rawOrderId) {
+        if (dialogState.event.rawOrderId) { // From sheet
             await updateSheetStatus({
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
                 scheduledTime: newStart.toISOString(),
             });
             await refetchOrders();
-        } else {
+        } else { // Generic event
             const updatedEvent = {
                 ...dialogState.event,
                 title,
@@ -579,13 +588,6 @@ export function ScheduleView({
 
   const { event, staff, customer, title } = getDialogDetails();
 
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleData) return [];
-      return scheduleData.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isToday(eventDate);
-      });
-  }, [scheduleData]);
 
   if (!isClient) {
     return (
@@ -606,60 +608,58 @@ export function ScheduleView({
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
-        <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                    <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
-                </div>
-                <div className="md:col-span-1">
-                    <GenericTasks />
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+            <div className="md:col-span-3">
+                <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
             </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>タイムライン</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                    <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="relative">
-                            <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
-                                <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                                <div className="relative h-8 flex-1">
-                                    {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                        <div
-                                            key={i}
-                                            className="absolute h-full border-l"
-                                            style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
-                                        >
-                                            <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                                {timelineStartHour + i}:00
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                            <div className="relative mt-2 space-y-2">
-                                {staffData?.map((staff) => {
-                                    const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                    return (
-                                        <StaffRow
-                                            key={staff.id}
-                                            staff={staff}
-                                            events={events}
-                                            getCustomerByCode={getCustomerByCode}
-                                            isOver={currentOverStaffId === staff.id}
-                                            onDoubleClickEvent={handleDoubleClickEvent}
-                                            onDoubleClickTimeline={handleDoubleClickTimeline}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </ScrollArea>
-                </CardContent>
-            </Card>
+            <div className="md:col-span-2">
+                <GenericTasks />
+            </div>
         </div>
+
+        <Card className="pt-8">
+            <CardHeader className="absolute top-0 left-6">
+                <CardTitle>タイムライン</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+                <ScrollArea className="w-full whitespace-nowrap">
+                    <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                      <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                          <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                          <div className="relative h-8 flex-1">
+                              {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                  <div
+                                      key={i}
+                                      className="absolute h-full border-l"
+                                      style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                  >
+                                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                          {timelineStartHour + i}:00
+                                      </span>
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                      <div className="relative mt-2 space-y-2">
+                          {staffData?.map((staff) => {
+                              const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                              return (
+                                  <StaffRow
+                                      key={staff.id}
+                                      staff={staff}
+                                      events={events}
+                                      getCustomerByCode={getCustomerByCode}
+                                      isOver={currentOverStaffId === staff.id}
+                                      onDoubleClickEvent={handleDoubleClickEvent}
+                                      onDoubleClickTimeline={handleDoubleClickTimeline}
+                                  />
+                              );
+                          })}
+                      </div>
+                    </div>
+                </ScrollArea>
+            </CardContent>
+        </Card>
       
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
           <DialogContent>
