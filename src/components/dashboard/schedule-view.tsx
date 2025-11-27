@@ -277,7 +277,7 @@ export function ScheduleView({
   const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
-  const { scheduleEvents, setScheduleEvents, refetchOrders } = useOrder();
+  const { scheduleEvents, setScheduleEvents } = useOrder();
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
@@ -361,7 +361,7 @@ export function ScheduleView({
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
       } finally {
-          await refetchOrders();
+          //await refetchOrders();
       }
   };
 
@@ -462,7 +462,7 @@ export function ScheduleView({
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
             } finally {
-                await refetchOrders();
+                //await refetchOrders();
             }
         })();
     
@@ -518,7 +518,7 @@ export function ScheduleView({
                 } catch (e: any) {
                     toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
                 } finally {
-                    await refetchOrders();
+                    //await refetchOrders();
                 }
             })();
         }
@@ -587,7 +587,8 @@ export function ScheduleView({
                     scheduledTime: newStart.toISOString(),
                     timestamp: new Date().toISOString(),
                 });
-                await refetchOrders();
+                // No refetch, optimistic update below
+                 setScheduleEvents(prev => prev.map(e => e.id === dialogState.event.id ? { ...e, title, description, start: newStart.toISOString(), end: newEnd.toISOString() } : e));
 
             } else { // Generic event
                 const updatedEvent = { ...dialogState.event, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
@@ -682,7 +683,7 @@ export function ScheduleView({
                                     </div>
                                 ))}
                             </div>
-                            <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                            <div className="flex-shrink-0 font-semibold p-2 text-center" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                         </div>
                         <div className="relative mt-2 space-y-2">
                             {isToday(currentDate) && (
@@ -835,7 +836,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
         ref={setNodeRef} 
         className={cn("relative flex-1 h-16 border-b", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
-        style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}
+        style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
         <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (
@@ -847,15 +848,16 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
               onDoubleClick={() => onDoubleClickEvent(event)}
             />
           ))}
-           {status && isToday(new Date()) && (
-              <div 
-                className="absolute top-0 h-full flex items-center text-xs font-medium"
-                style={{left: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + 16}px`}}
-              >
-                {status.status}
-              </div>
-            )}
         </div>
+      </div>
+
+      {/* Status Cell */}
+      <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
+        {status && isToday(new Date()) && (
+          <div className="text-sm text-center font-semibold">
+             {status.status}
+          </div>
+        )}
       </div>
     </div>
   )
