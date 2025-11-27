@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
 import { cn, findKey } from '@/lib/utils';
-import { format, isToday, parseISO, isValid, startOfDay } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 
 interface OrderTableProps {
@@ -39,7 +39,7 @@ const formatDate = (dateString: string) => {
 const formatTime = (timeString: string) => {
     if (!timeString) return timeString;
     
-    // Handle cases like "1899-12-29T15:00:00.000Z"
+    // Handle cases like "1899-12-29T15:00:00.000Z" which come from Sheets for time-only values
     if (typeof timeString === 'string' && timeString.startsWith('1899-12-')) {
         const date = new Date(timeString);
         if (isValid(date)) {
@@ -118,16 +118,14 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
   const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
 
-  const headers = rawOrders && rawOrders.length > 0 
-    ? Object.keys(rawOrders[0]).filter(key => 
-        ![
-          'Order_URL',
-          'taskCalendarEventId', 
-          'travelCalendarEventId', 
-          '緊急連絡先'
-        ].includes(key)
-      )
-    : [];
+  const headers = [
+    '受注ID', 'ユーザーコード', 'お取引先名', '作業予定日', '予定時間', 'ご担当者様', '作業場所',
+    '受注No(ﾘﾏｰｸ1 8ｹﾀ)', '任意コメント(ﾘﾏｰｸ2 10ｹﾀ)', '車名', '登録ナンバー(下４桁)',
+    '入庫状況', 'タイヤ品番', 'タイヤサイズ', '品名', '作業内容', '本数', '空気圧センサー',
+    'パッキン交換', 'タイヤ手配状況', '廃タイヤ処分', '連絡先', '受注ステータス', '担当',
+    '最終更新日時', '最終位置情報（緯度,経度）', 'チップ配置作業予定', '移動開始', '現場到着',
+    '作業開始', '作業完了', '作業所要時間', '退勤ボタン', '緊急連絡'
+  ];
     
   const handleRowClick = (order: any) => {
     if (isAdmin && order && order.Order_URL) {
