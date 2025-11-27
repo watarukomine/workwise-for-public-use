@@ -20,7 +20,7 @@ import { findKey } from '@/lib/utils';
 function OptimizerPageContent() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
-  const { orders: rawOrders, isLoading: isLoadingOrders } = useOrder();
+  const { rawOrdersData: rawOrders, isLoading: isLoadingOrders } = useOrder();
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
@@ -37,7 +37,8 @@ function OptimizerPageContent() {
   }, [appliedSelectedStaffIds, allStaff, isStaffLoading]);
   
   const statuses: StaffStatus[] = React.useMemo(() => {
-    if (!filteredStaffFromSelection.length || !rawOrders.length) {
+    const orders = rawOrders || [];
+    if (!filteredStaffFromSelection.length || !orders.length) {
         return filteredStaffFromSelection.map(sf => ({
             staffId: sf.id,
             status: '待機中',
@@ -57,7 +58,7 @@ function OptimizerPageContent() {
     }
 
     // Process orders to find the latest status for each staff member
-    for (const order of rawOrders) {
+    for (const order of orders) {
         const staffName = findKey(order, ['担当']);
         const staffMember = allStaff.find(s => s.name === staffName);
         if (!staffMember || !staffStatusMap.has(staffMember.id)) continue;
