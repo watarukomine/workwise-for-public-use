@@ -43,7 +43,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -202,9 +202,8 @@ interface ScheduleViewProps {
     staffData: WithId<Staff>[];
     customerData: WithId<Customer>[];
     scheduleData: WithId<ScheduleEvent>[];
+    rawOrdersData: any[]; 
     setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
-    unassignedOrders: WithId<Order>[];
-    setUnassignedOrders: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
 }
 
 const genericTasks: WithId<Order>[] = [
@@ -222,7 +221,7 @@ function GenericTasks() {
     };
 
     return (
-        <Card>
+        <Card className="h-full">
             <CardHeader>
                 <CardTitle className="text-base">汎用タスク</CardTitle>
             </CardHeader>
@@ -282,9 +281,8 @@ export function ScheduleView({
     staffData, 
     customerData,
     scheduleData, 
+    rawOrdersData,
     setScheduleData,
-    unassignedOrders,
-    setUnassignedOrders,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
   React.useEffect(() => {
@@ -293,10 +291,30 @@ export function ScheduleView({
   
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
-  const { refetchOrders } = useOrder();
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
+  
+  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
+  
+  React.useEffect(() => {
+    if (!rawOrdersData) return;
+    const allMappedOrders = rawOrdersData.map(mapRawToOrder);
+    const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
+    
+    const newUnassignedOrders = allMappedOrders.filter(order => {
+        if (!order.rawOrderId) return false;
+        
+        if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
+        
+        const scheduledDateKey = findKey(order.raw, ['作業予定日']);
+        if (!scheduledDateKey) return false;
+
+        const scheduledDate = parseISO(scheduledDateKey);
+        return isValid(scheduledDate) && isToday(scheduledDate);
+    });
+    setUnassignedOrders(newUnassignedOrders);
+  }, [rawOrdersData, scheduleData]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -322,16 +340,29 @@ export function ScheduleView({
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
       if (!eventToUnassign.rawOrderId) return;
       try {
-        await updateSheetStatus({
+        const result = await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
             staffName: "",
             statusValue: "未割当",
             timestamp: new Date().toISOString(),
         });
-        
-        await refetchOrders();
-        toast({ title: 'タスクを未割り当てに戻しました' });
+
+          if (result.status === 'error') throw new Error(result.message);
+          
+          const originalOrder = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
+          if (originalOrder) {
+            const orderToAddBack = mapRawToOrder(originalOrder);
+             setUnassignedOrders(prev => {
+              if (!prev.some(o => o.id === orderToAddBack.id)) {
+                return [...prev, orderToAddBack];
+              }
+              return prev;
+            });
+          }
+      
+          setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
+          toast({ title: 'タスクを未割り当てに戻しました' });
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
@@ -367,7 +398,7 @@ export function ScheduleView({
     startOfDay.setHours(timelineStartHour, 0, 0, 0);
 
     const getNewStartFromDrop = () => {
-      const dropX = (active.rect.current.translated?.left ?? 0) - timelineRect.left + staffRowElement.scrollLeft;
+      const dropX = (active.rect.current.translated?.left ?? 0) - timelineRect.left;
       const newStartMinutes = pixelsToMinutes(dropX);
       return addMinutes(startOfDay, newStartMinutes);
     };
@@ -379,15 +410,17 @@ export function ScheduleView({
         
         try {
             if (draggedEvent.staffId !== newStaffId && draggedEvent.rawOrderId) {
-                await updateSheetStatus({
+                const customer = getCustomerByCode(draggedEvent.locationId);
+                const result = await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
                     staffName: staffMember.name,
                     statusValue: '作業待ち',
                     timestamp: new Date().toISOString(),
                 });
+
+                if (result.status === 'error') throw new Error(result.message);
                 
-                const customer = getCustomerByCode(draggedEvent.locationId);
                 toast({
                   title: `${staffMember.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
                 });
@@ -426,7 +459,6 @@ export function ScheduleView({
                      return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
                 }
             });
-            refetchOrders();
 
         } catch(e: any) {
             toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
@@ -441,7 +473,6 @@ export function ScheduleView({
         const customer = getCustomerByCode(order.customerCode);
         const isGeneric = order.id.startsWith('generic-');
 
-        // Optimistic UI update
         if (isGeneric) {
              const newEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}`,
@@ -454,6 +485,21 @@ export function ScheduleView({
              };
              setScheduleData(prev => [...prev, newEvent]);
         } else {
+            try {
+              const result = await updateSheetStatus({
+                  gasUrl: ORDER_GAS_URL,
+                  eventTitle: `(ID: ${order.rawOrderId})`,
+                  staffName: staff.name,
+                  statusValue: '作業待ち',
+                  timestamp: new Date().toISOString(),
+              });
+
+              if (result.status === 'error') throw new Error(result.message);
+              
+              toast({
+                title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
+              });
+              
               const tripId = `trip-${Date.now()}`;
               const taskEnd = addMinutes(taskStart, order.estimatedDuration);
               const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
@@ -483,29 +529,11 @@ export function ScheduleView({
               
               setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
               setScheduleData(prev => [...prev, travelEvent, taskEvent]);
-        }
-        
-        // Backend update
-        (async () => {
-            try {
-              if (!isGeneric) {
-                  await updateSheetStatus({
-                      gasUrl: ORDER_GAS_URL,
-                      eventTitle: `(ID: ${order.rawOrderId})`,
-                      staffName: staff.name,
-                      statusValue: '作業待ち',
-                      timestamp: new Date().toISOString(),
-                  });
-                  toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`});
-                  refetchOrders();
-              } else {
-                  toast({ title: '汎用タスクを追加しました' });
-              }
+              
             } catch (e: any) {
                  toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                 refetchOrders();
             }
-        })();
+        }
     }
   };
 
@@ -665,7 +693,7 @@ export function ScheduleView({
                           </div>
                             <div className="relative mt-2 space-y-2">
                                 {staffData?.map((staff) => {
-                                    const events = scheduleData?.filter((e) => e.staffId === staff.id) || [];
+                                    const events = scheduleData.filter((e) => e.staffId === staff.id);
                                     return (
                                         <StaffRow
                                             key={staff.id}
