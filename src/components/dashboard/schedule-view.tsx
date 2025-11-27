@@ -202,8 +202,9 @@ interface ScheduleViewProps {
     staffData: WithId<Staff>[];
     customerData: WithId<Customer>[];
     scheduleData: WithId<ScheduleEvent>[];
-    rawOrdersData: any[]; 
     setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
+    unassignedOrders: WithId<Order>[];
+    setUnassignedOrders: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
 }
 
 const genericTasks: WithId<Order>[] = [
@@ -281,8 +282,9 @@ export function ScheduleView({
     staffData, 
     customerData,
     scheduleData, 
-    rawOrdersData,
     setScheduleData,
+    unassignedOrders,
+    setUnassignedOrders,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
   React.useEffect(() => {
@@ -293,35 +295,14 @@ export function ScheduleView({
   const { toast } = useToast();
   const { refetchOrders } = useOrder();
 
-  const [dialogState, setDialogState] = React.useState({ mode: 'closed' });
-  const [editedEventDetails, setEditedEventDetails] = React.useState({ title: '', description: '', startTime: '', endTime: '' });
-  
-  const [unassignedOrders, setUnassignedOrders] = React.useState([]);
-  
-  React.useEffect(() => {
-    if (!rawOrdersData) return;
-    const allMappedOrders = rawOrdersData.map(mapRawToOrder);
-    const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
-    
-    const newUnassignedOrders = allMappedOrders.filter(order => {
-        if (!order.rawOrderId) return false;
-        
-        if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
-        
-        const scheduledDateKey = findKey(order.raw, ['作業予定日']);
-        if (!scheduledDateKey) return false;
-
-        const scheduledDate = parseISO(scheduledDateKey);
-        return isValid(scheduledDate) && isToday(scheduledDate);
-    });
-    setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, scheduleData]);
+  const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
+  const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
-  const [activeItem, setActiveItem] = React.useState(null);
-  const [currentOverStaffId, setCurrentOverStaffId] = React.useState(null);
+  const [activeItem, setActiveItem] = React.useState<any | null>(null);
+  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActiveItem(event.active.data.current);
@@ -398,7 +379,6 @@ export function ScheduleView({
         
         try {
             if (draggedEvent.staffId !== newStaffId && draggedEvent.rawOrderId) {
-                const customer = getCustomerByCode(draggedEvent.locationId);
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
@@ -407,6 +387,7 @@ export function ScheduleView({
                     timestamp: new Date().toISOString(),
                 });
                 
+                const customer = getCustomerByCode(draggedEvent.locationId);
                 toast({
                   title: `${staffMember.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
                 });
@@ -445,7 +426,7 @@ export function ScheduleView({
                      return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
                 }
             });
-            await refetchOrders();
+            refetchOrders();
 
         } catch(e: any) {
             toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
@@ -516,13 +497,13 @@ export function ScheduleView({
                       timestamp: new Date().toISOString(),
                   });
                   toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`});
-                  await refetchOrders();
+                  refetchOrders();
               } else {
                   toast({ title: '汎用タスクを追加しました' });
               }
             } catch (e: any) {
                  toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                 await refetchOrders();
+                 refetchOrders();
             }
         })();
     }
@@ -650,9 +631,13 @@ export function ScheduleView({
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
         <div className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <GenericTasks />
-                <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-1">
+                    <GenericTasks />
+                </div>
+                <div className="lg:col-span-2">
+                    <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
+                </div>
             </div>
 
             <Card>
@@ -680,7 +665,7 @@ export function ScheduleView({
                           </div>
                             <div className="relative mt-2 space-y-2">
                                 {staffData?.map((staff) => {
-                                    const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                    const events = scheduleData?.filter((e) => e.staffId === staff.id) || [];
                                     return (
                                         <StaffRow
                                             key={staff.id}
