@@ -12,6 +12,8 @@ import { useSelectedStaff } from './selected-staff-context';
 const TRAVEL_TIME_MINUTES = 30;
 
 interface OrderContextType {
+  orders: any[];
+  setOrders: React.Dispatch<React.SetStateAction<any[]>>;
   unassignedOrders: WithId<Order>[];
   setUnassignedOrders: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
   scheduleEvents: WithId<ScheduleEvent>[];
@@ -27,6 +29,7 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export function OrderProvider({ children }: { children: ReactNode }) {
+  const [orders, setOrders] = useState<any[]>([]);
   const [unassignedOrders, setUnassignedOrders] = useState<WithId<Order>[]>([]);
   const [scheduleEvents, setScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
   const [statuses, setStatuses] = useState<StaffStatus[]>([]);
@@ -57,6 +60,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       if (result.error && result.message) throw new Error(result.message);
       
       const rawOrderData = result.data || (Array.isArray(result) ? result : []);
+      setOrders(rawOrderData);
       
       const newScheduleEvents: WithId<ScheduleEvent>[] = [];
       const newUnassignedOrders: WithId<Order>[] = [];
@@ -154,6 +158,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       console.error("Failed to fetch or process order data from GAS:", e);
       setErrorState(`受注データの取得または処理に失敗しました: ${e.message}`);
       // Only clear data on error to prevent flicker on successful refetch
+      setOrders([]);
       setUnassignedOrders([]);
       setScheduleEvents([]);
       setStatuses([]);
@@ -170,6 +175,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, [fetchAndProcessData, isStaffLoading]);
 
   const value = {
+    orders,
+    setOrders,
     unassignedOrders,
     setUnassignedOrders,
     scheduleEvents,
