@@ -39,7 +39,6 @@ const formatDate = (dateString: string) => {
 const formatTime = (timeString: string) => {
     if (!timeString) return timeString;
     
-    // Handle cases like "1899-12-29T15:00:00.000Z" which come from Sheets for time-only values
     if (typeof timeString === 'string' && timeString.startsWith('1899-12-')) {
         const date = new Date(timeString);
         if (isValid(date)) {
@@ -47,7 +46,6 @@ const formatTime = (timeString: string) => {
         }
     }
 
-    // Handles ISO-8601 DateTime strings or just time strings
     const date = new Date(timeString);
     if (!isValid(date)) {
         const today = new Date();
@@ -67,16 +65,6 @@ const formatTime = (timeString: string) => {
     }
 };
 
-const formatDurationFromMinutes = (minutes: number | string) => {
-    const numMinutes = Number(minutes);
-    if (isNaN(numMinutes) || numMinutes < 0) {
-        return minutes; // Return original if not a valid number
-    }
-    const hours = Math.floor(numMinutes / 60);
-    const mins = numMinutes % 60;
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-};
-
 const formatDateTime = (dateTimeString: string) => {
     if (!dateTimeString || !isValid(parseISO(dateTimeString))) return dateTimeString;
     try {
@@ -84,30 +72,6 @@ const formatDateTime = (dateTimeString: string) => {
     } catch {
         return dateTimeString;
     }
-};
-
-const VerticalHeader = ({ children }: { children: React.ReactNode }) => {
-    if (typeof children !== 'string') {
-        return <>{children}</>;
-    }
-    // Handle special case for multi-line headers
-    if (children.includes('\n')) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full">
-                {children.split('\n').map((line, index) => (
-                    <div key={index} className="flex">
-                        {line.split('').map((char, i) => <div key={i}>{char}</div>)}
-                    </div>
-                ))}
-            </div>
-        )
-    }
-
-    return (
-        <div className="flex flex-col items-center justify-center h-full">
-            {children.split('').map((char, index) => <div key={index}>{char}</div>)}
-        </div>
-    );
 };
 
 
@@ -145,9 +109,11 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
   const headers = [
     '受注ID', 'ユーザーコード', 'お取引先名', '作業予定日', '予定時間', 'ご担当者様', '作業場所',
-    '受注No(ﾘﾏｰｸ1 8ｹﾀ)', '任意コメント(ﾘﾏｰｸ2\n10ｹﾀ)', '車名', '登録ナンバー(下４桁)',
+    '受注No(ﾘﾏｰｸ1 8ｹﾀ)', '任意コメント(ﾘﾏｰｸ2 10ｹﾀ)', '車名', '登録ナンバー(下４桁)',
     '入庫状況', 'タイヤ品番', 'タイヤサイズ', '品名', '作業内容', '本数', '空気圧センサー\nパッキン交換',
-    'タイヤ手配状況', '廃タイヤ処分', '連絡先', '受注ステータス'
+    'タイヤ手配状況', '廃タイヤ処分', '連絡先', '受注ステータス', '担当', '最終更新日時',
+    '最終位置情報（緯度,経度）', 'チップ配置作業予定', '移動開始', '現場到着', '作業開始', '作業完了',
+    '作業所要時間', '退勤ボタン', '緊急連絡'
   ];
     
   const handleRowClick = (order: any) => {
@@ -171,31 +137,42 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   
   const getFormattedValue = (order: any, header: string) => {
       const dbKeys: Record<string, string[]> = {
-          '受注ID': ['受注ID', 'id'],
-          'ユーザーコード': ['ユーザーコード'],
-          'お取引先名': ['お取引先名'],
-          '作業予定日': ['作業予定日'],
-          '予定時間': ['予定時間'],
-          'ご担当者様': ['ご担当者様'],
-          '作業場所': ['作業場所'],
-          '受注No(ﾘﾏｰｸ1 8ｹﾀ)': ['受注No(ﾘﾏｰｸ1 8ｹﾀ)'],
-          '任意コメント(ﾘﾏｰｸ2\n10ｹﾀ)': ['任意コメント(ﾘﾏｰｸ2 10ｹﾀ)'],
-          '車名': ['車名'],
-          '登録ナンバー(下４桁)': ['登録ナンバー(下４桁)'],
-          '入庫状況': ['入庫状況'],
-          'タイヤ品番': ['タイヤ品番'],
-          'タイヤサイズ': ['タイヤサイズ'],
-          '品名': ['品名'],
-          '作業内容': ['作業内容'],
-          '本数': ['本数'],
-          '空気圧センサー\nパッキン交換': ['空気圧センサー', 'パッキン交換'],
-      'タイヤ手配状況': ['タイヤ手配状況'],
-      '廃タイヤ処分': ['廃タイヤ処分'],
-      '連絡先': ['連絡先'],
-      '受注ステータス': ['受注ステータス']
-    };
+        '受注ID': ['受注ID', 'id'],
+        'ユーザーコード': ['ユーザーコード'],
+        'お取引先名': ['お取引先名'],
+        '作業予定日': ['作業予定日'],
+        '予定時間': ['予定時間'],
+        'ご担当者様': ['ご担当者様'],
+        '作業場所': ['作業場所'],
+        '受注No(ﾘﾏｰｸ1 8ｹﾀ)': ['受注No(ﾘﾏｰｸ1 8ｹﾀ)'],
+        '任意コメント(ﾘﾏｰｸ2 10ｹﾀ)': ['任意コメント(ﾘﾏｰｸ2 10ｹﾀ)'],
+        '車名': ['車名'],
+        '登録ナンバー(下４桁)': ['登録ナンバー(下４桁)'],
+        '入庫状況': ['入庫状況'],
+        'タイヤ品番': ['タイヤ品番'],
+        'タイヤサイズ': ['タイヤサイズ'],
+        '品名': ['品名'],
+        '作業内容': ['作業内容'],
+        '本数': ['本数'],
+        '空気圧センサー\nパッキン交換': ['空気圧センサー', 'パッキン交換', '空気圧センサーパッキン交換'],
+        'タイヤ手配状況': ['タイヤ手配状況'],
+        '廃タイヤ処分': ['廃タイヤ処分'],
+        '連絡先': ['連絡先'],
+        '受注ステータス': ['受注ステータス'],
+        '担当': ['担当'],
+        '最終更新日時': ['最終更新日時'],
+        '最終位置情報（緯度,経度）': ['最終位置情報（緯度,経度）'],
+        'チップ配置作業予定': ['チップ配置作業予定'],
+        '移動開始': ['移動開始'],
+        '現場到着': ['現場到着'],
+        '作業開始': ['作業開始'],
+        '作業完了': ['作業完了'],
+        '作業所要時間': ['作業所要時間'],
+        '退勤ボタン': ['退勤ボタン'],
+        '緊急連絡': ['緊急連絡'],
+      };
 
-    const keys = dbKeys[header] || [header];
+    const keys = dbKeys[header] || [header.replace('\n', '')];
     const value = findKey(order, keys);
     
       if (headersToFormat[header]) {
@@ -220,13 +197,15 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
             />
           </div>
         </div>
-        <div className="rounded-md border">
+        <div className="rounded-md border overflow-auto">
           <Table>
             <TableHeader>
               <TableRow>
                 {headers.map(header => 
-                  <TableHead key={header} className="h-40 p-2 text-center align-middle">
-                     <VerticalHeader>{header}</VerticalHeader>
+                  <TableHead key={header} className="h-40 p-2 text-xs">
+                    <div className="[writing-mode:vertical-rl] transform-gpu -rotate-180 flex items-center justify-center whitespace-nowrap">
+                        {header.split('\n').map((line, index) => <div key={index}>{line}</div>)}
+                    </div>
                   </TableHead>
                 )}
               </TableRow>
