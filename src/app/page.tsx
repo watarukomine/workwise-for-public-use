@@ -18,16 +18,22 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
+import { useCustomer } from '@/contexts/customer-context';
 
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
   
   const { 
-    isLoading: isLoadingOrders,
-    statuses,
-    scheduleEvents,
+    scheduleEvents, 
+    setScheduleEvents, 
+    unassignedOrders, 
+    setUnassignedOrders, 
+    isLoading: isLoadingOrders, 
+    orders,
+    statuses
   } = useOrder();
   
+  const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
@@ -46,7 +52,8 @@ export default function DashboardPage() {
       if (appliedSelectedStaffIds.length === 0) {
         selectedStaff = staffToUse;
       } else {
-        selectedStaff = staffToUse.filter(staff => appliedSelectedStaffIds.includes(staff.id));
+        const selectedIds = new Set(appliedSelectedStaffIds);
+        selectedStaff = staffToUse.filter(staff => selectedIds.has(staff.id));
       }
     }
 
@@ -73,7 +80,7 @@ export default function DashboardPage() {
     return selectedStaff.map(s => s.name).join('、');
   }, [allStaff, appliedSelectedStaffIds, profile]);
 
-  const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading;
+  const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading || isLoadingCustomers;
 
   const handleDateChange = (direction: 'next' | 'prev' | 'today') => {
       setCurrentDate(current => {
@@ -160,6 +167,12 @@ export default function DashboardPage() {
         ) : (
             <ScheduleView 
                 staffData={filteredStaff} 
+                customerData={allCustomers || []} 
+                scheduleData={scheduleEvents}
+                setScheduleData={setScheduleEvents}
+                rawOrdersData={orders}
+                unassignedOrders={unassignedOrders}
+                setUnassignedOrders={setUnassignedOrders}
                 currentDate={currentDate}
             />
         )}
