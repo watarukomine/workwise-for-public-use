@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -537,10 +536,11 @@ export function ScheduleView({
                 end: newStart.toISOString(),
              };
              
-             setScheduleEvents(prev => [...prev.filter(e => e.orderId !== order.id), travelEvent, taskEvent]);
+             // Optimistic UI Update
+             setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-             handleEventClick(taskEvent);
         
+            // Backend Update
             (async () => {
                 try {
                     await updateSheetStatus({
@@ -552,10 +552,11 @@ export function ScheduleView({
                         timestamp: new Date().toISOString(),
                     });
                     toast({ title: "タスクを割り当てました" });
-                    refetchOrders();
+                    await refetchOrders(); // Fetch to get latest state including calendarEventIds if any
                 } catch (e: any) {
                     toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                    refetchOrders(); // Revert on failure
+                    // Revert UI on failure by refetching
+                    await refetchOrders();
                 }
             })();
         }
