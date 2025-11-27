@@ -86,16 +86,6 @@ const formatDateTime = (dateTimeString: string) => {
     }
 };
 
-// Helper to parse dates which might be in various formats
-const parseDate = (dateString: any): Date | null => {
-  if (!dateString || typeof dateString !== 'string') return null;
-  const date = parseISO(dateString); // Handles 'YYYY-MM-DDTHH:mm:ss.sssZ'
-  if (isValid(date)) {
-    return date;
-  }
-  return null;
-}
-
 export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -106,13 +96,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const filteredOrders = React.useMemo(() => {
     if (!rawOrders) return [];
 
-    let ordersToDisplay = rawOrders.filter(order => {
-        const scheduledDate = parseDate(order['作業予定日']);
-        const receptionDate = parseDate(order['受付日']);
-        const isScheduledForToday = scheduledDate ? isToday(startOfDay(scheduledDate)) : false;
-        const isReceivedToday = receptionDate ? isToday(startOfDay(receptionDate)) : false;
-        return isScheduledForToday || isReceivedToday;
-    });
+    let ordersToDisplay = rawOrders;
 
     if (searchTerm.trim() === '') {
       return ordersToDisplay;
@@ -241,7 +225,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
         </div>
         <div className="flex items-center justify-end space-x-2 py-4">
           <span className="text-sm text-muted-foreground">
-            {totalPages > 0 ? totalPages : 1}ページ中の{page}ページ
+            {totalPages > 0 ? `${totalPages}ページ中の${page}ページ` : '0ページ中の0ページ'}
           </span>
           <Button
             variant="outline"
