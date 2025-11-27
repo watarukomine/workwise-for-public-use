@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -12,7 +11,7 @@ import { AlertCircle, ChevronLeft, ChevronRight, Monitor, Smartphone } from 'luc
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { format, startOfToday, addDays, subDays, isToday } from 'date-fns';
+import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay, parseISO, isValid } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { VerticalScheduleView } from '@/components/dashboard/vertical-schedule-view';
 import { Switch } from '@/components/ui/switch';
@@ -20,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
 import { useCustomer } from '@/contexts/customer-context';
+
 
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
@@ -65,7 +65,7 @@ export default function DashboardPage() {
     });
 
   }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
-
+  
   const selectedStaffNames = React.useMemo(() => {
     if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
       return null;
@@ -165,9 +165,9 @@ export default function DashboardPage() {
         ) : (
             <ScheduleView 
                 staffData={filteredStaff} 
-                customerData={allCustomers || []} 
                 rawOrdersData={rawOrdersData}
                 currentDate={currentDate}
+                statuses={statuses}
             />
         )}
         {isToday(currentDate) && <StatusUpdates staffData={filteredStaff} statuses={statuses} />}
