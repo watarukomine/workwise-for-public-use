@@ -8,13 +8,9 @@ import {
   type DragEndEvent,
   type DragStartEvent,
   type DragOverEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragOverlay,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import type { ScheduleEvent, Staff, Order, WithId, StaffStatus, Customer } from '@/lib/types';
+import type { ScheduleEvent, Staff, Customer, Order, WithId } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -29,7 +25,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, getContrastingTextColor, formatTime } from '@/lib/utils';
+import { cn, findKey, formatTime, mapRawToOrder } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,24 +39,21 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
-import { updateSheetStatus, sendIcsViaGmail, handleCalendarEvent } from '@/app/actions/gas-actions';
-import { ORDER_GAS_URL } from '@/lib/settings';
 import { useOrder } from '@/contexts/order-context';
-import { Mail } from 'lucide-react';
-import { useCustomer } from '@/contexts/customer-context';
+import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
-
-const PIXELS_PER_MINUTE = 1.2;
+const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
 const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
 const STAFF_COL_WIDTH = 144;
-const STATUS_COL_WIDTH = 120;
-const HEADER_AREA_HEIGHT_REM = 15;
+
 
 const timeStringToDate = (timeStr: string, baseDate: Date) => {
     if (!/^\d{2}:\d{2}$/.test(timeStr)) {
@@ -99,77 +92,57 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
 interface DraggableOrderProps {
   order: WithId<Order>;
-  style?: React.CSSProperties;
-  isOverlay?: boolean;
+  customer?: WithId<Customer>;
+  className?: string;
 }
 
-const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, style: customStyle, isOverlay }) => {
+const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
-      id: `order-${order.rawOrderId}`,
+      id: `order-${order.id}`,
       data: { ...order, isOrder: true },
     });
 
-  const style: React.CSSProperties = {
-      ...(transform && !isOverlay ? { transform: CSS.Translate.toString(transform) } : {}),
-      width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
-      ...customStyle,
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    zIndex: isDragging ? 100 : 1,
+    opacity: isDragging ? 0.8 : 1,
+    width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
   };
   
-  const isGeneric = order.id.startsWith('generic-');
+  const [line1, line2] = order.taskDetails.split('\n');
 
-  let line1, line2, tooltipContent;
+  const tooltipContent = (
+    <>
+      <p className="font-bold">{line1}</p>
+      {line2 && <p>{line2}</p>}
+      <p className="text-xs text-muted-foreground">所要時間: {order.estimatedDuration}分</p>
+    </>
+  );
 
-  if (isGeneric) {
-    line1 = order.taskDetails;
-    tooltipContent = (
-      <>
-        <p className="font-bold">{line1}</p>
-        <p className="text-xs text-muted-foreground">所要時間: {order.estimatedDuration}分</p>
-      </>
-    );
-  } else {
-    const equipmentMark = order.equipmentStatus ? `（${order.equipmentStatus.charAt(0)}）` : '';
-    const name = order.customerName || '不明な顧客';
-    line1 = `${name}${equipmentMark}`;
-    const scheduledTimeFormatted = order.scheduledTime ? formatTime(order.scheduledTime) : '';
-    line2 = [scheduledTimeFormatted, order.tireSize].filter(Boolean).join('・');
-     tooltipContent = (
-      <>
-        <p className="font-bold">{line1}</p>
-        <p>{line2}</p>
-        <p className="text-xs text-muted-foreground mt-1">所要時間: {order.estimatedDuration}分</p>
-        <p className="text-xs text-muted-foreground">作業内容: {order.taskDetails}</p>
-      </>
-    );
-  }
-  
   return (
-      <Tooltip>
-        <TooltipTrigger
-          ref={setNodeRef}
-          style={style}
-          {...listeners}
-          {...attributes}
-          className={cn(
-            "h-12 rounded-md px-2 flex flex-col justify-center cursor-move",
-            !customStyle && 'bg-primary text-primary-foreground',
-            isDragging && !isOverlay && "opacity-30"
-          )}
+    <Tooltip>
+      <TooltipTrigger
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
+      >
+        <div
+          className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
         >
-          <div className="pointer-events-none">
-            <p className="text-xs font-semibold truncate">
-              {line1}
-            </p>
-            {line2 && <p className="text-xs opacity-80 truncate">
-              {line2}
-            </p>}
-          </div>
-        </TooltipTrigger>
-         <TooltipContent>
-          {tooltipContent}
-        </TooltipContent>
-      </Tooltip>
+          <p className="text-xs font-semibold truncate pointer-events-none">
+            {line1}
+          </p>
+          {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
+            {line2}
+          </p>}
+        </div>
+      </TooltipTrigger>
+       <TooltipContent>
+        {tooltipContent}
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -197,21 +170,17 @@ const genericTasks: WithId<Order>[] = [
 ];
 
 function GenericTasks() {
-    const getDraggableStyle = (task: Order): React.CSSProperties => {
-        let backgroundColor = 'hsl(var(--primary))';
-        if (task.id === 'generic-travel') backgroundColor = '#facc15'; // yellow-400
-        if (task.id === 'generic-work') backgroundColor = '#9ca3af'; // gray-400
-        if (task.id === 'generic-break') backgroundColor = '#22c55e'; // green-500
-
-        const color = getContrastingTextColor(backgroundColor);
-        return { backgroundColor, color };
+    const getDraggableClassName = (task: Order) => {
+        if (task.id === 'generic-travel') return 'bg-yellow-500 text-black';
+        if (task.id === 'generic-work') return 'bg-gray-400 text-white';
+        if (task.id === 'generic-break') return 'bg-green-500 text-white';
+        return 'bg-primary text-primary-foreground';
     };
 
     return (
-        <Card className="h-full">
-            <CardHeader className='pb-4'>
-                <CardTitle className="text-lg">汎用タスク</CardTitle>
-                 <CardDescription>休憩や移動など、受注以外のタスクです。</CardDescription>
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-base">汎用タスク</CardTitle>
             </CardHeader>
             <CardContent>
                  <div className="flex flex-wrap gap-2">
@@ -219,7 +188,7 @@ function GenericTasks() {
                         <DraggableOrder
                             key={task.id}
                             order={task}
-                            style={getDraggableStyle(task)}
+                            className={getDraggableClassName(task)}
                         />
                     ))}
                 </div>
@@ -228,27 +197,18 @@ function GenericTasks() {
     );
 }
 
-function UnassignedTasks({ orders, date }: { orders: WithId<Order>[], date: Date }) {
+function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date }) {
+    const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
     const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
     
     const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
-    
-    const todaysOrders = orders.filter(order => {
-        const orderDateStr = order.scheduledDate;
-        if (!orderDateStr) return false;
-        
-        const orderDate = parseISO(orderDateStr);
-        if (!isValid(orderDate)) return false;
-
-        return isEqual(startOfDay(orderDate), startOfDay(date));
-    });
 
     return (
         <Card 
             ref={setNodeRef}
-            className={cn("transition-colors h-full", isOver && "bg-primary/10 border-primary/50")}
+            className={cn("transition-colors", isOver && "bg-primary/10 border-primary/50")}
         >
-            <CardHeader className='pb-4'>
+            <CardHeader>
                 <CardTitle className="text-lg">{titleText}</CardTitle>
                 <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。</CardDescription>
             </CardHeader>
@@ -256,17 +216,14 @@ function UnassignedTasks({ orders, date }: { orders: WithId<Order>[], date: Date
                 <ScrollArea className="w-full whitespace-nowrap">
                     <div className="pr-4 min-h-[6rem]">
                         <div className="flex flex-wrap gap-2">
-                            {todaysOrders.map((order) => (
+                            {orders.map((order) => (
                                 <DraggableOrder
                                     key={order.id}
                                     order={order}
-                                    style={{
-                                        backgroundColor: 'hsl(var(--primary))',
-                                        color: 'hsl(var(--primary-foreground))'
-                                    }}
+                                    customer={getCustomerByCode(order.customerCode)}
                                 />
                             ))}
-                            {todaysOrders.length === 0 && (
+                            {orders.length === 0 && (
                                 <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
                                     <p>未割り当てオーダーはありません。</p>
                                 </div>
@@ -290,7 +247,7 @@ const TimeIndicator = () => {
         return () => clearInterval(timer);
     }, []);
 
-    if (!now || !isToday(now)) return null; 
+    if (!now) return null; 
     
     const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
     if (!isVisible) return null;
@@ -300,8 +257,8 @@ const TimeIndicator = () => {
 
     return (
         <div
-            className="absolute top-0 w-0.5 bg-red-500 pointer-events-none z-40"
-            style={{ left: `${leftPosition}px`, bottom: "-100vh" }}
+            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
+            style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
         </div>
@@ -313,43 +270,28 @@ export function ScheduleView({
     currentDate,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
+  const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
   const { 
-    unassignedOrders,
-    setUnassignedOrders,
-    scheduleEvents,
-    setScheduleEvents,
-    refetchOrders,
-    statuses,
-   } = useOrder();
-  
+      scheduleEvents, 
+      setScheduleEvents, 
+      unassignedOrders, 
+      setUnassignedOrders,
+      refetchOrders,
+    } = useOrder();
+
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
-  
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    })
-  );
-
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-      });
-  }, [scheduleEvents, currentDate]);
-
-  const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
-
-  const [activeItem, setActiveItem] = React.useState<any | null>(null);
-  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
   
   React.useEffect(() => {
     setIsClient(true);
   }, []);
+  
+  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
+  const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
+
+  const [activeItem, setActiveItem] = React.useState<any | null>(null);
+  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActiveItem(event.active.data.current);
@@ -379,16 +321,17 @@ export function ScheduleView({
             timestamp: new Date().toISOString(),
         });
         
-        toast({ title: 'タスクを未割り当てに戻しました' });
         await refetchOrders();
+        toast({ title: 'タスクを未割り当てに戻しました' });
       } catch(e: any) {
           console.error("Unassignment failed:", e);
-          toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+          toast({ variant: 'destructive', title: '更新エラー', description: `シート更新に失敗しました: ${e.message}` });
+          await refetchOrders();
       }
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over, delta } = event;
+    const { active, over } = event;
     const item = active.data.current as (WithId<Order> & {isOrder?: boolean}) | WithId<ScheduleEvent>;
 
     setActiveItem(null);
@@ -416,22 +359,58 @@ export function ScheduleView({
     startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
 
     const getNewStartFromDrop = () => {
-      // Add window.scrollY to account for page scroll position
-      const dropX = (active.rect.current.initial?.left ?? 0) - timelineRect.left + delta.x;
+      const dropX = (active.rect.current.translated?.left ?? 0) - timelineRect.left;
       const newStartMinutes = pixelsToMinutes(dropX);
       return addMinutes(startOfTimelineDay, newStartMinutes);
     };
-
+    
     const newStart = getNewStartFromDrop();
 
+    // Moving an existing event
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
+        
+        const isTripEvent = !!draggedEvent.tripId;
+
+        // Optimistic UI Update
+        setScheduleEvents(prev => {
+            if (isTripEvent) {
+                const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
+                const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
+                const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
+                
+                const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
+                const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
+
+                let newTaskStart = newStart;
+                if (draggedEvent.id.endsWith('-travel') && travelEvent) {
+                    newTaskStart = addMinutes(newStart, travelDuration);
+                }
+                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
+                const newTravelStart = subMinutes(newTaskStart, travelDuration);
+                
+                return prev.map(e => {
+                    if (e.tripId !== draggedEvent.tripId) return e;
+                    if (e.id.endsWith('-task')) {
+                        return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+                    }
+                    if (e.id.endsWith('-travel')) {
+                        return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                    }
+                    return e;
+                });
+            } else { // Generic event
+                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                 const newEnd = addMinutes(newStart, duration);
+                 return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+            }
+        });
         
         // Backend update
         (async () => {
             try {
+                const newStaff = getStaffById(newStaffId);
                 if (draggedEvent.rawOrderId && !draggedEvent.rawOrderId.startsWith('generic-')) {
-                    const newStaff = getStaffById(newStaffId);
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
@@ -442,12 +421,11 @@ export function ScheduleView({
                 toast({ title: "スケジュールを更新しました" });
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
-            } finally {
                 await refetchOrders();
             }
         })();
     
-    } else if ('isOrder' in item && item.isOrder) {
+    } else if ('isOrder' in item && item.isOrder) { // Adding a new event
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
@@ -469,6 +447,7 @@ export function ScheduleView({
              setScheduleEvents(prev => [...prev, newEvent]);
         } else {
              const tripId = `trip-${order.rawOrderId}`;
+             const customer = getCustomerByCode(order.customerCode);
              const taskEvent: WithId<ScheduleEvent> = {
                 ...order,
                 id: `${tripId}-task`,
@@ -515,17 +494,14 @@ export function ScheduleView({
                 }
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-            } finally {
                 await refetchOrders();
             }
         })();
     }
   };
-
-  const handleEventClick = (event: WithId<ScheduleEvent>) => {
-    if (event.id.endsWith('-travel')) return;
+  const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
     setEditedEventDetails({
-        title: event.customerName || event.title || '',
+        title: event.title || '',
         description: event.description || '',
         startTime: formatTime(event.start),
         endTime: formatTime(event.end),
@@ -575,25 +551,13 @@ export function ScheduleView({
                 locationId: '',
                 start: newStart.toISOString(),
                 end: newEnd.toISOString(),
-                rawOrderId: `generic-${Date.now()}`,
-                customerCode: '',
-                customerName: '',
-                address: '',
-                taskDetails: title,
-                serviceType: '',
-                status: '作業待ち',
-                scheduledDate: currentDate.toISOString(),
-                estimatedDuration: differenceInMinutes(newEnd, newStart),
-                value: 0,
             };
             setScheduleEvents(prev => [...prev, newEvent]);
+            toast({ title: '新しい予定を作成しました。'});
 
         } else if (dialogState.mode === 'edit') {
             const { event: originalEvent } = dialogState;
-            const staff = getStaffById(originalEvent.staffId);
-            if (!staff) throw new Error("担当スタッフが見つかりません。");
-
-            // Optimistic UI Update
+             // Optimistic UI Update
             setScheduleEvents(prevEvents => prevEvents.map(e => {
                 if (e.id === originalEvent.id) {
                     return { ...e, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
@@ -604,9 +568,8 @@ export function ScheduleView({
                 }
                 return e;
             }));
-            setDialogState({ mode: 'closed' });
 
-            // Backend Update
+            // Backend Update (no refetch)
             (async () => {
                 try {
                     if (originalEvent.rawOrderId && !originalEvent.rawOrderId.startsWith('generic-')) {
@@ -614,22 +577,13 @@ export function ScheduleView({
                             gasUrl: ORDER_GAS_URL,
                             eventTitle: `(ID: ${originalEvent.rawOrderId})`,
                             scheduledTime: newStart.toISOString(),
-                            timestamp: new Date().toISOString(),
-                        });
-                    } else if (originalEvent.calendarEventId && staff.calendarId) {
-                        await handleCalendarEvent({
-                            gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: staff.calendarId,
-                            eventId: originalEvent.calendarEventId, title, description,
-                            startTime: newStart.toISOString(), endTime: newEnd.toISOString()
                         });
                     }
-                    toast({ title: '予定を更新しました' });
+                    toast({ title: '予定を更新しました。'});
                 } catch (e: any) {
                     toast({ variant: 'destructive', title: '更新エラー', description: `予定の更新に失敗しました: ${e.message}` });
-                    await refetchOrders(); // Revert on error
                 }
             })();
-            return;
         }
         setDialogState({ mode: 'closed' });
     } catch (e: any) {
@@ -650,151 +604,116 @@ export function ScheduleView({
 
     setDialogState({ mode: 'closed' });
   };
-    
-  const handleSendIcalMail = async () => {
-        if (dialogState.mode !== 'edit') return;
-        const { event } = dialogState;
-        const staff = getStaffById(event.staffId);
-
-        if (!staff || !staff.email) {
-            toast({ variant: 'destructive', title: '送信エラー', description: '担当スタッフにメールアドレスが設定されていません。' });
-            return;
-        }
-
-        try {
-            const result = await sendIcsViaGmail({
-                gasUrl: ORDER_GAS_URL,
-                recipient: staff.email,
-                title: event.title,
-                description: event.description,
-                startTime: (event.start as Date | string).toString(),
-                endTime: (event.end as Date | string).toString(),
-                location: event.address,
-            });
-             if (result.status === 'error') throw new Error(result.message);
-            toast({ title: 'iCalメールを送信しました', description: `${staff.name}宛に予定を送信しました。` });
-
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: '送信エラー', description: `iCalメールの送信に失敗しました: ${e.message}` });
-        }
-    }
 
   const getDialogDetails = () => {
     if (dialogState.mode === 'edit') {
       const { event } = dialogState;
       const staff = getStaffById(event.staffId);
-      return { event, staff, title: '予定の編集' };
+      const customer = getCustomerByCode(event.locationId);
+      return { event, staff, customer, title: '予定の編集' };
     }
     if (dialogState.mode === 'new') {
       const staff = getStaffById(dialogState.staffId);
       return { staff, start: dialogState.start, title: '新規予定の作成' };
     }
-    return { event: undefined, staff: undefined, start: undefined, title: '' };
+    return { event: undefined, staff: undefined, customer: undefined, start: undefined, title: '' };
   };
 
-  const { event, staff, title } = getDialogDetails();
+  const { event, staff, customer, title } = getDialogDetails();
+
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleEvents) return [];
+      return scheduleEvents.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+      });
+  }, [scheduleEvents, currentDate]);
 
   if (!isClient) {
     return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="md:col-span-3 h-48 rounded-lg bg-muted animate-pulse"></div>
-          <div className="md:col-span-2 h-48 rounded-lg bg-muted animate-pulse"></div>
-        </div>
-        <div className="h-[calc(100vh-20rem)] rounded-lg bg-muted animate-pulse"></div>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>スケジュール</CardTitle>
+          <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
+        </CardHeader>
+        <CardContent>
+           <div className="flex items-center justify-center h-64">
+             <p>Loading schedule...</p>
+           </div>
+        </CardContent>
+      </Card>
     );
   }
 
-  const getDraggableStyle = (task: Order) => {
-      let backgroundColor = 'hsl(var(--primary))';
-      if (task.id === 'generic-travel') backgroundColor = '#facc15'; // yellow-400
-      if (task.id === 'generic-work') backgroundColor = '#9ca3af'; // gray-400
-      if (task.id === 'generic-break') backgroundColor = '#22c55e'; // green-500
-      
-      const color = getContrastingTextColor(backgroundColor);
-      return { backgroundColor, color };
-  };
-
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver} sensors={sensors}>
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
       <TooltipProvider>
-        <div className="flex flex-col h-full">
-            <div className="sticky top-0 z-20 bg-background pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <div className="md:col-span-3">
-                      <UnassignedTasks orders={unassignedOrders} date={currentDate} />
-                  </div>
-                  <div className="md:col-span-2">
-                      <GenericTasks />
-                  </div>
-                </div>
-                
-                <div className="relative flex border-t border-b mt-2 bg-background/95 backdrop-blur-sm">
-                    <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                    <div className="relative flex-1">
-                        {isToday(currentDate) && <TimeIndicator />}
-                        {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                            <div
-                                key={i}
-                                className="absolute border-l"
-                                style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px`, top: 0, bottom: 0 }}
-                            >
-                                <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
-                                    {timelineStartHour + i}:00
-                                </span>
-                            </div>
-                        ))}
+        <div className="space-y-4">
+            <GenericTasks />
+            <UnassignedTasks orders={unassignedOrders.filter(order => {
+                const orderDateStr = order.scheduledDate;
+                if (!orderDateStr) return isToday(currentDate); // Or some other default behavior
+                const orderDate = parseISO(orderDateStr);
+                return isValid(orderDate) && isEqual(startOfDay(orderDate), startOfDay(currentDate));
+            })} customers={allCustomers || []} date={currentDate} />
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>タイムライン</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                    <div className="relative">
+                      <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm">
+                          <div className="flex-shrink-0" style={{ width: `${STAFF_COL_WIDTH}px` }}></div>
+                          <div className="relative h-8 flex-1">
+                              {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                  <div
+                                      key={i}
+                                      className="absolute h-full border-l"
+                                      style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}
+                                  >
+                                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">
+                                          {timelineStartHour + i}:00
+                                      </span>
+                                  </div>
+                              ))}
+                               {isToday(currentDate) && (
+                                <div 
+                                    className="absolute top-0 h-full pointer-events-none z-40"
+                                    style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
+                                >
+                                    <TimeIndicator />
+                                </div>
+                               )}
+                          </div>
+                      </div>
+                      <div className="relative">
+                        <ScrollArea className="w-full whitespace-nowrap">
+                          <div className="relative mt-2" style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE + STAFF_COL_WIDTH}px`}}>
+                              <div className="relative space-y-2">
+                                  {staffData?.map((staff) => {
+                                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                      return (
+                                          <StaffRow
+                                              key={staff.id}
+                                              staff={staff}
+                                              events={events}
+                                              getCustomerByCode={getCustomerByCode}
+                                              isOver={currentOverStaffId === staff.id}
+                                              onDoubleClickEvent={handleDoubleClickEvent}
+                                              onDoubleClickTimeline={handleDoubleClickTimeline}
+                                          />
+                                      );
+                                  })}
+                              </div>
+                          </div>
+                        </ScrollArea>
+                      </div>
                     </div>
-                    <div className="flex-shrink-0 font-semibold p-2 border-l text-center" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
-                </div>
-            </div>
-            
-            <ScrollArea 
-                className="flex-grow" 
-                style={{ height: `calc(100vh - ${HEADER_AREA_HEIGHT_REM + 6}rem)` }}
-            >
-              <div className="relative space-y-2 pb-4">
-                {staffData?.map((staff) => {
-                    const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                    const status = statuses.find(s => s.staffId === staff.id);
-                    return (
-                        <StaffRow
-                            key={staff.id}
-                            staff={staff}
-                            events={events}
-                            status={status}
-                            isOver={currentOverStaffId === staff.id}
-                            onEventClick={handleEventClick}
-                            onDoubleClickTimeline={handleDoubleClickTimeline}
-                        />
-                    );
-                })}
-              </div>
-            </ScrollArea>
+                </CardContent>
+            </Card>
         </div>
       
-      <DragOverlay>
-        {activeItem && activeItem.isOrder && (
-            <DraggableOrder
-              order={activeItem}
-              style={activeItem.id.startsWith('generic-') ? getDraggableStyle(activeItem) : {
-                backgroundColor: 'hsl(var(--primary))',
-                color: 'hsl(var(--primary-foreground))'
-              }}
-              isOverlay
-            />
-        )}
-        {activeItem && activeItem.staffId && (
-           <DraggableEvent
-              event={activeItem}
-              staff={getStaffById(activeItem.staffId)!}
-              onClick={() => {}}
-              isOverlay
-            />
-        )}
-      </DragOverlay>
-
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
           <DialogContent>
               <DialogHeader>
@@ -808,6 +727,7 @@ export function ScheduleView({
                       {dialogState.mode === 'edit' && (
                           <div className="text-sm space-y-1">
                               <p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>
+                              {customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}
                           </div>
                       )}
                        {dialogState.mode === 'new' && (
@@ -816,7 +736,7 @@ export function ScheduleView({
                           </div>
                       )}
                       <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="title" className="text-right">お取引先名</Label>
+                          <Label htmlFor="title" className="text-right">タスク名</Label>
                           <Input
                               id="title"
                               value={editedEventDetails.title}
@@ -860,10 +780,7 @@ export function ScheduleView({
                   <DialogFooter className="sm:justify-between">
                       <div className="flex gap-2">
                           {dialogState.mode === 'edit' && (
-                            <>
-                              <Button variant="outline" size="sm" onClick={handleSendIcalMail}><Mail className="mr-2 h-4 w-4" /> メール</Button>
-                              <Button variant="destructive" size="sm" onClick={handleDeleteEvent}>削除</Button>
-                            </>
+                              <Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>
                           )}
                       </div>
                       <div className="flex gap-2 mt-4 sm:mt-0">
@@ -883,74 +800,49 @@ export function ScheduleView({
 interface StaffRowProps {
   staff: WithId<Staff>;
   events: WithId<ScheduleEvent>[];
-  status?: StaffStatus;
+  getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   isOver: boolean;
-  onEventClick: (event: WithId<ScheduleEvent>) => void;
+  onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, isOver, onEventClick, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
-  const areaColorMap: Record<string, string> = {
-    '横浜店': '#e0f2fe', // blue-50
-    '東名川崎店': '#f0fdf4', // green-50
-    '綾瀬店': '#fff7ed', // orange-50
-  };
-  
-  const bgColor = staff['母店'] ? areaColorMap[staff['母店']] || '#ffffff' : '#ffffff';
-  
-  const staffRowStyle: React.CSSProperties = {
-    backgroundColor: bgColor,
-  };
 
-  const staffNameStyle: React.CSSProperties = {
-    width: `${STAFF_COL_WIDTH}px`,
-    backgroundColor: bgColor,
+  const areaColors: Record<string, string> = {
+    '横浜店': 'bg-blue-50',
+    '東名川崎店': 'bg-green-50',
+    '綾瀬店': 'bg-orange-50',
   };
-
-  const statusStyle: React.CSSProperties = {
-    width: `${STATUS_COL_WIDTH}px`,
-    backgroundColor: bgColor,
-  };
-
+  const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className="flex relative" style={staffRowStyle}>
-      {/* Staff Name Cell */}
-      <div className="sticky left-0 z-10 flex-shrink-0 px-2 flex items-center border-r h-16" style={staffNameStyle}>
-        <div className="font-semibold flex items-center gap-2 w-full truncate">
-            <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
-            <span className='truncate flex-1'>{staff.name}</span>
+    <div className={cn("flex h-16 relative", areaBgClass)}>
+      <div className={cn("sticky left-0 z-10 flex-shrink-0 pr-2 flex items-center", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+        <div className="font-semibold flex items-center gap-2 w-full">
+          <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
+          <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
-      
-      {/* Timeline Cell */}
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
-        className={cn("relative flex-1 h-16 border-b", isOver && "bg-primary/10")} 
+        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
         style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
       >
-        <div className="absolute top-0 left-0 h-full w-full">
+        <div className="h-full border-t border-b"></div>
+        <div className="absolute top-0 left-0 h-full">
           {events.map((event) => (
             <DraggableEvent
               key={event.id}
               event={event}
               staff={staff}
-              onClick={() => onEventClick(event)}
+              getCustomerByCode={getCustomerByCode}
+              onDoubleClick={() => onDoubleClickEvent(event)}
             />
           ))}
         </div>
-      </div>
-
-      {/* Status Cell */}
-      <div className="sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16" style={statusStyle}>
-        {status && isToday(new Date()) && (
-          <div className="text-xs text-center font-medium">
-             {status.status}
-          </div>
-        )}
       </div>
     </div>
   )
@@ -959,11 +851,11 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, isOver, onEv
 interface DraggableEventProps {
   event: WithId<ScheduleEvent>;
   staff: WithId<Staff>;
-  onClick: () => void;
-  isOverlay?: boolean;
+  getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
+  onDoubleClick: () => void;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, onClick, isOverlay }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id,
     data: event,
@@ -972,52 +864,46 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, onClick, 
   const { left, width } = getEventDimensions(event.start, event.end);
 
   const style: React.CSSProperties = {
-    left: isOverlay ? undefined : `${left}px`,
+    left: `${left}px`,
     width: `${width}px`,
-    transform: transform && !isOverlay ? CSS.Translate.toString(transform) : undefined,
-    zIndex: isDragging ? 100 : 20, // ensure events are above the timeline grid but below overlay
+    transform: CSS.Translate.toString(transform),
+    zIndex: isDragging ? 100 : 1,
   };
-  
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onClick();
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); 
+    onDoubleClick();
   };
   
   const isTravelEvent = event.title?.startsWith('移動');
-
+  
   const divStyle: React.CSSProperties = {
       backgroundColor: staff.color || 'hsl(var(--primary))',
-      color: getContrastingTextColor(staff.color || 'hsl(var(--primary))')
   };
 
   if (isTravelEvent) {
-    divStyle.opacity = 0.5;
+      style.opacity = 0.5;
   }
-
-  const isGeneric = !event.rawOrderId || event.rawOrderId.startsWith('generic-');
-  let line1: string;
-  let line2: string | undefined;
-
-  if (isTravelEvent) {
-    line1 = event.title;
-  } else if (isGeneric) {
-    line1 = event.title;
-  } else {
-    const equipmentMark = event.equipmentStatus ? `（${event.equipmentStatus.charAt(0)}）` : '';
-    line1 = `${event.customerName || '不明な顧客'}${equipmentMark}`;
-    const scheduledTimeFormatted = event.scheduledTime ? formatTime(event.scheduledTime) : formatTime(event.start);
-    line2 = [scheduledTimeFormatted, event.tireSize].filter(Boolean).join('・');
-  }
-
-  const tooltipTitle = isTravelEvent || isGeneric ? event.title : line1;
-  const tooltipDescription = !isGeneric ? (
-    <>
-      <p>{line2}</p>
-      <p className="text-xs text-muted-foreground mt-1">所要時間: {event.estimatedDuration}分</p>
-      <p className="text-xs text-muted-foreground">作業内容: {event.taskDetails}</p>
-    </>
-  ) : null;
   
+  const brightStaff = ['小峯', '加藤', '牛島', '門馬'];
+  let textColorClass = 'text-primary-foreground';
+  if (isTravelEvent) {
+    textColorClass = 'text-foreground';
+  } else if (staff.name && brightStaff.includes(staff.name)) {
+      textColorClass = 'text-black';
+  }
+  
+  if (event.title === '業務') {
+    divStyle.backgroundColor = 'rgb(156 163 175)';
+  } else if (event.title === '休憩') {
+    divStyle.backgroundColor = 'rgb(34 197 94)';
+  }
+
+  const [line1, ...rest] = (event.title || '').split('\n');
+  const line2 = rest.join('\n');
+  const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
+  const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
+
   return (
     <Tooltip>
       <TooltipTrigger
@@ -1025,24 +911,19 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, onClick, 
         style={style}
         {...listeners}
         {...attributes}
-        onClick={handleClick}
-        className={cn(
-          "absolute h-12 top-1/2 -translate-y-1/2 rounded-lg border p-1 shadow-sm transition-all flex items-center cursor-grab active:cursor-grabbing active:shadow-lg",
-          isOverlay ? "" : "transition-all duration-200 ease-in-out",
-          isDragging && !isOverlay && "opacity-30 shadow-2xl scale-105"
-        )}
+        onDoubleClick={handleDoubleClick}
+        className={cn("absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move", isDragging && "opacity-80")}
         data-event-chip="true"
       >
-        <div className="flex h-full w-1.5 flex-shrink-0 rounded-full bg-current mr-2" style={{ backgroundColor: staff.color }}></div>
         <div
-          className="w-full h-full rounded-md flex flex-col justify-center"
-          style={{ backgroundColor: 'transparent' }} // Let the parent handle the color
+          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)}
+          style={divStyle}
         >
-          <p className="text-xs font-semibold truncate pointer-events-none" style={{ color: divStyle.color }}>
+          <p className="text-xs font-semibold truncate pointer-events-none">
             {line1}
           </p>
           {line2 && (
-            <p className="text-xs opacity-80 truncate pointer-events-none" style={{ color: divStyle.color }}>
+            <p className="text-xs opacity-80 truncate pointer-events-none">
                 {line2}
             </p>
           )}
@@ -1050,9 +931,10 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, onClick, 
       </TooltipTrigger>
       <TooltipContent>
         <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
+        {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
         <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
         <p className="text-sm">担当: {staff.name}</p>
-        {tooltipDescription}
+        {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
       </TooltipContent>
     </Tooltip>
   );
