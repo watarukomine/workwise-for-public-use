@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -170,7 +171,6 @@ export default function DashboardPage() {
                 statuses={statuses}
             />
         )}
-        {isToday(currentDate) && <StatusUpdates staffData={filteredStaff} statuses={statuses} />}
       </div>
     </div>
   );
