@@ -14,7 +14,7 @@ import {
   DragOverlay,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import type { ScheduleEvent, Staff, Order, WithId, StaffStatus } from '@/lib/types';
+import type { ScheduleEvent, Staff, Order, WithId, StaffStatus, Customer } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -29,7 +29,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, getContrastingTextColor, formatTime } from '@/lib/utils';
+import { cn, getContrastingTextColor, formatTime, findKey } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -49,6 +49,7 @@ import { updateSheetStatus, sendIcsViaGmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import * as ics from 'ics';
 import { CalendarPlus, Mail } from 'lucide-react';
+import { useCustomer } from '@/contexts/customer-context';
 
 
 const PIXELS_PER_MINUTE = 1.2;
@@ -772,7 +773,7 @@ export function ScheduleView({
       const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `${(event.title || 'event').replace(/ /g, '_')}.ics`;
+      link.download = `${event.title.replace(/ /g, '_')}.ics`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1129,14 +1130,15 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, onClick, 
         {...attributes}
         onClick={handleClick}
         className={cn(
-          "absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move",
+          "absolute h-12 top-1/2 -translate-y-1/2 rounded-lg border p-2 shadow-sm transition-all flex items-center cursor-grab active:cursor-grabbing active:shadow-lg active:scale-105",
           isOverlay ? "" : "transition-all duration-200 ease-in-out",
-          isDragging && !isOverlay && "opacity-30"
+          isDragging && !isOverlay && "opacity-30 shadow-2xl scale-105"
         )}
         data-event-chip="true"
       >
+        <div className="flex h-full w-1.5 flex-shrink-0 rounded-full bg-current mr-2"></div>
         <div
-          className="w-full h-full rounded-md flex flex-col justify-center p-1"
+          className="w-full h-full rounded-md flex flex-col justify-center"
           style={divStyle}
         >
           <p className="text-xs font-semibold truncate pointer-events-none">
