@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -25,6 +26,7 @@ export default function DashboardPage() {
   
   const { 
     rawOrdersData,
+    scheduleEvents,
     isLoading: isLoadingOrders, 
     statuses
   } = useOrder();
@@ -156,6 +158,7 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         {showVerticalView ? (
             <VerticalScheduleView 
+                scheduleData={scheduleEvents}
                 staffData={filteredStaff}
                 currentDate={currentDate}
             />
