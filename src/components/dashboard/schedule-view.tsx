@@ -163,6 +163,8 @@ interface ScheduleViewProps {
     rawOrdersData: any[]; 
     currentDate: Date;
     statuses: StaffStatus[];
+    scheduleData: WithId<ScheduleEvent>[];
+    setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
 }
 
 const genericTasks: WithId<Order>[] = [
@@ -273,26 +275,28 @@ export function ScheduleView({
     rawOrdersData,
     currentDate,
     statuses,
+    scheduleData,
+    setScheduleData,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
-  const { scheduleEvents, setScheduleEvents, refetchOrders } = useOrder();
+  const { refetchOrders } = useOrder();
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   
   const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
+      if (!scheduleData) return [];
+      return scheduleData.filter(event => {
           const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
           return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
       });
-  }, [scheduleEvents, currentDate]);
+  }, [scheduleData, currentDate]);
 
   React.useEffect(() => {
-    if (!rawOrdersData) return;
+    if (!rawOrdersData || !dailySchedule) return;
     
     const scheduledRawOrderIds = new Set(dailySchedule.map(e => e.rawOrderId).filter(Boolean));
     
@@ -314,7 +318,7 @@ export function ScheduleView({
     }).map(o => mapRawToOrder(o));
 
     setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, dailySchedule, currentDate]);
+  }, [rawOrdersData, dailySchedule, currentDate, staffData]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -344,8 +348,6 @@ export function ScheduleView({
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
       if (!eventToUnassign.rawOrderId) return;
       
-      setScheduleEvents(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
-
       try {
         await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
@@ -379,7 +381,7 @@ export function ScheduleView({
         if (item.rawOrderId) {
           await unassignTask(item);
         } else {
-           setScheduleEvents(prev => prev.filter(e => e.id !== item.id));
+           setScheduleData(prev => prev.filter(e => e.id !== item.id));
            toast({ title: '汎用タスクを削除しました' });
         }
         return;
@@ -407,7 +409,7 @@ export function ScheduleView({
         const draggedEvent = item as WithId<ScheduleEvent>;
         
         // Optimistic UI update
-        setScheduleEvents(prev => {
+        setScheduleData(prev => {
             const isTripEvent = !!draggedEvent.tripId;
             if (isTripEvent) {
                 const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
@@ -483,11 +485,10 @@ export function ScheduleView({
                 start: newStart.toISOString(),
                 end: addMinutes(newStart, order.estimatedDuration).toISOString(),
              };
-             setScheduleEvents(prev => [...prev, newEvent]);
+             setScheduleData(prev => [...prev, newEvent]);
              toast({ title: "汎用タスクを追加しました" });
         } else {
-             
-            (async () => {
+             (async () => {
                 try {
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
@@ -560,7 +561,7 @@ export function ScheduleView({
                 start: newStart.toISOString(),
                 end: newEnd.toISOString(),
             };
-            setScheduleEvents(prev => [...prev, newEvent]);
+            setScheduleData(prev => [...prev, newEvent]);
 
         } else if (dialogState.mode === 'edit') {
             if (dialogState.event.rawOrderId) { // Sheet-based event
@@ -574,7 +575,7 @@ export function ScheduleView({
 
             } else { // Generic event
                 const updatedEvent = { ...dialogState.event, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
-                setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+                setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
             }
         }
         setDialogState({ mode: 'closed' });
@@ -590,7 +591,7 @@ export function ScheduleView({
     if (eventToDelete.rawOrderId) {
         await unassignTask(eventToDelete);
     } else {
-        setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+        setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id));
         toast({ title: '予定を削除しました' });
     }
 
