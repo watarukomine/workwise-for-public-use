@@ -1,9 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
-import { customerData, staffStatusData } from '@/lib/data';
 import type { Customer, WithId, Staff, Order } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -12,22 +12,20 @@ import { AlertCircle, ChevronLeft, ChevronRight, Monitor, Smartphone } from 'luc
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay, parseISO, isValid } from 'date-fns';
+import { format, startOfToday, addDays, subDays, isToday } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { VerticalScheduleView } from '@/components/dashboard/vertical-schedule-view';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
-import { mapRawToOrder } from '@/lib/utils';
 
 
 export default function DashboardPage() {
-  const [customers] = React.useState<WithId<Customer>[]>(customerData);
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
   
   const { 
-    orders: rawOrders, 
+    orders, 
     isLoading: isLoadingOrders,
   } = useOrder();
   
@@ -64,16 +62,28 @@ export default function DashboardPage() {
 
   }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
   
-  const filteredStatuses = React.useMemo(() => {
-    if (!staffStatusData || !filteredStaff) return [];
-    const selectedIds = new Set(filteredStaff.map(s => s.id));
-    return staffStatusData.filter(status => selectedIds.has(status.staffId));
-  }, [filteredStaff]);
+  const filteredStatuses: StaffStatus[] = React.useMemo(() => {
+      if (!filteredStaff.length || !orders.length) {
+          return filteredStaff.map(sf => ({
+              staffId: sf.id,
+              status: '待機中',
+              lastAction: '現在地情報なし',
+          }));
+      }
+  
+      const staffStatusMap = new Map<string, StaffStatus>();
+  
+      // Initialize with default status
+      for (const staff of filteredStaff) {
+          staffStatusMap.set(staff.id, {
+              staffId: staff.id,
+              status: '待機中',
+              lastAction: '現在地情報なし',
+          });
+      }
+      return Array.from(staffStatusMap.values());
+    }, [filteredStaff, orders]);
 
-  const mappedOrders = React.useMemo(() => {
-    if (!rawOrders) return [];
-    return rawOrders.map(mapRawToOrder);
-  }, [rawOrders]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
@@ -174,7 +184,7 @@ export default function DashboardPage() {
         ) : (
             <ScheduleView 
                 staffData={filteredStaff} 
-                orders={mappedOrders}
+                orders={orders}
                 currentDate={currentDate}
                 statuses={filteredStatuses}
             />

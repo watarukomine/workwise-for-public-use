@@ -18,6 +18,7 @@ export type Staff = {
   department?: string; // from user's code
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  calendarId?: string;
 };
 
 export type Customer = {
@@ -41,22 +42,37 @@ export type Customer = {
   userCode?: string;
 };
 
-export type ScheduleEvent = {
+export type Order = {
   id: string;
+  rawOrderId?: string;
+  customerCode: string;
+  customerName: string;
+  address: string;
+  taskDetails: string;
+  serviceType: string;
+  status: string;
+  scheduledDate: string;
+  scheduledTime?: string;
+  estimatedDuration: number;
+  value: number;
+  staffName?: string;
+  equipmentStatus?: string;
+  tireSize?: string;
+  // raw?: any; 
+};
+
+export type ScheduleEvent = WithId<Order> & {
   tripId?: string; 
   orderId?: string; 
-  rawOrderId?: string; 
   title: string;
   description?: string;
   locationId?: string;
-  staffId?: string;
-  start: Date | string | Timestamp;
-  end: Date | string | Timestamp;
-  // For react-big-calendar
-  staffName?: string;
-  status?: string;
+  staffId: string;
+  start: Date | string;
+  end: Date | string;
   allDay?: boolean;
   resource?: any;
+  calendarEventId?: string;
 };
 
 export type StaffStatus = {
@@ -66,20 +82,7 @@ export type StaffStatus = {
   distanceFromSite?: string;
   latitude?: number;
   longitude?: number;
+  lastUpdate?: string;
   message?: string;
 };
 
-export type Order = {
-  id: string;
-  customerCode: string;
-  taskDetails: string;
-  estimatedDuration: number; 
-  raw?: any; 
-  rawOrderId?: string;
-  customerName?: string; // from user's code
-  productName?: string; // from user's code
-  amount?: number; // from user's code
-  deliveryDate?: string; // from user's code
-  staff?: string; // from user's code
-  status?: string; // from user's code
-};
