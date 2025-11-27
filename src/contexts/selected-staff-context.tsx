@@ -64,7 +64,8 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
 
     } catch (error: any) {
         console.error('Error fetching staff data from GAS:', error);
-        throw new Error(error.message || 'スプレッドシートからスタッフデータを取得できませんでした。GASのURL、デプロイ設定（全員に公開）、シートの構成を確認してください。');
+        // Re-throw the specific error from fetchGasData
+        throw error;
     }
 };
 
