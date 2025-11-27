@@ -78,12 +78,10 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const isAdmin = profile?.role === 'admin';
 
   const filteredOrders = React.useMemo(() => {
-    if (!rawOrders) return [];
-
-    let ordersToDisplay = rawOrders;
+    const ordersToDisplay = rawOrders || [];
 
     if (searchTerm.trim() !== '') {
-        ordersToDisplay = ordersToDisplay.filter(order =>
+        return ordersToDisplay.filter(order =>
             ['受注ID', 'お取引先名', '担当'].some(key => 
                 String(findKey(order, [key]) || '').toLowerCase().includes(searchTerm.toLowerCase())
             )
@@ -209,7 +207,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
               ) : (
                 <TableRow>
                   <TableCell colSpan={headers.length + 1} className="h-24 text-center">
-                    {rawOrders.length === 0 && !searchTerm ? "表示対象の受注情報が見つかりません。" : "検索条件に合う受注が見つかりません。"}
+                    {(rawOrders || []).length === 0 && !searchTerm ? "表示対象の受注情報が見つかりません。" : "検索条件に合う受注が見つかりません。"}
                   </TableCell>
                 </TableRow>
               )}
