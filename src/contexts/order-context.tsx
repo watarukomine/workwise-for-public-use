@@ -163,7 +163,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [orderGasUrl, allStaff, isStaffLoading]);
+  }, [orderGasUrl, allStaff]);
 
 
   useEffect(() => {
