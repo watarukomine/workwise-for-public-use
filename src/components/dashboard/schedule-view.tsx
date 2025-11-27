@@ -163,6 +163,8 @@ interface ScheduleViewProps {
     rawOrdersData: any[]; 
     currentDate: Date;
     statuses: StaffStatus[];
+    scheduleData: WithId<ScheduleEvent>[];
+    setScheduleData: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
 }
 
 const genericTasks: WithId<Order>[] = [
@@ -273,28 +275,30 @@ export function ScheduleView({
     rawOrdersData,
     currentDate,
     statuses,
+    scheduleData,
+    setScheduleData,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
-  const { scheduleEvents, setScheduleEvents } = useOrder();
+  const { refetchOrders } = useOrder();
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   
   const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
+      if (!scheduleData) return [];
+      return scheduleData.filter(event => {
           const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
           return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
       });
-  }, [scheduleEvents, currentDate]);
+  }, [scheduleData, currentDate]);
 
   React.useEffect(() => {
     if (!rawOrdersData) return;
     
-    const scheduledRawOrderIds = new Set(scheduleEvents.map(e => e.rawOrderId).filter(Boolean));
+    const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
     
     const newUnassignedOrders = rawOrdersData.filter(order => {
         const staffName = findKey(order, ['担当']);
@@ -311,10 +315,10 @@ export function ScheduleView({
 
         const scheduledDate = parseISO(workDate);
         return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
-    }).map(mapRawToOrder);
+    }).map(o => mapRawToOrder(o));
 
     setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, currentDate, scheduleEvents]);
+  }, [rawOrdersData, currentDate, scheduleData, staffData]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -344,7 +348,7 @@ export function ScheduleView({
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
       if (!eventToUnassign.rawOrderId) return;
       
-      setScheduleEvents(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
+      setScheduleData(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
 
       try {
         await updateSheetStatus({
@@ -361,7 +365,7 @@ export function ScheduleView({
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
       } finally {
-          //await refetchOrders();
+          await refetchOrders();
       }
   };
 
@@ -379,7 +383,7 @@ export function ScheduleView({
         if (item.rawOrderId) {
           await unassignTask(item);
         } else {
-           setScheduleEvents(prev => prev.filter(e => e.id !== item.id));
+           setScheduleData(prev => prev.filter(e => e.id !== item.id));
            toast({ title: '汎用タスクを削除しました' });
         }
         return;
@@ -407,7 +411,7 @@ export function ScheduleView({
         const draggedEvent = item as WithId<ScheduleEvent>;
         
         // Optimistic UI update
-        setScheduleEvents(prev => {
+        setScheduleData(prev => {
             const isTripEvent = !!draggedEvent.tripId;
             if (isTripEvent) {
                 const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
@@ -462,7 +466,7 @@ export function ScheduleView({
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
             } finally {
-                //await refetchOrders();
+                await refetchOrders();
             }
         })();
     
@@ -483,27 +487,9 @@ export function ScheduleView({
                 start: newStart.toISOString(),
                 end: addMinutes(newStart, order.estimatedDuration).toISOString(),
              };
-             setScheduleEvents(prev => [...prev, newEvent]);
+             setScheduleData(prev => [...prev, newEvent]);
              toast({ title: "汎用タスクを追加しました" });
         } else {
-             const tripId = `trip-${order.rawOrderId}`;
-             const customer = getCustomerByCode(order.customerCode);
-             const travelEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-travel`, tripId,
-                title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                staffId: newStaffId, locationId: customer?.id || '',
-                start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString(),
-                rawOrderId: order.rawOrderId,
-             };
-             const taskEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-task`, tripId, orderId: order.id, rawOrderId: order.rawOrderId,
-                title: order.taskDetails,
-                staffId: newStaffId, locationId: customer?.id || '',
-                start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-             };
-             setScheduleEvents(prev => [...prev.filter(e => e.orderId !== order.id), travelEvent, taskEvent]);
-             setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-        
             (async () => {
                 try {
                     await updateSheetStatus({
@@ -518,7 +504,7 @@ export function ScheduleView({
                 } catch (e: any) {
                     toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
                 } finally {
-                    //await refetchOrders();
+                    await refetchOrders();
                 }
             })();
         }
@@ -577,7 +563,7 @@ export function ScheduleView({
                 start: newStart.toISOString(),
                 end: newEnd.toISOString(),
             };
-            setScheduleEvents(prev => [...prev, newEvent]);
+            setScheduleData(prev => [...prev, newEvent]);
 
         } else if (dialogState.mode === 'edit') {
             if (dialogState.event.rawOrderId) { // Sheet-based event
@@ -587,12 +573,11 @@ export function ScheduleView({
                     scheduledTime: newStart.toISOString(),
                     timestamp: new Date().toISOString(),
                 });
-                // No refetch, optimistic update below
-                 setScheduleEvents(prev => prev.map(e => e.id === dialogState.event.id ? { ...e, title, description, start: newStart.toISOString(), end: newEnd.toISOString() } : e));
+                await refetchOrders();
 
             } else { // Generic event
                 const updatedEvent = { ...dialogState.event, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
-                setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+                setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
             }
         }
         setDialogState({ mode: 'closed' });
@@ -608,7 +593,7 @@ export function ScheduleView({
     if (eventToDelete.rawOrderId) {
         await unassignTask(eventToDelete);
     } else {
-        setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+        setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id));
         toast({ title: '予定を削除しました' });
     }
 
@@ -882,7 +867,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 100 : 1,
+    zIndex: isDragging ? 100 : 20,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {

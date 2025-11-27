@@ -1,10 +1,9 @@
-
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { ORDER_GAS_URL } from '@/lib/settings';
-import type { Order, ScheduleEvent, StaffStatus, WithId } from '@/lib/types';
+import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
 import { findKey, mapRawToOrder } from '@/lib/utils';
 import { addMinutes, subMinutes, parseISO, isValid } from 'date-fns';
 import { useSelectedStaff } from './selected-staff-context';
@@ -12,8 +11,7 @@ import { useSelectedStaff } from './selected-staff-context';
 const TRAVEL_TIME_MINUTES = 30;
 
 interface OrderContextType {
-  orders: any[];
-  setOrders: React.Dispatch<React.SetStateAction<any[]>>;
+  rawOrdersData: any[];
   scheduleEvents: WithId<ScheduleEvent>[];
   setScheduleEvents: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
   statuses: StaffStatus[];
@@ -27,7 +25,7 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 export function OrderProvider({ children }: { children: ReactNode }) {
-  const [orders, setOrdersState] = useState<any[]>([]);
+  const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
   const [scheduleEvents, setScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
   const [statuses, setStatuses] = useState<StaffStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,125 +44,125 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       return;
     }
     
-    if (isStaffLoading || allStaff.length === 0) {
-      setIsLoading(false);
-      return;
+    if (isStaffLoading) {
+      return; // Wait for staff to be loaded
     }
 
     setIsLoading(true);
+    setErrorState(null);
 
     try {
       const result = await fetchGasData(orderGasUrl);
       if (result.error && result.message) throw new Error(result.message);
       
       const newRawOrderData = result.data || (Array.isArray(result) ? result : []);
+      setRawOrdersData(newRawOrderData);
       
-      const newScheduleEvents: WithId<ScheduleEvent>[] = [];
-      const staffStatusMap = new Map<string, StaffStatus>();
-
-      allStaff.forEach(sf => {
-          staffStatusMap.set(sf.id, {
-              staffId: sf.id,
-              status: '待機中',
-              lastAction: '情報なし',
-          });
-      });
-
-      newRawOrderData.forEach((rawOrder: any) => {
-        const mappedOrder = mapRawToOrder(rawOrder, allStaff);
-        const staffName = mappedOrder.staffName;
-        const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
-        const scheduledTimeStr = mappedOrder.scheduledTime;
-        
-        if (staffMember && scheduledTimeStr) {
-          try {
-            const scheduledTime = parseISO(scheduledTimeStr);
-
-            if (isValid(scheduledTime)) {
-                const tripId = `trip-${mappedOrder.rawOrderId}`;
-
-                const taskEvent: WithId<ScheduleEvent> = {
-                    ...mappedOrder,
-                    id: `${tripId}-task`,
-                    tripId,
-                    orderId: mappedOrder.id,
-                    title: mappedOrder.taskDetails,
-                    staffId: staffMember.id,
-                    locationId: mappedOrder.customerCode || '',
-                    start: scheduledTime.toISOString(),
-                    end: addMinutes(scheduledTime, mappedOrder.estimatedDuration).toISOString(),
-                };
-
-                const travelEvent: WithId<ScheduleEvent> = {
-                    ...mappedOrder,
-                    id: `${tripId}-travel`,
-                    tripId,
-                    orderId: mappedOrder.id,
-                    title: `移動: ${mappedOrder.customerName || mappedOrder.taskDetails.split('\n')[0]}`,
-                    staffId: staffMember.id,
-                    locationId: mappedOrder.customerCode || '',
-                    start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
-                    end: scheduledTime.toISOString(),
-                };
-                newScheduleEvents.push(travelEvent, taskEvent);
-            }
-          } catch(e) {
-            console.error("Error parsing schedule time for order:", mappedOrder.id, e);
-          }
-        }
-        
-        if (staffMember) {
-            const lastUpdateStr = findKey(rawOrder, ['最終更新日時']);
-            const lastUpdate = lastUpdateStr ? new Date(lastUpdateStr) : new Date(0);
-
-            const currentStatus = staffStatusMap.get(staffMember.id)!;
-            const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
-            
-            if (lastUpdate.getTime() >= currentUpdate.getTime()) {
-                const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）']) || '';
-                const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
-                
-                staffStatusMap.set(staffMember.id, {
-                    staffId: staffMember.id,
-                    status: findKey(rawOrder, ['受注ステータス']) || '待機中',
-                    lastAction: `[${findKey(rawOrder, ['受注 ID', 'id'])}] ${findKey(rawOrder, ['受注ステータス'])}`,
-                    latitude: !isNaN(lat) ? lat : undefined,
-                    longitude: !isNaN(lon) ? lon : undefined,
-                    lastUpdate: lastUpdate.toISOString(),
-                });
-            }
-        }
-      });
-      
-      setErrorState(null);
-      setOrdersState(newRawOrderData);
-      setScheduleEvents(newScheduleEvents);
-      setStatuses(Array.from(staffStatusMap.values()));
-
     } catch (e: any) {
       console.error("Failed to fetch or process order data from GAS:", e);
       setErrorState(`受注データの取得または処理に失敗しました: ${e.message}`);
-      setOrdersState([]);
+      setRawOrdersData([]);
       setScheduleEvents([]);
       setStatuses([]);
     } finally {
       setIsLoading(false);
     }
-  }, [orderGasUrl, allStaff, isStaffLoading]);
-
+  }, [orderGasUrl, isStaffLoading]);
 
   useEffect(() => {
-    if (!isStaffLoading && allStaff.length > 0) {
-      fetchAndProcessData();
-    } else if (!isStaffLoading) {
-      // If staff loading is done but there's no staff, we should stop loading.
-      setIsLoading(false);
+    fetchAndProcessData();
+  }, [fetchAndProcessData]);
+
+  useEffect(() => {
+    if (isStaffLoading || allStaff.length === 0) {
+      return;
     }
-  }, [isStaffLoading, allStaff, fetchAndProcessData]);
+
+    const newScheduleEvents: WithId<ScheduleEvent>[] = [];
+    const staffStatusMap = new Map<string, StaffStatus>();
+
+    allStaff.forEach(sf => {
+      staffStatusMap.set(sf.id, {
+        staffId: sf.id,
+        status: '待機中',
+        lastAction: '情報なし',
+      });
+    });
+
+    rawOrdersData.forEach((rawOrder: any) => {
+      const mappedOrder = mapRawToOrder(rawOrder);
+      const staffName = mappedOrder.staffName;
+      const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
+      const scheduledTimeStr = mappedOrder.scheduledTime;
+      
+      if (staffMember && scheduledTimeStr) {
+        try {
+          const scheduledTime = parseISO(scheduledTimeStr);
+
+          if (isValid(scheduledTime)) {
+              const tripId = `trip-${mappedOrder.rawOrderId}`;
+
+              const taskEvent: WithId<ScheduleEvent> = {
+                  ...mappedOrder,
+                  id: `${tripId}-task`,
+                  tripId,
+                  orderId: mappedOrder.id,
+                  title: mappedOrder.taskDetails,
+                  staffId: staffMember.id,
+                  locationId: mappedOrder.customerCode || '',
+                  start: scheduledTime.toISOString(),
+                  end: addMinutes(scheduledTime, mappedOrder.estimatedDuration).toISOString(),
+              };
+
+              const travelEvent: WithId<ScheduleEvent> = {
+                  ...mappedOrder,
+                  id: `${tripId}-travel`,
+                  tripId,
+                  orderId: mappedOrder.id,
+                  title: `移動: ${mappedOrder.customerName || mappedOrder.taskDetails.split('\n')[0]}`,
+                  staffId: staffMember.id,
+                  locationId: mappedOrder.customerCode || '',
+                  start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
+                  end: scheduledTime.toISOString(),
+              };
+              newScheduleEvents.push(travelEvent, taskEvent);
+          }
+        } catch(e) {
+          console.error("Error parsing schedule time for order:", mappedOrder.id, e);
+        }
+      }
+      
+      if (staffMember) {
+          const lastUpdateStr = findKey(rawOrder, ['最終更新日時']);
+          const lastUpdate = lastUpdateStr ? new Date(lastUpdateStr) : new Date(0);
+
+          const currentStatus = staffStatusMap.get(staffMember.id)!;
+          const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
+          
+          if (lastUpdate.getTime() >= currentUpdate.getTime()) {
+              const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）']) || '';
+              const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
+              
+              staffStatusMap.set(staffMember.id, {
+                  staffId: staffMember.id,
+                  status: findKey(rawOrder, ['受注ステータス']) || '待機中',
+                  lastAction: `[${findKey(rawOrder, ['受注 ID', 'id'])}] ${findKey(rawOrder, ['受注ステータス'])}`,
+                  latitude: !isNaN(lat) ? lat : undefined,
+                  longitude: !isNaN(lon) ? lon : undefined,
+                  lastUpdate: lastUpdate.toISOString(),
+              });
+          }
+      }
+    });
+
+    setScheduleEvents(newScheduleEvents);
+    setStatuses(Array.from(staffStatusMap.values()));
+    
+  }, [rawOrdersData, allStaff, isStaffLoading]);
+
 
   const value = {
-    orders,
-    setOrders: setOrdersState,
+    rawOrdersData,
     scheduleEvents,
     setScheduleEvents,
     statuses,
