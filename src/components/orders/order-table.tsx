@@ -46,18 +46,22 @@ const formatTime = (timeString: string) => {
     if (!timeString) return '';
     
     // Handle time formatted as a full date string (e.g., from Sheets)
-    const date = new Date(timeString);
-    if (isValid(date)) {
-        // Check if it's a "zero" date from Sheets for a time-only value
-        if (date.getFullYear() === 1899) {
+    try {
+        const date = parseISO(timeString);
+         if (isValid(date)) {
+            // Check if it's a "zero" date from Sheets for a time-only value like 1899-12-30...
+            if (date.getFullYear() < 1970) {
+                return format(date, 'HH:mm');
+            }
             return format(date, 'HH:mm');
         }
-        // If it's a full valid date, maybe we just want the time part
-        return format(date, 'HH:mm');
+    } catch(e) {
+        // Ignore parse error and proceed
     }
 
+
     // Handle HH:mm string
-    const timeRegex = /^\d{2}:\d{2}$/;
+    const timeRegex = /^\d{1,2}:\d{2}$/;
     if(timeRegex.test(timeString)) {
         return timeString;
     }
@@ -111,11 +115,11 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const getFormattedValue = (order: any, header: string) => {
       const dbKeys: Record<string, string[]> = {
         '受注ID': ['受注 ID', '受注id', 'id'],
-        'お取引先名': ['お取引先名', '店舗'],
-        '機材有無': ['機材有無'],
-        '作業予定日': ['作業予定日'],
-        '予定時間': ['予定時間', 'チップ配置作業予定'],
-        'タイヤサイズ': ['タイヤサイズ', 'サイズ'],
+        'お取引先名': ['お取引先名', '店舗', 'customerName'],
+        '機材有無': ['機材有無', 'equipmentStatus'],
+        '作業予定日': ['作業予定日', 'scheduledDate'],
+        '予定時間': ['予定時間', 'scheduledTime'],
+        'タイヤサイズ': ['タイヤサイズ', 'tireSize'],
         '本数': ['本数'],
         '担当': ['担当', 'staffName'],
         '受注ステータス': ['受注ステータス', 'status'],
@@ -237,4 +241,3 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     </Card>
   );
 }
-
