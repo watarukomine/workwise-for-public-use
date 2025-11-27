@@ -202,8 +202,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
             <TableHeader>
               <TableRow>
                 {headers.map(header => 
-                  <TableHead key={header} className="h-40 p-2 text-xs">
-                    <div className="[writing-mode:vertical-rl] flex items-center justify-center whitespace-nowrap">
+                  <TableHead key={header} className="h-40 p-2 text-left">
+                    <div className="[writing-mode:vertical-rl]">
                         {header.split('\n').map((line, index) => <div key={index}>{line}</div>)}
                     </div>
                   </TableHead>
@@ -228,7 +228,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     >
                       {headers.map(header => {
                         const cellContent = getFormattedValue(order, header);
-                        return <TableCell key={header} className="text-center align-middle whitespace-nowrap">{cellContent}</TableCell>
+                        return <TableCell key={header} className="whitespace-nowrap">{cellContent}</TableCell>
                       })}
                     </TableRow>
                   )
