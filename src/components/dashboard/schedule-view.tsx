@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -315,7 +316,7 @@ export function ScheduleView({
 
         const scheduledDate = parseISO(workDate);
         return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
-    }).map(o => mapRawToOrder(o));
+    }).map(o => mapRawToOrder(o, staffData));
 
     setUnassignedOrders(newUnassignedOrders);
   }, [rawOrdersData, currentDate, scheduleData, staffData]);
@@ -348,8 +349,6 @@ export function ScheduleView({
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
       if (!eventToUnassign.rawOrderId) return;
       
-      setScheduleData(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
-
       try {
         await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
@@ -378,7 +377,6 @@ export function ScheduleView({
     
     if (!item || !over) return;
     
-    // --- Dropping back to unassigned area ---
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         if (item.rawOrderId) {
           await unassignTask(item);
@@ -406,69 +404,36 @@ export function ScheduleView({
     
     const newStart = getNewStartFromDrop();
 
-    // --- Moving an existing event ---
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
         
-        // Optimistic UI update
-        setScheduleData(prev => {
-            const isTripEvent = !!draggedEvent.tripId;
-            if (isTripEvent) {
-                const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
-                const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
-                const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
-                
-                const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
-                const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
-
-                let newTaskStart = newStart;
-                if (draggedEvent.id.endsWith('-travel') && travelEvent) {
-                    newTaskStart = addMinutes(newStart, travelDuration);
+        try {
+            if (draggedEvent.rawOrderId) {
+                let taskStart = newStart;
+                if(draggedEvent.id.endsWith('-travel')) {
+                    const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                    taskStart = addMinutes(newStart, travelDuration);
                 }
-                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
-                const newTravelStart = subMinutes(newTaskStart, travelDuration);
-                
-                return prev.map(e => {
-                    if (e.tripId !== draggedEvent.tripId) return e;
-                    if (e.id.endsWith('-task')) {
-                        return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-                    }
-                    if (e.id.endsWith('-travel')) {
-                        return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-                    }
-                    return e;
+                const newStaff = getStaffById(newStaffId);
+                await updateSheetStatus({
+                    gasUrl: ORDER_GAS_URL,
+                    eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+                    staffName: newStaff?.name,
+                    scheduledTime: taskStart.toISOString(),
                 });
-
-            } else { // Moving a generic event
+                toast({ title: "スケジュールを更新しました" });
+                await refetchOrders();
+            } else {
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                 const newEnd = addMinutes(newStart, duration);
-                return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+                const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
+                setScheduleData(prev => prev.map(e => e.id === draggedEvent.id ? updatedEvent : e));
+                toast({ title: "汎用タスクを移動しました" });
             }
-        });
-        
-        (async () => {
-            try {
-                if (draggedEvent.rawOrderId) {
-                    let taskStart = newStart;
-                    if(draggedEvent.id.endsWith('-travel')) {
-                        const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                        taskStart = addMinutes(newStart, travelDuration);
-                    }
-                    const newStaff = getStaffById(newStaffId);
-                    await updateSheetStatus({
-                        gasUrl: ORDER_GAS_URL,
-                        eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                        staffName: newStaff?.name,
-                        scheduledTime: taskStart.toISOString(),
-                    });
-                }
-                toast({ title: "スケジュールを更新しました" });
-            } catch (e: any) {
-                toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
-            } finally {
-                await refetchOrders();
-            }
-        })();
+        } catch (e: any) {
+            toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
+            await refetchOrders();
+        }
     
     } else if ('estimatedDuration' in item) {
         const order = item as WithId<Order>;
@@ -490,26 +455,24 @@ export function ScheduleView({
              setScheduleData(prev => [...prev, newEvent]);
              toast({ title: "汎用タスクを追加しました" });
         } else {
-            (async () => {
-                try {
-                    await updateSheetStatus({
-                        gasUrl: ORDER_GAS_URL,
-                        eventTitle: `(ID: ${order.rawOrderId})`,
-                        staffName: staff.name,
-                        statusValue: '作業待ち',
-                        scheduledTime: newStart.toISOString(),
-                        timestamp: new Date().toISOString(),
-                    });
-                    toast({ title: "タスクを割り当てました" });
-                } catch (e: any) {
-                    toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                } finally {
-                    await refetchOrders();
-                }
-            })();
+            try {
+                await updateSheetStatus({
+                    gasUrl: ORDER_GAS_URL,
+                    eventTitle: `(ID: ${order.rawOrderId})`,
+                    staffName: staff.name,
+                    statusValue: '作業待ち',
+                    scheduledTime: newStart.toISOString(),
+                    timestamp: new Date().toISOString(),
+                });
+                toast({ title: "タスクを割り当てました" });
+                await refetchOrders();
+            } catch (e: any) {
+                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+            }
         }
     }
   };
+
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
     setEditedEventDetails({
         title: event.title || '',
@@ -552,9 +515,6 @@ export function ScheduleView({
 
     try {
         if (dialogState.mode === 'new') {
-            const staff = getStaffById(dialogState.staffId);
-            if (!staff) throw new Error("担当スタッフが見つかりません。");
-            
             const newEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}`,
                 title, description,
@@ -566,7 +526,7 @@ export function ScheduleView({
             setScheduleData(prev => [...prev, newEvent]);
 
         } else if (dialogState.mode === 'edit') {
-            if (dialogState.event.rawOrderId) { // Sheet-based event
+            if (dialogState.event.rawOrderId) {
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
@@ -575,11 +535,12 @@ export function ScheduleView({
                 });
                 await refetchOrders();
 
-            } else { // Generic event
+            } else {
                 const updatedEvent = { ...dialogState.event, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
                 setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
             }
         }
+        toast({ title: '保存しました' });
         setDialogState({ mode: 'closed' });
     } catch (e: any) {
         toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });
@@ -807,7 +768,6 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
 
   return (
     <div className={cn("flex relative", areaBgClass)}>
-      {/* Staff Name Cell */}
       <div className={cn("sticky left-0 z-10 flex-shrink-0 px-2 flex items-center border-r h-16", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
             <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
@@ -815,7 +775,6 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
         </div>
       </div>
       
-      {/* Timeline Cell */}
       <div 
         id={`staff-row-${staff.id}`}
         ref={setNodeRef} 
@@ -836,7 +795,6 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
         </div>
       </div>
 
-      {/* Status Cell */}
       <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
         {status && isToday(new Date()) && (
           <div className="text-sm text-center font-semibold">

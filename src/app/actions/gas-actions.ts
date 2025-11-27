@@ -77,28 +77,3 @@ export async function updateSheetStatus(args: {
 }): Promise<GasResponse> {
     return callGasApi(args);
 }
-
-export async function handleCalendarEvent(args: {
-    gasUrl: string;
-    operation: 'create' | 'update' | 'delete';
-    calendarId: string;
-    eventId?: string;
-    title?: string;
-    description?: string;
-    startTime?: string;
-    endTime?: string;
-}): Promise<GasResponse> {
-    return callGasApi(args);
-}
-
-export async function sendIcsViaGmail(args: {
-    gasUrl: string;
-    recipient: string;
-    title?: string;
-    description?: string;
-    startTime?: string;
-    endTime?: string;
-    location?: string;
-}): Promise<GasResponse> {
-    return callGasApi({ ...args, operation: 'sendIcs' });
-}

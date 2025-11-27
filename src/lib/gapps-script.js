@@ -79,14 +79,12 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
-    if (params.operation === 'sendIcs') {
-      return sendIcsEmail(params);
-    } else if (params.eventTitle) { // Update sheet from app
+    if (params.eventTitle) { // Update sheet from app
       return updateSheetWithOrderInfo(params);
     } else {
       return ContentService.createTextOutput(JSON.stringify({
         status: "error",
-        message: "必要なパラメータ (operation または eventTitle) がありません"
+        message: "必要なパラメータ (eventTitle) がありません"
       })).setMimeType(ContentService.MimeType.JSON);
     }
   } catch (error) {
@@ -185,75 +183,6 @@ function updateSheetWithOrderInfo(params) {
     return ContentService.createTextOutput(JSON.stringify({
       status: "error",
       message: error.message
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * Creates and sends an iCalendar event via Gmail.
- */
-function sendIcsEmail(params) {
-  const { recipient, title, description, startTime, endTime, location } = params;
-
-  if (!recipient || !title || !startTime || !endTime) {
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: "iCalメールの送信には、recipient, title, startTime, endTime が必要です。"
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-
-  try {
-    const start = new Date(startTime);
-    const end = new Date(endTime);
-    const now = new Date();
-
-    // Format dates for iCalendar
-    const formatDateForIcs = (date) => {
-      return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-    };
-
-    const icsContent = [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//WorkWise//EN',
-      'BEGIN:VEVENT',
-      'UID:' + Utilities.getUuid(),
-      'DTSTAMP:' + formatDateForIcs(now),
-      'DTSTART:' + formatDateForIcs(start),
-      'DTEND:' + formatDateForIcs(end),
-      'SUMMARY:' + title,
-      'DESCRIPTION:' + (description || ''),
-      'LOCATION:' + (location || ''),
-      'END:VEVENT',
-      'END:VCALENDAR'
-    ].join('\r\n');
-    
-    const icsBlob = Utilities.newBlob(icsContent, 'text/calendar', 'invite.ics');
-
-    const mailOptions = {
-      attachments: [icsBlob],
-      htmlBody: `
-        <p>新しい予定が追加されました。</p>
-        <p><b>件名:</b> ${title}</p>
-        <p><b>日時:</b> ${start.toLocaleString('ja-JP')} - ${end.toLocaleString('ja-JP')}</p>
-        ${description ? `<p><b>詳細:</b><br>${description.replace(/\n/g, '<br>')}</p>` : ''}
-        ${location ? `<p><b>場所:</b> ${location}</p>` : ''}
-        <p>添付のiCalendarファイルを開いて、カレンダーに予定を追加してください。</p>
-      `
-    };
-
-    GmailApp.sendEmail(recipient, `【WorkWise】予定の通知: ${title}`, '', mailOptions);
-
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "success",
-      message: `iCalメールを ${recipient} に送信しました。`
-    })).setMimeType(ContentService.MimeType.JSON);
-
-  } catch (error) {
-    console.error("Error in sendIcsEmail:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: `iCalメールの送信に失敗しました: ${error.message}`
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
