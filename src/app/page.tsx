@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
 import { StatusUpdates } from '@/components/dashboard/status-updates';
-import type { Customer, WithId, Staff, Order } from '@/lib/types';
+import type { Customer, WithId, Staff, Order, StaffStatus, ScheduleEvent } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -12,7 +12,7 @@ import { AlertCircle, ChevronLeft, ChevronRight, Monitor, Smartphone } from 'luc
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { format, startOfToday, addDays, subDays, isToday } from 'date-fns';
+import { format, startOfToday, addDays, subDays, isToday, isEqual, startOfDay, parseISO, isValid, addMinutes, subMinutes } from 'date-fns';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { VerticalScheduleView } from '@/components/dashboard/vertical-schedule-view';
 import { Switch } from '@/components/ui/switch';
@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
 
+const TRAVEL_TIME_MINUTES = 30;
 
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
@@ -62,27 +63,75 @@ export default function DashboardPage() {
 
   }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
   
-  const filteredStatuses: StaffStatus[] = React.useMemo(() => {
-      if (!filteredStaff.length || !orders.length) {
-          return filteredStaff.map(sf => ({
+  const { scheduleEvents, unassignedOrders, statuses } = React.useMemo(() => {
+      const scheduleEvents: WithId<ScheduleEvent>[] = [];
+      const unassignedOrders: WithId<Order>[] = [];
+      const staffStatusMap = new Map<string, StaffStatus>();
+
+      filteredStaff.forEach(sf => {
+          staffStatusMap.set(sf.id, {
               staffId: sf.id,
               status: '待機中',
               lastAction: '現在地情報なし',
-          }));
-      }
-  
-      const staffStatusMap = new Map<string, StaffStatus>();
-  
-      // Initialize with default status
-      for (const staff of filteredStaff) {
-          staffStatusMap.set(staff.id, {
-              staffId: staff.id,
-              status: '待機中',
-              lastAction: '現在地情報なし',
           });
+      });
+
+      if (allStaff.length > 0) {
+        orders.forEach((order: WithId<Order>) => {
+          const staff = order.staffName ? allStaff.find(s => s.name === order.staffName) : undefined;
+          const scheduledTimeStr = order.scheduledTime;
+          const scheduledDateStr = order.scheduledDate;
+
+          if (staff && scheduledTimeStr && scheduledDateStr) {
+            try {
+              const scheduledDate = parseISO(scheduledDateStr);
+              const [hours, minutes] = scheduledTimeStr.split(':').map(Number);
+              if (isNaN(hours) || isNaN(minutes)) throw new Error("Invalid time format");
+              const taskStart = new Date(scheduledDate);
+              taskStart.setHours(hours, minutes, 0, 0);
+
+              if (isValid(taskStart)) {
+                  const tripId = `trip-${order.rawOrderId}`;
+
+                  const taskEvent: WithId<ScheduleEvent> = {
+                      ...order,
+                      id: `${tripId}-task`,
+                      tripId,
+                      orderId: order.id,
+                      title: order.taskDetails,
+                      staffId: staff.id,
+                      locationId: order.customerCode || '',
+                      start: taskStart.toISOString(),
+                      end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
+                  };
+
+                  const travelEvent: WithId<ScheduleEvent> = {
+                      ...order,
+                      id: `${tripId}-travel`,
+                      tripId,
+                      orderId: order.id,
+                      title: `移動: ${order.customerName || order.taskDetails.split('\\n')[0]}`,
+                      staffId: staff.id,
+                      locationId: order.customerCode || '',
+                      start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(),
+                      end: taskStart.toISOString(),
+                  };
+                  scheduleEvents.push(travelEvent, taskEvent);
+              } else {
+                  unassignedOrders.push(order);
+              }
+            } catch(e) {
+              unassignedOrders.push(order);
+            }
+          } else {
+              unassignedOrders.push(order);
+          }
+        });
       }
-      return Array.from(staffStatusMap.values());
-    }, [filteredStaff, orders]);
+      
+      const statuses = Array.from(staffStatusMap.values());
+      return { scheduleEvents, unassignedOrders, statuses };
+  }, [orders, allStaff, filteredStaff]);
 
 
   const selectedStaffNames = React.useMemo(() => {
@@ -177,19 +226,20 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         {showVerticalView ? (
             <VerticalScheduleView 
-                scheduleData={[]} // This view is not fully implemented with new data flow
+                scheduleData={scheduleEvents}
                 staffData={filteredStaff}
                 currentDate={currentDate}
             />
         ) : (
             <ScheduleView 
                 staffData={filteredStaff} 
-                orders={orders}
+                orders={unassignedOrders}
+                scheduleEvents={scheduleEvents}
                 currentDate={currentDate}
-                statuses={filteredStatuses}
+                statuses={statuses}
             />
         )}
-        {isToday(currentDate) && <StatusUpdates staffData={filteredStaff} statuses={filteredStatuses} />}
+        {isToday(currentDate) && <StatusUpdates staffData={filteredStaff} statuses={statuses} />}
       </div>
     </div>
   );
