@@ -24,12 +24,8 @@ export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
   
   const { 
-    scheduleEvents, 
-    setScheduleEvents, 
-    unassignedOrders, 
-    setUnassignedOrders, 
+    rawOrdersData,
     isLoading: isLoadingOrders, 
-    orders,
     statuses
   } = useOrder();
   
@@ -160,7 +156,6 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-8">
         {showVerticalView ? (
             <VerticalScheduleView 
-                scheduleData={scheduleEvents}
                 staffData={filteredStaff}
                 currentDate={currentDate}
             />
@@ -168,11 +163,7 @@ export default function DashboardPage() {
             <ScheduleView 
                 staffData={filteredStaff} 
                 customerData={allCustomers || []} 
-                scheduleData={scheduleEvents}
-                setScheduleData={setScheduleEvents}
-                rawOrdersData={orders}
-                unassignedOrders={unassignedOrders}
-                setUnassignedOrders={setUnassignedOrders}
+                rawOrdersData={rawOrdersData}
                 currentDate={currentDate}
             />
         )}
