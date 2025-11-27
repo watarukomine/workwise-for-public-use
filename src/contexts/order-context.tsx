@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
@@ -36,6 +37,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       return;
     }
     
+    // Don't start fetching until staff data is available.
+    if (isStaffLoading) {
+      return;
+    }
+
     setIsLoading(true);
     setErrorState(null);
 
@@ -44,7 +50,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       if (result.error && result.message) throw new Error(result.message);
       
       const rawOrderData = result.data || (Array.isArray(result) ? result : []);
-      const mappedOrders = rawOrderData.map(mapRawToOrder);
+      // Pass allStaff to mapRawToOrder to correctly find staff names
+      const mappedOrders = rawOrderData.map((order: any) => mapRawToOrder(order, allStaff));
       setOrdersState(mappedOrders);
 
     } catch (e: any) {
@@ -54,14 +61,12 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [orderGasUrl]);
+  }, [orderGasUrl, allStaff, isStaffLoading]);
 
 
   useEffect(() => {
-    if (!isStaffLoading) {
-      fetchAndProcessData();
-    }
-  }, [fetchAndProcessData, isStaffLoading]);
+    fetchAndProcessData();
+  }, [fetchAndProcessData]);
 
   const value = {
     orders,

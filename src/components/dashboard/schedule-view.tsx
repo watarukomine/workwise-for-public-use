@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -47,10 +48,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { updateSheetStatus, sendIcsViaGmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
-import * as ics from 'ics';
+import { useOrder } from '@/contexts/order-context';
 import { CalendarPlus, Mail } from 'lucide-react';
-import { useCustomer } from '@/contexts/customer-context';
-
 
 const PIXELS_PER_MINUTE = 1.2;
 const timelineStartHour = 9;
@@ -85,10 +84,10 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
     return { left: 0, width: minutesToPixels(60) }; 
   }
   
-  const startOfDay = new Date(start);
-  startOfDay.setHours(timelineStartHour, 0, 0, 0);
+  const startOfTimeline = new Date(start);
+  startOfTimeline.setHours(timelineStartHour, 0, 0, 0);
 
-  const leftInMinutes = differenceInMinutes(start, startOfDay);
+  const leftInMinutes = differenceInMinutes(start, startOfTimeline);
   const widthInMinutes = differenceInMinutes(end, start);
 
   return {
@@ -187,7 +186,8 @@ type EditedEventDetails = {
 
 interface ScheduleViewProps {
     staffData: WithId<Staff>[];
-    orders: WithId<Order>[];
+    orders: WithId<Order>[]; // unassigned orders
+    scheduleEvents: WithId<ScheduleEvent>[];
     currentDate: Date;
     statuses: StaffStatus[];
 }
@@ -239,11 +239,10 @@ function UnassignedTasks({ orders, date }: { orders: WithId<Order>[], date: Date
         const orderDateStr = order.scheduledDate;
         if (!orderDateStr) return false;
         
-        // Ensure comparison is done in the same format
         const orderDate = parseISO(orderDateStr);
         if (!isValid(orderDate)) return false;
 
-        return format(orderDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+        return isEqual(startOfDay(orderDate), startOfDay(date));
     });
 
     return (
@@ -314,13 +313,23 @@ const TimeIndicator = () => {
 export function ScheduleView({ 
     staffData, 
     orders,
+    scheduleEvents: initialScheduleEvents,
     currentDate,
     statuses,
 }: ScheduleViewProps) {
   const [isClient, setIsClient] = React.useState(false);
   const { toast } = useToast();
-  const [scheduleEvents, setScheduleEvents] = React.useState<WithId<ScheduleEvent>[]>([]);
+  const { refetchOrders } = useOrder();
+  
+  const [scheduleEvents, setScheduleEvents] = React.useState<WithId<ScheduleEvent>[]>(initialScheduleEvents);
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>(orders);
+
+  // When initial data from props changes, update the internal state
+  React.useEffect(() => {
+      setScheduleEvents(initialScheduleEvents);
+      setUnassignedOrders(orders);
+  }, [initialScheduleEvents, orders]);
+
 
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
@@ -340,76 +349,6 @@ export function ScheduleView({
           return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
       });
   }, [scheduleEvents, currentDate]);
-
-  const refetchOrders = React.useCallback(async () => {
-    // This is a placeholder. In a real app, you would re-fetch data.
-    // For now, we'll just log it. A real implementation might involve a context update or a server action.
-    console.log("Refetching orders...");
-  }, []);
-
-  React.useEffect(() => {
-    const assignedRawOrderIds = new Set(scheduleEvents.map(e => e.rawOrderId).filter(Boolean));
-    const initialEvents: WithId<ScheduleEvent>[] = [];
-    const stillUnassignedOrders: WithId<Order>[] = [];
-
-    orders.forEach(order => {
-        const staff = staffData.find(s => s.name === order.staffName);
-        const scheduledTimeStr = order.scheduledTime;
-        const scheduledDateStr = order.scheduledDate;
-
-        if (staff && scheduledTimeStr && scheduledDateStr) {
-            try {
-                const scheduledDate = parseISO(scheduledDateStr);
-                const [hours, minutes] = scheduledTimeStr.split(':').map(Number);
-                if (isNaN(hours) || isNaN(minutes)) {
-                    throw new Error("Invalid time format");
-                }
-                const taskStart = new Date(scheduledDate);
-                taskStart.setHours(hours, minutes, 0, 0);
-
-                if (isValid(taskStart)) {
-                    const tripId = `trip-${order.rawOrderId}`;
-
-                    const taskEvent: WithId<ScheduleEvent> = {
-                        ...order,
-                        id: `${tripId}-task`,
-                        tripId,
-                        orderId: order.id,
-                        title: order.taskDetails,
-                        staffId: staff.id,
-                        locationId: order.customerCode || '',
-                        start: taskStart.toISOString(),
-                        end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
-                    };
-
-                    const travelEvent: WithId<ScheduleEvent> = {
-                        ...order,
-                        id: `${tripId}-travel`,
-                        tripId,
-                        orderId: order.id,
-                        title: `移動: ${order.customerName || order.taskDetails.split('\\n')[0]}`,
-                        staffId: staff.id,
-                        locationId: order.customerCode || '',
-                        start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(),
-                        end: taskStart.toISOString(),
-                    };
-
-                    initialEvents.push(travelEvent, taskEvent);
-                } else {
-                    stillUnassignedOrders.push(order);
-                }
-            } catch(e) {
-                 stillUnassignedOrders.push(order);
-            }
-        } else {
-            stillUnassignedOrders.push(order);
-        }
-    });
-
-    setScheduleEvents(initialEvents);
-    setUnassignedOrders(stillUnassignedOrders);
-  }, [orders, staffData]);
-
 
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
@@ -438,8 +377,6 @@ export function ScheduleView({
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
       if (!eventToUnassign.rawOrderId) return;
       
-      setScheduleEvents(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
-
       try {
         await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
@@ -451,16 +388,16 @@ export function ScheduleView({
         });
         
         toast({ title: 'タスクを未割り当てに戻しました' });
+        refetchOrders(); // Re-fetch all data to ensure consistency
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
       }
-      // No refetch here, optimistic update is enough for unassignment
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
+    const item = active.data.current as (WithId<Order> & {isOrder?: boolean}) | WithId<ScheduleEvent>;
 
     setActiveItem(null);
     setCurrentOverStaffId(null);
@@ -497,42 +434,39 @@ export function ScheduleView({
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
         
-        setScheduleEvents(prev => {
-            const isTripEvent = !!draggedEvent.tripId;
-            if (isTripEvent) {
-                const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
-                const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
-                const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
-                
-                const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
-                const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
+        // Optimistic UI update
+        const isTripEvent = !!draggedEvent.tripId;
+        let newEvents;
+        if (isTripEvent) {
+            newEvents = scheduleEvents.map(e => {
+                if (e.tripId !== draggedEvent.tripId) return e;
+
+                const taskDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                const travelDuration = e.id.endsWith('-travel') ? differenceInMinutes(parseISO(e.end as string), parseISO(e.start as string)) : TRAVEL_TIME_MINUTES;
 
                 let newTaskStart = newStart;
-                if (draggedEvent.id.endsWith('-travel') && travelEvent) {
+                if (draggedEvent.id.endsWith('-travel')) {
                     newTaskStart = addMinutes(newStart, travelDuration);
                 }
                 const newTaskEnd = addMinutes(newTaskStart, taskDuration);
                 const newTravelStart = subMinutes(newTaskStart, travelDuration);
-                
-                return prev.map(e => {
-                    if (e.tripId !== draggedEvent.tripId) return e;
-                    const newEvent = { ...e, staffId: newStaffId };
-                    if (e.id.endsWith('-task')) {
-                        return { ...newEvent, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-                    }
-                    if (e.id.endsWith('-travel')) {
-                        return { ...newEvent, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-                    }
-                    return newEvent;
-                });
 
-            } else { // Moving a generic event
-                const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                const newEnd = addMinutes(newStart, duration);
-                return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
-            }
-        });
+                if (e.id.endsWith('-task')) {
+                    return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+                }
+                if (e.id.endsWith('-travel')) {
+                    return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                }
+                return e;
+            });
+        } else { // Generic event
+            const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+            const newEnd = addMinutes(newStart, duration);
+            newEvents = scheduleEvents.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+        }
+        setScheduleEvents(newEvents);
         
+        // Backend update
         (async () => {
             try {
                 if (draggedEvent.rawOrderId && !draggedEvent.rawOrderId.startsWith('generic-')) {
@@ -550,9 +484,10 @@ export function ScheduleView({
                     });
                 }
                 toast({ title: "スケジュールを更新しました" });
+                refetchOrders();
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
-                await refetchOrders(); // Revert on failure
+                refetchOrders(); // Revert on failure
             }
         })();
     
@@ -565,6 +500,7 @@ export function ScheduleView({
         
         if (isGeneric) {
              const newEvent: WithId<ScheduleEvent> = {
+                ...order,
                 id: `event-${Date.now()}`,
                 title: order.taskDetails,
                 description: '',
@@ -572,13 +508,11 @@ export function ScheduleView({
                 locationId: '',
                 start: newStart.toISOString(),
                 end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                ...order,
              };
              setScheduleEvents(prev => [...prev, newEvent]);
              toast({ title: "汎用タスクを追加しました" });
         } else {
              const tripId = `trip-${order.rawOrderId}`;
-             
              const taskEvent: WithId<ScheduleEvent> = {
                 ...order,
                 id: `${tripId}-task`,
@@ -596,7 +530,7 @@ export function ScheduleView({
                 id: `${tripId}-travel`,
                 tripId,
                 orderId: order.id,
-                title: `移動: ${order.customerName || order.taskDetails.split('\\n')[0]}`,
+                title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
                 staffId: newStaffId,
                 locationId: order.customerCode || '',
                 start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(),
@@ -618,10 +552,10 @@ export function ScheduleView({
                         timestamp: new Date().toISOString(),
                     });
                     toast({ title: "タスクを割り当てました" });
+                    refetchOrders();
                 } catch (e: any) {
                     toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                    setScheduleEvents(prev => prev.filter(e => e.tripId !== tripId));
-                    setUnassignedOrders(prev => [...prev, order]);
+                    refetchOrders(); // Revert on failure
                 }
             })();
         }
@@ -648,9 +582,9 @@ export function ScheduleView({
     const clickX = e.clientX - timelineRect.left;
     const clickMinutes = pixelsToMinutes(clickX);
     
-    const startOfDay = new Date(currentDate);
-    startOfDay.setHours(timelineStartHour, 0, 0, 0);
-    const newStart = addMinutes(startOfDay, clickMinutes);
+    const startOfTimelineDay = new Date(currentDate);
+    startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
+    const newStart = addMinutes(startOfTimelineDay, clickMinutes);
 
     setEditedEventDetails({ title: '', description: '', startTime: formatTime(newStart), endTime: formatTime(addMinutes(newStart, 60)) });
     setDialogState({ mode: 'new', staffId, start: newStart });
@@ -681,6 +615,17 @@ export function ScheduleView({
                 locationId: '',
                 start: newStart.toISOString(),
                 end: newEnd.toISOString(),
+                 // Fill required Order properties for the type
+                rawOrderId: `generic-${Date.now()}`,
+                customerCode: '',
+                customerName: '',
+                address: '',
+                taskDetails: title,
+                serviceType: '',
+                status: '作業待ち',
+                scheduledDate: currentDate.toISOString(),
+                estimatedDuration: differenceInMinutes(newEnd, newStart),
+                value: 0,
             };
             setScheduleEvents(prev => [...prev, newEvent]);
 
@@ -737,7 +682,7 @@ export function ScheduleView({
                 description: event.description,
                 startTime: (event.start as Date | string).toString(),
                 endTime: (event.end as Date | string).toString(),
-                location: event.locationId, // Assuming locationId is address for now
+                location: event.address,
             });
              if (result.status === 'error') throw new Error(result.message);
             toast({ title: 'iCalメールを送信しました', description: `${staff.name}宛に予定を送信しました。` });
@@ -746,41 +691,6 @@ export function ScheduleView({
             toast({ variant: 'destructive', title: '送信エラー', description: `iCalメールの送信に失敗しました: ${e.message}` });
         }
     }
-
-  const handleSendIcal = () => {
-    if (dialogState.mode !== 'edit') return;
-    const { event } = dialogState;
-
-    const start = parseISO(event.start as string);
-    const end = parseISO(event.end as string);
-
-    const icsEvent: ics.EventAttributes = {
-      title: event.title,
-      description: event.description,
-      start: [start.getFullYear(), start.getMonth() + 1, start.getDate(), start.getHours(), start.getMinutes()],
-      end: [end.getFullYear(), end.getMonth() + 1, end.getDate(), end.getMinutes()],
-      location: event.locationId,
-      status: 'CONFIRMED',
-      organizer: { name: 'WorkWise', email: 'noreply@workwise.app' },
-    };
-
-    ics.createEvent(icsEvent, (error, value) => {
-      if (error) {
-        toast({ variant: 'destructive', title: 'iCal作成エラー', description: error.message });
-        return;
-      }
-
-      const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `${event.title.replace(/ /g, '_')}.ics`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast({ title: 'iCalファイルをダウンロードしました' });
-    });
-  };
-
 
   const getDialogDetails = () => {
     if (dialogState.mode === 'edit') {
@@ -963,7 +873,6 @@ export function ScheduleView({
                       <div className="flex gap-2">
                           {dialogState.mode === 'edit' && (
                             <>
-                              <Button variant="outline" size="sm" onClick={handleSendIcal}><CalendarPlus className="mr-2 h-4 w-4" /> iCal</Button>
                               <Button variant="outline" size="sm" onClick={handleSendIcalMail}><Mail className="mr-2 h-4 w-4" /> メール</Button>
                               <Button variant="destructive" size="sm" onClick={handleDeleteEvent}>削除</Button>
                             </>
@@ -1130,22 +1039,21 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, onClick, 
         {...attributes}
         onClick={handleClick}
         className={cn(
-          "absolute h-12 top-1/2 -translate-y-1/2 rounded-lg border p-2 shadow-sm transition-all flex items-center cursor-grab active:cursor-grabbing active:shadow-lg active:scale-105",
+          "absolute h-12 top-1/2 -translate-y-1/2 rounded-lg border p-1 shadow-sm transition-all flex items-center cursor-grab active:cursor-grabbing active:shadow-lg",
           isOverlay ? "" : "transition-all duration-200 ease-in-out",
           isDragging && !isOverlay && "opacity-30 shadow-2xl scale-105"
         )}
         data-event-chip="true"
       >
-        <div className="flex h-full w-1.5 flex-shrink-0 rounded-full bg-current mr-2"></div>
+        <div className="flex h-full w-1.5 flex-shrink-0 rounded-full bg-current mr-2" style={{ backgroundColor: staff.color }}></div>
         <div
           className="w-full h-full rounded-md flex flex-col justify-center"
-          style={divStyle}
         >
-          <p className="text-xs font-semibold truncate pointer-events-none">
+          <p className="text-xs font-semibold truncate pointer-events-none" style={{ color: divStyle.color }}>
             {line1}
           </p>
           {line2 && (
-            <p className="text-xs opacity-80 truncate pointer-events-none">
+            <p className="text-xs opacity-80 truncate pointer-events-none" style={{ color: divStyle.color }}>
                 {line2}
             </p>
           )}

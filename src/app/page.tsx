@@ -19,6 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
+import { findKey } from '@/lib/utils';
 
 const TRAVEL_TIME_MINUTES = 30;
 
@@ -64,15 +65,16 @@ export default function DashboardPage() {
   }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
   
   const { scheduleEvents, unassignedOrders, statuses } = React.useMemo(() => {
-      const scheduleEvents: WithId<ScheduleEvent>[] = [];
-      const unassignedOrders: WithId<Order>[] = [];
+      const newScheduleEvents: WithId<ScheduleEvent>[] = [];
+      const newUnassignedOrders: WithId<Order>[] = [];
       const staffStatusMap = new Map<string, StaffStatus>();
 
+      // Initialize statuses for all filtered staff
       filteredStaff.forEach(sf => {
           staffStatusMap.set(sf.id, {
               staffId: sf.id,
               status: '待機中',
-              lastAction: '現在地情報なし',
+              lastAction: '情報なし',
           });
       });
 
@@ -80,17 +82,13 @@ export default function DashboardPage() {
         orders.forEach((order: WithId<Order>) => {
           const staff = order.staffName ? allStaff.find(s => s.name === order.staffName) : undefined;
           const scheduledTimeStr = order.scheduledTime;
-          const scheduledDateStr = order.scheduledDate;
-
-          if (staff && scheduledTimeStr && scheduledDateStr) {
+          
+          let isAssigned = false;
+          if (staff && scheduledTimeStr) {
             try {
-              const scheduledDate = parseISO(scheduledDateStr);
-              const [hours, minutes] = scheduledTimeStr.split(':').map(Number);
-              if (isNaN(hours) || isNaN(minutes)) throw new Error("Invalid time format");
-              const taskStart = new Date(scheduledDate);
-              taskStart.setHours(hours, minutes, 0, 0);
+              const scheduledTime = parseISO(scheduledTimeStr);
 
-              if (isValid(taskStart)) {
+              if (isValid(scheduledTime)) {
                   const tripId = `trip-${order.rawOrderId}`;
 
                   const taskEvent: WithId<ScheduleEvent> = {
@@ -101,8 +99,8 @@ export default function DashboardPage() {
                       title: order.taskDetails,
                       staffId: staff.id,
                       locationId: order.customerCode || '',
-                      start: taskStart.toISOString(),
-                      end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
+                      start: scheduledTime.toISOString(),
+                      end: addMinutes(scheduledTime, order.estimatedDuration).toISOString(),
                   };
 
                   const travelEvent: WithId<ScheduleEvent> = {
@@ -110,27 +108,55 @@ export default function DashboardPage() {
                       id: `${tripId}-travel`,
                       tripId,
                       orderId: order.id,
-                      title: `移動: ${order.customerName || order.taskDetails.split('\\n')[0]}`,
+                      title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
                       staffId: staff.id,
                       locationId: order.customerCode || '',
-                      start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(),
-                      end: taskStart.toISOString(),
+                      start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
+                      end: scheduledTime.toISOString(),
                   };
-                  scheduleEvents.push(travelEvent, taskEvent);
-              } else {
-                  unassignedOrders.push(order);
+                  newScheduleEvents.push(travelEvent, taskEvent);
+                  isAssigned = true;
               }
             } catch(e) {
-              unassignedOrders.push(order);
+              console.error("Error parsing schedule time for order:", order.id, e);
             }
-          } else {
-              unassignedOrders.push(order);
+          }
+          
+          if (!isAssigned) {
+              newUnassignedOrders.push(order);
+          }
+
+          // Update staff status based on the latest order info
+          if (staff && staffStatusMap.has(staff.id)) {
+            const lastUpdateStr = findKey(order.raw, ['最終更新日時']);
+            if (lastUpdateStr) {
+                const lastUpdate = parseISO(lastUpdateStr);
+                const currentStatus = staffStatusMap.get(staff.id)!;
+                const currentUpdate = currentStatus.lastUpdate ? parseISO(currentStatus.lastUpdate) : new Date(0);
+
+                if (isValid(lastUpdate) && lastUpdate.getTime() >= currentUpdate.getTime()) {
+                    const locationStr: string = findKey(order.raw, ['最終位置情報（緯度,経度）']) || '';
+                    const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
+                    
+                    staffStatusMap.set(staff.id, {
+                        staffId: staff.id,
+                        status: (findKey(order.raw, ['受注ステータス']) || '待機中') as StaffStatus['status'],
+                        lastAction: `[${order.rawOrderId}] ${findKey(order.raw, ['受注ステータス'])}`,
+                        latitude: !isNaN(lat) ? lat : undefined,
+                        longitude: !isNaN(lon) ? lon : undefined,
+                        lastUpdate: lastUpdate.toISOString(),
+                    });
+                }
+            }
           }
         });
       }
       
-      const statuses = Array.from(staffStatusMap.values());
-      return { scheduleEvents, unassignedOrders, statuses };
+      return { 
+        scheduleEvents: newScheduleEvents, 
+        unassignedOrders: newUnassignedOrders, 
+        statuses: Array.from(staffStatusMap.values()) 
+      };
   }, [orders, allStaff, filteredStaff]);
 
 
