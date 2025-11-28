@@ -46,7 +46,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus, sendIcsEmail, handleCalendarEvent } from '@/app/actions/gas-actions';
+import { updateSheetStatus, sendIcsEmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { Mail } from 'lucide-react';
 import { createContext, useContext } from 'react';
@@ -282,7 +282,7 @@ const TimeIndicator = () => {
 };
 
 const RenderDragOverlay = () => {
-    const { active } = useDndContext();
+    const { active, transform } = useDndContext();
     const { getCustomerByCode, getStaffById } = useScheduleView();
 
     const activeItem = active?.data.current;
@@ -290,11 +290,8 @@ const RenderDragOverlay = () => {
     if (!active || !activeItem) return null;
     
     const style: React.CSSProperties = {
-        transform: `translate3d(${active.rect.current.translated?.left ?? 0}px, ${active.rect.current.translated?.top ?? 0}px, 0)`,
+        transform: CSS.Translate.toString(transform),
         pointerEvents: 'none',
-        position: 'fixed',
-        top: 0,
-        left: 0,
     };
 
     return (
@@ -908,7 +905,7 @@ interface DraggableEventProps {
 }
 
 const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, isOverlay }) => {
-  const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({ id: event.id, data: event });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: event.id, data: event });
   const { left, width } = getEventDimensions(event.start, event.end);
 
   const style: React.CSSProperties = isOverlay ? 
@@ -920,6 +917,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         position: 'absolute',
         top: '50%',
         transform: 'translateY(-50%)',
+        zIndex: isDragging ? 'auto' : 50,
       };
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
