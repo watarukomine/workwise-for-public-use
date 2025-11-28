@@ -32,7 +32,7 @@ export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbx1BRiSa4R
  * スタッフ情報が記載されているスプレッドシートのURL。
  * staff/page.tsx のヘッダークリックで開かれます。
  */
-export const STAFF_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Staff sheet URL
+export const STAFF_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo/edit?usp=sharing';
 
 /**
  * 販売店情報が記載されているスプレッドシートのURL。
