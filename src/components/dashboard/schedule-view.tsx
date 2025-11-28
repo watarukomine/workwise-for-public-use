@@ -331,21 +331,23 @@ export function ScheduleView({
       setScheduleData(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
 
       try {
-        await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
-            staffName: "",
-            statusValue: "未割当",
-            scheduledTime: "",
-            timestamp: new Date().toISOString(),
-        });
-        
         const eventsToDelete = prevSchedule.filter(e => e.tripId === eventToUnassign.tripId);
         for (const event of eventsToDelete) {
             if (event.calendarEventId) {
                 await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: event.calendarEventId });
             }
         }
+        
+        await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
+            staffName: "",
+            statusValue: "未割当",
+            scheduledTime: "",
+            taskCalendarEventId: "",
+            travelCalendarEventId: "",
+            timestamp: new Date().toISOString(),
+        });
           
         await refetchOrders();
         toast({ title: 'タスクを未割り当てに戻しました' });
@@ -448,15 +450,9 @@ export function ScheduleView({
             }
 
             if (draggedEvent.rawOrderId) { // Trip-based event
-                await updateSheetStatus({
-                    gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                    scheduledTime: taskStart.toISOString(),
-                    staffName: newStaff.name,
-                });
-                
+                 const tripEvents = prevSchedule.filter(e => e.tripId === draggedEvent.tripId);
+                 
                 if (isStaffChange) {
-                     const tripEvents = prevSchedule.filter(e => e.tripId === draggedEvent.tripId);
                      for (const event of tripEvents) {
                          if (oldStaff.calendarId && event.calendarEventId) {
                             await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: oldStaff.calendarId, eventId: event.calendarEventId });
@@ -482,7 +478,7 @@ export function ScheduleView({
                 }
             }
             toast({ title: "スケジュールを更新しました" });
-        } catch(e: any) {
+        } catch (e: any) {
             toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
             setScheduleData(prevSchedule);
         }
@@ -497,7 +493,7 @@ export function ScheduleView({
         }
 
         const isGeneric = order.id.startsWith('generic-');
-
+        
         try {
             if (isGeneric) {
                 const tempId = `temp-${Date.now()}`;
@@ -549,8 +545,6 @@ export function ScheduleView({
             }
         } catch (e: any) {
              toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-             // No need to rollback UI for new tasks, as they weren't in the state before.
-             // We may need to refetch orders to get the unassigned task back.
              await refetchOrders();
         }
     }
@@ -627,12 +621,6 @@ export function ScheduleView({
             if (!staff || !staff.calendarId) throw new Error("担当スタッフにカレンダーIDが設定されていません。");
             
             if (dialogState.event.rawOrderId) {
-                await updateSheetStatus({
-                    gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
-                    scheduledTime: newStart.toISOString(),
-                    timestamp: new Date().toISOString(),
-                });
                 await refetchOrders();
             } else if(dialogState.event.calendarEventId) { 
                 await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'update', calendarId: staff.calendarId, eventId: dialogState.event.calendarEventId, title, description, startTime: newStart.toISOString(), endTime: newEnd.toISOString() });
