@@ -394,40 +394,41 @@ export function ScheduleView({
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
         
-        // Optimistic UI update
+        // Optimistic UI update for moving events
         setScheduleEvents(prev => {
-            const isTripEvent = !!draggedEvent.tripId;
-            if (isTripEvent) {
-                const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
-                const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
-                const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
-                
-                const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
-                const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
-
-                let newTaskStart = newStart;
-                if (draggedEvent.id.endsWith('-travel') && travelEvent) {
-                    newTaskStart = addMinutes(newStart, travelDuration);
-                }
-                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
-                const newTravelStart = subMinutes(newTaskStart, travelDuration);
-                
-                return prev.map(e => {
-                    if (e.tripId !== draggedEvent.tripId) return e;
-                    if (e.id.endsWith('-task')) {
-                        return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-                    }
-                    if (e.id.endsWith('-travel')) {
-                        return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-                    }
-                    return e;
-                });
-
-            } else { // Moving a generic event
+            const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId);
+            
+            if (!draggedEvent.tripId) { // Generic event
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                 const newEnd = addMinutes(newStart, duration);
-                return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+                const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
+                return [...prev.filter(e => e.id !== draggedEvent.id), updatedEvent];
             }
+
+            // Trip event (from sheet)
+            const originalTripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
+            const taskEvent = originalTripEvents.find(e => e.id.endsWith('-task'))!;
+            const travelEvent = originalTripEvents.find(e => e.id.endsWith('-travel'));
+            
+            const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
+            const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
+
+            let newTaskStart = newStart;
+            if (draggedEvent.id.endsWith('-travel') && travelEvent) {
+                newTaskStart = addMinutes(newStart, travelDuration);
+            }
+
+            const newTaskEnd = addMinutes(newTaskStart, taskDuration);
+            const newTravelStart = subMinutes(newTaskStart, travelDuration);
+            
+            const updatedTaskEvent = { ...taskEvent, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+            const updatedEvents = [updatedTaskEvent];
+            if (travelEvent) {
+                 const updatedTravelEvent = { ...travelEvent, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                 updatedEvents.push(updatedTravelEvent);
+            }
+            
+            return [...otherEvents, ...updatedEvents];
         });
         
         (async () => {
@@ -461,23 +462,15 @@ export function ScheduleView({
         if (!staff) return;
 
         const isGeneric = order.id.startsWith('generic-');
-
+        
         if (isGeneric) {
-             const tempId = `event-temp-${Date.now()}`;
              const newEvent: WithId<ScheduleEvent> = {
-                id: tempId,
+                id: `event-${Date.now()}`,
                 title: order.taskDetails, description: '',
                 staffId: newStaffId, locationId: '',
                 start: newStart.toISOString(),
                 end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                raw: {}, // Add dummy properties to satisfy the type
-                customerCode: '',
-                customerName: '',
-                address: '',
-                serviceType: '',
-                status: '',
-                scheduledDate: '',
-                value: 0
+                ...order,
              };
              setScheduleEvents(prev => [...prev, newEvent]);
              toast({ title: "汎用タスクを追加しました" });
@@ -486,22 +479,22 @@ export function ScheduleView({
              const tripId = `trip-${order.rawOrderId}`;
              const customer = getCustomerByCode(order.customerCode);
              
-             // Optimistic UI Update
              const travelEvent: WithId<ScheduleEvent> = {
                 id: `${tripId}-travel`, tripId,
                 title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
                 staffId: newStaffId, locationId: customer?.id || '',
                 start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString(),
-                rawOrderId: order.rawOrderId, ...order
+                ...order
              };
              const taskEvent: WithId<ScheduleEvent> = {
                 id: `${tripId}-task`, tripId,
                 title: order.taskDetails,
                 staffId: newStaffId, locationId: customer?.id || '',
                 start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                rawOrderId: order.rawOrderId, ...order
+                ...order
              };
-             setScheduleEvents(prev => [...prev.filter(e => e.orderId !== order.id), travelEvent, taskEvent]);
+
+             setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
         
             (async () => {
