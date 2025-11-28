@@ -393,17 +393,16 @@ export function ScheduleView({
     // --- Moving an existing event ---
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
-        const newStaff = getStaffById(newStaffId);
-        if (!newStaff) return;
         
-        // Optimistic UI update for moving events
         setScheduleEvents(prev => {
             const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId && e.id !== draggedEvent.id);
+            const eventsToUpdate = prev.filter(e => e.tripId === draggedEvent.tripId || e.id === draggedEvent.id);
             
-            if (draggedEvent.tripId) { // Trip-based event
-                const originalTripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
-                const taskEvent = originalTripEvents.find(e => e.id.endsWith('-task'))!;
-                const travelEvent = originalTripEvents.find(e => e.id.endsWith('-travel'));
+            if (eventsToUpdate.length === 0) return prev;
+
+            if (draggedEvent.tripId) {
+                const taskEvent = eventsToUpdate.find(e => e.id.endsWith('-task'))!;
+                const travelEvent = eventsToUpdate.find(e => e.id.endsWith('-travel'));
                 
                 const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
                 const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
@@ -433,6 +432,8 @@ export function ScheduleView({
         (async () => {
             try {
                 if (draggedEvent.rawOrderId) {
+                    const newStaff = getStaffById(newStaffId);
+                    if (!newStaff) throw new Error('担当者が見つかりません');
                     let taskStart = newStart;
                     if(draggedEvent.id.endsWith('-travel')) {
                         const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
@@ -441,7 +442,7 @@ export function ScheduleView({
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                        staffName: newStaff?.name,
+                        staffName: newStaff.name,
                         scheduledTime: taskStart.toISOString(),
                     });
                 }
@@ -449,8 +450,6 @@ export function ScheduleView({
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
                 setScheduleEvents(previousSchedule); // Revert on error
-            } finally {
-                await refetchOrders();
             }
         })();
     
@@ -482,17 +481,16 @@ export function ScheduleView({
                 title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
                 staffId: newStaffId, locationId: customer?.userCode || '',
                 start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString(),
-                raw: order.raw
+                rawOrderId: order.rawOrderId, raw: order.raw,
              };
              const taskEvent: WithId<ScheduleEvent> = {
                 id: `${tripId}-task`, tripId,
                 title: order.taskDetails,
                 staffId: newStaffId, locationId: customer?.userCode || '',
                 start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                rawOrderId: order.rawOrderId,
-                raw: order.raw,
+                rawOrderId: order.rawOrderId, raw: order.raw,
              };
-
+             
              setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
         
@@ -506,22 +504,14 @@ export function ScheduleView({
                         scheduledTime: newStart.toISOString(),
                         timestamp: new Date().toISOString(),
                     });
-                     await sendIcsEmail({
-                        gasUrl: ORDER_GAS_URL,
-                        staffName: staff.name,
-                        title: order.taskDetails,
-                        description: `顧客: ${order.customerName}\n住所: ${order.address}`,
-                        startTime: newStart.toISOString(),
-                        endTime: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                        location: order.address,
-                    });
-                    toast({ title: "タスクを割り当て、担当者にメールを送信しました。" });
+                    
+                    setDialogState({ mode: 'details', event: taskEvent });
+                    toast({ title: "タスクを割り当てました。詳細を確認しメールを送信してください。" });
+
                 } catch (e: any) {
-                    toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てまたはメール送信に失敗しました: ${e.message}` });
+                    toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
                     setScheduleEvents(previousSchedule); // Revert UI
                     setUnassignedOrders(previousUnassigned);
-                } finally {
-                    await refetchOrders();
                 }
             })();
         }
@@ -620,6 +610,29 @@ export function ScheduleView({
     setDialogState({ mode: 'closed' });
   };
   
+    const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
+    const staff = getStaffById(event.staffId);
+    if (!staff) {
+      toast({ variant: 'destructive', title: 'エラー', description: '担当者が見つかりません。' });
+      return;
+    }
+    try {
+      await sendIcsEmail({
+        gasUrl: ORDER_GAS_URL,
+        staffName: staff.name,
+        title: event.title,
+        description: `顧客: ${findKey(event.raw, ['お取引先名', '店舗']) || 'N/A'}\n住所: ${findKey(event.raw, ['住所']) || 'N/A'}`,
+        startTime: event.start as string,
+        endTime: event.end as string,
+        location: findKey(event.raw, ['住所']) || '',
+      });
+      toast({ title: 'メール送信成功', description: `${staff.name}にiCalメールを送信しました。` });
+      setDialogState({ mode: 'closed' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'メール送信エラー', description: e.message });
+    }
+  };
+
   const getDialogDetails = () => {
     if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
       const { event } = dialogState;
@@ -715,6 +728,7 @@ export function ScheduleView({
                  {dialogState.mode === 'details' && event ? (
                   <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 py-4 max-h-[60vh] overflow-y-auto">
+                      {renderDetailItem('担当者', staff?.name)}
                       {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
                       {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
                       {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
@@ -731,7 +745,11 @@ export function ScheduleView({
                       {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
                       {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
                   </div>
-                   <DialogFooter>
+                   <DialogFooter className="sm:justify-between">
+                       <Button variant="outline" onClick={() => handleSendIcs(event)}>
+                          <Mail className="mr-2 h-4 w-4" />
+                          iCalメール送信
+                       </Button>
                       <DialogClose asChild>
                           <Button>閉じる</Button>
                       </DialogClose>
@@ -872,5 +890,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-    

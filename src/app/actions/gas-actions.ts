@@ -87,5 +87,5 @@ export async function sendIcsEmail(args: {
     endTime: string;
     location: string;
 }): Promise<GasResponse> {
-    return callGasApi({ operation: 'sendEmail', ...args });
+    return callGasApi({ ...args, operation: 'sendEmail' });
 }
