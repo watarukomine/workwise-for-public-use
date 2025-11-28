@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   const { 
     isLoading: isLoadingOrders, 
     statuses,
+    rawOrdersData,
   } = useOrder();
   
   const { isLoading: isLoadingCustomers, customers: allCustomers } = useCustomer();
