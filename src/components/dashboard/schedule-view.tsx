@@ -315,6 +315,38 @@ export function ScheduleView({
     setActive(event.active);
   };
   
+    const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
+      if (!eventToUnassign.rawOrderId) return;
+      
+      const previousSchedule = [...scheduleEvents];
+      const orderToUnassign = mapRawToOrder(eventToUnassign.raw, 0);
+
+      // Optimistic UI update
+      setScheduleEvents(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
+      setUnassignedOrders(prev => [...prev, orderToUnassign]);
+
+      try {
+        await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
+            staffName: "",
+            statusValue: "未割当",
+            scheduledTime: "",
+            timestamp: new Date().toISOString(),
+        });
+        
+        toast({ title: 'タスクを未割り当てに戻しました' });
+      } catch(e: any) {
+          console.error("Unassignment failed:", e);
+          toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+          // Revert UI on error
+          setScheduleEvents(previousSchedule);
+          setUnassignedOrders(prev => prev.filter(o => o.id !== orderToUnassign.id));
+      } finally {
+          await refetchOrders();
+      }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
@@ -347,7 +379,8 @@ export function ScheduleView({
     startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
 
     const getNewStartFromDrop = () => {
-      const dropX = (active.rect.current.translated?.left ?? 0) - timelineRect.left;
+      if (!active.rect.current.translated) return new Date();
+      const dropX = active.rect.current.translated.left - timelineRect.left;
       const newStartMinutes = pixelsToMinutes(dropX);
       return addMinutes(startOfTimelineDay, newStartMinutes);
     };
@@ -358,6 +391,7 @@ export function ScheduleView({
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
         
+        // Optimistic UI update
         setScheduleEvents(prev => {
             const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId && e.id !== draggedEvent.id);
             const eventsToUpdate = prev.filter(e => e.tripId === draggedEvent.tripId || e.id === draggedEvent.id);
@@ -749,8 +783,8 @@ export function ScheduleView({
               transform: CSS.Translate.toString(
                 active.rect.current.translated
                   ? {
-                      x: active.rect.current.translated.left - active.rect.current.initial.left,
-                      y: active.rect.current.translated.top - active.rect.current.initial.top,
+                      x: active.rect.current.translated.left,
+                      y: active.rect.current.translated.top,
                     }
                   : { x: 0, y: 0 }
               ),
@@ -895,5 +929,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </div>
   );
 };
-
-    
