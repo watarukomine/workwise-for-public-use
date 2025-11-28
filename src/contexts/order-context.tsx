@@ -183,8 +183,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
 
         // An unassigned order should not have a staff or scheduled time.
-        const staffName = findKey(order, ['担当']);
-        const scheduledTime = findKey(order, ['チップ配置作業予定']);
+        const staffName = findKey(order.raw, ['担当']);
+        const scheduledTime = findKey(order.raw, ['チップ配置作業予定']);
         if(staffName || scheduledTime) return false;
         
         const scheduledDate = order.scheduledDate ? parseISO(order.scheduledDate) : null;

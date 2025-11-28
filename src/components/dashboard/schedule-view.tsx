@@ -464,27 +464,6 @@ export function ScheduleView({
                 toast({ title: "汎用タスクを追加しました" });
 
             } else {
-                // Optimistic UI update
-                const customer = getCustomerByCode(order.customerCode);
-                const tripId = `trip-${order.rawOrderId}`;
-                const taskEnd = addMinutes(newStart, order.estimatedDuration);
-                const travelStart = subMinutes(newStart, TRAVEL_TIME_MINUTES);
-                const travelEvent: WithId<ScheduleEvent> = {
-                    id: `${tripId}-travel`, tripId,
-                    title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                    staffId: newStaffId, locationId: customer?.id || '',
-                    start: travelStart.toISOString(), end: newStart.toISOString(),
-                    ...order,
-                 };
-                 const taskEvent: WithId<ScheduleEvent> = {
-                    id: `${tripId}-task`, tripId, orderId: order.id,
-                    title: order.taskDetails,
-                    staffId: newStaffId, locationId: customer?.id || '',
-                    start: newStart.toISOString(), end: taskEnd.toISOString(),
-                    ...order,
-                 };
-                setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
-
                 // Backend update
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
