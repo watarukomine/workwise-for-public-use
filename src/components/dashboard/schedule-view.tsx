@@ -336,16 +336,15 @@ export function ScheduleView({
         });
         
         toast({ title: 'タスクを未割り当てに戻しました' });
+        await refetchOrders();
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
           // Revert UI on error
           setScheduleEvents(previousSchedule);
           setUnassignedOrders(prev => prev.filter(o => o.id !== orderToUnassign.id));
-      } finally {
-          await refetchOrders();
       }
-  };
+    };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -393,43 +392,31 @@ export function ScheduleView({
         
         // Optimistic UI update
         setScheduleEvents(prev => {
-            const updatedEvents = prev.map(e => {
-                if (e.id !== draggedEvent.id && e.tripId !== draggedEvent.tripId) {
-                    return e;
-                }
+            const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId);
+            
+            const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
+            const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
+            const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
+            
+            const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
+            const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
 
-                // For trip events, we need to move both task and travel
-                if (e.tripId && e.tripId === draggedEvent.tripId) {
-                    const originalTask = prev.find(ev => ev.tripId === draggedEvent.tripId && ev.id.endsWith('-task'))!;
-                    const originalTravel = prev.find(ev => ev.tripId === draggedEvent.tripId && ev.id.endsWith('-travel'));
-                    const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
-                    const travelDuration = originalTravel ? differenceInMinutes(parseISO(originalTravel.end as string), parseISO(originalTravel.start as string)) : TRAVEL_TIME_MINUTES;
+            let newTaskStart = newStart;
+            if (draggedEvent.id.endsWith('-travel') && travelEvent) {
+                newTaskStart = addMinutes(newStart, travelDuration);
+            }
+            const newTaskEnd = addMinutes(newTaskStart, taskDuration);
+            const newTravelStart = subMinutes(newTaskStart, travelDuration);
 
-                    let newTaskStart = newStart;
-                    if (draggedEvent.id.endsWith('-travel')) {
-                        newTaskStart = addMinutes(newStart, travelDuration);
-                    }
-                    const newTaskEnd = addMinutes(newTaskStart, taskDuration);
-                    const newTravelStart = subMinutes(newTaskStart, travelDuration);
-
-                    if (e.id.endsWith('-task')) {
-                        return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-                    }
-                    if (e.id.endsWith('-travel')) {
-                         return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-                    }
-                }
-                
-                // For generic (non-trip) events
-                if (e.id === draggedEvent.id) {
-                     const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                     const newEnd = addMinutes(newStart, duration);
-                     return { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
-                }
-
-                return e;
-            });
-            return updatedEvents.filter(Boolean) as WithId<ScheduleEvent>[];
+            const updatedEvents = [];
+            if(taskEvent) {
+                updatedEvents.push({ ...taskEvent, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() });
+            }
+            if (travelEvent) {
+                 updatedEvents.push({ ...travelEvent, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() });
+            }
+            
+            return [...otherEvents, ...updatedEvents];
         });
         
         (async () => {
@@ -437,23 +424,24 @@ export function ScheduleView({
                 if (draggedEvent.rawOrderId) {
                     const newStaff = getStaffById(newStaffId);
                     if (!newStaff) throw new Error('担当者が見つかりません');
-                    let taskStart = newStart;
+                    
+                    let taskStartForSheet = newStart;
                     if(draggedEvent.id.endsWith('-travel')) {
                         const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                        taskStart = addMinutes(newStart, travelDuration);
+                        taskStartForSheet = addMinutes(newStart, travelDuration);
                     }
+
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
                         staffName: newStaff.name,
-                        scheduledTime: taskStart.toISOString(),
+                        scheduledTime: taskStartForSheet.toISOString(),
                     });
+                    toast({ title: "スケジュールを更新しました" });
                 }
-                toast({ title: "スケジュールを更新しました" });
-                await refetchOrders(); // Refetch to ensure consistency
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
-                setScheduleEvents(previousSchedule); // Revert on error
+                setScheduleEvents(previousSchedule);
             }
         })();
     
@@ -786,14 +774,10 @@ export function ScheduleView({
           <TooltipProvider>
           {active && (
             <div style={{
-              transform: CSS.Translate.toString(
-                active.rect.current.translated
-                  ? {
-                      x: active.rect.current.translated.left,
-                      y: active.rect.current.translated.top,
-                    }
-                  : { x: 0, y: 0 }
-              ),
+              transform: CSS.Translate.toString({
+                x: active.rect.current.translated?.left ?? 0,
+                y: active.rect.current.translated?.top ?? 0,
+              }),
             }}>
               {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
                   <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
@@ -863,22 +847,15 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: event.id, data: event });
   const { left, width } = getEventDimensions(event.start, event.end);
 
-  const style: React.CSSProperties = {
-    left: isOverlay ? '0' : `${left}px`,
+  const style: React.CSSProperties = isOverlay ? {} : {
+    left: `${left}px`,
     width: `${width}px`,
-    opacity: isDragging && !isOverlay ? 0 : 1,
-    zIndex: isDragging || isOverlay ? 100 : 20,
+    opacity: isDragging ? 0 : 1,
     position: 'absolute',
     top: '50%',
-    transform: 'translateY(-50%)'
+    transform: 'translateY(-50%)',
+    zIndex: 20
   };
-
-  if (isOverlay) {
-    style.top = '0';
-    style.left = '0';
-    style.transform = 'none';
-  }
-
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
   
@@ -919,7 +896,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     >
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)} style={divStyle}>
+        <div className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)} style={{...divStyle, width: `${width}px`}}>
           <p className="text-xs font-semibold truncate pointer-events-none">{line1}</p>
           {line2 && (<p className="text-xs opacity-80 truncate pointer-events-none">{line2}</p>)}
         </div>
@@ -935,3 +912,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </div>
   );
 };
+
+    
