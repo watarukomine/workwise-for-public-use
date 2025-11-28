@@ -74,8 +74,6 @@ export async function updateSheetStatus(args: {
     actionType?: string | null;
     actionTimestamp?: string | null;
     scheduledTime?: string | null;
-    taskCalendarEventId?: string | null;
-    travelCalendarEventId?: string | null;
 }): Promise<GasResponse> {
     return callGasApi(args);
 }
@@ -90,17 +88,4 @@ export async function sendIcsEmail(args: {
     location: string;
 }): Promise<GasResponse> {
     return callGasApi({ ...args, operation: 'sendEmail' });
-}
-
-export async function handleCalendarEvent(args: {
-    gasUrl: string;
-    operation: 'create' | 'update' | 'delete';
-    calendarId: string;
-    eventId?: string;
-    title?: string;
-    description?: string;
-    startTime?: string;
-    endTime?: string;
-}): Promise<GasResponse> {
-    return callGasApi({ ...args });
 }
