@@ -46,7 +46,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus, sendIcsEmail } from '@/app/actions/gas-actions';
+import { updateSheetStatus, sendIcsEmail, handleCalendarEvent } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { Mail } from 'lucide-react';
 import { createContext, useContext } from 'react';
@@ -282,20 +282,24 @@ const TimeIndicator = () => {
 };
 
 const RenderDragOverlay = () => {
-    const { active, transform } = useDndContext();
+    const { active } = useDndContext();
     const { getCustomerByCode, getStaffById } = useScheduleView();
 
     const activeItem = active?.data.current;
 
     if (!active || !activeItem) return null;
     
-    const overlayStyle: React.CSSProperties = {
-        transform: CSS.Translate.toString(transform),
-      };
+    const style: React.CSSProperties = {
+        transform: `translate3d(${active.rect.current.translated?.left ?? 0}px, ${active.rect.current.translated?.top ?? 0}px, 0)`,
+        pointerEvents: 'none',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+    };
 
     return (
         <DragOverlay>
-            <div style={overlayStyle}>
+            <div style={style}>
             {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
               <OrderChip order={activeItem} style={{ width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px` }} />
             ) : activeItem && 'staffId' in activeItem ? (
@@ -410,7 +414,6 @@ export function ScheduleView({
     
     if (!over) return;
     
-    // Guard against accidental clicks
     if (Math.abs(delta.x) < 5 && Math.abs(delta.y) < 5) {
         return;
     }
@@ -737,7 +740,7 @@ export function ScheduleView({
       onDragStart={handleDragStart} 
       onDragEnd={handleDragEnd}
       activationConstraint={{
-        distance: 5,
+        distance: 8,
       }}
     >
       <TooltipProvider>
@@ -760,7 +763,7 @@ export function ScheduleView({
                         <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
                           <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-b">
                               <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                              <div className="relative h-8 flex-1 border-l">
+                              <div className="relative h-[34px] flex-1 border-l">
                                   {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                       <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
                                           <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
@@ -909,7 +912,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const { left, width } = getEventDimensions(event.start, event.end);
 
   const style: React.CSSProperties = isOverlay ? 
-    (transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : {}) :
+    {} :
     {
         left: `${left}px`,
         width: `${width}px`,
