@@ -161,30 +161,28 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   );
 
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger
-          ref={setNodeRef}
-          style={style}
-          {...listeners}
-          {...attributes}
+    <Tooltip>
+      <TooltipTrigger
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
+      >
+        <div
+          className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
         >
-          <div
-            className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
-          >
-            <p className="text-xs font-semibold truncate pointer-events-none">
-              {line1}
-            </p>
-            <p className="text-xs opacity-80 truncate pointer-events-none">
-              {line2}
-            </p>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          {tooltipContent}
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+          <p className="text-xs font-semibold truncate pointer-events-none">
+            {line1}
+          </p>
+          <p className="text-xs opacity-80 truncate pointer-events-none">
+            {line2}
+          </p>
+        </div>
+      </TooltipTrigger>
+       <TooltipContent>
+        {tooltipContent}
+      </TooltipContent>
+    </Tooltip>
   );
 };
 
@@ -214,11 +212,8 @@ const genericTasks: WithId<Order>[] = [
       { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60 },
 ];
 
-function CombinedTasks({ orders, customers }: { orders: WithId<Order>[], customers: WithId<Customer>[] }) {
-    const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
-    const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
-
-    const getGenericTaskClassName = (task: Order) => {
+function GenericTasks() {
+    const getDraggableClassName = (task: Order) => {
         if (task.id === 'generic-travel') return 'bg-yellow-500 text-black';
         if (task.id === 'generic-work') return 'bg-gray-400 text-white';
         if (task.id === 'generic-break') return 'bg-green-500 text-white';
@@ -226,45 +221,54 @@ function CombinedTasks({ orders, customers }: { orders: WithId<Order>[], custome
     };
 
     return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-base">汎用タスク</CardTitle>
+            </CardHeader>
+            <CardContent>
+                 <div className="flex flex-wrap gap-2">
+                    {genericTasks.map((task) => (
+                        <DraggableOrder
+                            key={task.id}
+                            order={task}
+                            className={getDraggableClassName(task)}
+                        />
+                    ))}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function UnassignedTasks({ orders, customers }: { orders: WithId<Order>[], customers: WithId<Customer>[] }) {
+    const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
+    const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
+
+    return (
         <Card 
             ref={setNodeRef}
-            className={cn("transition-colors h-full", isOver && "bg-primary/10 border-primary/50")}
+            className={cn("transition-colors", isOver && "bg-primary/10 border-primary/50")}
         >
             <CardHeader>
-                <CardTitle className="text-lg">タスク</CardTitle>
-                <CardDescription>タイムラインにタスクをドラッグして割り当てます。</CardDescription>
+                <CardTitle className="text-lg">本日の受注タスク</CardTitle>
+                <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。タイムラインからここに戻すと未割り当てになります。</CardDescription>
             </CardHeader>
             <CardContent>
                 <ScrollArea className="w-full whitespace-nowrap">
-                    <div className="pr-4 min-h-[6rem] space-y-4">
-                        <div>
-                            <h3 className="text-sm font-semibold mb-2 text-muted-foreground">受注タスク</h3>
-                            <div className="flex flex-wrap gap-2">
-                                {orders.map((order) => (
-                                    <DraggableOrder
-                                        key={order.id}
-                                        order={order}
-                                        customer={getCustomerByCode(order.customerCode)}
-                                    />
-                                ))}
-                                {orders.length === 0 && (
-                                    <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
-                                        <p>本日の未割り当てオーダーはありません。</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-semibold mb-2 text-muted-foreground">汎用タスク</h3>
-                            <div className="flex flex-wrap gap-2">
-                                {genericTasks.map((task) => (
-                                    <DraggableOrder
-                                        key={task.id}
-                                        order={task}
-                                        className={getGenericTaskClassName(task)}
-                                    />
-                                ))}
-                            </div>
+                    <div className="pr-4 min-h-[6rem]">
+                        <div className="flex flex-wrap gap-2">
+                            {orders.map((order) => (
+                                <DraggableOrder
+                                    key={order.id}
+                                    order={order}
+                                    customer={getCustomerByCode(order.customerCode)}
+                                />
+                            ))}
+                            {orders.length === 0 && (
+                                <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
+                                    <p>本日の未割り当てオーダーはありません。</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </ScrollArea>
@@ -272,7 +276,6 @@ function CombinedTasks({ orders, customers }: { orders: WithId<Order>[], custome
         </Card>
     );
 }
-
 
 export function ScheduleView({ 
     staffData, 
@@ -335,40 +338,48 @@ export function ScheduleView({
   };
 
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
-      if (!eventToUnassign.rawOrderId) return;
-      try {
-        const result = await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
-            staffName: "",
-            statusValue: "未割当",
-            timestamp: new Date().toISOString(),
-        });
-
-          if (result.status === 'error') throw new Error(result.message);
-          
-          const originalOrder = rawOrdersData.find(o => String(findKey(o, ['受注 ID','受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
-          if (originalOrder) {
-            const orderToAddBack = mapRawToOrder(originalOrder);
-             setUnassignedOrders(prev => {
-              if (!prev.some(o => o.id === orderToAddBack.id)) {
-                return [...prev, orderToAddBack];
-              }
-              return prev;
-            });
-          }
-      
-          setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
-          toast({ title: 'タスクを未割り当てに戻しました' });
-      } catch(e: any) {
-          console.error("Unassignment failed:", e);
-          toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-      }
+    if (!eventToUnassign.rawOrderId) return;
+  
+    // Optimistic UI update
+    const previousSchedule = [...scheduleData];
+    const previousUnassigned = [...unassignedOrders];
+  
+    const originalOrder = rawOrdersData.find(o => String(findKey(o, ['受注 ID', '受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
+    if (originalOrder) {
+      const orderToAddBack = mapRawToOrder(originalOrder);
+      setUnassignedOrders(prev => {
+        if (!prev.some(o => o.id === orderToAddBack.id)) {
+          return [...prev, orderToAddBack];
+        }
+        return prev;
+      });
+    }
+    setScheduleData(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
+    toast({ title: 'タスクを未割り当てに戻しました' });
+  
+    try {
+      const result = await updateSheetStatus({
+        gasUrl: ORDER_GAS_URL,
+        eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
+        staffName: "",
+        statusValue: "未割当",
+        timestamp: new Date().toISOString(),
+      });
+  
+      if (result.status === 'error') throw new Error(result.message);
+  
+    } catch (e: any) {
+      console.error("Unassignment failed:", e);
+      // Rollback on failure
+      setScheduleData(previousSchedule);
+      setUnassignedOrders(previousUnassigned);
+      toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました。UIを元に戻します。: ${e.message}` });
+    }
   };
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    const item = active.data.current;
+    const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
 
     setActiveItem(null);
     setCurrentOverStaffId(null);
@@ -377,7 +388,7 @@ export function ScheduleView({
     
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         if (item.rawOrderId) {
-          await unassignTask(item);
+          unassignTask(item);
         } else {
            setScheduleData(prev => prev.filter(e => e.id !== item.id && e.tripId !== item.tripId));
            toast({ title: '汎用タスクを削除しました' });
@@ -402,72 +413,73 @@ export function ScheduleView({
 
     if ('staffId' in item) { // Moving an existing event
         const draggedEvent = item as WithId<ScheduleEvent>;
+        const newStart = getNewStartFromDrop();
         const staffMember = getStaffById(newStaffId);
         if (!staffMember) return;
         
-        try {
-            if (draggedEvent.staffId !== newStaffId && draggedEvent.rawOrderId) {
-                const customer = getCustomerByCode(draggedEvent.locationId);
-                const result = await updateSheetStatus({
-                    gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                    staffName: staffMember.name,
-                    statusValue: '作業待ち',
-                    timestamp: new Date().toISOString(),
-                });
-
-                if (result.status === 'error') throw new Error(result.message);
-                
-                toast({
-                  title: `${staffMember.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
-                });
-            }
-
-            const newStart = getNewStartFromDrop();
-
-            setScheduleData(prev => {
+        const previousSchedule = [...scheduleData];
+        
+        // Optimistic UI Update
+        setScheduleData(prev => {
+            const isTripEvent = !!draggedEvent.tripId;
+            if (isTripEvent) {
                 const eventsToMove = prev.filter(e => e.tripId === draggedEvent.tripId);
-                if (eventsToMove.length > 0) {
-                    const originalTask = eventsToMove.find(e => e.id.endsWith('-task')) || draggedEvent;
-                    const originalTravel = eventsToMove.find(e => e.id.endsWith('-travel'));
-                    const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
-                    
-                    let newTaskStart = newStart;
-                    if (originalTravel && draggedEvent.id === originalTravel.id) {
-                        newTaskStart = addMinutes(newStart, TRAVEL_TIME_MINUTES);
-                    }
-                    
-                    const newTaskEnd = addMinutes(newTaskStart, taskDuration);
-                    const newTravelStart = subMinutes(newTaskStart, TRAVEL_TIME_MINUTES);
-
-                    return prev.map(e => {
-                        if (e.tripId !== draggedEvent.tripId) return e;
-                        if (e.id.endsWith('-task')) {
-                            return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-                        }
-                        if (e.id.endsWith('-travel')) {
-                            return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-                        }
-                        return e;
-                    });
-                } else {
-                     const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                     const newEnd = addMinutes(newStart, duration);
-                     return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+                const originalTask = eventsToMove.find(e => e.id.endsWith('-task')) || draggedEvent;
+                const originalTravel = eventsToMove.find(e => e.id.endsWith('-travel'));
+                const taskDuration = differenceInMinutes(parseISO(originalTask.end as string), parseISO(originalTask.start as string));
+                
+                let newTaskStart = newStart;
+                if (originalTravel && draggedEvent.id.endsWith('-travel')) {
+                    newTaskStart = addMinutes(newStart, TRAVEL_TIME_MINUTES);
                 }
-            });
+                
+                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
+                const newTravelStart = subMinutes(newTaskStart, TRAVEL_TIME_MINUTES);
 
-        } catch(e: any) {
-            toast({ variant: 'destructive', title: '更新エラー', description: `移動に失敗しました: ${e.message}` });
-        }
+                return prev.map(e => {
+                    if (e.tripId !== draggedEvent.tripId) return e;
+                    const newEventData = { ...e, staffId: newStaffId };
+                    if (e.id.endsWith('-task')) {
+                        return { ...newEventData, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+                    }
+                    if (e.id.endsWith('-travel')) {
+                        return { ...newEventData, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                    }
+                    return newEventData;
+                });
+            } else { // Generic event
+                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                 const newEnd = addMinutes(newStart, duration);
+                 return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+            }
+        });
+
+        // Async Background Update
+        (async () => {
+            try {
+                if (draggedEvent.rawOrderId) {
+                     await updateSheetStatus({
+                        gasUrl: ORDER_GAS_URL,
+                        eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+                        staffName: staffMember.name,
+                        statusValue: '作業待ち',
+                        timestamp: new Date().toISOString(),
+                    });
+                    toast({ title: "スケジュールを更新しました" });
+                }
+            } catch (e: any) {
+                // Rollback on failure
+                setScheduleData(previousSchedule);
+                toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました。UIを元に戻します。: ${e.message}` });
+            }
+        })();
+
     } else if ('estimatedDuration' in item) { // Adding a new event from orders
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
         const taskStart = getNewStartFromDrop();
-        
-        const customer = getCustomerByCode(order.customerCode);
         const isGeneric = order.id.startsWith('generic-');
 
         if (isGeneric) {
@@ -481,7 +493,47 @@ export function ScheduleView({
                 end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
              };
              setScheduleData(prev => [...prev, newEvent]);
-        } else {
+             return; // No backend call for generic tasks
+        }
+        
+        // Optimistic UI Update
+        const previousSchedule = [...scheduleData];
+        const previousUnassigned = [...unassignedOrders];
+
+        const customer = getCustomerByCode(order.customerCode);
+        const tripId = `trip-${Date.now()}`;
+        const taskEnd = addMinutes(taskStart, order.estimatedDuration);
+        const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
+
+        const travelEvent: WithId<ScheduleEvent> = {
+            id: `event-${Date.now()}-travel`,
+            tripId: tripId,
+            title: `移動: ${customer?.storeName || order.taskDetails}`,
+            staffId: newStaffId,
+            locationId: customer?.id || '',
+            start: travelStart.toISOString(),
+            end: taskStart.toISOString(),
+        };
+
+        const taskEvent: WithId<ScheduleEvent> = {
+            id: `event-${Date.now()}-task`,
+            tripId: tripId,
+            orderId: order.id,
+            rawOrderId: order.rawOrderId,
+            title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`,
+            description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
+            staffId: newStaffId,
+            locationId: customer?.id || '',
+            start: taskStart.toISOString(),
+            end: taskEnd.toISOString(),
+        };
+        
+        setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
+        setScheduleData(prev => [...prev, travelEvent, taskEvent]);
+        toast({ title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました` });
+
+        // Async Background Update
+        (async () => {
             try {
               const result = await updateSheetStatus({
                   gasUrl: ORDER_GAS_URL,
@@ -490,47 +542,14 @@ export function ScheduleView({
                   statusValue: '作業待ち',
                   timestamp: new Date().toISOString(),
               });
-
               if (result.status === 'error') throw new Error(result.message);
-              
-              toast({
-                title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
-              });
-              
-              const tripId = `trip-${Date.now()}`;
-              const taskEnd = addMinutes(taskStart, order.estimatedDuration);
-              const travelStart = subMinutes(taskStart, TRAVEL_TIME_MINUTES);
-
-              const travelEvent: WithId<ScheduleEvent> = {
-                  id: `event-${Date.now()}-travel`,
-                  tripId: tripId,
-                  title: `移動: ${customer?.storeName || order.taskDetails}`,
-                  staffId: newStaffId,
-                  locationId: customer?.id || '',
-                  start: travelStart.toISOString(),
-                  end: taskStart.toISOString(),
-              };
-
-              const taskEvent: WithId<ScheduleEvent> = {
-                  id: `event-${Date.now()}-task`,
-                  tripId: tripId,
-                  orderId: order.id,
-                  rawOrderId: order.rawOrderId,
-                  title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
-                  staffId: newStaffId,
-                  locationId: customer?.id || '',
-                  start: taskStart.toISOString(),
-                  end: taskEnd.toISOString(),
-              };
-              
-              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-              setScheduleData(prev => [...prev, travelEvent, taskEvent]);
-              
             } catch (e: any) {
-                 toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+                 // Rollback on failure
+                 setScheduleData(previousSchedule);
+                 setUnassignedOrders(previousUnassigned);
+                 toast({ variant: 'destructive', title: '割当エラー', description: `シートの更新に失敗しました。UIを元に戻します。: ${e.message}` });
             }
-        }
+        })();
     }
   };
 
@@ -652,9 +671,10 @@ export function ScheduleView({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
+      <TooltipProvider>
         <div className="space-y-4">
-            
-            <CombinedTasks orders={unassignedOrders} customers={allCustomers || []} />
+            <GenericTasks />
+            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} />
 
             <Card>
                 <CardHeader>
@@ -779,7 +799,7 @@ export function ScheduleView({
                   </DialogFooter>
               </DialogContent>
           </Dialog>
-        
+      </TooltipProvider>
     </DndContext>
   );
 }
@@ -854,7 +874,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     left: `${left}px`,
     width: `${width}px`,
     transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 100 : 20,
+    zIndex: isDragging ? 100 : 1,
     opacity: isDragging ? 0.8 : 1,
   };
 
