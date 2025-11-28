@@ -92,7 +92,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any) => mapRawToOrder(o, allStaff));
+    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any, index: number) => mapRawToOrder(o, index));
     setOrders(mappedOrders);
 
     const newScheduleEvents: WithId<ScheduleEvent>[] = [];
@@ -108,7 +108,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     
     const scheduledRawOrderIds = new Set<string>();
 
-    rawOrdersData.forEach((rawOrder: any) => {
+    rawOrdersData.forEach((rawOrder: any, index: number) => {
       const staffName = findKey(rawOrder, ['担当']);
       const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
       const scheduledTimeStr = findKey(rawOrder, ['チップ配置作業予定']);
@@ -118,14 +118,13 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           const scheduledTime = parseISO(scheduledTimeStr);
 
           if (isValid(scheduledTime)) {
-              const mappedOrder = mapRawToOrder(rawOrder, allStaff);
+              const mappedOrder = mapRawToOrder(rawOrder, index);
               if (mappedOrder.rawOrderId) {
                 scheduledRawOrderIds.add(mappedOrder.rawOrderId);
               }
 
               const tripId = `trip-${mappedOrder.rawOrderId}`;
               
-              // Ensure unique IDs
               const taskEventId = `${tripId}-task`;
               const travelEventId = `${tripId}-travel`;
 

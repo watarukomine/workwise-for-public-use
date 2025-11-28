@@ -57,9 +57,10 @@ export const formatTime = (date: Date | string) => {
   return format(d, 'HH:mm');
 };
 
-export const mapRawToOrder = (rawOrder: any, allStaff: WithId<Staff>[] = []): WithId<Order> => {
+export const mapRawToOrder = (rawOrder: any, rowIndex: number): WithId<Order> => {
     const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
-    const orderId = findKey(rawOrder, idKeys) || `ord-${Math.random()}`;
+    const orderId = findKey(rawOrder, idKeys);
+    const uniqueId = String(orderId ? `${orderId}-${rowIndex}` : `ord-rand-${Math.random()}`);
 
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
     const scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定']);
@@ -79,8 +80,8 @@ export const mapRawToOrder = (rawOrder: any, allStaff: WithId<Staff>[] = []): Wi
     }
 
     return {
-        id: String(orderId),
-        rawOrderId: String(orderId),
+        id: uniqueId,
+        rawOrderId: String(orderId || ''),
         customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
         customerName: customerName,
         address: findKey(rawOrder, ['住所']) || '',
@@ -94,10 +95,10 @@ export const mapRawToOrder = (rawOrder: any, allStaff: WithId<Staff>[] = []): Wi
         staffName: staffName,
         equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
         tireSize: tireSize,
-        taskCalendarEventId: findKey(rawOrder, ['taskCalendarEventId']),
-        travelCalendarEventId: findKey(rawOrder, ['travelCalendarEventId']),
+        raw: rawOrder,
     };
 };
+
 
 export function getContrastingTextColor(hexColor: string): string {
     if (!hexColor) return '#000000';
