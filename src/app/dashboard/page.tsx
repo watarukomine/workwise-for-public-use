@@ -26,11 +26,11 @@ export default function DashboardPage() {
   
   const { 
     isLoading: isLoadingOrders, 
+    scheduleEvents,
     statuses,
-    rawOrdersData,
   } = useOrder();
   
-  const { isLoading: isLoadingCustomers, customers: allCustomers } = useCustomer();
+  const { isLoading: isLoadingCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
@@ -157,6 +157,7 @@ export default function DashboardPage() {
       {showVerticalView ? (
           <VerticalScheduleView 
               staffData={filteredStaff}
+              scheduleData={scheduleEvents}
               currentDate={currentDate}
           />
       ) : (

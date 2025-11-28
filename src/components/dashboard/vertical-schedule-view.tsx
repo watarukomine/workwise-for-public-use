@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -32,7 +33,7 @@ export function VerticalScheduleView({ scheduleData, staffData, currentDate }: V
     
     // Filter for events assigned to the currently displayed staff for the current date and sort by start time
     const staffIds = new Set(staffData.map(s => s.id));
-    const relevantEvents = scheduleData
+    const relevantEvents = (scheduleData || [])
         .filter(event => {
             const eventDate = parseISO(event.start as string);
             return event.staffId && 
