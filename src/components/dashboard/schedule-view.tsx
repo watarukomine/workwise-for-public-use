@@ -390,10 +390,8 @@ export function ScheduleView({
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
         
-        // Optimistic UI update
         setScheduleEvents(prev => {
             const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId);
-            
             const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
             const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
             const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
@@ -774,10 +772,7 @@ export function ScheduleView({
           <TooltipProvider>
           {active && (
             <div style={{
-              transform: CSS.Translate.toString({
-                x: active.rect.current.translated?.left ?? 0,
-                y: active.rect.current.translated?.top ?? 0,
-              }),
+              transform: CSS.Translate.toString(active.rect.current.translated)
             }}>
               {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
                   <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
@@ -811,12 +806,17 @@ interface StaffRowProps {
 
 const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
+  const [isHovering, setIsHovering] = React.useState(false);
 
   const areaColors: Record<string, string> = { '横浜店': 'bg-blue-50', '東名川崎店': 'bg-green-50', '綾瀬店': 'bg-orange-50' };
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex relative", areaBgClass)}>
+    <div 
+      className={cn("flex relative", areaBgClass, isHovering ? 'z-20' : 'z-10')}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+    >
       <div className={cn("sticky left-0 z-10 flex-shrink-0 px-2 flex items-center border-r h-16", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
             <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
@@ -854,7 +854,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
-    zIndex: 20
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
@@ -912,5 +911,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </div>
   );
 };
-
-    
