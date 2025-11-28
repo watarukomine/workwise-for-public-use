@@ -15,6 +15,7 @@ interface OrderContextType {
   rawOrdersData: any[];
   orders: WithId<Order>[];
   unassignedOrders: WithId<Order>[];
+  setUnassignedOrders: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
   scheduleEvents: WithId<ScheduleEvent>[];
   setScheduleEvents: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
   statuses: StaffStatus[];
@@ -206,6 +207,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     rawOrdersData,
     orders,
     unassignedOrders,
+    setUnassignedOrders,
     scheduleEvents,
     setScheduleEvents,
     statuses,

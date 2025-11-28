@@ -287,7 +287,7 @@ export function ScheduleView({
   const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
-  const { refetchOrders, unassignedOrders, scheduleEvents, setScheduleEvents } = useOrder();
+  const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents } = useOrder();
   
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
@@ -359,6 +359,10 @@ export function ScheduleView({
     
     if (!item || !over) return;
     
+    const previousSchedule = [...scheduleEvents];
+    const previousUnassigned = [...unassignedOrders];
+
+    // --- Dropping back to unassigned area ---
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         if (item.rawOrderId) {
           await unassignTask(item);
@@ -386,12 +390,49 @@ export function ScheduleView({
     
     const newStart = getNewStartFromDrop();
 
-    if ('staffId' in item) { // Moving an existing event
+    // --- Moving an existing event ---
+    if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
+        
+        // Optimistic UI update
+        setScheduleEvents(prev => {
+            const isTripEvent = !!draggedEvent.tripId;
+            if (isTripEvent) {
+                const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
+                const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
+                const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
+                
+                const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
+                const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
+
+                let newTaskStart = newStart;
+                if (draggedEvent.id.endsWith('-travel') && travelEvent) {
+                    newTaskStart = addMinutes(newStart, travelDuration);
+                }
+                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
+                const newTravelStart = subMinutes(newTaskStart, travelDuration);
+                
+                return prev.map(e => {
+                    if (e.tripId !== draggedEvent.tripId) return e;
+                    if (e.id.endsWith('-task')) {
+                        return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+                    }
+                    if (e.id.endsWith('-travel')) {
+                        return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                    }
+                    return e;
+                });
+
+            } else { // Moving a generic event
+                const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                const newEnd = addMinutes(newStart, duration);
+                return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+            }
+        });
         
         (async () => {
             try {
-                if (draggedEvent.rawOrderId) { 
+                if (draggedEvent.rawOrderId) {
                     let taskStart = newStart;
                     if(draggedEvent.id.endsWith('-travel')) {
                         const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
@@ -408,31 +449,55 @@ export function ScheduleView({
                 toast({ title: "スケジュールを更新しました" });
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
+                setScheduleEvents(previousSchedule); // Revert on error
             } finally {
                 await refetchOrders();
             }
         })();
     
-    } else if ('estimatedDuration' in item) { // Creating a new event
+    } else if ('estimatedDuration' in item) { // --- Creating a new event ---
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
 
         const isGeneric = order.id.startsWith('generic-');
+
+        if (isGeneric) {
+             const tempId = `event-temp-${Date.now()}`;
+             const newEvent: WithId<ScheduleEvent> = {
+                id: tempId,
+                title: order.taskDetails, description: '',
+                staffId: newStaffId, locationId: '',
+                start: newStart.toISOString(),
+                end: addMinutes(newStart, order.estimatedDuration).toISOString(),
+                ...order
+             };
+             setScheduleEvents(prev => [...prev, newEvent]);
+             toast({ title: "汎用タスクを追加しました" });
+
+        } else {
+             const tempTripId = `trip-temp-${order.rawOrderId || Date.now()}`;
+             const customer = getCustomerByCode(order.customerCode);
+
+             const travelEvent: WithId<ScheduleEvent> = {
+                id: `${tempTripId}-travel`, tripId: tempTripId,
+                title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
+                staffId: newStaffId, locationId: customer?.id || '',
+                start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString(),
+                rawOrderId: order.rawOrderId, ...order
+             };
+             const taskEvent: WithId<ScheduleEvent> = {
+                id: `${tempTripId}-task`, tripId: tempTripId,
+                title: order.taskDetails,
+                staffId: newStaffId, locationId: customer?.id || '',
+                start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(),
+                rawOrderId: order.rawOrderId, ...order
+             };
+             setScheduleEvents(prev => [...prev.filter(e => e.orderId !== order.id), travelEvent, taskEvent]);
+             setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
         
-        (async () => {
-            try {
-                if (isGeneric) {
-                    const newEvent: WithId<ScheduleEvent> = {
-                        id: `event-${Date.now()}`,
-                        title: order.taskDetails, description: '',
-                        staffId: newStaffId, locationId: '',
-                        start: newStart.toISOString(),
-                        end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                        ...order
-                    };
-                    setScheduleEvents(prev => [...prev, newEvent]);
-                } else {
+            (async () => {
+                try {
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: `(ID: ${order.rawOrderId})`,
@@ -450,14 +515,16 @@ export function ScheduleView({
                         endTime: addMinutes(newStart, order.estimatedDuration).toISOString(),
                         location: order.address,
                     });
+                    toast({ title: "タスクを割り当て、担当者にメールを送信しました。" });
+                } catch (e: any) {
+                    toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てまたはメール送信に失敗しました: ${e.message}` });
+                    setScheduleEvents(previousSchedule); // Revert UI
+                    setUnassignedOrders(previousUnassigned);
+                } finally {
+                    await refetchOrders();
                 }
-                toast({ title: "タスクを割り当て、担当者にメールを送信しました。" });
-            } catch (e: any) {
-                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てまたはメール送信に失敗しました: ${e.message}` });
-            } finally {
-                await refetchOrders();
-            }
-        })();
+            })();
+        }
     }
   };
     const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
