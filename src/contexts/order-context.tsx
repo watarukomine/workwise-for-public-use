@@ -60,7 +60,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       
       const newRawOrderData = result.data || (Array.isArray(result) ? result : []);
       setRawOrdersData(newRawOrderData);
-      // The logic to process this data is now in a dedicated useEffect below.
       
     } catch (e: any) {
       console.error("Failed to fetch or process order data from GAS:", e);
@@ -88,7 +87,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any) => mapRawToOrder(o));
+    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any) => mapRawToOrder(o, allStaff));
     setOrders(mappedOrders);
 
     const newScheduleEvents: WithId<ScheduleEvent>[] = [];
@@ -103,7 +102,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     });
 
     rawOrdersData.forEach((rawOrder: any) => {
-      const mappedOrder = mapRawToOrder(rawOrder);
+      const mappedOrder = mapRawToOrder(rawOrder, allStaff);
       const staffName = mappedOrder.staffName;
       const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
       const scheduledTimeStr = mappedOrder.scheduledTime;
