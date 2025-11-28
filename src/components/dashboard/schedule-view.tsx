@@ -671,21 +671,19 @@ export function ScheduleView({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </TooltipProvider>
         <DragOverlay dropAnimation={null} style={{ zIndex: 110 }}>
-          <TooltipProvider>
-            {activeItem && 'estimatedDuration' in activeItem ? (
-                <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
-            ) : activeItem ? (
-                <DraggableEvent
-                event={activeItem}
-                staff={getStaffById(activeItem.staffId)!}
-                getCustomerByCode={getCustomerByCode}
-                onDoubleClick={() => {}}
-                />
-            ) : null}
-          </TooltipProvider>
+          {activeItem && 'estimatedDuration' in activeItem ? (
+              <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
+          ) : activeItem ? (
+              <DraggableEvent
+              event={activeItem}
+              staff={getStaffById(activeItem.staffId)!}
+              getCustomerByCode={getCustomerByCode}
+              onDoubleClick={() => {}}
+              />
+          ) : null}
         </DragOverlay>
+      </TooltipProvider>
     </DndContext>
   );
 }
@@ -716,7 +714,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
       </div>
       <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-16 border-b", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)} style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
         <div className="absolute top-0 left-0 h-full w-full">
-          {events.map((event) => (<DraggableEvent key={`${event.tripId || event.id}-${event.id}`} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)}/>))}
+          {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)}/>))}
         </div>
       </div>
       <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
