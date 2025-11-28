@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -283,35 +282,33 @@ const TimeIndicator = () => {
 };
 
 const RenderDragOverlay = () => {
-    const { active, transform } = useDndContext();
+    const { active } = useDndContext();
     const { getCustomerByCode, getStaffById } = useScheduleView();
 
     const activeItem = active?.data.current;
 
     if (!active || !activeItem) return null;
     
-    const style = { transform: CSS.Translate.toString(transform) };
-
     return (
-      <div style={style}>
-        {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
-          <OrderChip order={activeItem} style={{ width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px` }} />
-        ) : activeItem && 'staffId' in activeItem ? (
-          (() => {
-            const staff = getStaffById(activeItem.staffId);
-            if (!staff) return null;
-            return (
-              <DraggableEvent
-                event={activeItem}
-                staff={staff}
-                getCustomerByCode={getCustomerByCode}
-                onDoubleClick={() => { }}
-                isOverlay={true}
-              />
-            );
-          })()
-        ) : null}
-      </div>
+        <DragOverlay>
+            {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
+              <OrderChip order={activeItem} style={{ width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px` }} />
+            ) : activeItem && 'staffId' in activeItem ? (
+              (() => {
+                const staff = getStaffById(activeItem.staffId);
+                if (!staff) return null;
+                return (
+                  <DraggableEvent
+                    event={activeItem}
+                    staff={staff}
+                    getCustomerByCode={getCustomerByCode}
+                    onDoubleClick={() => { }}
+                    isOverlay={true}
+                  />
+                );
+              })()
+            ) : null}
+        </DragOverlay>
     );
 }
 
@@ -403,12 +400,12 @@ export function ScheduleView({
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
-    const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
-
     setActive(null);
     
-    if (!item || !over) return;
+    if (!over) return;
     
+    const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
+
     const previousSchedule = [...scheduleEvents];
     const previousUnassigned = [...unassignedOrders];
 
@@ -425,7 +422,6 @@ export function ScheduleView({
     
     const newStaffId = over.id as string;
     const staffRowElement = document.getElementById(`staff-row-${newStaffId}`);
-    
     if (!staffRowElement) return;
     
     const timelineRect = staffRowElement.getBoundingClientRect();
@@ -445,47 +441,47 @@ export function ScheduleView({
     if ('staffId' in item) {
       const draggedEvent = item as WithId<ScheduleEvent>;
       const newStaff = getStaffById(newStaffId);
-      const oldStaff = getStaffById(draggedEvent.staffId);
-      if (!newStaff || !oldStaff) return;
-  
-      const isStaffChange = draggedEvent.staffId !== newStaffId;
+      if (!newStaff) return;
   
       // Optimistic UI Update
       setScheduleEvents(prev => {
-        const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId && e.id !== draggedEvent.id);
-        let tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
-        if (tripEvents.length === 0 && !draggedEvent.tripId) {
-            tripEvents = [{...draggedEvent}];
-        }
-  
-        const taskEvent = tripEvents.find(e => e.id.endsWith('-task') || !e.tripId) || draggedEvent;
-        const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
+        const otherEvents = prev.filter(e => e.id !== draggedEvent.id && e.tripId !== draggedEvent.tripId);
         
-        const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
-        const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
+        let eventsToUpdate: WithId<ScheduleEvent>[];
+        if (draggedEvent.tripId) {
+            eventsToUpdate = previousSchedule.filter(e => e.tripId === draggedEvent.tripId);
+        } else {
+            eventsToUpdate = [draggedEvent];
+        }
+
+        const taskEventInTrip = eventsToUpdate.find(e => e.id.endsWith('-task') || !e.tripId) || eventsToUpdate[0];
+        const travelEventInTrip = eventsToUpdate.find(e => e.id.endsWith('-travel'));
+        
+        const taskDuration = differenceInMinutes(parseISO(taskEventInTrip.end as string), parseISO(taskEventInTrip.start as string));
+        const travelDuration = travelEventInTrip ? differenceInMinutes(parseISO(travelEventInTrip.end as string), parseISO(travelEventInTrip.start as string)) : TRAVEL_TIME_MINUTES;
   
         let newTaskStart = newStart;
-        if (draggedEvent.id.endsWith('-travel') && travelEvent) {
+        if (draggedEvent.id.endsWith('-travel')) {
             newTaskStart = addMinutes(newStart, travelDuration);
         }
         const newTaskEnd = addMinutes(newTaskStart, taskDuration);
         const newTravelStart = subMinutes(newTaskStart, travelDuration);
         
-        const updatedEvents = [];
-        const updatedTask = { ...taskEvent, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-        updatedEvents.push(updatedTask);
-        if (travelEvent) {
-          const updatedTravel = { ...travelEvent, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-          updatedEvents.push(updatedTravel);
+        const updatedTripEvents: WithId<ScheduleEvent>[] = [];
+        const updatedTask = { ...taskEventInTrip, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+        updatedTripEvents.push(updatedTask);
+        if (travelEventInTrip) {
+          const updatedTravel = { ...travelEventInTrip, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+          updatedTripEvents.push(updatedTravel);
         }
         
-        return [...otherEvents, ...updatedEvents];
+        return [...otherEvents, ...updatedTripEvents];
       });
       
       // Backend Update
       (async () => {
           try {
-              if (draggedEvent.rawOrderId) { // Sheet-based event
+              if (draggedEvent.rawOrderId) {
                   let taskStart = newStart;
                   if(draggedEvent.id.endsWith('-travel')) {
                       const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
@@ -497,8 +493,6 @@ export function ScheduleView({
                       staffName: newStaff.name,
                       scheduledTime: taskStart.toISOString(),
                   });
-              } else { // Generic event
-                // This logic is for non-sheet events, usually they don't need backend updates unless tied to another system
               }
               toast({ title: "スケジュールを更新しました" });
               await refetchOrders();
@@ -732,7 +726,7 @@ export function ScheduleView({
       onDragStart={handleDragStart} 
       onDragEnd={handleDragEnd}
       activationConstraint={{
-        distance: 8,
+        distance: 5,
       }}
     >
       <TooltipProvider>
@@ -843,13 +837,7 @@ export function ScheduleView({
                 )}
                 </DialogContent>
             </Dialog>
-        <DragOverlay dropAnimation={null}>
-          <TooltipProvider>
-            {active && (
-                <RenderDragOverlay />
-            )}
-          </TooltipProvider>
-        </DragOverlay>
+        <RenderDragOverlay />
       </TooltipProvider>
     </DndContext>
     </ScheduleViewContext.Provider>
@@ -906,17 +894,19 @@ interface DraggableEventProps {
 }
 
 const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, isOverlay }) => {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: event.id, data: event });
+  const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({ id: event.id, data: event });
   const { left, width } = getEventDimensions(event.start, event.end);
 
-  const style: React.CSSProperties = isOverlay ? {} : {
-    left: `${left}px`,
-    width: `${width}px`,
-    opacity: isDragging ? 0 : 1,
-    position: 'absolute',
-    top: '50%',
-    transform: 'translateY(-50%)',
-  };
+  const style: React.CSSProperties = isOverlay ? 
+    (transform ? { transform: CSS.Translate.toString(transform) } : {}) : 
+    {
+        left: `${left}px`,
+        width: `${width}px`,
+        opacity: isDragging ? 0 : 1,
+        position: 'absolute',
+        top: '50%',
+        transform: 'translateY(-50%)',
+      };
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
   
@@ -945,6 +935,16 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
+  const eventContent = (
+      <div
+          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && !isOverlay && "opacity-50")}
+          style={{...divStyle, width: isOverlay ? `${width}px` : '100%'}}
+      >
+        <p className="text-xs font-semibold truncate pointer-events-none">{line1}</p>
+        {line2 && (<p className="text-xs opacity-80 truncate pointer-events-none">{line2}</p>)}
+      </div>
+  );
+
   return (
     <div
         ref={setNodeRef}
@@ -955,21 +955,18 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         className={cn("rounded-md flex flex-col justify-center cursor-move h-12", isOverlay ? 'shadow-lg' : '')}
         data-event-chip="true"
     >
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)} style={{...divStyle, width: isOverlay ? `${width}px` : '100%'}}>
-          <p className="text-xs font-semibold truncate pointer-events-none">{line1}</p>
-          {line2 && (<p className="text-xs opacity-80 truncate pointer-events-none">{line2}</p>)}
-        </div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
-        {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
-        <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
-        <p className="text-sm">担当: {staff.name}</p>
-        {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
-      </TooltipContent>
-    </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {eventContent}
+          </TooltipTrigger>
+          <TooltipContent>
+            <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
+            {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
+            <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
+            <p className="text-sm">担当: {staff.name}</p>
+            {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
+          </TooltipContent>
+        </Tooltip>
     </div>
   );
 };
