@@ -34,7 +34,6 @@ function doGet(e) {
       const obj = {};
       headers.forEach((header, index) => {
         const cellValue = row[index];
-        // Check if the cell value is a valid Date object before calling toISOString
         if (cellValue && cellValue instanceof Date && !isNaN(cellValue)) {
           obj[header] = cellValue.toISOString();
         } else {
@@ -66,33 +65,23 @@ function doPost(e) {
         console.log("JSON data parsed:", JSON.stringify(params));
       } catch (parseError) {
         console.error("JSON parse error:", parseError.message);
-        return ContentService.createTextOutput(JSON.stringify({
-          status: "error",
-          message: "JSONデータの解析に失敗しました: " + parseError.message
-        })).setMimeType(ContentService.MimeType.JSON);
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "JSONデータの解析に失敗しました: " + parseError.message })).setMimeType(ContentService.MimeType.JSON);
       }
     } else {
       console.error("No JSON data received in request");
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "error",
-        message: "リクエストにJSONデータがありません"
-      })).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "リクエストにJSONデータがありません" })).setMimeType(ContentService.MimeType.JSON);
     }
     
-    if (params.eventTitle) { // Update sheet from app
+    if (params.operation === 'sendEmail') {
+      return sendIcsEmail(params);
+    } else if (params.eventTitle) { // Update sheet from app
       return updateSheetWithOrderInfo(params);
     } else {
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "error",
-        message: "必要なパラメータ (eventTitle) がありません"
-      })).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "必要なパラメータ (eventTitle または operation) がありません" })).setMimeType(ContentService.MimeType.JSON);
     }
   } catch (error) {
     console.error("Error in doPost:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: "エラーが発生しました: " + error.message
-    })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "エラーが発生しました: " + error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
@@ -110,10 +99,7 @@ function updateSheetWithOrderInfo(params) {
     
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
     if (!match || !match[1] || match[1].toUpperCase() === 'N/A') {
-      return ContentService.createTextOutput(JSON.stringify({ 
-        status: "success", 
-        message: "汎用タスクまたはIDなしタスクのためシート更新はスキップされました。" 
-      })).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "汎用タスクまたはIDなしタスクのためシート更新はスキップされました。" })).setMimeType(ContentService.MimeType.JSON);
     }
     
     const orderId = match[1];
@@ -173,16 +159,98 @@ function updateSheetWithOrderInfo(params) {
         }
     }
         
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "success",
-      message: `受注ID: ${orderId} を更新しました。`,
-    })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `受注ID: ${orderId} を更新しました。`, })).setMimeType(ContentService.MimeType.JSON);
     
   } catch (error) {
     console.error("Error in updateSheetWithOrderInfo:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: error.message
-    })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function sendIcsEmail(params) {
+  const { staffName, title, description, startTime, endTime, location } = params;
+
+  try {
+    if (!staffName) throw new Error("スタッフ名が指定されていません。");
+
+    const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
+    const staffSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
+    if (!staffSheet) throw new Error(`シート「${STAFF_SHEET_NAME}」が見つかりません。`);
+
+    const staffData = staffSheet.getDataRange().getValues();
+    const headers = staffData[0];
+    const nameCol = headers.indexOf("スタッフ名");
+    const emailCol = headers.indexOf("メールアドレス");
+
+    if (nameCol === -1 || emailCol === -1) throw new Error("スタッフマスタに「スタッフ名」または「メールアドレス」の列が見つかりません。");
+
+    let recipientEmail;
+    for (let i = 1; i < staffData.length; i++) {
+      if (staffData[i][nameCol] === staffName) {
+        recipientEmail = staffData[i][emailCol];
+        break;
+      }
+    }
+
+    if (!recipientEmail) {
+      // Return success even if email not found to not block UI, but log it.
+      console.warn(`Email for staff "${staffName}" not found. Skipping email.`);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "担当者のメールアドレスが見つからなかったため、メールは送信されませんでした。" })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipientEmail)) {
+      console.warn(`Invalid email format for ${staffName}: ${recipientEmail}. Skipping email.`);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 (${staffName}) のメールアドレス形式が正しくありません。` })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const formatToIcsDate = (date) => {
+      return date.getUTCFullYear() + 
+             ('0' + (date.getUTCMonth() + 1)).slice(-2) + 
+             ('0' + date.getUTCDate()).slice(-2) + 'T' + 
+             ('0' + date.getUTCHours()).slice(-2) + 
+             ('0' + date.getUTCMinutes()).slice(-2) + 
+             ('0' + date.getUTCSeconds()).slice(-2) + 'Z';
+    };
+
+    const startDate = new Date(startTime);
+    const endDate = new Date(endTime);
+    const now = new Date();
+    
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//WorkWise//EN',
+      'BEGIN:VEVENT',
+      'UID:' + Utilities.getUuid(),
+      'DTSTAMP:' + formatToIcsDate(now),
+      'DTSTART:' + formatToIcsDate(startDate),
+      'DTEND:' + formatToIcsDate(endDate),
+      'SUMMARY:' + title,
+      'DESCRIPTION:' + (description || ''),
+      'LOCATION:' + (location || ''),
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].join('\r\n');
+
+    const subject = "新規予定のお知らせ: " + title;
+    const body = "新しい予定が割り当てられました。添付のiCalendarファイルを開いてカレンダーに追加してください。";
+    const options = {
+      attachments: [{
+        fileName: "invite.ics",
+        content: icsContent,
+        mimeType: "text/calendar"
+      }]
+    };
+
+    MailApp.sendEmail(recipientEmail, subject, body, options);
+    
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 ${staffName} に予定のメールを送信しました。` })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    console.error("Error in sendIcsEmail:", error.message, error.stack);
+    // Even if email fails, we don't want to block the UI flow, so we return a modified success response.
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `シートは更新されましたが、メール送信中にエラーが発生しました: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
   }
 }

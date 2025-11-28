@@ -77,3 +77,15 @@ export async function updateSheetStatus(args: {
 }): Promise<GasResponse> {
     return callGasApi(args);
 }
+
+export async function sendIcsEmail(args: {
+    gasUrl: string;
+    staffName: string;
+    title: string;
+    description: string;
+    startTime: string;
+    endTime: string;
+    location: string;
+}): Promise<GasResponse> {
+    return callGasApi({ operation: 'sendEmail', ...args });
+}

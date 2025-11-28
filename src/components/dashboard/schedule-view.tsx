@@ -45,9 +45,8 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { updateSheetStatus, sendIcsEmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
-import * as ics from 'ics';
 import { Mail } from 'lucide-react';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -442,10 +441,19 @@ export function ScheduleView({
                         scheduledTime: newStart.toISOString(),
                         timestamp: new Date().toISOString(),
                     });
+                     await sendIcsEmail({
+                        gasUrl: ORDER_GAS_URL,
+                        staffName: staff.name,
+                        title: order.taskDetails,
+                        description: `顧客: ${order.customerName}\n住所: ${order.address}`,
+                        startTime: newStart.toISOString(),
+                        endTime: addMinutes(newStart, order.estimatedDuration).toISOString(),
+                        location: order.address,
+                    });
                 }
-                toast({ title: "タスクを割り当てました" });
+                toast({ title: "タスクを割り当て、担当者にメールを送信しました。" });
             } catch (e: any) {
-                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てまたはメール送信に失敗しました: ${e.message}` });
             } finally {
                 await refetchOrders();
             }
@@ -543,41 +551,6 @@ export function ScheduleView({
     }
 
     setDialogState({ mode: 'closed' });
-  };
-  
-  const handleSendICal = () => {
-    if (dialogState.mode !== 'details') return;
-    const { event } = dialogState;
-    const start = parseISO(event.start as string);
-    const end = parseISO(event.end as string);
-    
-    const icsEvent: ics.EventAttributes = {
-      title: event.title,
-      description: event.description,
-      start: [start.getFullYear(), start.getMonth() + 1, start.getDate(), start.getHours(), start.getMinutes()],
-      end: [end.getFullYear(), end.getMonth() + 1, end.getDate(), end.getHours(), end.getMinutes()],
-      location: event.address,
-    };
-    
-    ics.createEvent(icsEvent, (error, value) => {
-      if (error) {
-        console.error(error);
-        toast({ variant: 'destructive', title: 'iCal作成エラー', description: error.message });
-        return;
-      }
-      const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result;
-        const mailtoLink = `mailto:?subject=${encodeURIComponent(event.title)}&body=${encodeURIComponent("予定をカレンダーに追加してください。\n\n")}&attach=${dataUrl}`;
-        
-        // This is a workaround for browsers that block mailto with long data URIs
-        const a = document.createElement('a');
-        a.href = mailtoLink;
-        a.click();
-      };
-      reader.readAsDataURL(blob);
-    });
   };
   
   const getDialogDetails = () => {
@@ -691,11 +664,7 @@ export function ScheduleView({
                       {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
                       {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
                   </div>
-                   <DialogFooter className="sm:justify-between pt-4 border-t">
-                      <Button variant="outline" onClick={handleSendICal}>
-                        <Mail className="mr-2 h-4 w-4" />
-                        iCalメール送信
-                      </Button>
+                   <DialogFooter>
                       <DialogClose asChild>
                           <Button>閉じる</Button>
                       </DialogClose>
