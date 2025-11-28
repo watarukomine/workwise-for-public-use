@@ -783,18 +783,15 @@ export function ScheduleView({
             </Dialog>
         <DragOverlay dropAnimation={null}>
           <TooltipProvider>
-          {active && (
-            <div style={
-              active.rect.current.translated
-                ? {
-                    position: 'fixed',
-                    left: active.rect.current.translated.left,
-                    top: active.rect.current.translated.top,
-                    width: active.rect.current.initial.width,
-                    height: active.rect.current.initial.height,
-                  }
-                : {}
-            }>
+          {active && active.rect.current.translated && (
+            <div style={{
+                position: 'fixed',
+                left: active.rect.current.translated.left,
+                top: active.rect.current.translated.top,
+                width: active.rect.current.initial.width,
+                height: active.rect.current.initial.height,
+              }}
+            >
               {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
                   <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
               ) : activeItem && (
@@ -932,3 +929,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </div>
   );
 };
+
+    
