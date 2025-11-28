@@ -425,7 +425,7 @@ export function ScheduleView({
                 staffId: newStaffId, locationId: '',
                 start: newStart.toISOString(),
                 end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                ...order
+                customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, customerCode: ''
             };
             setScheduleEvents(prev => [...prev, newEvent]);
         } else {
@@ -436,15 +436,15 @@ export function ScheduleView({
                 title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
                 staffId: newStaffId, locationId: customer?.id || '',
                 start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString(),
-                rawOrderId: order.rawOrderId, ...order
-            };
-            const taskEvent: WithId<ScheduleEvent> = {
+                ...order
+             };
+             const taskEvent: WithId<ScheduleEvent> = {
                 id: `${tripId}-task`, tripId,
                 title: order.taskDetails,
                 staffId: newStaffId, locationId: customer?.id || '',
                 start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                rawOrderId: order.rawOrderId, ...order
-            };
+                ...order
+             };
             setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
         }
 
@@ -453,7 +453,6 @@ export function ScheduleView({
             try {
                 if (isGeneric) {
                     // For generic tasks, we could add calendar events if needed in the future.
-                    // For now, it's a UI-only optimistic update.
                 } else {
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
@@ -601,54 +600,53 @@ export function ScheduleView({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
-      <TooltipProvider>
-        <Card className="pt-8">
-            <CardContent className="p-4 md:p-6 space-y-6">
-                <Card>
-                    <div className="grid grid-cols-1 md:grid-cols-5">
-                        <div className="md:col-span-3 md:border-r">
-                            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
-                        </div>
-                        <div className="md:col-span-2">
-                            <GenericTasks />
-                        </div>
-                    </div>
-                </Card>
+      <Card className="pt-8">
+          <CardContent className="p-4 md:p-6 space-y-6">
+              <Card>
+                  <div className="grid grid-cols-1 md:grid-cols-5">
+                      <div className="md:col-span-3 md:border-r">
+                          <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+                      </div>
+                      <div className="md:col-span-2">
+                          <GenericTasks />
+                      </div>
+                  </div>
+              </Card>
 
-                <div>
-                    <h3 className="text-lg font-semibold mb-2">タイムライン</h3>
-                    <ScrollArea className="w-full whitespace-nowrap border rounded-lg">
-                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                          <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-b">
-                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                              <div className="relative h-8 flex-1 border-l">
-                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                      <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
-                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
-                                      </div>
-                                  ))}
-                              </div>
-                              <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
-                          </div>
-                          <div className="relative mt-2 space-y-2">
-                              {isToday(currentDate) && (
-                              <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
-                                  <TimeIndicator />
-                              </div>
-                              )}
-                              {staffData?.map((staff) => {
-                                  const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                  const status = statuses.find(s => s.staffId === staff.id);
-                                  return (
-                                      <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={currentOverStaffId === staff.id} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
-                                  );
-                              })}
-                          </div>
+              <div>
+                  <h3 className="text-lg font-semibold mb-2">タイムライン</h3>
+                  <ScrollArea className="w-full whitespace-nowrap border rounded-lg">
+                      <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                        <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-b">
+                            <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                            <div className="relative h-8 flex-1 border-l">
+                                {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                    <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
+                                        <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                         </div>
-                    </ScrollArea>
-                </div>
-            </CardContent>
-        </Card>
+                        <div className="relative mt-2 space-y-2">
+                            {isToday(currentDate) && (
+                            <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                                <TimeIndicator />
+                            </div>
+                            )}
+                            {staffData?.map((staff) => {
+                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                const status = statuses.find(s => s.staffId === staff.id);
+                                return (
+                                    <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={currentOverStaffId === staff.id} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
+                                );
+                            })}
+                        </div>
+                      </div>
+                  </ScrollArea>
+              </div>
+          </CardContent>
+      </Card>
       
       <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
           <DialogContent>
@@ -672,7 +670,6 @@ export function ScheduleView({
                   </DialogFooter>
               </DialogContent>
           </Dialog>
-        </TooltipProvider>
         <TooltipProvider>
             <DragOverlay dropAnimation={null} style={{ zIndex: 110 }}>
             {activeItem && 'estimatedDuration' in activeItem ? (
@@ -717,7 +714,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
       </div>
       <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-16 border-b", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)} style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
         <div className="absolute top-0 left-0 h-full w-full">
-          {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)}/>))}
+          {events.map((event) => (<DraggableEvent key={`${event.tripId || event.id}-${event.id}`} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)}/>))}
         </div>
       </div>
       <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
