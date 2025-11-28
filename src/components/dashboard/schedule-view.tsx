@@ -161,28 +161,30 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   );
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-      >
-        <div
-          className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger
+          ref={setNodeRef}
+          style={style}
+          {...listeners}
+          {...attributes}
         >
-          <p className="text-xs font-semibold truncate pointer-events-none">
-            {line1}
-          </p>
-          <p className="text-xs opacity-80 truncate pointer-events-none">
-            {line2}
-          </p>
-        </div>
-      </TooltipTrigger>
-       <TooltipContent>
-        {tooltipContent}
-      </TooltipContent>
-    </Tooltip>
+          <div
+            className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
+          >
+            <p className="text-xs font-semibold truncate pointer-events-none">
+              {line1}
+            </p>
+            <p className="text-xs opacity-80 truncate pointer-events-none">
+              {line2}
+            </p>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          {tooltipContent}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 
@@ -287,10 +289,10 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
 
-  const [dialogState, setDialogState] = React.useState({ mode: 'closed' });
-  const [editedEventDetails, setEditedEventDetails] = React.useState({ title: '', description: '', startTime: '', endTime: '' });
+  const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
+  const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   
-  const [unassignedOrders, setUnassignedOrders] = React.useState([]);
+  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
   
   React.useEffect(() => {
     if (!rawOrdersData) return;
@@ -314,8 +316,8 @@ export function ScheduleView({
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
-  const [activeItem, setActiveItem] = React.useState(null);
-  const [currentOverStaffId, setCurrentOverStaffId] = React.useState(null);
+  const [activeItem, setActiveItem] = React.useState<any | null>(null);
+  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActiveItem(event.active.data.current);
@@ -929,3 +931,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </TooltipProvider>
   );
 };
+
+    
