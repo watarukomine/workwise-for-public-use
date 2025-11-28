@@ -660,7 +660,13 @@ export function ScheduleView({
   );
 
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext 
+      onDragStart={handleDragStart} 
+      onDragEnd={handleDragEnd}
+      activationConstraint={{
+        distance: 8,
+      }}
+    >
       <TooltipProvider>
         <Card className="pt-8">
             <CardContent className="p-4 md:p-6 space-y-6">
@@ -773,7 +779,14 @@ export function ScheduleView({
           <TooltipProvider>
           {active && (
             <div style={{
-              transform: CSS.Translate.toString(active.rect.current.translated)
+              transform: CSS.Translate.toString(
+                active.rect.current.translated
+                  ? {
+                      x: active.rect.current.translated.left - active.rect.current.initial.left,
+                      y: active.rect.current.translated.top - active.rect.current.initial.top,
+                    }
+                  : { x: 0, y: 0 }
+              ),
             }}>
               {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
                   <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
