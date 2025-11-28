@@ -182,17 +182,19 @@ function GenericTasks() {
     };
 
     return (
-        <div className="h-full">
-            <h3 className="text-lg font-semibold mb-2">汎用タスク</h3>
-            <p className="text-sm text-muted-foreground mb-4">休憩や移動など、受注以外のタスクです。</p>
-            <div className="flex flex-wrap gap-2">
-                {genericTasks.map((task) => (
-                    <DraggableOrder
-                        key={task.id}
-                        order={task}
-                        className={getDraggableClassName(task)}
-                    />
-                ))}
+        <div>
+            <h3 className="text-lg font-semibold px-4">汎用タスク</h3>
+            <p className="text-sm text-muted-foreground px-4 mb-4">休憩や移動など、受注以外のタスクです。</p>
+            <div className="p-4 pt-2">
+                 <div className="flex flex-wrap gap-2">
+                    {genericTasks.map((task) => (
+                        <DraggableOrder
+                            key={task.id}
+                            order={task}
+                            className={getDraggableClassName(task)}
+                        />
+                    ))}
+                </div>
             </div>
         </div>
     );
@@ -207,28 +209,30 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     return (
         <div 
             ref={setNodeRef}
-            className={cn("transition-colors h-full p-4 rounded-lg border", isOver && "bg-primary/10 border-primary/50")}
+            className={cn("transition-colors h-full rounded-md", isOver && "bg-primary/10")}
         >
-            <h3 className="text-lg font-semibold mb-2">{titleText}</h3>
-            <p className="text-sm text-muted-foreground mb-4">下のタイムラインにドラッグして割り当てます。</p>
-            <ScrollArea className="w-full whitespace-nowrap h-32">
-                <div className="pr-4 min-h-[6rem]">
-                    <div className="flex flex-wrap gap-2">
-                        {orders.map((order) => (
-                            <DraggableOrder
-                                key={order.id}
-                                order={order}
-                                customer={getCustomerByCode(order.customerCode)}
-                            />
-                        ))}
-                        {orders.length === 0 && (
-                            <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
-                                <p>未割り当てオーダーはありません。</p>
-                            </div>
-                        )}
+            <h3 className="text-lg font-semibold px-4">{titleText}</h3>
+            <p className="text-sm text-muted-foreground px-4 mb-4">下のタイムラインにタスクをドラッグして割り当てます。</p>
+            <div className="p-4 pt-2">
+                <ScrollArea className="w-full whitespace-nowrap h-32">
+                    <div className="pr-4 min-h-[6rem]">
+                        <div className="flex flex-wrap gap-2">
+                            {orders.map((order) => (
+                                <DraggableOrder
+                                    key={order.id}
+                                    order={order}
+                                    customer={getCustomerByCode(order.customerCode)}
+                                />
+                            ))}
+                            {orders.length === 0 && (
+                                <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
+                                    <p>未割り当てオーダーはありません。</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
-            </ScrollArea>
+                </ScrollArea>
+            </div>
         </div>
     );
 }
@@ -306,10 +310,10 @@ export function ScheduleView({
 
         const scheduledDate = parseISO(workDate);
         return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
-    }).map(o => mapRawToOrder(o, staffData));
+    }).map(o => mapRawToOrder(o));
 
     setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, currentDate, scheduleData, staffData]);
+  }, [rawOrdersData, currentDate, scheduleData]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -344,7 +348,7 @@ export function ScheduleView({
 
       const originalOrder = rawOrdersData.find(o => String(findKey(o, ['受注 ID', '受注id', '受注ID', 'id'])) === eventToUnassign.rawOrderId);
       if (originalOrder) {
-          const orderToAddBack = mapRawToOrder(originalOrder, staffData);
+          const orderToAddBack = mapRawToOrder(originalOrder);
           setUnassignedOrders(prev => [...prev, orderToAddBack]);
       }
       setScheduleData(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
@@ -596,14 +600,16 @@ export function ScheduleView({
       <TooltipProvider>
         <Card className="pt-8">
             <CardContent className="p-4 md:p-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div className="md:col-span-3">
-                        <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+                <Card>
+                    <div className="grid grid-cols-1 md:grid-cols-5">
+                        <div className="md:col-span-3 md:border-r">
+                            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+                        </div>
+                        <div className="md:col-span-2">
+                            <GenericTasks />
+                        </div>
                     </div>
-                    <div className="md:col-span-2">
-                        <GenericTasks />
-                    </div>
-                </div>
+                </Card>
 
                 <div>
                     <h3 className="text-lg font-semibold mb-2">タイムライン</h3>
