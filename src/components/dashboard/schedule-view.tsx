@@ -393,42 +393,41 @@ export function ScheduleView({
     // --- Moving an existing event ---
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
+        const newStaff = getStaffById(newStaffId);
+        if (!newStaff) return;
         
         // Optimistic UI update for moving events
         setScheduleEvents(prev => {
-            const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId);
+            const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId && e.id !== draggedEvent.id);
             
-            if (!draggedEvent.tripId) { // Generic event
+            if (draggedEvent.tripId) { // Trip-based event
+                const originalTripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
+                const taskEvent = originalTripEvents.find(e => e.id.endsWith('-task'))!;
+                const travelEvent = originalTripEvents.find(e => e.id.endsWith('-travel'));
+                
+                const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
+                const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
+
+                let newTaskStart = newStart;
+                if (draggedEvent.id.endsWith('-travel') && travelEvent) {
+                    newTaskStart = addMinutes(newStart, travelDuration);
+                }
+                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
+                const newTravelStart = subMinutes(newTaskStart, travelDuration);
+                
+                const updatedTaskEvent = { ...taskEvent, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
+                const updatedEvents = [updatedTaskEvent];
+                if (travelEvent) {
+                     const updatedTravelEvent = { ...travelEvent, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
+                     updatedEvents.push(updatedTravelEvent);
+                }
+                return [...otherEvents, ...updatedEvents];
+            } else { // Generic event
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                 const newEnd = addMinutes(newStart, duration);
                 const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
-                return [...prev.filter(e => e.id !== draggedEvent.id), updatedEvent];
+                return [...otherEvents, updatedEvent];
             }
-
-            // Trip event (from sheet)
-            const originalTripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
-            const taskEvent = originalTripEvents.find(e => e.id.endsWith('-task'))!;
-            const travelEvent = originalTripEvents.find(e => e.id.endsWith('-travel'));
-            
-            const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
-            const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
-
-            let newTaskStart = newStart;
-            if (draggedEvent.id.endsWith('-travel') && travelEvent) {
-                newTaskStart = addMinutes(newStart, travelDuration);
-            }
-
-            const newTaskEnd = addMinutes(newTaskStart, taskDuration);
-            const newTravelStart = subMinutes(newTaskStart, travelDuration);
-            
-            const updatedTaskEvent = { ...taskEvent, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-            const updatedEvents = [updatedTaskEvent];
-            if (travelEvent) {
-                 const updatedTravelEvent = { ...travelEvent, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-                 updatedEvents.push(updatedTravelEvent);
-            }
-            
-            return [...otherEvents, ...updatedEvents];
         });
         
         (async () => {
@@ -439,7 +438,6 @@ export function ScheduleView({
                         const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                         taskStart = addMinutes(newStart, travelDuration);
                     }
-                    const newStaff = getStaffById(newStaffId);
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
@@ -470,7 +468,7 @@ export function ScheduleView({
                 staffId: newStaffId, locationId: '',
                 start: newStart.toISOString(),
                 end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                ...order,
+                raw: {},
              };
              setScheduleEvents(prev => [...prev, newEvent]);
              toast({ title: "汎用タスクを追加しました" });
@@ -482,16 +480,17 @@ export function ScheduleView({
              const travelEvent: WithId<ScheduleEvent> = {
                 id: `${tripId}-travel`, tripId,
                 title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                staffId: newStaffId, locationId: customer?.id || '',
+                staffId: newStaffId, locationId: customer?.userCode || '',
                 start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString(),
-                ...order
+                raw: order.raw
              };
              const taskEvent: WithId<ScheduleEvent> = {
                 id: `${tripId}-task`, tripId,
                 title: order.taskDetails,
-                staffId: newStaffId, locationId: customer?.id || '',
+                staffId: newStaffId, locationId: customer?.userCode || '',
                 start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                ...order
+                rawOrderId: order.rawOrderId,
+                raw: order.raw,
              };
 
              setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
@@ -582,7 +581,7 @@ export function ScheduleView({
                 title, description,
                 staffId: dialogState.staffId, locationId: '',
                 start: newStart.toISOString(), end: newEnd.toISOString(),
-                customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, customerCode: '', raw:{}
+                raw:{}
             };
             setScheduleEvents(prev => [...prev, newEvent]);
 
@@ -873,3 +872,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    

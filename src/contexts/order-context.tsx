@@ -59,25 +59,27 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
               const tripId = `trip-${mappedOrder.rawOrderId || mappedOrder.id}`;
               
               const taskEvent: WithId<ScheduleEvent> = {
-                  ...mappedOrder,
-                  id: `${tripId}-task`,
+                  id: `${tripId}-task`, // Unique ID for task
                   tripId,
                   title: mappedOrder.taskDetails,
                   staffId: staffMember.id,
                   locationId: mappedOrder.customerCode || '',
                   start: scheduledTime.toISOString(),
                   end: addMinutes(scheduledTime, mappedOrder.estimatedDuration).toISOString(),
+                  rawOrderId: mappedOrder.rawOrderId,
+                  raw: rawOrder,
               };
 
               const travelEvent: WithId<ScheduleEvent> = {
-                  ...mappedOrder,
-                  id: `${tripId}-travel`,
+                  id: `${tripId}-travel`, // Unique ID for travel
                   tripId,
                   title: `移動: ${mappedOrder.customerName || mappedOrder.taskDetails.split('\n')[0]}`,
                   staffId: staffMember.id,
                   locationId: mappedOrder.customerCode || '',
                   start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
                   end: scheduledTime.toISOString(),
+                  rawOrderId: mappedOrder.rawOrderId,
+                  raw: rawOrder,
               };
               newScheduleEvents.push(travelEvent, taskEvent);
           }
@@ -220,3 +222,5 @@ export function useOrder() {
   }
   return context;
 }
+
+    
