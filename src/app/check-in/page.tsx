@@ -37,7 +37,7 @@ function CheckInClient() {
         'Start Travel': '移動開始',
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
-        'Finish Task': '作業終了',
+        'Finish Task': '作業完了',
         'Wait': '位置情報更新',
         'Send Message': 'メッセージ送信'
     };
@@ -88,7 +88,7 @@ function CheckInClient() {
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '待機中',
+      'Finish Task': '作業完了',
       'Wait': '待機中',
       'Arrive': '作業待ち',
     };
@@ -190,7 +190,7 @@ function CheckInClient() {
     { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },
-    { action: 'Finish Task', label: '作業終了', icon: CheckCircle },
+    { action: 'Finish Task', label: '作業完了', icon: CheckCircle },
     { action: 'Wait', label: '位置情報更新', icon: RefreshCw },
   ];
 
