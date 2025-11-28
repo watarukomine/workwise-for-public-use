@@ -1,9 +1,7 @@
-
 'use client';
 
 import * as React from 'react';
 import { ScheduleView } from '@/components/dashboard/schedule-view';
-import { StatusUpdates } from '@/components/dashboard/status-updates';
 import type { WithId, Staff } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -157,24 +155,22 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-8">
-        {showVerticalView ? (
-            <VerticalScheduleView 
-                scheduleData={scheduleEvents}
-                staffData={filteredStaff}
-                currentDate={currentDate}
-            />
-        ) : (
-            <ScheduleView 
-                staffData={filteredStaff} 
-                rawOrdersData={rawOrdersData}
-                currentDate={currentDate}
-                statuses={statuses}
-                scheduleData={scheduleEvents}
-                setScheduleData={setScheduleEvents}
-            />
-        )}
-      </div>
+      {showVerticalView ? (
+          <VerticalScheduleView 
+              scheduleData={scheduleEvents}
+              staffData={filteredStaff}
+              currentDate={currentDate}
+          />
+      ) : (
+          <ScheduleView 
+              staffData={filteredStaff} 
+              rawOrdersData={rawOrdersData}
+              currentDate={currentDate}
+              statuses={statuses}
+              scheduleData={scheduleEvents}
+              setScheduleData={setScheduleEvents}
+          />
+      )}
     </div>
   );
 }
