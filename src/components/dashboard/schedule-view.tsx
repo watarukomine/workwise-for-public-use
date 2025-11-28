@@ -47,6 +47,8 @@ import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
+import * as ics from 'ics';
+import { Mail } from 'lucide-react';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -156,7 +158,9 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
 type DialogState = 
   | { mode: 'closed' }
   | { mode: 'edit'; event: WithId<ScheduleEvent> }
+  | { mode: 'details'; event: WithId<ScheduleEvent> }
   | { mode: 'new'; staffId: string; start: Date };
+
 
 type EditedEventDetails = {
     title: string;
@@ -417,7 +421,6 @@ export function ScheduleView({
 
         const isGeneric = order.id.startsWith('generic-');
         
-        // Async backend update
         (async () => {
             try {
                 if (isGeneric) {
@@ -444,24 +447,23 @@ export function ScheduleView({
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
             } finally {
-                // Refetch to sync with source of truth
                 await refetchOrders();
             }
         })();
     }
   };
-  const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
-    if (event.rawOrderId) { 
-        toast({ title: '受注タスクの編集', description: '受注タスクの詳細はスプレッドシートから直接編集してください。' });
-        return;
+    const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
+    if (event.rawOrderId) {
+      setDialogState({ mode: 'details', event });
+    } else {
+      setEditedEventDetails({
+          title: event.title || '',
+          description: event.description || '',
+          startTime: formatTime(event.start),
+          endTime: formatTime(event.end),
+      });
+      setDialogState({ mode: 'edit', event });
     }
-    setEditedEventDetails({
-        title: event.title || '',
-        description: event.description || '',
-        startTime: formatTime(event.start),
-        endTime: formatTime(event.end),
-    });
-    setDialogState({ mode: 'edit', event });
   };
   
   const handleDoubleClickTimeline = (staffId: string, e: React.MouseEvent) => {
@@ -542,13 +544,49 @@ export function ScheduleView({
 
     setDialogState({ mode: 'closed' });
   };
-
+  
+  const handleSendICal = () => {
+    if (dialogState.mode !== 'details') return;
+    const { event } = dialogState;
+    const start = parseISO(event.start as string);
+    const end = parseISO(event.end as string);
+    
+    const icsEvent: ics.EventAttributes = {
+      title: event.title,
+      description: event.description,
+      start: [start.getFullYear(), start.getMonth() + 1, start.getDate(), start.getHours(), start.getMinutes()],
+      end: [end.getFullYear(), end.getMonth() + 1, end.getDate(), end.getHours(), end.getMinutes()],
+      location: event.address,
+    };
+    
+    ics.createEvent(icsEvent, (error, value) => {
+      if (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: 'iCal作成エラー', description: error.message });
+        return;
+      }
+      const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result;
+        const mailtoLink = `mailto:?subject=${encodeURIComponent(event.title)}&body=${encodeURIComponent("予定をカレンダーに追加してください。\n\n")}&attach=${dataUrl}`;
+        
+        // This is a workaround for browsers that block mailto with long data URIs
+        const a = document.createElement('a');
+        a.href = mailtoLink;
+        a.click();
+      };
+      reader.readAsDataURL(blob);
+    });
+  };
+  
   const getDialogDetails = () => {
-    if (dialogState.mode === 'edit') {
+    if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
       const { event } = dialogState;
       const staff = getStaffById(event.staffId);
       const customer = getCustomerByCode(event.locationId);
-      return { event, staff, customer, title: '予定の編集' };
+      const title = dialogState.mode === 'edit' ? '予定の編集' : '受注詳細';
+      return { event, staff, customer, title };
     }
     if (dialogState.mode === 'new') {
       const staff = getStaffById(dialogState.staffId);
@@ -572,6 +610,10 @@ export function ScheduleView({
       </Card>
     );
   }
+  
+  const renderDetailItem = (label: string, value: any) => (
+    value ? <div className="text-sm"><span className="font-semibold text-muted-foreground">{label}:</span> {String(value)}</div> : null
+  );
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
@@ -625,11 +667,42 @@ export function ScheduleView({
         </Card>
         
         <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
-            <DialogContent>
+            <DialogContent className={cn(dialogState.mode === 'details' && "max-w-xl")}>
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription>{dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}</DialogDescription>
+                    <DialogDescription>{dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : dialogState.mode === 'new' ? '新しい予定の詳細を入力してください。' : 'スプレッドシートから取得した受注の詳細情報です。'}</DialogDescription>
                 </DialogHeader>
+                 {dialogState.mode === 'details' && event ? (
+                  <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 py-4 max-h-[60vh] overflow-y-auto">
+                      {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
+                      {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
+                      {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
+                      {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
+                      {renderDetailItem('車名', findKey(event.raw, ['車名']))}
+                      {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
+                      {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
+                      {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
+                      {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
+                      {renderDetailItem('品名', findKey(event.raw, ['品名']))}
+                      {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
+                      {renderDetailItem('本数', findKey(event.raw, ['本数']))}
+                      {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
+                      {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
+                      {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
+                  </div>
+                   <DialogFooter className="sm:justify-between pt-4 border-t">
+                      <Button variant="outline" onClick={handleSendICal}>
+                        <Mail className="mr-2 h-4 w-4" />
+                        iCalメール送信
+                      </Button>
+                      <DialogClose asChild>
+                          <Button>閉じる</Button>
+                      </DialogClose>
+                  </DialogFooter>
+                  </>
+                ) : (
+                <>
                 <div className="grid gap-4 py-4">
                         {dialogState.mode === 'edit' && (<div className="text-sm space-y-1"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>{customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}</div>)}
                          {dialogState.mode === 'new' && (<div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>)}
@@ -644,6 +717,8 @@ export function ScheduleView({
                         <div className="flex gap-2">{dialogState.mode === 'edit' && (<Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>)}</div>
                         <div className="flex gap-2 mt-4 sm:mt-0"><DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose><Button onClick={handleSaveEvent}>保存</Button></div>
                     </DialogFooter>
+                  </>
+                )}
                 </DialogContent>
             </Dialog>
         <DragOverlay dropAnimation={null}>
