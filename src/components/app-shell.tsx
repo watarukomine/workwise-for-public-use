@@ -47,7 +47,7 @@ import { cn } from '@/lib/utils';
 
 
 const allNavItems = [
-  { href: '/', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'] },
+  { href: '/dashboard', label: '本日の予定', icon: ClipboardList, roles: ['admin', 'staff'] },
   { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'] },
   { href: '/orders', label: '受注管理', icon: ShoppingBag, roles: ['admin'] },
   { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
