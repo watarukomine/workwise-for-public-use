@@ -470,24 +470,32 @@ export function ScheduleView({
                 staffId: newStaffId, locationId: '',
                 start: newStart.toISOString(),
                 end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                ...order
+                raw: {}, // Add dummy properties to satisfy the type
+                customerCode: '',
+                customerName: '',
+                address: '',
+                serviceType: '',
+                status: '',
+                scheduledDate: '',
+                value: 0
              };
              setScheduleEvents(prev => [...prev, newEvent]);
              toast({ title: "汎用タスクを追加しました" });
 
         } else {
-             const tempTripId = `trip-temp-${order.rawOrderId || Date.now()}`;
+             const tripId = `trip-${order.rawOrderId}`;
              const customer = getCustomerByCode(order.customerCode);
-
+             
+             // Optimistic UI Update
              const travelEvent: WithId<ScheduleEvent> = {
-                id: `${tempTripId}-travel`, tripId: tempTripId,
+                id: `${tripId}-travel`, tripId,
                 title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
                 staffId: newStaffId, locationId: customer?.id || '',
                 start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString(),
                 rawOrderId: order.rawOrderId, ...order
              };
              const taskEvent: WithId<ScheduleEvent> = {
-                id: `${tempTripId}-task`, tripId: tempTripId,
+                id: `${tripId}-task`, tripId,
                 title: order.taskDetails,
                 staffId: newStaffId, locationId: customer?.id || '',
                 start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(),
