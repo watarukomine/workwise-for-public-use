@@ -57,6 +57,7 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 role: getRole(),
                 color: assignedColor || fallbackColor,
                 avatarUrl: findKey(item, ['avatarUrl']) || '',
+                calendarId: findKey(item, ['calendarId', 'カレンダーID']),
                 '母店': findKey(item, ['母店']),
                 ...item
             };

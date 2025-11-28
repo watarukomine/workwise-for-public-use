@@ -213,18 +213,33 @@ function updateSheetWithOrderInfo(params) {
 }
 
 function findStaffCalendarId(sheet, staffName) {
-    if (!sheet || !staffName) return null;
+    if (!sheet) {
+      console.error(`findStaffCalendarId Error: Staff sheet not found or provided.`);
+      return null;
+    }
+    if (!staffName) {
+      console.log(`findStaffCalendarId: No staff name provided, cannot find calendar ID.`);
+      return null;
+    }
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
     const nameCol = headers.indexOf("スタッフ名");
     const calIdCol = headers.indexOf("calendarId");
-    if (nameCol === -1 || calIdCol === -1) return null;
+    if (nameCol === -1) {
+      console.error(`findStaffCalendarId Error: 'スタッフ名' column not found in staff sheet.`);
+      return null;
+    }
+    if (calIdCol === -1) {
+      console.error(`findStaffCalendarId Error: 'calendarId' column not found in staff sheet.`);
+      return null;
+    }
 
     for(let i=1; i < data.length; i++) {
         if(data[i][nameCol] === staffName) {
             return data[i][calIdCol];
         }
     }
+    console.warn(`findStaffCalendarId: Staff '${staffName}' not found in staff sheet.`);
     return null;
 }
 

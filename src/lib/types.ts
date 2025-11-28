@@ -58,7 +58,8 @@ export type Order = {
   staffName?: string;
   equipmentStatus?: string;
   tireSize?: string;
-  // raw?: any; 
+  taskCalendarEventId?: string;
+  travelCalendarEventId?: string;
 };
 
 export type ScheduleEvent = WithId<Order> & {
@@ -85,4 +86,3 @@ export type StaffStatus = {
   lastUpdate?: string;
   message?: string;
 };
-

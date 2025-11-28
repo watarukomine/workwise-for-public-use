@@ -94,6 +94,8 @@ export const mapRawToOrder = (rawOrder: any, allStaff: WithId<Staff>[] = []): Wi
         staffName: staffName,
         equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
         tireSize: tireSize,
+        taskCalendarEventId: findKey(rawOrder, ['taskCalendarEventId']),
+        travelCalendarEventId: findKey(rawOrder, ['travelCalendarEventId']),
     };
 };
 
