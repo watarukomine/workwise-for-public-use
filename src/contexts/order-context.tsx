@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
@@ -5,7 +6,7 @@ import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
 import { findKey, mapRawToOrder } from '@/lib/utils';
-import { addMinutes, subMinutes, parseISO, isValid } from 'date-fns';
+import { addMinutes, subMinutes, parseISO, isValid, isEqual, startOfDay } from 'date-fns';
 import { useSelectedStaff } from './selected-staff-context';
 
 const TRAVEL_TIME_MINUTES = 30;
@@ -13,6 +14,7 @@ const TRAVEL_TIME_MINUTES = 30;
 interface OrderContextType {
   rawOrdersData: any[];
   orders: WithId<Order>[];
+  unassignedOrders: WithId<Order>[];
   scheduleEvents: WithId<ScheduleEvent>[];
   setScheduleEvents: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
   statuses: StaffStatus[];
@@ -29,6 +31,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
   const [orders, setOrders] = useState<WithId<Order>[]>([]);
   const [scheduleEvents, setScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
+  const [unassignedOrders, setUnassignedOrders] = useState<WithId<Order>[]>([]);
   const [statuses, setStatuses] = useState<StaffStatus[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
@@ -84,6 +87,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       setOrders([]);
       setScheduleEvents([]);
       setStatuses([]);
+      setUnassignedOrders([]);
       return;
     }
 
@@ -100,6 +104,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         lastAction: '情報なし',
       });
     });
+    
+    const scheduledRawOrderIds = new Set<string>();
 
     rawOrdersData.forEach((rawOrder: any) => {
       const mappedOrder = mapRawToOrder(rawOrder, allStaff);
@@ -112,6 +118,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           const scheduledTime = parseISO(scheduledTimeStr);
 
           if (isValid(scheduledTime)) {
+              if (mappedOrder.rawOrderId) {
+                scheduledRawOrderIds.add(mappedOrder.rawOrderId);
+              }
+
               const tripId = `trip-${mappedOrder.rawOrderId}`;
 
               const taskEvent: WithId<ScheduleEvent> = {
@@ -167,15 +177,25 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    const newUnassignedOrders = mappedOrders.filter(order => {
+        if (!order.rawOrderId) return false;
+        if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
+
+        const scheduledDate = order.scheduledDate ? parseISO(order.scheduledDate) : null;
+        return scheduledDate && isValid(scheduledDate);
+    });
+
+    setUnassignedOrders(newUnassignedOrders);
     setScheduleEvents(newScheduleEvents);
     setStatuses(Array.from(staffStatusMap.values()));
     
   }, [rawOrdersData, allStaff]);
 
 
-  const value = {
+  const value: OrderContextType = {
     rawOrdersData,
     orders,
+    unassignedOrders,
     scheduleEvents,
     setScheduleEvents,
     statuses,

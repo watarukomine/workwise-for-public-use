@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -160,7 +161,6 @@ type EditedEventDetails = {
 
 interface ScheduleViewProps {
     staffData: WithId<Staff>[];
-    rawOrdersData: any[]; 
     currentDate: Date;
     statuses: StaffStatus[];
     scheduleData: WithId<ScheduleEvent>[];
@@ -205,6 +205,11 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
     
     const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
+    
+    const dailyOrders = orders.filter(order => {
+        const scheduledDate = parseISO(order.scheduledDate);
+        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(date));
+    });
 
     return (
         <div 
@@ -217,14 +222,14 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
                 <ScrollArea className="w-full whitespace-nowrap h-32">
                     <div className="pr-4 min-h-[6rem]">
                         <div className="flex flex-wrap gap-2">
-                            {orders.map((order) => (
+                            {dailyOrders.map((order) => (
                                 <DraggableOrder
                                     key={order.id}
                                     order={order}
                                     customer={getCustomerByCode(order.customerCode)}
                                 />
                             ))}
-                            {orders.length === 0 && (
+                            {dailyOrders.length === 0 && (
                                 <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
                                     <p>未割り当てオーダーはありません。</p>
                                 </div>
@@ -268,7 +273,6 @@ const TimeIndicator = () => {
 
 export function ScheduleView({ 
     staffData, 
-    rawOrdersData,
     currentDate,
     statuses,
     scheduleData,
@@ -277,9 +281,8 @@ export function ScheduleView({
   const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
-  const { refetchOrders } = useOrder();
+  const { refetchOrders, unassignedOrders } = useOrder();
   
-  const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   
@@ -290,33 +293,6 @@ export function ScheduleView({
           return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
       });
   }, [scheduleData, currentDate]);
-
-  React.useEffect(() => {
-    if (!rawOrdersData || !allStaff.length) return;
-    
-    const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
-    
-    const newUnassignedOrders = rawOrdersData.filter(order => {
-        const staffName = findKey(order, ['担当']);
-        const scheduledTime = findKey(order, ['チップ配置作業予定']);
-        const orderId = findKey(order, ['受注 ID', '受注id', '受注ID', 'id']);
-        
-        if (scheduledRawOrderIds.has(orderId)) return false;
-        
-        const isAssigned = staffName && scheduledTime;
-        if (isAssigned) return false;
-
-        const workDate = findKey(order, ['作業予定日']);
-        if (!workDate) return false;
-
-        const scheduledDate = parseISO(workDate);
-        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
-    }).map(o => mapRawToOrder(o, allStaff));
-
-    setUnassignedOrders(newUnassignedOrders);
-  }, [rawOrdersData, currentDate, scheduleData, allStaff]);
-
-  const { allStaff } = useSelectedStaff();
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -521,53 +497,35 @@ export function ScheduleView({
         }
 
         const isGeneric = order.id.startsWith('generic-');
-        const prevUnassigned = [...unassignedOrders];
-        const prevSchedule = [...scheduleData];
 
-        if (isGeneric) {
-            const tempId = `temp-${Date.now()}`;
-            const newEventEnd = addMinutes(newStart, order.estimatedDuration);
-            const optimisticEvent: WithId<ScheduleEvent> = {
-                id: tempId, title: order.taskDetails, description: '',
-                staffId: newStaffId, locationId: '',
-                start: newStart.toISOString(), end: newEventEnd.toISOString(),
-                ...order
-            };
-            setScheduleData(prev => [...prev, optimisticEvent]);
+        try {
+            if (isGeneric) {
+                const tempId = `temp-${Date.now()}`;
+                const newEventEnd = addMinutes(newStart, order.estimatedDuration);
+                const optimisticEvent: WithId<ScheduleEvent> = {
+                    id: tempId, title: order.taskDetails, description: '',
+                    staffId: newStaffId, locationId: '',
+                    start: newStart.toISOString(), end: newEventEnd.toISOString(),
+                    ...order
+                };
+                setScheduleData(prev => [...prev, optimisticEvent]);
 
-            try {
                 const result = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: order.taskDetails, startTime: newStart.toISOString(), endTime: newEventEnd.toISOString() });
                 if (result.status === 'error') throw new Error(result.message);
                 setScheduleData(prev => prev.map(e => e.id === tempId ? { ...e, id: result.eventId!, calendarEventId: result.eventId } : e));
                 toast({ title: "汎用タスクを追加しました" });
-            } catch (e: any) {
-                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                setScheduleData(prevSchedule);
-            }
 
-        } else {
-             const tripId = `trip-${order.rawOrderId}`;
-             const customer = getCustomerByCode(order.customerCode);
-             setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-             
-             const travelEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-travel`, tripId,
-                title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                staffId: newStaffId, locationId: customer?.id || '',
-                start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString(),
-                rawOrderId: order.rawOrderId, ...order
-             };
-             const taskEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-task`, tripId, orderId: order.id, rawOrderId: order.rawOrderId,
-                title: order.taskDetails,
-                staffId: newStaffId, locationId: customer?.id || '',
-                start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(), ...order
-             };
-             setScheduleData(prev => [...prev.filter(e => e.orderId !== order.id), travelEvent, taskEvent]);
-        
-            try {
-                const travelResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelEvent.title, startTime: travelEvent.start, endTime: travelEvent.end });
-                const taskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskEvent.title, description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`, startTime: taskEvent.start, endTime: taskEvent.end });
+            } else {
+                const customer = getCustomerByCode(order.customerCode);
+                
+                const travelTitle = `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`;
+                const travelStart = subMinutes(newStart, TRAVEL_TIME_MINUTES);
+                const travelResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: travelTitle, startTime: travelStart.toISOString(), endTime: newStart.toISOString() });
+                
+                const taskTitle = order.taskDetails;
+                const taskEnd = addMinutes(newStart, order.estimatedDuration);
+                const taskDescription = `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`;
+                const taskResult = await handleCalendarEvent({ gasUrl: ORDER_GAS_URL, operation: 'create', calendarId: staff.calendarId, title: taskTitle, startTime: newStart.toISOString(), endTime: taskEnd.toISOString(), description: taskDescription });
 
                 if (taskResult.status === 'error' || travelResult.status === 'error') {
                   if (taskResult.eventId) await handleCalendarEvent({gasUrl: ORDER_GAS_URL, operation: 'delete', calendarId: staff.calendarId, eventId: taskResult.eventId});
@@ -585,14 +543,15 @@ export function ScheduleView({
                     taskCalendarEventId: taskResult.eventId,
                     travelCalendarEventId: travelResult.eventId,
                 });
-
+                
                 await refetchOrders();
                 toast({ title: "タスクを割り当てました" });
-            } catch (e: any) {
-                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                setScheduleData(prevSchedule);
-                setUnassignedOrders(prevUnassigned);
             }
+        } catch (e: any) {
+             toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+             // No need to rollback UI for new tasks, as they weren't in the state before.
+             // We may need to refetch orders to get the unassigned task back.
+             await refetchOrders();
         }
     }
   };
