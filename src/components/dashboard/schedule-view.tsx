@@ -844,13 +844,13 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const style: React.CSSProperties = {
     left: `${left}px`,
     width: `${width}px`,
-    transform: CSS.Translate.toString(transform),
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0 : 1,
     zIndex: isDragging ? 0 : 20,
   };
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
   
   const isTravelEvent = event.title?.startsWith('移動');
+  
   const divStyle: React.CSSProperties = { backgroundColor: staff.color || 'hsl(var(--primary))' };
   if (isTravelEvent && !isDragging) style.opacity = 0.5;
   
@@ -890,3 +890,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
+
+    
