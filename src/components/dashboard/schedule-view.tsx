@@ -282,17 +282,16 @@ const TimeIndicator = () => {
 };
 
 const RenderDragOverlay = () => {
-    const { active, transform } = useDndContext();
+    const { active } = useDndContext();
     const { getCustomerByCode, getStaffById } = useScheduleView();
-
-    const activeItem = active?.data.current;
-
-    if (!active || !activeItem) return null;
     
     const style: React.CSSProperties = {
-        transform: CSS.Translate.toString(transform),
         pointerEvents: 'none',
     };
+
+    if (!active) return null;
+
+    const activeItem = active.data.current;
 
     return (
         <DragOverlay>
@@ -736,9 +735,6 @@ export function ScheduleView({
     <DndContext 
       onDragStart={handleDragStart} 
       onDragEnd={handleDragEnd}
-      activationConstraint={{
-        distance: 8,
-      }}
     >
       <TooltipProvider>
         <Card className="pt-8">
