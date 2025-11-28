@@ -600,78 +600,80 @@ export function ScheduleView({
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
-      <Card className="pt-8">
-          <CardContent className="p-4 md:p-6 space-y-6">
-              <Card>
-                  <div className="grid grid-cols-1 md:grid-cols-5">
-                      <div className="md:col-span-3 md:border-r">
-                          <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
-                      </div>
-                      <div className="md:col-span-2">
-                          <GenericTasks />
-                      </div>
-                  </div>
-              </Card>
+      <TooltipProvider>
+        <Card className="pt-8">
+            <CardContent className="p-4 md:p-6 space-y-6">
+                <Card>
+                    <div className="grid grid-cols-1 md:grid-cols-5">
+                        <div className="md:col-span-3 md:border-r">
+                            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+                        </div>
+                        <div className="md:col-span-2">
+                            <GenericTasks />
+                        </div>
+                    </div>
+                </Card>
 
-              <div>
-                  <h3 className="text-lg font-semibold mb-2">タイムライン</h3>
-                  <ScrollArea className="w-full whitespace-nowrap border rounded-lg">
-                      <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                        <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-b">
-                            <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                            <div className="relative h-8 flex-1 border-l">
-                                {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                    <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
-                                        <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                <div>
+                    <h3 className="text-lg font-semibold mb-2">タイムライン</h3>
+                    <ScrollArea className="w-full whitespace-nowrap border rounded-lg">
+                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                          <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-b">
+                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                              <div className="relative h-8 flex-1 border-l">
+                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                      <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
+                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
+                                      </div>
+                                  ))}
+                              </div>
+                              <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                          </div>
+                          <div className="relative mt-2 space-y-2">
+                              {isToday(currentDate) && (
+                              <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                                  <TimeIndicator />
+                              </div>
+                              )}
+                              {staffData?.map((staff) => {
+                                  const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                  const status = statuses.find(s => s.staffId === staff.id);
+                                  return (
+                                      <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={currentOverStaffId === staff.id} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
+                                  );
+                              })}
+                          </div>
                         </div>
-                        <div className="relative mt-2 space-y-2">
-                            {isToday(currentDate) && (
-                            <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
-                                <TimeIndicator />
-                            </div>
-                            )}
-                            {staffData?.map((staff) => {
-                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                const status = statuses.find(s => s.staffId === staff.id);
-                                return (
-                                    <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={currentOverStaffId === staff.id} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
-                                );
-                            })}
+                    </ScrollArea>
+                </div>
+            </CardContent>
+        </Card>
+        
+        <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{title}</DialogTitle>
+                    <DialogDescription>{dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                        {dialogState.mode === 'edit' && (<div className="text-sm space-y-1"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>{customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}</div>)}
+                         {dialogState.mode === 'new' && (<div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>)}
+                        <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="title" className="text-right">タスク名</Label><Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/></div>
+                         <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="description" className="text-right">詳細</Label><Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))} className="col-span-3" placeholder="予定の詳細やメモ"/></div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="col-span-2 grid gap-2"><Label htmlFor="start-time">開始時間</Label><Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/></div>
+                            <div className="col-span-2 grid gap-2"><Label htmlFor="end-time">終了時間</Label><Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/></div>
                         </div>
-                      </div>
-                  </ScrollArea>
-              </div>
-          </CardContent>
-      </Card>
-      
-      <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
-          <DialogContent>
-              <DialogHeader>
-                  <DialogTitle>{title}</DialogTitle>
-                  <DialogDescription>{dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                      {dialogState.mode === 'edit' && (<div className="text-sm space-y-1"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>{customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}</div>)}
-                       {dialogState.mode === 'new' && (<div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>)}
-                      <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="title" className="text-right">タスク名</Label><Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/></div>
-                       <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="description" className="text-right">詳細</Label><Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))} className="col-span-3" placeholder="予定の詳細やメモ"/></div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                          <div className="col-span-2 grid gap-2"><Label htmlFor="start-time">開始時間</Label><Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/></div>
-                          <div className="col-span-2 grid gap-2"><Label htmlFor="end-time">終了時間</Label><Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/></div>
-                      </div>
-                  </div>
-                  <DialogFooter className="sm:justify-between">
-                      <div className="flex gap-2">{dialogState.mode === 'edit' && (<Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>)}</div>
-                      <div className="flex gap-2 mt-4 sm:mt-0"><DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose><Button onClick={handleSaveEvent}>保存</Button></div>
-                  </DialogFooter>
-              </DialogContent>
-          </Dialog>
-        <TooltipProvider>
-            <DragOverlay dropAnimation={null} style={{ zIndex: 110 }}>
+                    </div>
+                    <DialogFooter className="sm:justify-between">
+                        <div className="flex gap-2">{dialogState.mode === 'edit' && (<Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>)}</div>
+                        <div className="flex gap-2 mt-4 sm:mt-0"><DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose><Button onClick={handleSaveEvent}>保存</Button></div>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </TooltipProvider>
+        <DragOverlay dropAnimation={null} style={{ zIndex: 110 }}>
+          <TooltipProvider>
             {activeItem && 'estimatedDuration' in activeItem ? (
                 <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
             ) : activeItem ? (
@@ -682,8 +684,8 @@ export function ScheduleView({
                 onDoubleClick={() => {}}
                 />
             ) : null}
-            </DragOverlay>
-      </TooltipProvider>
+          </TooltipProvider>
+        </DragOverlay>
     </DndContext>
   );
 }
