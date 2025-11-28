@@ -61,7 +61,9 @@ export const formatTime = (date: Date | string) => {
 export const mapRawToOrder = (rawOrder: any, rowIndex: number): WithId<Order> => {
     const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
     const orderId = findKey(rawOrder, idKeys);
-    const uniqueId = String(orderId ? `${orderId}-${rowIndex}` : `ord-rand-${Math.random()}`);
+    // Use a simpler, more robust unique ID for the draggable item itself.
+    // The tripId in the schedule event will be based on this.
+    const uniqueId = String(orderId || `ord-rand-${Math.random()}`);
 
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
     const scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定']);
@@ -144,4 +146,3 @@ export function getContrastingTextColor(hexColor: string): string {
     return (yiq >= 128) ? '#000000' : '#FFFFFF';
 }
 
-    

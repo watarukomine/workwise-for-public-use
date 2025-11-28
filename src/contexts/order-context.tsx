@@ -56,10 +56,10 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
               const mappedOrder = mapRawToOrder(rawOrder, index);
               if (mappedOrder.rawOrderId) scheduledRawOrderIds.add(mappedOrder.rawOrderId);
 
-              const tripId = `trip-${mappedOrder.rawOrderId || mappedOrder.id}`;
+              const tripId = `trip-${mappedOrder.rawOrderId}`;
               
               const taskEvent: WithId<ScheduleEvent> = {
-                  id: `${tripId}-task`, // Unique ID for task
+                  id: `${tripId}-task`,
                   tripId,
                   title: mappedOrder.taskDetails,
                   staffId: staffMember.id,
@@ -71,7 +71,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
               };
 
               const travelEvent: WithId<ScheduleEvent> = {
-                  id: `${tripId}-travel`, // Unique ID for travel
+                  id: `${tripId}-travel`,
                   tripId,
                   title: `移動: ${mappedOrder.customerName || mappedOrder.taskDetails.split('\n')[0]}`,
                   staffId: staffMember.id,
@@ -222,5 +222,3 @@ export function useOrder() {
   }
   return context;
 }
-
-    
