@@ -282,15 +282,20 @@ const TimeIndicator = () => {
 };
 
 const RenderDragOverlay = () => {
-    const { active } = useDndContext();
+    const { active, transform } = useDndContext();
     const { getCustomerByCode, getStaffById } = useScheduleView();
 
     const activeItem = active?.data.current;
 
     if (!active || !activeItem) return null;
     
+    const overlayStyle: React.CSSProperties = {
+        transform: CSS.Translate.toString(transform),
+      };
+
     return (
         <DragOverlay>
+            <div style={overlayStyle}>
             {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
               <OrderChip order={activeItem} style={{ width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px` }} />
             ) : activeItem && 'staffId' in activeItem ? (
@@ -308,6 +313,7 @@ const RenderDragOverlay = () => {
                 );
               })()
             ) : null}
+            </div>
         </DragOverlay>
     );
 }
@@ -399,11 +405,16 @@ export function ScheduleView({
     };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
+    const { active, over, delta } = event;
     setActive(null);
     
     if (!over) return;
     
+    // Guard against accidental clicks
+    if (Math.abs(delta.x) < 5 && Math.abs(delta.y) < 5) {
+        return;
+    }
+
     const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
 
     const previousSchedule = [...scheduleEvents];
@@ -898,7 +909,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const { left, width } = getEventDimensions(event.start, event.end);
 
   const style: React.CSSProperties = isOverlay ? 
-    (transform ? { transform: CSS.Translate.toString(transform) } : {}) : 
+    (transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : {}) :
     {
         left: `${left}px`,
         width: `${width}px`,
