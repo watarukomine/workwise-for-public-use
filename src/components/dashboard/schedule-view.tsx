@@ -871,7 +871,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
 
   if (isTravelEvent) {
     if (typeof backgroundColor === 'string' && backgroundColor.startsWith('hsl')) {
-       const match = backgroundColor.match(/hsl((\d+),\s*(\d+)%,\s*(\d+)%)/);
+       const match = backgroundColor.match(/hsl\((\d+),\s*(\d+)%,\s*(\d+)%\)/);
        if (match) {
          backgroundColor = `hsla(${match[1]}, ${match[2]}%, ${match[3]}%, 0.5)`;
        }
@@ -931,5 +931,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </TooltipProvider>
   );
 };
-
-    
