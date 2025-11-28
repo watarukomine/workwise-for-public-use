@@ -467,7 +467,7 @@ export function ScheduleView({
                 staffId: newStaffId, locationId: '',
                 start: newStart.toISOString(),
                 end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                raw: {},
+                raw:{}
              };
              setScheduleEvents(prev => [...prev, newEvent]);
              toast({ title: "汎用タスクを追加しました" });
@@ -777,7 +777,7 @@ export function ScheduleView({
             </Dialog>
         <DragOverlay dropAnimation={null}>
           <TooltipProvider>
-          {activeItem && 'estimatedDuration' in activeItem ? (
+          {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
               <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
           ) : activeItem ? (
               <DraggableEvent
@@ -844,7 +844,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const style: React.CSSProperties = {
     left: `${left}px`,
     width: `${width}px`,
-    transform: isDragging ? undefined : CSS.Translate.toString(transform),
+    transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 0 : 20,
   };
