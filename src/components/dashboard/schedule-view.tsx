@@ -390,6 +390,7 @@ export function ScheduleView({
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
         
+        // Optimistic UI update
         setScheduleEvents(prev => {
             const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId);
             const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
@@ -435,8 +436,8 @@ export function ScheduleView({
                         staffName: newStaff.name,
                         scheduledTime: taskStartForSheet.toISOString(),
                     });
-                    toast({ title: "スケジュールを更新しました" });
                 }
+                toast({ title: "スケジュールを更新しました" });
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
                 setScheduleEvents(previousSchedule);
@@ -895,7 +896,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     >
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)} style={{...divStyle, width: `${width}px`}}>
+        <div className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)} style={{...divStyle, width: isOverlay ? `${width}px` : '100%'}}>
           <p className="text-xs font-semibold truncate pointer-events-none">{line1}</p>
           {line2 && (<p className="text-xs opacity-80 truncate pointer-events-none">{line2}</p>)}
         </div>
