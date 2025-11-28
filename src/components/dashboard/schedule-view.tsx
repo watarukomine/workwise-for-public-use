@@ -390,10 +390,11 @@ export function ScheduleView({
     if ('staffId' in item) {
         const draggedEvent = item as WithId<ScheduleEvent>;
         
-        // Optimistic UI update
         setScheduleEvents(prev => {
-            const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId);
-            const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
+          const otherEvents = prev.filter(e => e.tripId !== draggedEvent.tripId);
+          const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
+
+          if (tripEvents.length > 0) {
             const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
             const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
             
@@ -414,8 +415,12 @@ export function ScheduleView({
             if (travelEvent) {
                  updatedEvents.push({ ...travelEvent, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() });
             }
-            
             return [...otherEvents, ...updatedEvents];
+          } else { // Generic event
+             const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+             const newEnd = addMinutes(newStart, duration);
+             return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+          }
         });
         
         (async () => {
@@ -438,6 +443,7 @@ export function ScheduleView({
                     });
                 }
                 toast({ title: "スケジュールを更新しました" });
+                await refetchOrders();
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
                 setScheduleEvents(previousSchedule);
@@ -778,16 +784,17 @@ export function ScheduleView({
         <DragOverlay dropAnimation={null}>
           <TooltipProvider>
           {active && (
-            <div style={{
-              transform: CSS.Translate.toString(
-                active.rect.current.translated
-                  ? {
-                      x: active.rect.current.translated.left - active.rect.current.initial.left,
-                      y: active.rect.current.translated.top - active.rect.current.initial.top,
-                    }
-                  : { x: 0, y: 0 }
-              ),
-            }}>
+            <div style={
+              active.rect.current.translated
+                ? {
+                    position: 'fixed',
+                    left: active.rect.current.translated.left,
+                    top: active.rect.current.translated.top,
+                    width: active.rect.current.initial.width,
+                    height: active.rect.current.initial.height,
+                  }
+                : {}
+            }>
               {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
                   <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
               ) : activeItem && (
