@@ -123,10 +123,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
               }
 
               const tripId = `trip-${mappedOrder.rawOrderId}`;
+              
+              // Ensure unique IDs
+              const taskEventId = `${tripId}-task`;
+              const travelEventId = `${tripId}-travel`;
 
               const taskEvent: WithId<ScheduleEvent> = {
                   ...mappedOrder,
-                  id: `${tripId}-task`,
+                  id: taskEventId,
                   tripId,
                   orderId: mappedOrder.id,
                   title: mappedOrder.taskDetails,
@@ -138,7 +142,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
               const travelEvent: WithId<ScheduleEvent> = {
                   ...mappedOrder,
-                  id: `${tripId}-travel`,
+                  id: travelEventId,
                   tripId,
                   orderId: mappedOrder.id,
                   title: `移動: ${mappedOrder.customerName || mappedOrder.taskDetails.split('\n')[0]}`,

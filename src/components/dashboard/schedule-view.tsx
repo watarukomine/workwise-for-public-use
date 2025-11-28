@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -141,7 +142,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
     });
 
   const style = {
-    opacity: isDragging ? 0 : 1,
+    opacity: isDragging ? 0.5 : 1,
     width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
   };
 
@@ -171,9 +172,9 @@ interface ScheduleViewProps {
 }
 
 const genericTasks: WithId<Order>[] = [
-      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0 },
-      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0 },
-      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0 },
+      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
+      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
+      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
 ];
 
 function GenericTasks() {
@@ -416,43 +417,19 @@ export function ScheduleView({
 
         const isGeneric = order.id.startsWith('generic-');
         
-        // Optimistic UI Update
-        const tempId = `temp-${Date.now()}`;
-        if (isGeneric) {
-            const newEvent: WithId<ScheduleEvent> = {
-                id: tempId,
-                title: order.taskDetails, description: '',
-                staffId: newStaffId, locationId: '',
-                start: newStart.toISOString(),
-                end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, customerCode: ''
-            };
-            setScheduleEvents(prev => [...prev, newEvent]);
-        } else {
-            const tripId = `trip-${order.rawOrderId || tempId}`;
-            const customer = getCustomerByCode(order.customerCode);
-            const travelEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-travel`, tripId,
-                title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                staffId: newStaffId, locationId: customer?.id || '',
-                start: subMinutes(newStart, TRAVEL_TIME_MINUTES).toISOString(), end: newStart.toISOString(),
-                ...order
-             };
-             const taskEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-task`, tripId,
-                title: order.taskDetails,
-                staffId: newStaffId, locationId: customer?.id || '',
-                start: newStart.toISOString(), end: addMinutes(newStart, order.estimatedDuration).toISOString(),
-                ...order
-             };
-            setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
-        }
-
         // Async backend update
         (async () => {
             try {
                 if (isGeneric) {
-                    // For generic tasks, we could add calendar events if needed in the future.
+                    const newEvent: WithId<ScheduleEvent> = {
+                        id: `event-${Date.now()}`,
+                        title: order.taskDetails, description: '',
+                        staffId: newStaffId, locationId: '',
+                        start: newStart.toISOString(),
+                        end: addMinutes(newStart, order.estimatedDuration).toISOString(),
+                        ...order
+                    };
+                    setScheduleEvents(prev => [...prev, newEvent]);
                 } else {
                     await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
@@ -466,8 +443,6 @@ export function ScheduleView({
                 toast({ title: "タスクを割り当てました" });
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                 // Revert optimistic update on failure
-                setScheduleEvents(prev => prev.filter(e => e.id !== tempId && e.tripId !== `trip-${order.rawOrderId || tempId}`));
             } finally {
                 // Refetch to sync with source of truth
                 await refetchOrders();
@@ -529,7 +504,7 @@ export function ScheduleView({
                 title, description,
                 staffId: dialogState.staffId, locationId: '',
                 start: newStart.toISOString(), end: newEnd.toISOString(),
-                customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, customerCode: ''
+                customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, customerCode: '', raw:{}
             };
             setScheduleEvents(prev => [...prev, newEvent]);
 
@@ -671,7 +646,8 @@ export function ScheduleView({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        <DragOverlay dropAnimation={null} style={{ zIndex: 110 }}>
+        <DragOverlay dropAnimation={null}>
+          <TooltipProvider>
           {activeItem && 'estimatedDuration' in activeItem ? (
               <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
           ) : activeItem ? (
@@ -682,6 +658,7 @@ export function ScheduleView({
               onDoubleClick={() => {}}
               />
           ) : null}
+          </TooltipProvider>
         </DragOverlay>
       </TooltipProvider>
     </DndContext>
@@ -739,7 +716,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     left: `${left}px`,
     width: `${width}px`,
     transform: isDragging ? undefined : CSS.Translate.toString(transform),
-    opacity: isDragging ? 0 : 1,
+    opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 0 : 20,
   };
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
