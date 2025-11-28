@@ -47,7 +47,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
     
     if (isStaffLoading) {
-      return; // Wait for staff to be loaded
+      // Wait for staff to be loaded before proceeding
+      return;
     }
 
     setIsLoading(true);
@@ -59,11 +60,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       
       const newRawOrderData = result.data || (Array.isArray(result) ? result : []);
       setRawOrdersData(newRawOrderData);
-      
-      const mappedOrders: WithId<Order>[] = newRawOrderData.map((o: any) => mapRawToOrder(o));
-      setOrders(mappedOrders);
-
-      // This logic will now be handled in a separate useEffect triggered by rawOrdersData change
+      // The logic to process this data is now in a dedicated useEffect below.
       
     } catch (e: any) {
       console.error("Failed to fetch or process order data from GAS:", e);
@@ -77,14 +74,22 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, [orderGasUrl, isStaffLoading]);
 
+  // Initial data fetch
   useEffect(() => {
     fetchAndProcessData();
   }, [fetchAndProcessData]);
 
+  // This effect is now solely responsible for processing data when it changes.
   useEffect(() => {
-    if (isStaffLoading || !rawOrdersData.length) {
+    if (!rawOrdersData.length || !allStaff.length) {
+      setOrders([]);
+      setScheduleEvents([]);
+      setStatuses([]);
       return;
     }
+
+    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any) => mapRawToOrder(o));
+    setOrders(mappedOrders);
 
     const newScheduleEvents: WithId<ScheduleEvent>[] = [];
     const staffStatusMap = new Map<string, StaffStatus>();
@@ -165,7 +170,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     setScheduleEvents(newScheduleEvents);
     setStatuses(Array.from(staffStatusMap.values()));
-  }, [rawOrdersData, allStaff, isStaffLoading]);
+    
+  }, [rawOrdersData, allStaff]);
 
 
   const value = {
