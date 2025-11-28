@@ -241,35 +241,6 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     );
 }
 
-const TimeIndicator = () => {
-    const [now, setNow] = React.useState<Date | null>(null);
-
-    React.useEffect(() => {
-        setNow(new Date());
-        const timer = setInterval(() => {
-            setNow(new Date());
-        }, 60000); 
-        return () => clearInterval(timer);
-    }, []);
-
-    if (!now) return null; 
-    
-    const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
-    if (!isVisible) return null;
-    
-    const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
-    const leftPosition = minutesToPixels(minutesFromStart);
-
-    return (
-        <div
-            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
-            style={{ left: `${leftPosition}px` }}
-        >
-            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
-        </div>
-    );
-};
-
 export function ScheduleView({ 
     staffData, 
     rawOrdersData,
@@ -669,14 +640,6 @@ export function ScheduleView({
                             <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                         </div>
                         <div className="relative mt-2 space-y-2">
-                            {isToday(currentDate) && (
-                            <div 
-                                className="absolute top-0 h-full pointer-events-none z-[101]"
-                                style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}
-                            >
-                                <TimeIndicator />
-                            </div>
-                            )}
                             {staffData?.map((staff) => {
                                 const events = dailySchedule.filter((e) => e.staffId === staff.id);
                                 const status = statuses.find(s => s.staffId === staff.id);
