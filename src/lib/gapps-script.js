@@ -4,7 +4,7 @@ const ORDER_SPREADSHEET_ID = "17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s";
 const ORDER_SHEET_NAME = "受注管理"; 
 
 // 「スタッフマスタ」シートがあるスプレッドシートのIDを貼り付けてください
-const STAFF_SPREADSHEET_ID = "1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60";
+const STAFF_SPREADSHEET_ID = "18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo";
 const STAFF_SHEET_NAME = "スタッフマスタ";
 // ↓↓↓↓【設定はここまで】↓↓↓↓
 
@@ -175,28 +175,6 @@ function updateSheetWithOrderInfo(params) {
             updateColumn(actionColMap[actionType], dateValue);
         }
     }
-
-    const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
-    const staffDataSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
-    const staffCalendarId = findStaffCalendarId(staffDataSheet, staffName || sheet.getRange(rowNum, headers.indexOf("担当") + 1).getValue());
-    
-    console.log(`Found calendarId: ${staffCalendarId} for staff: ${staffName}`);
-
-    if (scheduledTime && staffCalendarId) {
-      const calendar = CalendarApp.getCalendarById(staffCalendarId);
-      if(calendar) {
-          const taskStart = new Date(scheduledTime);
-          const workDuration = sheet.getRange(rowNum, headers.indexOf("作業時間（分）") + 1).getValue() || 60;
-          const taskEnd = new Date(taskStart.getTime() + workDuration * 60000);
-          const travelStart = new Date(taskStart.getTime() - 30 * 60000);
-
-          const currentTaskEventId = sheet.getRange(rowNum, headers.indexOf("taskCalendarEventId") + 1).getValue();
-          const currentTravelEventId = sheet.getRange(rowNum, headers.indexOf("travelCalendarEventId") + 1).getValue();
-          
-          updateCalendarEvent(calendar, currentTaskEventId, taskStart, taskEnd);
-          updateCalendarEvent(calendar, currentTravelEventId, travelStart, taskStart);
-      }
-    }
         
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
@@ -211,52 +189,6 @@ function updateSheetWithOrderInfo(params) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
-
-function findStaffCalendarId(sheet, staffName) {
-    if (!sheet) {
-      console.error(`findStaffCalendarId Error: Staff sheet not found or provided.`);
-      return null;
-    }
-    if (!staffName) {
-      console.log(`findStaffCalendarId: No staff name provided, cannot find calendar ID.`);
-      return null;
-    }
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0];
-    const nameCol = headers.indexOf("スタッフ名");
-    const calIdCol = headers.indexOf("calendarId");
-    if (nameCol === -1) {
-      console.error(`findStaffCalendarId Error: 'スタッフ名' column not found in staff sheet.`);
-      return null;
-    }
-    if (calIdCol === -1) {
-      console.error(`findStaffCalendarId Error: 'calendarId' column not found in staff sheet.`);
-      return null;
-    }
-
-    for(let i=1; i < data.length; i++) {
-        if(data[i][nameCol] === staffName) {
-            return data[i][calIdCol];
-        }
-    }
-    console.warn(`findStaffCalendarId: Staff '${staffName}' not found in staff sheet.`);
-    return null;
-}
-
-function updateCalendarEvent(calendar, eventId, startTime, endTime) {
-    if (eventId) {
-        try {
-            const event = calendar.getEventById(eventId);
-            if (event) {
-                event.setTime(startTime, endTime);
-                console.log(`Updated calendar event ${eventId}`);
-            }
-        } catch(e) { 
-            console.error(`Failed to update calendar event ${eventId}: ${e.message}`);
-        }
-    }
-}
-
 
 /**
  * カレンダーイベントを作成・更新・削除する
