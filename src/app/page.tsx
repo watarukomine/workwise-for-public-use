@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -120,7 +121,7 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold tracking-tight">
-                {isToday(currentDate) ? "本日の予定" : format(currentDate, "M月d日 (E)")}
+                {isToday(currentDate) ? "ダッシュボード" : format(currentDate, "M月d日 (E)")}
             </h1>
             <p className="text-muted-foreground">
               スタッフのスケジュールと現在の状況を一覧で確認できます。
