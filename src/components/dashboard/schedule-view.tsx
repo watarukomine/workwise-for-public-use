@@ -10,6 +10,7 @@ import {
   type DragStartEvent,
   type DragOverEvent,
   DragOverlay,
+  type Active,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import type { ScheduleEvent, Staff, Customer, Order, WithId, StaffStatus } from '@/lib/types';
@@ -303,21 +304,22 @@ export function ScheduleView({
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
-  const [activeItem, setActiveItem] = React.useState<any | null>(null);
+  const [active, setActive] = React.useState<Active | null>(null);
+  const activeItem = React.useMemo(() => active?.data.current, [active]);
   
   React.useEffect(() => {
     setIsClient(true);
   }, []);
   
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveItem(event.active.data.current);
+    setActive(event.active);
   };
   
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
 
-    setActiveItem(null);
+    setActive(null);
     
     if (!item || !over) return;
     
@@ -742,7 +744,7 @@ export function ScheduleView({
             </Dialog>
         <DragOverlay dropAnimation={null}>
           <TooltipProvider>
-          {activeItem && (
+          {active && (
             <div style={{
               transform: CSS.Translate.toString(
                 active.rect.current.translated
@@ -753,9 +755,9 @@ export function ScheduleView({
                   : { x: 0, y: 0 }
               ),
             }}>
-              {'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
+              {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
                   <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
-              ) : (
+              ) : activeItem && (
                   <DraggableEvent
                   event={activeItem}
                   staff={getStaffById(activeItem.staffId)!}
@@ -893,3 +895,5 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </div>
   );
 };
+
+    
