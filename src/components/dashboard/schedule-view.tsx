@@ -304,7 +304,6 @@ export function ScheduleView({
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
   const [activeItem, setActiveItem] = React.useState<any | null>(null);
-  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
   
   React.useEffect(() => {
     setIsClient(true);
@@ -314,48 +313,11 @@ export function ScheduleView({
     setActiveItem(event.active.data.current);
   };
   
-  const handleDragOver = (event: DragOverEvent) => {
-      const { over } = event;
-      const overId = over?.id;
-
-      if (typeof overId === 'string' && staffData.some(s => s.id === overId)) {
-          setCurrentOverStaffId(overId);
-      } else {
-          setCurrentOverStaffId(null);
-      }
-  };
-
-  const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
-      if (!eventToUnassign.rawOrderId) return;
-      
-      const prevSchedule = [...scheduleEvents];
-      setScheduleEvents(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
-
-      try {
-        await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
-            staffName: "",
-            statusValue: "未割当",
-            scheduledTime: "",
-            timestamp: new Date().toISOString(),
-        });
-        
-        await refetchOrders();
-        toast({ title: 'タスクを未割り当てに戻しました' });
-      } catch(e: any) {
-          console.error("Unassignment failed:", e);
-          toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-          setScheduleEvents(prevSchedule);
-      }
-  };
-
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
 
     setActiveItem(null);
-    setCurrentOverStaffId(null);
     
     if (!item || !over) return;
     
@@ -597,7 +559,7 @@ export function ScheduleView({
   };
 
   const handleDeleteEvent = async () => {
-    if (dialogState.mode !== 'edit') return;
+    if (dialogState.mode !== 'edit' && dialogState.mode !== 'details') return;
     const eventToDelete = dialogState.event;
     
     if (eventToDelete.rawOrderId) {
@@ -669,7 +631,7 @@ export function ScheduleView({
   );
 
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <TooltipProvider>
         <Card className="pt-8">
             <CardContent className="p-4 md:p-6 space-y-6">
@@ -709,7 +671,7 @@ export function ScheduleView({
                                   const events = dailySchedule.filter((e) => e.staffId === staff.id);
                                   const status = statuses.find(s => s.staffId === staff.id);
                                   return (
-                                      <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={currentOverStaffId === staff.id} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
+                                      <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
                                   );
                               })}
                           </div>
@@ -750,9 +712,12 @@ export function ScheduleView({
                           <Mail className="mr-2 h-4 w-4" />
                           iCalメール送信
                        </Button>
-                      <DialogClose asChild>
-                          <Button>閉じる</Button>
-                      </DialogClose>
+                       <div>
+                         <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
+                         <DialogClose asChild>
+                            <Button className='ml-2'>閉じる</Button>
+                         </DialogClose>
+                       </div>
                   </DialogFooter>
                   </>
                 ) : (
@@ -777,16 +742,30 @@ export function ScheduleView({
             </Dialog>
         <DragOverlay dropAnimation={null}>
           <TooltipProvider>
-          {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
-              <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
-          ) : activeItem ? (
-              <DraggableEvent
-              event={activeItem}
-              staff={getStaffById(activeItem.staffId)!}
-              getCustomerByCode={getCustomerByCode}
-              onDoubleClick={() => {}}
-              />
-          ) : null}
+          {activeItem && (
+            <div style={{
+              transform: CSS.Translate.toString(
+                active.rect.current.translated
+                  ? {
+                      x: active.rect.current.translated.left - active.rect.current.initial.left,
+                      y: active.rect.current.translated.top - active.rect.current.initial.top,
+                    }
+                  : { x: 0, y: 0 }
+              ),
+            }}>
+              {'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
+                  <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
+              ) : (
+                  <DraggableEvent
+                  event={activeItem}
+                  staff={getStaffById(activeItem.staffId)!}
+                  getCustomerByCode={getCustomerByCode}
+                  onDoubleClick={() => {}}
+                  isOverlay={true}
+                  />
+              )}
+            </div>
+          )}
           </TooltipProvider>
         </DragOverlay>
       </TooltipProvider>
@@ -835,24 +814,38 @@ interface DraggableEventProps {
   staff: WithId<Staff>;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   onDoubleClick: () => void;
+  isOverlay?: boolean;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick }) => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: event.id, data: event });
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, isOverlay }) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: event.id, data: event });
   const { left, width } = getEventDimensions(event.start, event.end);
 
   const style: React.CSSProperties = {
-    left: `${left}px`,
+    left: isOverlay ? '0' : `${left}px`,
     width: `${width}px`,
-    opacity: isDragging ? 0 : 1,
-    zIndex: isDragging ? 0 : 20,
+    opacity: isDragging && !isOverlay ? 0 : 1,
+    zIndex: isDragging || isOverlay ? 100 : 20,
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)'
   };
+
+  if (isOverlay) {
+    style.top = '0';
+    style.left = '0';
+    style.transform = 'none';
+  }
+
+
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
   
   const isTravelEvent = event.title?.startsWith('移動');
   
   const divStyle: React.CSSProperties = { backgroundColor: staff.color || 'hsl(var(--primary))' };
-  if (isTravelEvent && !isDragging) style.opacity = 0.5;
+  if (isTravelEvent && !isDragging) {
+    divStyle.backgroundColor = divStyle.backgroundColor ? `${divStyle.backgroundColor.replace(')', ', 0.5)').replace('rgb', 'rgba')}` : 'hsla(var(--primary), 0.5)'
+  }
   
   const textColor = staff.color ? getContrastingTextColor(staff.color) : 'white';
   let textColorClass = textColor === '#FFFFFF' ? 'text-white' : 'text-black';
@@ -873,8 +866,17 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
   return (
+    <div
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
+        onDoubleClick={handleDoubleClick}
+        className={cn("rounded-md flex flex-col justify-center cursor-move h-12", isOverlay ? 'shadow-lg' : '')}
+        data-event-chip="true"
+    >
     <Tooltip>
-      <TooltipTrigger ref={setNodeRef} style={style} {...listeners} {...attributes} onDoubleClick={handleDoubleClick} className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move" data-event-chip="true">
+      <TooltipTrigger asChild>
         <div className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)} style={divStyle}>
           <p className="text-xs font-semibold truncate pointer-events-none">{line1}</p>
           {line2 && (<p className="text-xs opacity-80 truncate pointer-events-none">{line2}</p>)}
@@ -888,7 +890,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
       </TooltipContent>
     </Tooltip>
+    </div>
   );
 };
-
-    
