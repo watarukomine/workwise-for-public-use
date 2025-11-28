@@ -9,6 +9,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
   type DragOverEvent,
+  DragOverlay,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import type { ScheduleEvent, Staff, Customer, Order, WithId, StaffStatus } from '@/lib/types';
@@ -91,26 +92,14 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
   };
 };
 
-interface DraggableOrderProps {
+interface OrderChipProps {
   order: WithId<Order>;
   customer?: WithId<Customer>;
   className?: string;
+  style?: React.CSSProperties;
 }
 
-const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className }) => {
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({
-      id: `order-${order.id}`,
-      data: order,
-    });
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 100 : 1,
-    opacity: isDragging ? 0.8 : 1,
-    width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
-  };
-  
+const OrderChip: React.FC<OrderChipProps> = ({ order, className, style }) => {
   const [line1, line2] = order.taskDetails.split('\n');
 
   const tooltipContent = (
@@ -122,28 +111,45 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   );
 
   return (
-      <Tooltip>
-        <TooltipTrigger
-          ref={setNodeRef}
-          style={style}
-          {...listeners}
-          {...attributes}
-        >
-          <div
-            className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}
-          >
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div style={style} className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}>
             <p className="text-xs font-semibold truncate pointer-events-none">
               {line1}
             </p>
             {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
               {line2}
             </p>}
-          </div>
-        </TooltipTrigger>
-         <TooltipContent>
-          {tooltipContent}
-        </TooltipContent>
-      </Tooltip>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>{tooltipContent}</TooltipContent>
+    </Tooltip>
+  );
+};
+
+
+interface DraggableOrderProps {
+  order: WithId<Order>;
+  customer?: WithId<Customer>;
+  className?: string;
+}
+
+const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className }) => {
+  const { attributes, listeners, setNodeRef, isDragging } =
+    useDraggable({
+      id: `order-${order.id}`,
+      data: order,
+    });
+
+  const style = {
+    opacity: isDragging ? 0 : 1,
+    width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
+        <OrderChip order={order} className={className} />
+    </div>
   );
 };
 
@@ -380,42 +386,6 @@ export function ScheduleView({
     if ('staffId' in item) { // Moving an existing event
         const draggedEvent = item as WithId<ScheduleEvent>;
         
-        // Optimistically update UI
-        setScheduleEvents(prev => {
-            const isTripEvent = !!draggedEvent.tripId;
-            if (isTripEvent) {
-                const tripEvents = prev.filter(e => e.tripId === draggedEvent.tripId);
-                const taskEvent = tripEvents.find(e => e.id.endsWith('-task'))!;
-                const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
-                
-                const taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
-                const travelDuration = travelEvent ? differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string)) : TRAVEL_TIME_MINUTES;
-
-                let newTaskStart = newStart;
-                if (draggedEvent.id.endsWith('-travel') && travelEvent) {
-                    newTaskStart = addMinutes(newStart, travelDuration);
-                }
-                const newTaskEnd = addMinutes(newTaskStart, taskDuration);
-                const newTravelStart = subMinutes(newTaskStart, travelDuration);
-                
-                return prev.map(e => {
-                    if (e.tripId !== draggedEvent.tripId) return e;
-                    if (e.id.endsWith('-task')) {
-                        return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-                    }
-                    if (e.id.endsWith('-travel')) {
-                        return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-                    }
-                    return e; // Should not happen
-                });
-
-            } else { // Moving a generic event
-                const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                const newEnd = addMinutes(newStart, duration);
-                return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
-            }
-        });
-        
         // Asynchronously update backend
         (async () => {
             try {
@@ -434,11 +404,9 @@ export function ScheduleView({
                     });
                 }
                 toast({ title: "スケジュールを更新しました" });
-                // We refetch to ensure consistency, though the UI is already updated.
-                await refetchOrders();
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
-                // On error, refetch to revert optimistic update
+            } finally {
                 await refetchOrders();
             }
         })();
@@ -464,7 +432,6 @@ export function ScheduleView({
                 toast({ title: "汎用タスクを追加しました" });
 
             } else {
-                // Backend update
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${order.rawOrderId})`,
@@ -479,13 +446,12 @@ export function ScheduleView({
             }
         } catch (e: any) {
              toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-             // On error, refetch to revert optimistic update
              await refetchOrders();
         }
     }
   };
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
-    if (event.rawOrderId) { // Sheet-based events are read-only in the dialog
+    if (event.rawOrderId) { 
         toast({ title: '受注タスクの編集', description: '受注タスクの詳細はスプレッドシートから直接編集してください。' });
         return;
     }
@@ -666,6 +632,18 @@ export function ScheduleView({
               </DialogContent>
           </Dialog>
       </TooltipProvider>
+      <DragOverlay dropAnimation={null} style={{ zIndex: 110 }}>
+        {activeItem && 'estimatedDuration' in activeItem ? (
+          <OrderChip order={activeItem} style={{width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px`}} />
+        ) : activeItem ? (
+          <DraggableEvent
+            event={activeItem}
+            staff={getStaffById(activeItem.staffId)!}
+            getCustomerByCode={getCustomerByCode}
+            onDoubleClick={() => {}}
+          />
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }
@@ -720,14 +698,15 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const style: React.CSSProperties = {
     left: `${left}px`,
     width: `${width}px`,
-    transform: CSS.Translate.toString(transform),
-    zIndex: isDragging ? 100 : 20,
+    transform: isDragging ? undefined : CSS.Translate.toString(transform),
+    opacity: isDragging ? 0 : 1,
+    zIndex: isDragging ? 0 : 20,
   };
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
   
   const isTravelEvent = event.title?.startsWith('移動');
   const divStyle: React.CSSProperties = { backgroundColor: staff.color || 'hsl(var(--primary))' };
-  if (isTravelEvent) style.opacity = 0.5;
+  if (isTravelEvent) style.opacity = isDragging ? 0 : 0.5;
   
   const textColor = staff.color ? getContrastingTextColor(staff.color) : 'white';
   let textColorClass = textColor === '#FFFFFF' ? 'text-white' : 'text-black';
@@ -750,7 +729,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   return (
     <Tooltip>
       <TooltipTrigger ref={setNodeRef} style={style} {...listeners} {...attributes} onDoubleClick={handleDoubleClick} className="absolute h-12 top-1/2 -translate-y-1/2 rounded-md flex flex-col justify-center cursor-move" data-event-chip="true">
-        <div className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && "opacity-80")} style={divStyle}>
+        <div className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass)} style={divStyle}>
           <p className="text-xs font-semibold truncate pointer-events-none">{line1}</p>
           {line2 && (<p className="text-xs opacity-80 truncate pointer-events-none">{line2}</p>)}
         </div>
