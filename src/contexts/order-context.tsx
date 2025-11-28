@@ -108,16 +108,16 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     const scheduledRawOrderIds = new Set<string>();
 
     rawOrdersData.forEach((rawOrder: any) => {
-      const mappedOrder = mapRawToOrder(rawOrder, allStaff);
-      const staffName = mappedOrder.staffName;
+      const staffName = findKey(rawOrder, ['担当']);
       const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
-      const scheduledTimeStr = mappedOrder.scheduledTime;
+      const scheduledTimeStr = findKey(rawOrder, ['チップ配置作業予定']);
       
       if (staffMember && scheduledTimeStr) {
         try {
           const scheduledTime = parseISO(scheduledTimeStr);
 
           if (isValid(scheduledTime)) {
+              const mappedOrder = mapRawToOrder(rawOrder, allStaff);
               if (mappedOrder.rawOrderId) {
                 scheduledRawOrderIds.add(mappedOrder.rawOrderId);
               }
@@ -150,7 +150,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
               newScheduleEvents.push(travelEvent, taskEvent);
           }
         } catch(e) {
-          console.error("Error parsing schedule time for order:", mappedOrder.id, e);
+          const orderId = findKey(rawOrder, ['受注 ID', '受注id', '受注ID', 'id']);
+          console.error("Error parsing schedule time for order:", orderId, e);
         }
       }
       
@@ -181,6 +182,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         if (!order.rawOrderId) return false;
         if (scheduledRawOrderIds.has(order.rawOrderId)) return false;
 
+        // An unassigned order should not have a staff or scheduled time.
+        const staffName = findKey(order, ['担当']);
+        const scheduledTime = findKey(order, ['チップ配置作業予定']);
+        if(staffName || scheduledTime) return false;
+        
         const scheduledDate = order.scheduledDate ? parseISO(order.scheduledDate) : null;
         return scheduledDate && isValid(scheduledDate);
     });

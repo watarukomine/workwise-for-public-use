@@ -205,6 +205,7 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
     
     const dailyOrders = orders.filter(order => {
+        if (!order.scheduledDate) return false;
         const scheduledDate = parseISO(order.scheduledDate);
         return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(date));
     });
@@ -379,7 +380,7 @@ export function ScheduleView({
     if ('staffId' in item) { // Moving an existing event
         const draggedEvent = item as WithId<ScheduleEvent>;
         
-        const prevSchedule = [...scheduleEvents];
+        // Optimistically update UI
         setScheduleEvents(prev => {
             const isTripEvent = !!draggedEvent.tripId;
             if (isTripEvent) {
@@ -405,7 +406,7 @@ export function ScheduleView({
                     if (e.id.endsWith('-travel')) {
                         return { ...e, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
                     }
-                    return e;
+                    return e; // Should not happen
                 });
 
             } else { // Moving a generic event
@@ -415,38 +416,32 @@ export function ScheduleView({
             }
         });
         
-        try {
-            if (draggedEvent.rawOrderId) { // Sheet-based event
-                const newStaff = getStaffById(newStaffId);
-                if (!newStaff) throw new Error("Staff not found");
-
-                const originalTask = scheduleEvents.find(e => e.tripId === draggedEvent.tripId && e.id.endsWith('-task'))!;
-                
-                let newTaskStart = newStart;
-                if (draggedEvent.id.endsWith('-travel')) {
-                    const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                    newTaskStart = addMinutes(newStart, travelDuration);
+        // Asynchronously update backend
+        (async () => {
+            try {
+                if (draggedEvent.rawOrderId) { // Sheet-based event
+                    let taskStart = newStart;
+                    if(draggedEvent.id.endsWith('-travel')) {
+                        const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+                        taskStart = addMinutes(newStart, travelDuration);
+                    }
+                    const newStaff = getStaffById(newStaffId);
+                    await updateSheetStatus({
+                        gasUrl: ORDER_GAS_URL,
+                        eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+                        staffName: newStaff?.name,
+                        scheduledTime: taskStart.toISOString(),
+                    });
                 }
-
-                await updateSheetStatus({
-                    gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${originalTask.rawOrderId})`,
-                    staffName: newStaff.name,
-                    scheduledTime: newTaskStart.toISOString(),
-                });
-
                 toast({ title: "スケジュールを更新しました" });
+                // We refetch to ensure consistency, though the UI is already updated.
                 await refetchOrders();
-
-            } else { // Generic, non-sheet event
-                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                 setScheduleEvents(prev => prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: addMinutes(newStart, duration).toISOString() } : e));
-                 toast({ title: "予定を更新しました" });
+            } catch (e: any) {
+                toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
+                // On error, refetch to revert optimistic update
+                await refetchOrders();
             }
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
-            setScheduleEvents(prevSchedule);
-        }
+        })();
     
     } else if ('estimatedDuration' in item) { // Creating a new event
         const order = item as WithId<Order>;
@@ -469,6 +464,28 @@ export function ScheduleView({
                 toast({ title: "汎用タスクを追加しました" });
 
             } else {
+                // Optimistic UI update
+                const customer = getCustomerByCode(order.customerCode);
+                const tripId = `trip-${order.rawOrderId}`;
+                const taskEnd = addMinutes(newStart, order.estimatedDuration);
+                const travelStart = subMinutes(newStart, TRAVEL_TIME_MINUTES);
+                const travelEvent: WithId<ScheduleEvent> = {
+                    id: `${tripId}-travel`, tripId,
+                    title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
+                    staffId: newStaffId, locationId: customer?.id || '',
+                    start: travelStart.toISOString(), end: newStart.toISOString(),
+                    ...order,
+                 };
+                 const taskEvent: WithId<ScheduleEvent> = {
+                    id: `${tripId}-task`, tripId, orderId: order.id,
+                    title: order.taskDetails,
+                    staffId: newStaffId, locationId: customer?.id || '',
+                    start: newStart.toISOString(), end: taskEnd.toISOString(),
+                    ...order,
+                 };
+                setScheduleEvents(prev => [...prev, travelEvent, taskEvent]);
+
+                // Backend update
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${order.rawOrderId})`,
@@ -478,17 +495,18 @@ export function ScheduleView({
                     timestamp: new Date().toISOString(),
                 });
                 
-                await refetchOrders();
                 toast({ title: "タスクを割り当てました" });
+                await refetchOrders();
             }
         } catch (e: any) {
              toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+             // On error, refetch to revert optimistic update
              await refetchOrders();
         }
     }
   };
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
-    if (event.rawOrderId) {
+    if (event.rawOrderId) { // Sheet-based events are read-only in the dialog
         toast({ title: '受注タスクの編集', description: '受注タスクの詳細はスプレッドシートから直接編集してください。' });
         return;
     }
