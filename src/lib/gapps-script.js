@@ -1,3 +1,4 @@
+
 // ↓↓↓↓【要設定】↓↓↓↓
 // 「受注管理」シートがあるスプレッドシートのIDを貼り付けてください
 const ORDER_SPREADSHEET_ID = "17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s"; 
@@ -78,14 +79,12 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
     
-    if (params.operation) { // 'create', 'update', 'delete' calendar events
-      return handleCalendarEvent(params);
-    } else if (params.eventTitle) { // Update sheet from app
+    if (params.eventTitle) { // Update sheet from app
       return updateSheetWithOrderInfo(params);
     } else {
       return ContentService.createTextOutput(JSON.stringify({
         status: "error",
-        message: "必要なパラメータ (operation または eventTitle) がありません"
+        message: "必要なパラメータ (eventTitle) がありません"
       })).setMimeType(ContentService.MimeType.JSON);
     }
   } catch (error) {
@@ -103,7 +102,7 @@ function doPost(e) {
 function updateSheetWithOrderInfo(params) {
   const { 
       eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, 
-      actionTimestamp, scheduledTime, taskCalendarEventId, travelCalendarEventId
+      actionTimestamp, scheduledTime
   } = params;
 
   try {
@@ -160,9 +159,7 @@ function updateSheetWithOrderInfo(params) {
       updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
     }
     updateColumn("チップ配置作業予定", scheduledTime ? new Date(scheduledTime) : (scheduledTime === "" ? "" : undefined)); 
-    updateColumn("taskCalendarEventId", taskCalendarEventId);
-    updateColumn("travelCalendarEventId", travelCalendarEventId);
-
+    
     if (actionType && actionTimestamp) {
         const dateValue = new Date(actionTimestamp);
         const actionColMap = {
@@ -187,67 +184,5 @@ function updateSheetWithOrderInfo(params) {
       status: "error",
       message: error.message
     })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * カレンダーイベントを作成・更新・削除する
- */
-function handleCalendarEvent(params) {
-  try {
-    console.log("handleCalendarEvent called with:", JSON.stringify(params));
-    
-    const { operation, calendarId, eventId, title, description, startTime, endTime } = params;
-    
-    if (!operation || !calendarId) {
-      throw new Error("必須パラメータ 'operation' または 'calendarId' がありません");
-    }
-    
-    const calendar = CalendarApp.getCalendarById(calendarId);
-    if (!calendar) throw new Error(`カレンダーID「${calendarId}」が見つからないか、アクセス権がありません。`);
-
-    let result = {};
-    
-    switch (operation) {
-      case 'create':
-        if (!title || !startTime || !endTime) throw new Error("予定の作成には title, startTime, endTime が必要です。");
-        const newEvent = calendar.createEvent(title, new Date(startTime), new Date(endTime), { description: description || '' });
-        result = { status: "success", message: "カレンダーに予定を作成しました。", eventId: newEvent.getId() };
-        break;
-        
-      case 'update':
-        if (!eventId) throw new Error("予定の更新には eventId が必要です。");
-        const eventToUpdate = calendar.getEventById(eventId);
-        if (!eventToUpdate) throw new Error(`イベントID「${eventId}」が見つかりません。`);
-        if (title) eventToUpdate.setTitle(title);
-        if (startTime && endTime) eventToUpdate.setTime(new Date(startTime), new Date(endTime));
-        if (description !== undefined) eventToUpdate.setDescription(description || "");
-        result = { status: "success", message: "カレンダーの予定を更新しました。", eventId: eventId };
-        break;
-        
-      case 'delete':
-        if (!eventId) throw new Error("予定の削除には eventId が必要です。");
-        try {
-            const eventToDelete = calendar.getEventById(eventId);
-            if (eventToDelete) {
-                eventToDelete.deleteEvent();
-                result = { status: "success", message: "カレンダーから予定を削除しました。" };
-            } else {
-                 result = { status: "success", message: "イベントは既に削除されているか、見つかりませんでした。" };
-            }
-        } catch(e) {
-            console.warn(`Could not delete event ${eventId}, it might have been already deleted. Error: ${e.message}`);
-            result = { status: "success", message: `イベント削除中に軽微なエラー: ${e.message}` };
-        }
-        break;
-        
-      default:
-        throw new Error(`不明な操作です: ${operation}`);
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    console.error("Error in handleCalendarEvent:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
