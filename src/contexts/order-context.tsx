@@ -123,7 +123,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
                 scheduledRawOrderIds.add(mappedOrder.rawOrderId);
               }
 
-              const tripId = `trip-${mappedOrder.rawOrderId}`;
+              const tripId = `trip-${mappedOrder.rawOrderId || mappedOrder.id}`;
               
               const taskEventId = `${tripId}-task`;
               const travelEventId = `${tripId}-travel`;
