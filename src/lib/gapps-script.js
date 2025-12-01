@@ -72,7 +72,8 @@ function doPost(e) {
     }
     
     if (params.operation === 'sendEmail') {
-      return sendIcsEmail(params);
+      // 修正点：paramsオブジェクトから必要な引数を全て取り出してsendIcsEmailに渡す
+      return sendIcsEmail(params.staffName, params.staffEmail, params.title, params.description, params.startTime, params.endTime, params.location);
     } else if (params.eventTitle) { // Update sheet from app
       return updateSheetWithOrderInfo(params);
     } else {
@@ -166,9 +167,8 @@ function updateSheetWithOrderInfo(params) {
   }
 }
 
-function sendIcsEmail(params) {
-  const { staffName, staffEmail, title, description, startTime, endTime, location } = params;
-
+// 修正点：引数をオブジェクトではなく、個別の変数として受け取るようにする
+function sendIcsEmail(staffName, staffEmail, title, description, startTime, endTime, location) {
   try {
     if (!staffEmail) throw new Error("宛先メールアドレスが指定されていません。");
 
@@ -224,7 +224,6 @@ function sendIcsEmail(params) {
 
   } catch (error) {
     console.error("Error in sendIcsEmail:", error.message, error.stack);
-    // Even if email fails, we don't want to block the UI flow, so we return a modified success response.
     return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `メール送信中にエラーが発生しました: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
   }
 }
