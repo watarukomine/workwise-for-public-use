@@ -767,7 +767,7 @@ export function ScheduleView({
                                 <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineEndHour}:00</span>
                             </div>
                         </div>
-                        <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                        <div className="flex-shrink-0 font-semibold p-2 border-l flex items-center justify-center" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                     </div>
                 </div>
 
