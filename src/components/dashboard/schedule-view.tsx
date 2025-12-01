@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -44,7 +43,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -389,6 +388,7 @@ export function ScheduleView({
         
         try {
             if (draggedEvent.staffId !== newStaffId && draggedEvent.rawOrderId) {
+                const customer = getCustomerByCode(draggedEvent.locationId);
                 const result = await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
@@ -400,7 +400,7 @@ export function ScheduleView({
                 if (result.status === 'error') throw new Error(result.message);
                 
                 toast({
-                  title: `${staffMember.name}にタスクを再割り当てしました`,
+                  title: `${staffMember.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
                 });
             }
 
@@ -475,7 +475,7 @@ export function ScheduleView({
               if (result.status === 'error') throw new Error(result.message);
               
               toast({
-                title: `${staff.name}にタスクを割り当てました`,
+                title: `${staff.name}に${customer?.storeName || 'タスク'}の作業を割り当てました`,
               });
               
               const tripId = `trip-${Date.now()}`;
@@ -485,7 +485,7 @@ export function ScheduleView({
               const travelEvent: WithId<ScheduleEvent> = {
                   id: `event-${Date.now()}-travel`,
                   tripId: tripId,
-                  title: `移動: ${order.taskDetails.split('\n')[0]}`,
+                  title: `移動: ${customer?.storeName || order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: travelStart.toISOString(),
@@ -497,8 +497,8 @@ export function ScheduleView({
                   tripId: tripId,
                   orderId: order.id,
                   rawOrderId: order.rawOrderId,
-                  title: order.taskDetails,
-                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}`,
+                  title: `${customer?.storeName || order.taskDetails.split('\n')[0]}`,
+                  description: `顧客: ${customer?.storeName || 'N/A'}\n住所: ${customer?.address || 'N/A'}\n詳細:\n${order.taskDetails}`,
                   staffId: newStaffId,
                   locationId: customer?.id || '',
                   start: taskStart.toISOString(),
@@ -625,9 +625,7 @@ export function ScheduleView({
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
         </CardHeader>
         <CardContent>
-           <div className="flex items-center justify-center h-64">
-             <p>Loading schedule...</p>
-           </div>
+           <p>Loading schedule...</p>
         </CardContent>
       </Card>
     );
