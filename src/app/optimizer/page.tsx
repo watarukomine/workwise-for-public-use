@@ -16,6 +16,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
 import { findKey } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 
 function OptimizerPageContent() {
@@ -29,7 +30,7 @@ function OptimizerPageContent() {
   const [avoidHighways, setAvoidHighways] = React.useState(false);
   const placesLibrary = useMapsLibrary("places");
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isProfileLoading && !profile) {
       router.push('/login');
     }

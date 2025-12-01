@@ -20,6 +20,7 @@ import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
 import { useCustomer } from '@/contexts/customer-context';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 
 export default function DashboardPage() {
