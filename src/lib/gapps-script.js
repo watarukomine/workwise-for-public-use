@@ -224,6 +224,7 @@ function sendIcsEmail(params) {
 
   } catch (error) {
     console.error("Error in sendIcsEmail:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `メール送信中にエラーが発生しました: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
+    // Even if email fails, we don't want to block the UI flow, so we return a modified success response.
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `シートは更新されましたが、メール送信中にエラーが発生しました: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
   }
 }
