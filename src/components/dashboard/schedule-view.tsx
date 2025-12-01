@@ -218,8 +218,12 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     
     const dailyOrders = orders.filter(order => {
         if (!order.scheduledDate) return false;
-        const scheduledDate = parseISO(order.scheduledDate);
-        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(date));
+        try {
+          const scheduledDate = parseISO(order.scheduledDate);
+          return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(date));
+        } catch(e) {
+          return false;
+        }
     });
 
     return (
@@ -760,7 +764,7 @@ export function ScheduleView({
                 <div>
                     <h3 className="text-lg font-semibold mb-2">タイムライン</h3>
                     <ScrollArea className="w-full whitespace-nowrap border rounded-lg">
-                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + (timelineTotalHours * 60 * PIXELS_PER_MINUTE) + STATUS_COL_WIDTH}px`}}>
                           <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-b">
                               <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
                               <div className="relative h-[34px] flex-1 border-l">
