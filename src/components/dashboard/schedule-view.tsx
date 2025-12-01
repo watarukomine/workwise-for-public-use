@@ -748,22 +748,20 @@ export function ScheduleView({
       activationConstraint={activationConstraint}
     >
       <TooltipProvider>
-        <Card className="pt-8">
-            <CardContent className="p-4 md:p-6 space-y-6">
-                <Card>
-                    <div className="grid grid-cols-1 md:grid-cols-5">
-                        <div className="md:col-span-3 md:border-r">
-                            <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+          <div className="space-y-6">
+                <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-2">
+                    <Card>
+                        <div className="grid grid-cols-1 md:grid-cols-5">
+                            <div className="md:col-span-3 md:border-r">
+                                <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+                            </div>
+                            <div className="md:col-span-2">
+                                <GenericTasks />
+                            </div>
                         </div>
-                        <div className="md:col-span-2">
-                            <GenericTasks />
-                        </div>
-                    </div>
-                </Card>
-
-                <div className='border rounded-lg overflow-hidden'>
-                    <h3 className="text-lg font-semibold mb-2 p-4">タイムライン</h3>
-                    <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-y">
+                    </Card>
+                     <h3 className="text-lg font-semibold mt-6 mb-2 px-4">タイムライン</h3>
+                     <div className="flex bg-background/95 border-y">
                         <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
                         <div className="relative h-[34px] flex-1 border-l">
                             {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
@@ -774,10 +772,12 @@ export function ScheduleView({
                         </div>
                         <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                     </div>
+                </div>
+
+                <div className='border-x border-b rounded-lg overflow-hidden -mt-2'>
                     <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + (timelineTotalHours * 60 * PIXELS_PER_MINUTE) + STATUS_COL_WIDTH}px`}}>
-                          
-                          <div className="relative mt-2 space-y-2">
+                          <div className="relative space-y-2">
                               {isToday(currentDate) && (
                               <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
                                   <TimeIndicator />
@@ -794,8 +794,7 @@ export function ScheduleView({
                         </div>
                     </ScrollArea>
                 </div>
-            </CardContent>
-        </Card>
+            </div>
         
         <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
             <DialogContent className={cn(dialogState.mode === 'details' && "max-w-xl")}>
