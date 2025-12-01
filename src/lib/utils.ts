@@ -58,47 +58,40 @@ export const formatTime = (date: Date | string) => {
   return format(d, 'HH:mm');
 };
 
-export const mapRawToOrder = (rawOrder: any, rowIndex: number): WithId<Order> => {
-    const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
-    const orderId = findKey(rawOrder, idKeys);
-    // Use a simpler, more robust unique ID for the draggable item itself.
-    // The tripId in the schedule event will be based on this.
-    const uniqueId = String(orderId || `ord-rand-${Math.random()}`);
-
+export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
     const scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定']);
     
     const customerName = findKey(rawOrder, ['お取引先名', '店舗', '取引先']) || '';
     const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || '';
     const unitCount = findKey(rawOrder, ['本数']) || '';
-    const taskContent = findKey(rawOrder, ['作業内容']) || '';
-    const staffName = findKey(rawOrder, ['担当']) || '';
     
-    const line1 = `${customerName}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
+    const equipmentStatus = findKey(rawOrder, ['機材有無']) || '';
+    let equipmentMark = '(×)';
+    if (equipmentStatus === '〇') {
+        equipmentMark = '(〇)';
+    } else if (equipmentStatus === '△') {
+        equipmentMark = '(△)';
+    }
+    
+    const line1 = `${customerName}${equipmentMark}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
     const line2 = `${tireSize}${unitCount ? ` / ${unitCount}本` : ''}`;
 
     let taskDetails = line1;
     if (line2.trim() && line2.trim() !== '/') {
         taskDetails += `\n${line2.trim()}`;
     }
+    
+    const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
+    const orderId = findKey(rawOrder, idKeys);
 
     return {
-        id: uniqueId,
-        rawOrderId: String(orderId || ''),
+        id: String(orderId || `ord-${Math.random()}`),
         customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
-        customerName: customerName,
-        address: findKey(rawOrder, ['住所']) || '',
-        taskDetails: taskDetails.trim() || taskContent,
-        serviceType: findKey(rawOrder, ['作業種別']) || '',
-        status: findKey(rawOrder, ['受注ステータス']) || '未割当',
-        scheduledDate: findKey(rawOrder, ['作業予定日']) || '',
-        scheduledTime: scheduledTime || '',
+        taskDetails: taskDetails.trim(),
         estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
-        value: parseFloat(findKey(rawOrder, ['金額']) || 0),
-        staffName: staffName,
-        equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
-        tireSize: tireSize,
         raw: rawOrder,
+        rawOrderId: String(orderId || '')
     };
 };
 
@@ -145,4 +138,3 @@ export function getContrastingTextColor(hexColor: string): string {
 
     return (yiq >= 128) ? '#000000' : '#FFFFFF';
 }
-
