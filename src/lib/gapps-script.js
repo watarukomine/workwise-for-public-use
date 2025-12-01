@@ -56,16 +56,10 @@ function doGet(e) {
 function doPost(e) {
   try {
     let params;
-    if (e.postData && e.postData.contents) {
-      if (e.postData.type && e.postData.type.indexOf("application/json") !== -1) {
-        params = JSON.parse(e.postData.contents);
-      } else {
-        // Fallback for form POST or other content types
-        params = e.parameter && Object.keys(e.parameter).length ? e.parameter : JSON.parse(e.postData.contents);
-      }
+    if (e.postData && e.postData.type === "application/json") {
+      params = JSON.parse(e.postData.contents);
     } else {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "リクエストにデータがありません" }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "リクエストにJSONデータがありません" })).setMimeType(ContentService.MimeType.JSON);
     }
     
     if (params.operation === 'sendEmail') {
@@ -73,16 +67,13 @@ function doPost(e) {
     } else if (params.eventTitle) { // Update sheet from app
       return updateSheetWithOrderInfo(params);
     } else {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "必要なパラメータ (eventTitle または operation) がありません" }))
-        .setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "必要なパラメータ (eventTitle または operation) がありません" })).setMimeType(ContentService.MimeType.JSON);
     }
   } catch (error) {
     console.error("Error in doPost:", error.message, error.stack);
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "エラーが発生しました: " + error.message }))
-      .setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "エラーが発生しました: " + error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
-
 
 /**
  * 受注IDでシートを検索し、指定された情報で更新する
@@ -94,15 +85,12 @@ function updateSheetWithOrderInfo(params) {
   } = params;
 
   try {
-    console.log("Updating sheet with:", JSON.stringify(params));
-    
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
     if (!match || !match[1] || match[1].toUpperCase() === 'N/A') {
       return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "汎用タスクまたはIDなしタスクのためシート更新はスキップされました。" })).setMimeType(ContentService.MimeType.JSON);
     }
     
     const orderId = match[1];
-    console.log("Extracted order ID:", orderId);
     
     const orderSpreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
     const sheet = orderSpreadsheet.getSheetByName(ORDER_SHEET_NAME);
@@ -125,15 +113,11 @@ function updateSheetWithOrderInfo(params) {
       throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
     }
     
-    console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
-    
     const updateColumn = (colName, value) => {
-      // valueがundefinedの場合のみ更新をスキップし、空文字列やnullは許可する
       if (value !== undefined) {
         const colIdx = headers.indexOf(colName);
         if (colIdx !== -1) {
           sheet.getRange(rowNum, colIdx + 1).setValue(value);
-          console.log(`Updated column '${colName}' with value: ${value}`);
         }
       }
     };
@@ -159,10 +143,9 @@ function updateSheetWithOrderInfo(params) {
         }
     }
         
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `受注ID: ${orderId} を更新しました。`, })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `受注ID: ${orderId} を更新しました。` })).setMimeType(ContentService.MimeType.JSON);
     
   } catch (error) {
-    console.error("Error in updateSheetWithOrderInfo:", error.message, error.stack);
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -224,7 +207,6 @@ function sendIcsEmail(params) {
     return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 ${staffName} に予定のメールを送信しました。` }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    console.error("Error in sendIcsEmail:", error.message, error.stack);
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `メール送信中にエラーが発生しました: ${error.message}` }))
       .setMimeType(ContentService.MimeType.JSON);
   }
