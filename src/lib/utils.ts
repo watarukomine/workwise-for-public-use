@@ -63,8 +63,6 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     const scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定']);
     
     const customerName = findKey(rawOrder, ['お取引先名', '店舗', '取引先']) || '';
-    const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || '';
-    const unitCount = findKey(rawOrder, ['本数']) || '';
     
     const equipmentStatus = findKey(rawOrder, ['機材有無']) || '';
     let equipmentMark = '(×)';
@@ -73,8 +71,11 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     } else if (equipmentStatus === '△') {
         equipmentMark = '(△)';
     }
-    
+
     const line1 = `${customerName}${equipmentMark}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
+    
+    const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || '';
+    const unitCount = findKey(rawOrder, ['本数']) || '';
     const line2 = `${tireSize}${unitCount ? ` / ${unitCount}本` : ''}`;
 
     let taskDetails = line1;

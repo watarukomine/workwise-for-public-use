@@ -25,7 +25,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid } from 'date-fns';
-import { cn, findKey, mapRawToOrder } from '@/lib/utils';
+import { cn, findKey } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -106,6 +106,44 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
     left: minutesToPixels(leftInMinutes),
     width: minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30), 
   };
+};
+
+const mapRawToOrder = (rawOrder: any): WithId<Order> => {
+    const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
+    
+    const customerName = findKey(rawOrder, ['お取引先名', '店舗', '取引先']) || '';
+    const scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定']);
+    
+    const equipmentStatus = findKey(rawOrder, ['機材有無']) || '';
+    let equipmentMark = '(×)';
+    if (equipmentStatus === '〇') {
+        equipmentMark = '(〇)';
+    } else if (equipmentStatus === '△') {
+        equipmentMark = '(△)';
+    }
+
+    const line1 = `${customerName}${equipmentMark}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
+
+    const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || '';
+    const unitCount = findKey(rawOrder, ['本数']) || '';
+    const line2 = `${tireSize}${unitCount ? ` / ${unitCount}本` : ''}`;
+
+    let taskDetails = line1;
+    if (line2.trim() && line2.trim() !== '/') {
+        taskDetails += `\n${line2.trim()}`;
+    }
+    
+    const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
+    const orderId = findKey(rawOrder, idKeys);
+
+    return {
+        id: String(orderId || `ord-${Math.random()}`),
+        customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
+        taskDetails: taskDetails.trim(),
+        estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
+        raw: rawOrder,
+        rawOrderId: String(orderId || '')
+    };
 };
 
 interface DraggableOrderProps {
@@ -278,7 +316,7 @@ export function ScheduleView({
   React.useEffect(() => {
     if (!rawOrdersData) return;
     const allMappedOrders = rawOrdersData.map(mapRawToOrder);
-    const scheduledRawOrderIds = new Set(scheduleData.map(e => e.rawOrderId).filter(Boolean));
+    const scheduledRawOrderIds = new Set((scheduleData || []).map(e => e.rawOrderId).filter(Boolean));
     
     const newUnassignedOrders = allMappedOrders.filter(order => {
         if (!order.rawOrderId) return false;
@@ -339,7 +377,7 @@ export function ScheduleView({
             });
           }
       
-          setScheduleData(prev => prev.filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
+          setScheduleData(prev => (prev || []).filter(e => e.id !== eventToUnassign.id && e.tripId !== eventToUnassign.tripId));
           toast({ title: 'タスクを未割り当てに戻しました' });
       } catch(e: any) {
           console.error("Unassignment failed:", e);
@@ -360,7 +398,7 @@ export function ScheduleView({
         if (item.rawOrderId) {
           await unassignTask(item);
         } else {
-           setScheduleData(prev => prev.filter(e => e.id !== item.id && e.tripId !== item.tripId));
+           setScheduleData(prev => (prev || []).filter(e => e.id !== item.id && e.tripId !== item.tripId));
            toast({ title: '汎用タスクを削除しました' });
         }
         return;
@@ -407,7 +445,8 @@ export function ScheduleView({
             const newStart = getNewStartFromDrop();
 
             setScheduleData(prev => {
-                const eventsToMove = prev.filter(e => e.tripId === draggedEvent.tripId);
+                const currentSchedule = prev || [];
+                const eventsToMove = currentSchedule.filter(e => e.tripId === draggedEvent.tripId);
                 if (eventsToMove.length > 0) {
                     const originalTask = eventsToMove.find(e => e.id.endsWith('-task')) || draggedEvent;
                     const originalTravel = eventsToMove.find(e => e.id.endsWith('-travel'));
@@ -421,7 +460,7 @@ export function ScheduleView({
                     const newTaskEnd = addMinutes(newTaskStart, taskDuration);
                     const newTravelStart = subMinutes(newTaskStart, TRAVEL_TIME_MINUTES);
 
-                    return prev.map(e => {
+                    return currentSchedule.map(e => {
                         if (e.tripId !== draggedEvent.tripId) return e;
                         if (e.id.endsWith('-task')) {
                             return { ...e, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
@@ -434,7 +473,7 @@ export function ScheduleView({
                 } else {
                      const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                      const newEnd = addMinutes(newStart, duration);
-                     return prev.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
+                     return currentSchedule.map(e => e.id === draggedEvent.id ? { ...e, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() } : e);
                 }
             });
 
@@ -461,7 +500,7 @@ export function ScheduleView({
                 start: taskStart.toISOString(),
                 end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
              };
-             setScheduleData(prev => [...prev, newEvent]);
+             setScheduleData(prev => [...(prev || []), newEvent]);
         } else {
             try {
               const result = await updateSheetStatus({
@@ -506,7 +545,7 @@ export function ScheduleView({
               };
               
               setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-              setScheduleData(prev => [...prev, travelEvent, taskEvent]);
+              setScheduleData(prev => [...(prev || []), travelEvent, taskEvent]);
               
             } catch (e: any) {
                  toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
@@ -569,7 +608,7 @@ export function ScheduleView({
             start: newStart.toISOString(),
             end: newEnd.toISOString(),
         };
-        setScheduleData(prev => [...prev, newEvent]);
+        setScheduleData(prev => [...(prev || []), newEvent]);
 
     } else if (dialogState.mode === 'edit') {
         const staff = getStaffById(dialogState.event.staffId);
@@ -582,7 +621,7 @@ export function ScheduleView({
             start: newStart.toISOString(),
             end: newEnd.toISOString(),
         };
-        setScheduleData(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+        setScheduleData(prev => (prev || []).map(e => e.id === updatedEvent.id ? updatedEvent : e));
     }
     setDialogState({ mode: 'closed' });
   };
@@ -594,7 +633,7 @@ export function ScheduleView({
     if (eventToDelete.rawOrderId) {
         await unassignTask(eventToDelete);
     } else {
-        setScheduleData(prev => prev.filter(e => e.id !== eventToDelete.id && e.tripId !== eventToDelete.tripId));
+        setScheduleData(prev => (prev || []).filter(e => e.id !== eventToDelete.id && e.tripId !== eventToDelete.tripId));
         toast({ title: '予定を削除しました' });
     }
 
@@ -663,7 +702,7 @@ export function ScheduleView({
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative mt-2 space-y-2">
                             {staffData?.map((staff) => {
-                                const events = scheduleData.filter((e) => e.staffId === staff.id);
+                                const events = (scheduleData || []).filter((e) => e.staffId === staff.id);
                                 return (
                                     <StaffRow
                                         key={staff.id}
@@ -911,5 +950,3 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </Tooltip>
   );
 };
-
-    
