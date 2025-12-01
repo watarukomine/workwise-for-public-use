@@ -39,7 +39,7 @@ function doGet(e) {
           obj[header] = cellValue;
         }
       });
-      obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowNumber}`;
+      obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowIndex + 2}`;
       return obj;
     });
 
