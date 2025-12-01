@@ -11,6 +11,7 @@ import {
   DragOverlay,
   type Active,
   useDndContext,
+  ActivationConstraint,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import type { ScheduleEvent, Staff, Customer, Order, WithId, StaffStatus } from '@/lib/types';
@@ -282,11 +283,11 @@ const TimeIndicator = () => {
 };
 
 const RenderDragOverlay = () => {
-    const { active } = useDndContext();
+    const { active, delta } = useDndContext();
     const { getCustomerByCode, getStaffById } = useScheduleView();
     
     const style: React.CSSProperties = {
-        pointerEvents: 'none',
+        transform: CSS.Translate.toString(delta),
     };
 
     if (!active) return null;
@@ -394,7 +395,7 @@ export function ScheduleView({
         });
         
         toast({ title: 'タスクを未割り当てに戻しました' });
-        await refetchOrders();
+        refetchOrders();
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
@@ -505,7 +506,7 @@ export function ScheduleView({
                   });
               }
               toast({ title: "スケジュールを更新しました" });
-              await refetchOrders();
+              refetchOrders();
           } catch (e: any) {
               toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
               setScheduleEvents(previousSchedule); // Revert on error
@@ -564,7 +565,7 @@ export function ScheduleView({
                      if(taskEvent) setDialogState({ mode: 'details', event: taskEvent });
 
                      toast({ title: "タスクを割り当てました。詳細を確認しメールを送信してください。" });
-                     await refetchOrders();
+                     refetchOrders();
                 }
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
@@ -641,7 +642,7 @@ export function ScheduleView({
                     scheduledTime: newStart.toISOString(),
                     timestamp: new Date().toISOString(),
                 });
-                await refetchOrders();
+                refetchOrders();
 
             } else { // Generic event
                 const updatedEvent = { ...dialogState.event, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
@@ -729,12 +730,16 @@ export function ScheduleView({
   );
 
   const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
+  const activationConstraint: ActivationConstraint = {
+      distance: 5,
+  };
 
   return (
     <ScheduleViewContext.Provider value={contextValue}>
     <DndContext 
       onDragStart={handleDragStart} 
       onDragEnd={handleDragEnd}
+      activationConstraint={activationConstraint}
     >
       <TooltipProvider>
         <Card className="pt-8">
