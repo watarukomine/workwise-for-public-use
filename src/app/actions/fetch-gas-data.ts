@@ -1,6 +1,8 @@
 
 'use server';
 
+import { unstable_noStore as noStore } from 'next/cache';
+
 /**
  * Fetches data from a given Google Apps Script URL.
  * This server action acts as a proxy to bypass client-side CORS issues.
@@ -8,6 +10,9 @@
  * @returns A promise that resolves to the JSON data from the GAS endpoint.
  */
 export async function fetchGasData(url: string): Promise<any> {
+  // This function will always be dynamically rendered, disabling caching.
+  noStore();
+
   if (!url) {
     throw new Error('URL is required to fetch data.');
   }
