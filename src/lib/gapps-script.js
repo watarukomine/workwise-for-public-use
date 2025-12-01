@@ -1,4 +1,3 @@
-
 // ↓↓↓↓【要設定】↓↓↓↓
 // 「受注管理」シートがあるスプレッドシートのIDを貼り付けてください
 const ORDER_SPREADSHEET_ID = "17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s"; 
@@ -168,40 +167,15 @@ function updateSheetWithOrderInfo(params) {
 }
 
 function sendIcsEmail(params) {
-  const { staffName, title, description, startTime, endTime, location } = params;
+  const { staffName, staffEmail, title, description, startTime, endTime, location } = params;
 
   try {
-    if (!staffName) throw new Error("スタッフ名が指定されていません。");
+    if (!staffEmail) throw new Error("宛先メールアドレスが指定されていません。");
 
-    const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
-    const staffSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
-    if (!staffSheet) throw new Error(`シート「${STAFF_SHEET_NAME}」が見つかりません。`);
-
-    const staffData = staffSheet.getDataRange().getValues();
-    const headers = staffData[0];
-    const nameCol = headers.indexOf("スタッフ名");
-    const emailCol = headers.indexOf("メールアドレス");
-
-    if (nameCol === -1 || emailCol === -1) throw new Error("スタッフマスタに「スタッフ名」または「メールアドレス」の列が見つかりません。");
-
-    let recipientEmail;
-    for (let i = 1; i < staffData.length; i++) {
-      if (staffData[i][nameCol] === staffName) {
-        recipientEmail = staffData[i][emailCol];
-        break;
-      }
-    }
-
-    if (!recipientEmail) {
-      // Return success even if email not found to not block UI, but log it.
-      console.warn(`Email for staff "${staffName}" not found. Skipping email.`);
-      return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "担当者のメールアドレスが見つからなかったため、メールは送信されませんでした。" })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(recipientEmail)) {
-      console.warn(`Invalid email format for ${staffName}: ${recipientEmail}. Skipping email.`);
+    if (!emailRegex.test(staffEmail)) {
+      console.warn(`Invalid email format for ${staffName}: ${staffEmail}. Skipping email.`);
       return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 (${staffName}) のメールアドレス形式が正しくありません。` })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -244,13 +218,12 @@ function sendIcsEmail(params) {
       }]
     };
 
-    MailApp.sendEmail(recipientEmail, subject, body, options);
+    MailApp.sendEmail(staffEmail, subject, body, options);
     
     return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 ${staffName} に予定のメールを送信しました。` })).setMimeType(ContentService.MimeType.JSON);
 
   } catch (error) {
     console.error("Error in sendIcsEmail:", error.message, error.stack);
-    // Even if email fails, we don't want to block the UI flow, so we return a modified success response.
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `シートは更新されましたが、メール送信中にエラーが発生しました: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `メール送信中にエラーが発生しました: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
   }
 }

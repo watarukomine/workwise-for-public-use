@@ -1,4 +1,3 @@
-
 'use server';
 
 interface GasApiArgs {
@@ -81,6 +80,7 @@ export async function updateSheetStatus(args: {
 export async function sendIcsEmail(args: {
     gasUrl: string;
     staffName: string;
+    staffEmail: string;
     title: string;
     description: string;
     startTime: string;

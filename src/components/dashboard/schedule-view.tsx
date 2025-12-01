@@ -559,7 +559,7 @@ export function ScheduleView({
                 if (isGeneric) {
                      toast({ title: "汎用タスクを追加しました" });
                 } else {
-                     await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
+                     updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
                      
                      const taskEvent = scheduleEvents.find(e => e.start === taskStart.toISOString() && e.staffId === newStaffId);
                      if(taskEvent) setDialogState({ mode: 'details', event: taskEvent });
@@ -671,14 +671,15 @@ export function ScheduleView({
   
     const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
     const staff = getStaffById(event.staffId);
-    if (!staff) {
-      toast({ variant: 'destructive', title: 'エラー', description: '担当者が見つかりません。' });
+    if (!staff || !staff.email) {
+      toast({ variant: 'destructive', title: 'エラー', description: '担当者が見つからないか、メールアドレスが登録されていません。' });
       return;
     }
     try {
       const result = await sendIcsEmail({
         gasUrl: ORDER_GAS_URL,
         staffName: staff.name,
+        staffEmail: staff.email,
         title: event.title,
         description: `顧客: ${findKey(event.raw, ['お取引先名', '店舗']) || 'N/A'}\n住所: ${findKey(event.raw, ['住所']) || 'N/A'}`,
         startTime: event.start as string,
