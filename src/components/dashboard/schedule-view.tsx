@@ -761,21 +761,22 @@ export function ScheduleView({
                     </div>
                 </Card>
 
-                <div>
-                    <h3 className="text-lg font-semibold mb-2">タイムライン</h3>
-                    <ScrollArea className="w-full whitespace-nowrap border rounded-lg">
+                <div className='border rounded-lg overflow-hidden'>
+                    <h3 className="text-lg font-semibold mb-2 p-4">タイムライン</h3>
+                    <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-y">
+                        <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                        <div className="relative h-[34px] flex-1 border-l">
+                            {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
+                                    <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                    </div>
+                    <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + (timelineTotalHours * 60 * PIXELS_PER_MINUTE) + STATUS_COL_WIDTH}px`}}>
-                          <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-b">
-                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                              <div className="relative h-[34px] flex-1 border-l">
-                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                      <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
-                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
-                                      </div>
-                                  ))}
-                              </div>
-                              <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
-                          </div>
+                          
                           <div className="relative mt-2 space-y-2">
                               {isToday(currentDate) && (
                               <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
