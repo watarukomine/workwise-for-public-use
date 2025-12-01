@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
 import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor } from '@/lib/utils';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -45,7 +45,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
-import { Textarea } from '../ui/textarea';
+import { Textarea } from '@/components/ui/textarea';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus, sendIcsEmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
@@ -560,7 +560,7 @@ export function ScheduleView({
                 if (isGeneric) {
                      toast({ title: "汎用タスクを追加しました" });
                 } else {
-                     updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
+                     await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
                      
                      const taskEvent = (scheduleEvents || []).find(e => e.start === taskStart.toISOString() && e.staffId === newStaffId);
                      if(taskEvent) setDialogState({ mode: 'details', event: taskEvent });
@@ -778,9 +778,9 @@ export function ScheduleView({
                                   <TimeIndicator />
                               </div>
                               )}
-                              {staffData?.map((staff) => {
-                                  const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                  const status = statuses.find(s => s.staffId === staff.id);
+                              {(staffData || []).map((staff) => {
+                                  const events = (dailySchedule || []).filter((e) => e.staffId === staff.id);
+                                  const status = (statuses || []).find(s => s.staffId === staff.id);
                                   return (
                                       <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
                                   );

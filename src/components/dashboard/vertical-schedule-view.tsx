@@ -9,9 +9,9 @@ import { Clock, MapPin, Briefcase } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCustomer } from '@/contexts/customer-context';
 import Link from 'next/link';
+import { useOrder } from '@/contexts/order-context';
 
 interface VerticalScheduleViewProps {
-  scheduleData: WithId<ScheduleEvent>[];
   staffData: WithId<Staff>[];
   currentDate: Date;
 }
@@ -23,8 +23,10 @@ const formatTime = (date: Date | string | undefined) => {
   return format(d, 'HH:mm');
 };
 
-export function VerticalScheduleView({ scheduleData, staffData, currentDate }: VerticalScheduleViewProps) {
+export function VerticalScheduleView({ staffData, currentDate }: VerticalScheduleViewProps) {
     const { customers } = useCustomer();
+    const { scheduleEvents } = useOrder();
+    
     const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => {
         if (!id) return undefined;
         // customer.id is userCode in some contexts. Let's find by either.
@@ -33,7 +35,7 @@ export function VerticalScheduleView({ scheduleData, staffData, currentDate }: V
     
     // Filter for events assigned to the currently displayed staff for the current date and sort by start time
     const staffIds = new Set(staffData.map(s => s.id));
-    const relevantEvents = (scheduleData || [])
+    const relevantEvents = (scheduleEvents || [])
         .filter(event => {
             const eventDate = parseISO(event.start as string);
             return event.staffId && 

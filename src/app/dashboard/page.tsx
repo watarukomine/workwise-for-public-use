@@ -26,7 +26,6 @@ export default function DashboardPage() {
   
   const { 
     isLoading: isLoadingOrders, 
-    scheduleEvents,
     statuses,
   } = useOrder();
   
@@ -157,7 +156,6 @@ export default function DashboardPage() {
       {showVerticalView ? (
           <VerticalScheduleView 
               staffData={filteredStaff}
-              scheduleData={scheduleEvents}
               currentDate={currentDate}
           />
       ) : (

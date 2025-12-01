@@ -161,6 +161,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setErrorState(null);
 
     try {
+      // Force cache-busting by adding a dummy parameter with the current timestamp
       const urlWithCacheBuster = `${orderGasUrl}${orderGasUrl.includes('?') ? '&' : '?'}dummy=${Date.now()}`;
       const result = await fetchGasData(urlWithCacheBuster);
       
@@ -180,7 +181,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, [orderGasUrl, isStaffLoading]);
 
-  // Initial data fetch and interval setup
+  // Initial data fetch
   useEffect(() => {
     if (isStaffLoading) {
       return;
