@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
@@ -164,7 +163,15 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       if (result.error && result.message) throw new Error(result.message);
       
       const newRawOrderData = result.data || (Array.isArray(result) ? result : []);
-      setRawOrdersData(newRawOrderData);
+      
+      if (allStaff.length > 0) {
+        setRawOrdersData(newRawOrderData);
+        const { orders, scheduleEvents, statuses, unassignedOrders } = processOrderData(newRawOrderData, allStaff);
+        setOrders(orders);
+        setScheduleEvents(scheduleEvents);
+        setStatuses(statuses);
+        setUnassignedOrders(unassignedOrders);
+      }
       
     } catch (e: any) {
       console.error("Failed to fetch or process order data from GAS:", e);
@@ -173,24 +180,18 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } finally {
       if (showLoading) setIsLoading(false);
     }
-  }, [orderGasUrl, isStaffLoading]);
+  }, [orderGasUrl, isStaffLoading, allStaff]);
 
-  // Initial data fetch
+  // Initial and reactive data fetch.
   useEffect(() => {
-    fetchAndProcessData(true);
-  }, [fetchAndProcessData]);
-
-  // This effect is now solely responsible for processing data when it changes.
-  useEffect(() => {
-    if (isLoading || isStaffLoading) return;
-
-    const { orders, scheduleEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff);
-    setOrders(orders);
-    setScheduleEvents(scheduleEvents);
-    setStatuses(statuses);
-    setUnassignedOrders(unassignedOrders);
-    
-  }, [rawOrdersData, allStaff, isLoading, isStaffLoading]);
+    // Only fetch when staff data is available.
+    if (!isStaffLoading && allStaff.length > 0) {
+      fetchAndProcessData(true);
+    } else if (!isStaffLoading) {
+      // If staff is not loading but there's no staff, we can stop loading.
+      setIsLoading(false);
+    }
+  }, [isStaffLoading, allStaff, fetchAndProcessData]);
 
 
   const value: OrderContextType = {
@@ -222,3 +223,4 @@ export function useOrder() {
   }
   return context;
 }
+    
