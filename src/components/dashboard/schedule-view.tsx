@@ -178,9 +178,9 @@ interface ScheduleViewProps {
 }
 
 const genericTasks: WithId<Order>[] = [
-      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30, raw: {} },
-      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60, raw: {} },
-      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60, raw: {} },
+      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30, raw: {}, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0 },
+      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60, raw: {}, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0 },
+      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60, raw: {}, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0 },
 ];
 
 function GenericTasks() {
@@ -201,7 +201,7 @@ function GenericTasks() {
                         <DraggableOrder
                             key={task.id}
                             order={task}
-                            className={getDraggableClassName(task)}
+                            className={getDraggableClassName(task as WithId<Order>)}
                         />
                     ))}
                 </div>
@@ -278,7 +278,7 @@ const TimeIndicator = () => {
 
     return (
         <div
-            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
+            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none z-[11]"
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -287,20 +287,15 @@ const TimeIndicator = () => {
 };
 
 const RenderDragOverlay = () => {
-    const { active, delta } = useDndContext();
+    const { active } = useDndContext();
     const { getCustomerByCode, getStaffById } = useScheduleView();
     
-    const style: React.CSSProperties = {
-        transform: CSS.Translate.toString(delta),
-    };
-
     if (!active) return null;
 
     const activeItem = active.data.current;
 
     return (
         <DragOverlay>
-            <div style={style}>
             {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
               <OrderChip order={activeItem} style={{ width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px` }} />
             ) : activeItem && 'staffId' in activeItem ? (
@@ -318,7 +313,6 @@ const RenderDragOverlay = () => {
                 );
               })()
             ) : null}
-            </div>
         </DragOverlay>
     );
 }
@@ -777,12 +771,12 @@ export function ScheduleView({
                     </div>
                 </div>
 
-                <div className='border-x border-b rounded-lg overflow-hidden -mt-2'>
+                <div className='border-x border-b rounded-lg overflow-hidden -mt-2 relative z-10'>
                     <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative" style={{ width: `${STAFF_COL_WIDTH + (timelineTotalHours * 60 * PIXELS_PER_MINUTE) + STATUS_COL_WIDTH}px`}}>
                           <div className="relative space-y-2">
                               {isToday(currentDate) && (
-                              <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                              <div className="absolute top-0 h-full pointer-events-none z-[11]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
                                   <TimeIndicator />
                               </div>
                               )}
@@ -922,7 +916,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         position: 'absolute',
         top: '50%',
         transform: 'translateY(-50%)',
-        zIndex: 50,
+        zIndex: 10,
       };
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
