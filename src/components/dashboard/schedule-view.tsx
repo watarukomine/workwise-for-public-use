@@ -178,9 +178,9 @@ interface ScheduleViewProps {
 }
 
 const genericTasks: WithId<Order>[] = [
-      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
-      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
-      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
+      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30, raw: {} },
+      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60, raw: {} },
+      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60, raw: {} },
 ];
 
 function GenericTasks() {
@@ -749,7 +749,7 @@ export function ScheduleView({
     >
       <TooltipProvider>
           <div className="space-y-6">
-                <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-2">
+                <div className="sticky top-16 z-20 bg-background/95 backdrop-blur-sm pt-4 pb-2">
                     <Card>
                         <div className="grid grid-cols-1 md:grid-cols-5">
                             <div className="md:col-span-3 md:border-r">
@@ -764,11 +764,14 @@ export function ScheduleView({
                      <div className="flex bg-background/95 border-y">
                         <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
                         <div className="relative h-[34px] flex-1 border-l">
-                            {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                            {Array.from({ length: timelineTotalHours }).map((_, i) => (
                                 <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
                                     <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
                                 </div>
                             ))}
+                             <div className="absolute h-full border-l" style={{ left: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
+                                <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineEndHour}:00</span>
+                            </div>
                         </div>
                         <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                     </div>
@@ -776,7 +779,7 @@ export function ScheduleView({
 
                 <div className='border-x border-b rounded-lg overflow-hidden -mt-2'>
                     <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + (timelineTotalHours * 60 * PIXELS_PER_MINUTE) + STATUS_COL_WIDTH}px`}}>
+                        <div className="relative" style={{ width: `${STAFF_COL_WIDTH + (timelineTotalHours * 60 * PIXELS_PER_MINUTE) + STATUS_COL_WIDTH}px`}}>
                           <div className="relative space-y-2">
                               {isToday(currentDate) && (
                               <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
