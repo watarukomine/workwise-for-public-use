@@ -32,7 +32,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
       return { orders: [], scheduleEvents: [], statuses: [], unassignedOrders: [] };
     }
 
-    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any, index: number) => mapRawToOrder(o));
+    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any) => mapRawToOrder(o));
     
     const newScheduleEvents: WithId<ScheduleEvent>[] = [];
     const staffStatusMap = new Map<string, StaffStatus>();
@@ -42,7 +42,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
     
     const scheduledRawOrderIds = new Set<string>();
 
-    rawOrdersData.forEach((rawOrder: any, index: number) => {
+    rawOrdersData.forEach((rawOrder: any) => {
       const staffName = findKey(rawOrder, ['担当']);
       const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
       const scheduledTimeStr = findKey(rawOrder, ['チップ配置作業予定']);
@@ -179,20 +179,12 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   // Initial data fetch and interval setup
   useEffect(() => {
-    if (isStaffLoading || allStaff.length === 0) {
-      // Don't fetch if staff isn't loaded, as processing depends on it
+    if (isStaffLoading) {
       return;
     }
     
-    fetchAndProcessData(true); // Initial fetch
+    fetchAndProcessData(true);
     
-    // Set up an interval to refetch data every 2 minutes (120000 ms)
-    const intervalId = setInterval(() => {
-        console.log('Refetching orders data automatically...');
-        fetchAndProcessData(false); // Subsequent fetches don't show global loading
-    }, 120000);
-
-    return () => clearInterval(intervalId); // Cleanup interval on component unmount
   }, [isStaffLoading, allStaff, fetchAndProcessData]);
 
 
