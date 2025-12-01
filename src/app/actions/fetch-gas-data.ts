@@ -18,11 +18,10 @@ export async function fetchGasData(url: string): Promise<any> {
   }
 
   try {
+    // The URL already contains a cache-busting parameter, so we fetch it directly.
     const response = await fetch(url, {
       method: 'GET',
-      cache: 'no-store',
-      // Using 'follow' is simpler and often sufficient.
-      // If redirects persist, it's a clear sign of a permissions issue on the GAS side.
+      cache: 'no-store', 
       redirect: 'follow', 
     });
     
@@ -33,12 +32,18 @@ export async function fetchGasData(url: string): Promise<any> {
     
     if (!response.ok) {
       let errorMessage = `GAS request failed. Status: ${response.status}.`;
-      const responseText = await response.text();
-      // Check if the response looks like a Google login page HTML or a redirect message.
-      if (responseText.toLowerCase().includes('<title>google') || responseText.toLowerCase().includes('signin')) {
-          errorMessage = 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings and that you have deployed a new version after any changes.';
-      } else if (response.status >= 300 && response.status < 400) {
-          errorMessage = "GAS request was redirected. This usually indicates a permission issue. Please ensure your script is deployed with 'Who has access' set to 'Anyone' and that you have deployed a new version after any changes to the script. The doGet() function must also correctly return ContentService output, not an HTML page.";
+      try {
+        const responseText = await response.text();
+        // Check if the response looks like a Google login page HTML or a redirect message.
+        if (responseText.toLowerCase().includes('<title>google') || responseText.toLowerCase().includes('signin')) {
+            errorMessage = 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings and that you have deployed a new version after any changes.';
+        } else if (response.status >= 300 && response.status < 400) {
+            errorMessage = "GAS request was redirected. This usually indicates a permission issue. Please ensure your script is deployed with 'Who has access' set to 'Anyone' and that you have deployed a new version after any changes to the script. The doGet() function must also correctly return ContentService output, not an HTML page.";
+        } else {
+            errorMessage += ` Response: ${responseText}`;
+        }
+      } catch (e) {
+        // Ignore if we can't read the body
       }
       
       throw new Error(errorMessage);

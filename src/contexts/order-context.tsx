@@ -159,19 +159,12 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setErrorState(null);
 
     try {
-      const result = await fetchGasData(orderGasUrl);
+      const urlWithCacheBuster = `${orderGasUrl}${orderGasUrl.includes('?') ? '&' : '?'}dummy=${Date.now()}`;
+      const result = await fetchGasData(urlWithCacheBuster);
       if (result.error && result.message) throw new Error(result.message);
       
       const newRawOrderData = result.data || (Array.isArray(result) ? result : []);
-      
-      if (allStaff.length > 0) {
-        setRawOrdersData(newRawOrderData);
-        const { orders, scheduleEvents, statuses, unassignedOrders } = processOrderData(newRawOrderData, allStaff);
-        setOrders(orders);
-        setScheduleEvents(scheduleEvents);
-        setStatuses(statuses);
-        setUnassignedOrders(unassignedOrders);
-      }
+      setRawOrdersData(newRawOrderData);
       
     } catch (e: any) {
       console.error("Failed to fetch or process order data from GAS:", e);
@@ -180,18 +173,34 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } finally {
       if (showLoading) setIsLoading(false);
     }
-  }, [orderGasUrl, isStaffLoading, allStaff]);
+  }, [orderGasUrl, isStaffLoading]);
 
-  // Initial and reactive data fetch.
   useEffect(() => {
-    // Only fetch when staff data is available.
-    if (!isStaffLoading && allStaff.length > 0) {
-      fetchAndProcessData(true);
-    } else if (!isStaffLoading) {
-      // If staff is not loading but there's no staff, we can stop loading.
-      setIsLoading(false);
-    }
+    if (isStaffLoading) return;
+    
+    fetchAndProcessData(true);
+    
+    // Set up an interval to refetch data every 2 minutes (120000 ms)
+    const intervalId = setInterval(() => {
+        console.log('Refetching orders data automatically...');
+        fetchAndProcessData(false);
+    }, 120000);
+
+    return () => clearInterval(intervalId); // Cleanup interval on component unmount
+
   }, [isStaffLoading, allStaff, fetchAndProcessData]);
+
+
+  useEffect(() => {
+    if (isLoading || isStaffLoading) return;
+
+    const { orders, scheduleEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff);
+    setOrders(orders);
+    setScheduleEvents(scheduleEvents);
+    setStatuses(statuses);
+    setUnassignedOrders(unassignedOrders);
+    
+  }, [rawOrdersData, allStaff, isLoading, isStaffLoading]);
 
 
   const value: OrderContextType = {
@@ -223,4 +232,3 @@ export function useOrder() {
   }
   return context;
 }
-    
