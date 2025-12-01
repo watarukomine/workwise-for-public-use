@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
 import { findKey } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 
 function OptimizerPageContent() {
@@ -22,10 +23,17 @@ function OptimizerPageContent() {
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
   const { rawOrdersData: rawOrders, isLoading: isLoadingOrders } = useOrder();
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
+  const router = useRouter();
   
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
   const [avoidHighways, setAvoidHighways] = React.useState(false);
   const placesLibrary = useMapsLibrary("places");
+
+  React.useEffect(() => {
+    if (!isProfileLoading && !profile) {
+      router.push('/login');
+    }
+  }, [isProfileLoading, profile, router]);
 
   const filteredStaffFromSelection = React.useMemo(() => {
     if (isStaffLoading || !allStaff) return [];
@@ -121,24 +129,12 @@ function OptimizerPageContent() {
 
   }, [filteredStaffFromSelection, allCustomers, statuses, optimizedRoute]);
 
-  if (baseIsLoading) {
+  if (baseIsLoading || !profile) {
     return (
       <div className="flex items-center justify-center p-10">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
-  }
-
-  if (!profile) {
-      return (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>ログインしてください</AlertTitle>
-          <AlertDescription>
-            <p>このページを表示するにはログインが必要です。</p>
-          </AlertDescription>
-        </Alert>
-      )
   }
 
   return (

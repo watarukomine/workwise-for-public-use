@@ -13,11 +13,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { ORDER_GAS_URL, ORDER_SHEET_URL } from '@/lib/settings';
+import { useRouter } from 'next/navigation';
 
 export default function OrdersPage() {
   const { orders, isLoading: isLoadingOrders, error: orderError, orderGasUrl, setOrderGasUrl } = useOrder();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
+  const router = useRouter();
 
   const [localUrl, setLocalUrl] = useState(orderGasUrl);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -26,6 +28,12 @@ export default function OrdersPage() {
   useEffect(() => {
     setLocalUrl(orderGasUrl);
   }, [orderGasUrl]);
+
+  useEffect(() => {
+    if (!isProfileLoading && !profile) {
+      router.push('/login');
+    }
+  }, [isProfileLoading, profile, router]);
 
   const handleUrlUpdate = () => {
     setIsUpdating(true);
@@ -57,25 +65,13 @@ export default function OrdersPage() {
 
   const isLoading = isLoadingOrders || isProfileLoading;
 
-  if (isProfileLoading) {
+  if (isLoading || !profile) {
     return (
         <div className="flex items-center justify-center p-10">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           <p className="ml-4">ユーザー情報を読み込んでいます...</p>
         </div>
     );
-  }
-
-  if (!profile) {
-     return (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>ログインしてください</AlertTitle>
-          <AlertDescription>
-            <p>このページを表示するにはログインが必要です。</p>
-          </AlertDescription>
-        </Alert>
-      )
   }
 
   if (!isAdmin) {

@@ -19,10 +19,12 @@ import { Label } from '@/components/ui/label';
 import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
 import { useCustomer } from '@/contexts/customer-context';
+import { useRouter } from 'next/navigation';
 
 
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
+  const router = useRouter();
   
   const { 
     isLoading: isLoadingOrders, 
@@ -35,6 +37,12 @@ export default function DashboardPage() {
   const isMobile = useIsMobile();
   const { forceMobileView, setForceMobileView } = useAppShell();
   
+  useEffect(() => {
+    if (!isProfileLoading && !profile) {
+      router.push('/login');
+    }
+  }, [isProfileLoading, profile, router]);
+
   const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || isStaffLoading || !profile) return [];
 
@@ -85,24 +93,12 @@ export default function DashboardPage() {
       });
   };
 
-  if (isLoading) {
+  if (isLoading || !profile) {
       return (
         <div className="flex items-center justify-center p-10">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       );
-  }
-
-  if (!profile) {
-      return (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>ようこそ WorkWiseへ</AlertTitle>
-          <AlertDescription>
-            <p>機能を利用するにはログインが必要です。</p>
-          </AlertDescription>
-        </Alert>
-      )
   }
   
   const showVerticalView = forceMobileView || (isMobile && profile.role !== 'admin');

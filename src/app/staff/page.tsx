@@ -13,14 +13,22 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { STAFF_GAS_URL, STAFF_SHEET_URL } from '@/lib/settings';
+import { useRouter } from 'next/navigation';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, isLoading: isStaffLoading, error } = useSelectedStaff();
+  const router = useRouter();
   
   const [localUrl, setLocalUrl] = useState(STAFF_GAS_URL);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (!isProfileLoading && !profile) {
+      router.push('/login');
+    }
+  }, [isProfileLoading, profile, router]);
 
   const handleUrlUpdate = async () => {
     setIsUpdating(true);
@@ -49,6 +57,15 @@ export default function StaffPage() {
     return self ? [self] : [];
   }, [profile, allStaff, isLoading]);
 
+  if (isLoading || !profile) {
+      return (
+        <div className="flex items-center justify-center p-10">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="ml-4">ユーザー情報を読み込んでいます...</p>
+        </div>
+      );
+  }
+
   return (
     <div className="space-y-8">
       <div className="space-y-2">
@@ -65,16 +82,6 @@ export default function StaffPage() {
             : "ご自身の情報を確認できます。"}
         </p>
       </div>
-
-      {!isLoading && !profile && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>ログインしてください</AlertTitle>
-          <AlertDescription>
-            <p>このページを表示するにはログインが必要です。</p>
-          </AlertDescription>
-        </Alert>
-      )}
       
       {error && !isStaffLoading && (
         <Alert variant="destructive">
@@ -93,10 +100,10 @@ export default function StaffPage() {
           <p className="ml-4">最新のスタッフ情報を読み込んでいます...</p>
         </div>
       ) : (
-        profile && <StaffTable staff={staffToDisplay} isLoading={isLoading} />
+        <StaffTable staff={staffToDisplay} isLoading={isLoading} />
       )}
       
-      {!isLoading && profile && allStaff.length === 0 && !error && (
+      {!isLoading && allStaff.length === 0 && !error && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>スタッフ情報がありません</AlertTitle>
