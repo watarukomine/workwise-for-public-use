@@ -72,11 +72,6 @@ export default function StaffPage() {
           <AlertTitle>ログインしてください</AlertTitle>
           <AlertDescription>
             <p>このページを表示するにはログインが必要です。</p>
-            <Button asChild className="mt-4">
-              <Link href="/login">
-                ログインページへ
-              </Link>
-            </Button>
           </AlertDescription>
         </Alert>
       )}

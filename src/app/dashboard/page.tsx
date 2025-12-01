@@ -100,11 +100,6 @@ export default function DashboardPage() {
           <AlertTitle>ようこそ WorkWiseへ</AlertTitle>
           <AlertDescription>
             <p>機能を利用するにはログインが必要です。</p>
-             <Button asChild className="mt-4">
-              <Link href="/login">
-                 ログインページへ
-              </Link>
-            </Button>
           </AlertDescription>
         </Alert>
       )
