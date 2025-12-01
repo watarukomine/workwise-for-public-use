@@ -159,6 +159,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setErrorState(null);
 
     try {
+      // Force cache-busting by adding a dummy parameter with the current timestamp
       const urlWithCacheBuster = `${orderGasUrl}${orderGasUrl.includes('?') ? '&' : '?'}dummy=${Date.now()}`;
       const result = await fetchGasData(urlWithCacheBuster);
       if (result.error && result.message) throw new Error(result.message);
@@ -175,22 +176,26 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, [orderGasUrl, isStaffLoading]);
 
+  // Initial data fetch and interval setup
   useEffect(() => {
-    if (isStaffLoading) return;
+    if (isStaffLoading || !allStaff.length) {
+      // Don't fetch if staff isn't loaded, as processing depends on it
+      return;
+    }
     
-    fetchAndProcessData(true);
+    fetchAndProcessData(true); // Initial fetch
     
     // Set up an interval to refetch data every 2 minutes (120000 ms)
     const intervalId = setInterval(() => {
         console.log('Refetching orders data automatically...');
-        fetchAndProcessData(false);
+        fetchAndProcessData(false); // Subsequent fetches don't show global loading
     }, 120000);
 
     return () => clearInterval(intervalId); // Cleanup interval on component unmount
-
   }, [isStaffLoading, allStaff, fetchAndProcessData]);
 
 
+  // This effect is now solely responsible for processing data when it changes.
   useEffect(() => {
     if (isLoading || isStaffLoading) return;
 
@@ -211,7 +216,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     scheduleEvents,
     setScheduleEvents,
     statuses,
-    refetchOrders: () => fetchAndProcessData(false), // Always refetch without global loading
+    refetchOrders: () => fetchAndProcessData(false), // Manual refetch
     isLoading,
     orderGasUrl,
     setOrderGasUrl,

@@ -11,13 +11,13 @@
  * スタッフマスターのデータを取得・更新するためのGoogle Apps ScriptのURL。
  * 主に staff-context.tsx や auth.ts で使用されます。
  */
-export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxi_HJzHxxFw7Fz5INPJNHcMIXwwFjl7qpFTvyu0ShlDddPYR4vgppnIeck4HoL5G-A7A/exec';
+export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbyjdlLbXbsqg3bRM-FyHElXqwdBIhB82mKnf8IydWjG_1OgVwmejURN0psdjgmLndhj/exec';
 
 /**
  * 顧客情報（販売店情報）を取得・更新するためのGoogle Apps ScriptのURL。
  * 主に customer-context.tsx で使用されます。
  */
-export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyLicNq9Lnedl15wcyc5bQymxMoc4G-3ObC6zrXu7NbY-ZK_GFyMYU_m-HQ_q8ZMgMKuQ/exec';
+export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b1tD4Y489xg0Fz09e84DtDAy_35KhJ_VD4RyJ3J1DavI0B_aZP5ck8hssWPCi/exec';
 
 /**
  * 受注情報を取得・更新し、カレンダー連携も行うGoogle Apps ScriptのURL。

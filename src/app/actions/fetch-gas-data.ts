@@ -62,3 +62,4 @@ export async function fetchGasData(url: string): Promise<any> {
     throw new Error(error.message || 'An unknown error occurred during the server fetch.');
   }
 }
+
