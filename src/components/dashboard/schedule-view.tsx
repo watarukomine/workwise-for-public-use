@@ -52,7 +52,7 @@ import { ORDER_GAS_URL } from '@/lib/settings';
 import { Mail } from 'lucide-react';
 import { createContext, useContext } from 'react';
 
-const PIXELS_PER_MINUTE = 1.5;
+const PIXELS_PER_MINUTE = 1.75;
 const timelineStartHour = 9;
 const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
@@ -771,12 +771,12 @@ export function ScheduleView({
                     </div>
                 </div>
 
-                <div className='border-x border-b rounded-lg overflow-hidden -mt-2 relative z-10'>
-                    <ScrollArea className="w-full whitespace-nowrap">
+                <div className='relative -mt-2' style={{ zIndex: 10 }}>
+                    <ScrollArea className="w-full whitespace-nowrap border rounded-b-lg">
                         <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
                           <div className="relative space-y-2">
                               {isToday(currentDate) && (
-                              <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                              <div className="absolute top-0 h-full pointer-events-none" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`, zIndex: 10}}>
                                   <TimeIndicator />
                               </div>
                               )}
