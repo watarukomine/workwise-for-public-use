@@ -197,6 +197,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     )
   }
 
+  const showLoginButton = !profile && pathname !== '/login';
+
   if (isMobile) {
     return (
         <SidebarProvider>
@@ -217,11 +219,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <div className="flex items-center justify-center p-4">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
-                ) : !profile ? (
+                ) : showLoginButton ? (
                     <Button asChild className="w-full">
                     <Link href="/login">
                         <LogIn className="mr-2 h-4 w-4" />
-                        ログイン / 新規登録
+                        ログイン
                     </Link>
                     </Button>
                 ) : null}
@@ -304,14 +306,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
                     </DropdownMenuContent>
                     </DropdownMenu>
-                ) : (
+                ) : showLoginButton ? (
                     <Button asChild size="sm">
                         <Link href="/login">
                             <LogIn className="mr-2 h-4 w-4" />
                             ログイン
                         </Link>
                     </Button>
-                )}
+                ) : null}
             </div>
         </header>
         <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
