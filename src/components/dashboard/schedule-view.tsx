@@ -200,8 +200,8 @@ function GenericTasks() {
                     {genericTasks.map((task) => (
                         <DraggableOrder
                             key={task.id}
-                            order={task}
-                            className={getDraggableClassName(task as WithId<Order>)}
+                            order={task as WithId<Order>}
+                            className={getDraggableClassName(task)}
                         />
                     ))}
                 </div>
@@ -216,7 +216,7 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     
     const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
     
-    const dailyOrders = orders.filter(order => {
+    const dailyOrders = (orders || []).filter(order => {
         if (!order.scheduledDate) return false;
         try {
           const scheduledDate = parseISO(order.scheduledDate);
@@ -278,7 +278,7 @@ const TimeIndicator = () => {
 
     return (
         <div
-            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none z-[11]"
+            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
             style={{ left: `${leftPosition}px` }}
         >
             <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
@@ -773,10 +773,10 @@ export function ScheduleView({
 
                 <div className='border-x border-b rounded-lg overflow-hidden -mt-2 relative z-10'>
                     <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="relative" style={{ width: `${STAFF_COL_WIDTH + (timelineTotalHours * 60 * PIXELS_PER_MINUTE) + STATUS_COL_WIDTH}px`}}>
+                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
                           <div className="relative space-y-2">
                               {isToday(currentDate) && (
-                              <div className="absolute top-0 h-full pointer-events-none z-[11]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                              <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
                                   <TimeIndicator />
                               </div>
                               )}
@@ -784,7 +784,7 @@ export function ScheduleView({
                                   const events = (dailySchedule || []).filter((e) => e.staffId === staff.id);
                                   const status = (statuses || []).find(s => s.staffId === staff.id);
                                   return (
-                                      <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
+                                      <StaffRow key={staff.id} staff={staff} events={events} status={status} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
                                   );
                               })}
                           </div>
@@ -863,13 +863,12 @@ interface StaffRowProps {
   staff: WithId<Staff>;
   events: WithId<ScheduleEvent>[];
   status?: StaffStatus;
-  getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
-  isOver: boolean;
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, onDoubleClickEvent, onDoubleClickTimeline }) => {
+  const { getCustomerByCode } = useScheduleView();
   const { setNodeRef } = useDroppable({ id: staff.id });
 
   const areaColors: Record<string, string> = { '横浜店': 'bg-blue-50', '東名川崎店': 'bg-green-50', '綾瀬店': 'bg-orange-50' };
@@ -883,7 +882,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
             <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
-      <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-16 border-b", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)} style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+      <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-16 border-b")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)} style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
         <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)}/>))}
         </div>
