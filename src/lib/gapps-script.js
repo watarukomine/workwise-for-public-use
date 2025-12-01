@@ -228,5 +228,3 @@ function sendIcsEmail(params) {
     return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `メール送信中にエラーが発生しました: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
   }
 }
-
-    
