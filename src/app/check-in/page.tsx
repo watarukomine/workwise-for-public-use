@@ -15,7 +15,7 @@ import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Work' | 'Wait' | 'Send Message';
 type StatusValue = StaffStatus['status'];
 
 function CheckInClient() {
@@ -37,7 +37,7 @@ function CheckInClient() {
         'Start Travel': '移動開始',
         'Arrive': '現場到着',
         'Begin Task': '作業開始',
-        'Finish Task': '作業完了',
+        'Finish Work': '作業完了',
         'Wait': '位置情報更新',
         'Send Message': 'メッセージ送信'
     };
@@ -88,7 +88,7 @@ function CheckInClient() {
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '作業完了',
+      'Finish Work': '作業完了',
       'Wait': '待機中',
       'Arrive': '作業待ち',
     };
@@ -190,7 +190,7 @@ function CheckInClient() {
     { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },
-    { action: 'Finish Task', label: '作業完了', icon: CheckCircle },
+    { action: 'Finish Work', label: '作業完了', icon: CheckCircle },
     { action: 'Wait', label: '位置情報更新', icon: RefreshCw },
   ];
 
@@ -250,7 +250,7 @@ function CheckInClient() {
               <AlertTitle>最後の記録</AlertTitle>
               <AlertDescription>
                 {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
-                {location && !['Clock In', 'Clock Out', 'Send Message'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})}
+                {location && !['Clock In', 'Clock Out', 'Send Message'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
               </AlertDescription>
             </Alert>
           )}
@@ -297,3 +297,5 @@ export default function CheckInPage() {
         </Suspense>
     )
 }
+
+    
