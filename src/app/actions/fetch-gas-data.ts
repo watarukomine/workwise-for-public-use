@@ -26,13 +26,9 @@ export async function fetchGasData(url: string): Promise<any> {
         throw new Error('Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings.');
     }
     
-    const contentType = response.headers.get('content-type');
-    const responseText = await response.text();
-
-    // Temporarily relax the JSON check to allow for HTML responses during testing
     if (!response.ok) {
       let errorMessage = `GAS request failed. Status: ${response.status}.`;
-      
+      const responseText = await response.text();
       // Check if the response looks like a Google login page HTML or a redirect message.
       if (responseText.toLowerCase().includes('<title>google') || responseText.toLowerCase().includes('signin')) {
           errorMessage = 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings and that you have deployed a new version after any changes.';
@@ -43,18 +39,12 @@ export async function fetchGasData(url: string): Promise<any> {
       throw new Error(errorMessage);
     }
 
-    try {
-        const result = JSON.parse(responseText);
-        // Check for an explicit error field within the JSON response from GAS itself.
-        if (result.error && result.message) {
-          throw new Error(`GAS script returned an error: ${result.message}`);
-        }
-        return result;
-    } catch (parseError) {
-        // If parsing fails, it might be the HTML response from our test. Don't throw error in that case.
-        console.log(`Could not parse response as JSON. This may be expected during mail test. Response: ${responseText.substring(0, 200)}...`);
-        return { data: [] }; // Return empty data to prevent app from crashing
+    const result = await response.json();
+    // Check for an explicit error field within the JSON response from GAS itself.
+    if (result.error && result.message) {
+      throw new Error(`GAS script returned an error: ${result.message}`);
     }
+    return result;
     
   } catch (error: any) {
     console.error('Server-side fetch to GAS failed:', error.message);
