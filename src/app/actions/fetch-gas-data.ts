@@ -7,34 +7,31 @@ import { unstable_noStore as noStore } from 'next/cache';
  * Fetches data from a given Google Apps Script URL.
  * This server action acts as a proxy to bypass client-side CORS issues.
  * @param url The full URL of the Google Apps Script web app.
- * @returns A promise that resolves to the JSON data from the GAS endpoint.
+ * @returns A promise that resolves to an object with either 'data' or 'error' property.
  */
-export async function fetchGasData(url: string): Promise<any> {
+export async function fetchGasData(url: string): Promise<{ data?: any; error?: string }> {
   // This function will always be dynamically rendered, disabling caching.
   noStore();
 
   if (!url) {
-    throw new Error('URL is required to fetch data.');
+    return { error: 'URL is required to fetch data.' };
   }
 
   try {
-    // The URL already contains a cache-busting parameter, so we fetch it directly.
     const response = await fetch(url, {
       method: 'GET',
       cache: 'no-store', 
       redirect: 'follow', 
     });
     
-    // If the final URL after following redirects is a Google sign-in page, it's a clear error.
     if (response.url.includes('accounts.google.com')) {
-        throw new Error('Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings.');
+        return { error: 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings.' };
     }
     
     if (!response.ok) {
       let errorMessage = `GAS request failed. Status: ${response.status}.`;
       try {
         const responseText = await response.text();
-        // Check if the response looks like a Google login page HTML or a redirect message.
         if (responseText.toLowerCase().includes('<title>google') || responseText.toLowerCase().includes('signin')) {
             errorMessage = 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings and that you have deployed a new version after any changes.';
         } else if (response.status >= 300 && response.status < 400) {
@@ -42,24 +39,20 @@ export async function fetchGasData(url: string): Promise<any> {
         } else {
             errorMessage += ` Response: ${responseText}`;
         }
-      } catch (e) {
-        // Ignore if we can't read the body
-      }
+      } catch (e) { /* Ignore if we can't read the body */ }
       
-      throw new Error(errorMessage);
+      return { error: errorMessage };
     }
 
     const result = await response.json();
-    // Check for an explicit error field within the JSON response from GAS itself.
     if (result.error && result.message) {
-      throw new Error(`GAS script returned an error: ${result.message}`);
+      return { error: `GAS script returned an error: ${result.message}` };
     }
-    return result;
+    
+    return { data: result.data || (Array.isArray(result) ? result : []) };
     
   } catch (error: any) {
     console.error('Server-side fetch to GAS failed:', error.message);
-    // Re-throw a cleaner error message to be caught by the client component.
-    throw new Error(error.message || 'An unknown error occurred during the server fetch.');
+    return { error: error.message || 'An unknown error occurred during the server fetch.' };
   }
 }
-

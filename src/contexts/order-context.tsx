@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
@@ -28,7 +29,7 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
-    if (!rawOrdersData.length || !allStaff.length) {
+    if (!rawOrdersData || !rawOrdersData.length || !allStaff || !allStaff.length) {
       return { orders: [], scheduleEvents: [], statuses: [], unassignedOrders: [] };
     }
 
@@ -160,12 +161,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setErrorState(null);
 
     try {
-      // Force cache-busting by adding a dummy parameter with the current timestamp
       const urlWithCacheBuster = `${orderGasUrl}${orderGasUrl.includes('?') ? '&' : '?'}dummy=${Date.now()}`;
       const result = await fetchGasData(urlWithCacheBuster);
-      if (result.error && result.message) throw new Error(result.message);
       
-      const newRawOrderData = result.data || (Array.isArray(result) ? result : []);
+      if (result.error) {
+          throw new Error(result.error);
+      }
+
+      const newRawOrderData = result.data || [];
       setRawOrdersData(newRawOrderData);
       
     } catch (e: any) {

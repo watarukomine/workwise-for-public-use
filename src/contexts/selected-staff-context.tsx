@@ -18,24 +18,29 @@ const simpleHash = (str: string) => {
     return Math.abs(hash);
 };
 
-export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
+export const fetchStaffDataFromGAS = async (): Promise<{staffList?: WithId<Staff>[]; error?: string}> => {
     const url = STAFF_GAS_URL;
     if (!url || url.includes('TODO_REPLACE_THIS_URL')) {
-        console.warn("スタッフ情報を取得するためのGoogle Apps Script URLが設定されていません。");
-        throw new Error("スタッフ情報を取得するためのURLが /src/lib/settings.ts で設定されていません。");
+        const errorMessage = "スタッフ情報を取得するためのURLが /src/lib/settings.ts で設定されていません。";
+        console.warn(errorMessage);
+        return { error: errorMessage };
     }
 
     try {
         const result = await fetchGasData(url);
         
-        const dataToProcess = result.data || (Array.isArray(result) ? result : []);
+        if (result.error) {
+            return { error: result.error };
+        }
+        
+        const dataToProcess = result.data || [];
         
         if (dataToProcess.length === 0) {
             console.warn("GASから取得したスタッフデータが空です。");
-            return [];
+            return { staffList: [] };
         }
 
-        return dataToProcess.map((item: any) => {
+        const staffList = dataToProcess.map((item: any): WithId<Staff> => {
             const getRole = (): 'admin' | 'staff' => {
                 const roleValue = findKey(item, ['ロール', '権限', 'role', 'Role']);
                 if (typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
@@ -62,11 +67,11 @@ export const fetchStaffDataFromGAS = async (): Promise<WithId<Staff>[]> => {
                 ...item
             };
         });
+        return { staffList };
 
     } catch (error: any) {
         console.error('Error fetching staff data from GAS:', error);
-        // Re-throw the specific error from fetchGasData
-        throw error;
+        return { error: error.message };
     }
 };
 
@@ -109,19 +114,25 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
             return;
         }
         try {
-          const fetchedStaff = await fetchStaffDataFromGAS();
-          setAllStaffState(fetchedStaff);
+          const { staffList, error: fetchError } = await fetchStaffDataFromGAS();
+          if (fetchError) {
+              throw new Error(fetchError);
+          }
+          
+          if (staffList) {
+            setAllStaffState(staffList);
 
-          if (fetchedStaff.length > 0) {
-            const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
-            if (savedIds) {
-              const parsedIds = JSON.parse(savedIds);
-              setAppliedSelectedStaffIds(parsedIds);
-              setPendingSelectedStaffIds(parsedIds);
-            } else {
-              const allStaffIds = fetchedStaff.map(s => s.id);
-              setAppliedSelectedStaffIds(allStaffIds);
-              setPendingSelectedStaffIds(allStaffIds);
+            if (staffList.length > 0) {
+              const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
+              if (savedIds) {
+                const parsedIds = JSON.parse(savedIds);
+                setAppliedSelectedStaffIds(parsedIds);
+                setPendingSelectedStaffIds(parsedIds);
+              } else {
+                const allStaffIds = staffList.map(s => s.id);
+                setAppliedSelectedStaffIds(allStaffIds);
+                setPendingSelectedStaffIds(allStaffIds);
+              }
             }
           }
 

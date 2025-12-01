@@ -15,8 +15,12 @@ const USER_SESSION_KEY = 'workwise-user-profile';
 export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
   console.log(`Attempting to sign in via spreadsheet for email: ${email}`);
   try {
-    const allStaff = await fetchStaffDataFromGAS();
-    const staffMember = allStaff.find(s => s.email === email);
+    const { staffList, error } = await fetchStaffDataFromGAS();
+    if(error || !staffList) {
+        throw new Error(error || 'Could not fetch staff data.');
+    }
+
+    const staffMember = staffList.find(s => s.email === email);
 
     if (!staffMember) {
       throw new Error('指定されたメールアドレスのスタッフが見つかりません。');

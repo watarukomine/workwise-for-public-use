@@ -23,9 +23,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const [customerGasUrl, setCustomerGasUrlState] = useState(CUSTOMER_GAS_URL);
   const [error, setErrorState] = useState<string | null>(null);
 
-  // This function is kept for the UI, but the default URL now comes from settings.ts
   const setCustomerGasUrl = (url: string) => {
-    // We can still allow overriding for the session if needed, but it won't persist across page loads.
     setCustomerGasUrlState(url);
   };
 
@@ -45,11 +43,11 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         try {
           const result = await fetchGasData(customerGasUrl);
 
-          if (result.error && result.message) {
-            throw new Error(result.message);
+          if (result.error) {
+            throw new Error(result.error);
           }
 
-          const customerData = result.data || (Array.isArray(result) ? result : []);
+          const customerData = result.data || [];
           setCustomers(customerData);
         } catch (e: any) {
           console.error("Failed to fetch customers from GAS:", e);
