@@ -32,7 +32,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
       return { orders: [], scheduleEvents: [], statuses: [], unassignedOrders: [] };
     }
 
-    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any, index: number) => mapRawToOrder(o, index));
+    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any, index: number) => mapRawToOrder(o));
     
     const newScheduleEvents: WithId<ScheduleEvent>[] = [];
     const staffStatusMap = new Map<string, StaffStatus>();
@@ -52,7 +52,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
         try {
           const scheduledTime = parseISO(scheduledTimeStr);
           if (isValid(scheduledTime)) {
-              const mappedOrder = mapRawToOrder(rawOrder, index);
+              const mappedOrder = mapRawToOrder(rawOrder);
               if (mappedOrder.rawOrderId) scheduledRawOrderIds.add(mappedOrder.rawOrderId);
 
               const tripId = `trip-${mappedOrder.rawOrderId}`;
@@ -131,6 +131,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
     };
 };
 
+
 export function OrderProvider({ children }: { children: ReactNode }) {
   const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
   const [orders, setOrders] = useState<WithId<Order>[]>([]);
@@ -178,7 +179,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   // Initial data fetch and interval setup
   useEffect(() => {
-    if (isStaffLoading || !allStaff.length) {
+    if (isStaffLoading || allStaff.length === 0) {
       // Don't fetch if staff isn't loaded, as processing depends on it
       return;
     }
@@ -197,7 +198,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   // This effect is now solely responsible for processing data when it changes.
   useEffect(() => {
-    if (isLoading || isStaffLoading) return;
+    if (isStaffLoading) return;
 
     const { orders, scheduleEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff);
     setOrders(orders);
@@ -205,7 +206,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setStatuses(statuses);
     setUnassignedOrders(unassignedOrders);
     
-  }, [rawOrdersData, allStaff, isLoading, isStaffLoading]);
+  }, [rawOrdersData, allStaff, isStaffLoading]);
 
 
   const value: OrderContextType = {

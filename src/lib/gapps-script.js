@@ -136,7 +136,7 @@ function updateSheetWithOrderInfo(params) {
             'Start Travel': "移動開始", 
             'Arrive': "現場到着",
             'Begin Task': "作業開始", 
-            'Finish Work': "作業完了",
+            'Finish Task': "作業完了",
         };
         if(actionColMap[actionType]) {
             updateColumn(actionColMap[actionType], dateValue);

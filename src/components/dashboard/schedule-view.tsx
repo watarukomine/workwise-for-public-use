@@ -25,7 +25,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid } from 'date-fns';
-import { cn, findKey } from '@/lib/utils';
+import { cn, findKey, mapRawToOrder } from '@/lib/utils';
 import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -108,44 +108,6 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
   };
 };
 
-const mapRawToOrder = (rawOrder: any): WithId<Order> => {
-    const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
-    
-    const customerName = findKey(rawOrder, ['お取引先名', '店舗', '取引先']) || '';
-    const scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定']);
-    
-    const equipmentStatus = findKey(rawOrder, ['機材有無']) || '';
-    let equipmentMark = '(×)';
-    if (equipmentStatus === '〇') {
-        equipmentMark = '(〇)';
-    } else if (equipmentStatus === '△') {
-        equipmentMark = '(△)';
-    }
-
-    const line1 = `${customerName}${equipmentMark}${scheduledTime ? `：${formatTime(scheduledTime)}` : ''}`;
-
-    const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ']) || '';
-    const unitCount = findKey(rawOrder, ['本数']) || '';
-    const line2 = `${tireSize}${unitCount ? ` / ${unitCount}本` : ''}`;
-
-    let taskDetails = line1;
-    if (line2.trim() && line2.trim() !== '/') {
-        taskDetails += `\n${line2.trim()}`;
-    }
-    
-    const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
-    const orderId = findKey(rawOrder, idKeys);
-
-    return {
-        id: String(orderId || `ord-${Math.random()}`),
-        customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
-        taskDetails: taskDetails.trim(),
-        estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
-        raw: rawOrder,
-        rawOrderId: String(orderId || '')
-    };
-};
-
 interface DraggableOrderProps {
   order: WithId<Order>;
   customer?: WithId<Customer>;
@@ -223,9 +185,9 @@ interface ScheduleViewProps {
 }
 
 const genericTasks: WithId<Order>[] = [
-      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30 },
-      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60 },
-      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60 },
+      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0 },
+      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0 },
+      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0 },
 ];
 
 function GenericTasks() {
@@ -246,7 +208,7 @@ function GenericTasks() {
                     {genericTasks.map((task) => (
                         <DraggableOrder
                             key={task.id}
-                            order={task}
+                            order={task as WithId<Order>}
                             className={getDraggableClassName(task)}
                         />
                     ))}
@@ -656,6 +618,14 @@ export function ScheduleView({
 
   const { event, staff, customer, title } = getDialogDetails();
 
+  const dailySchedule = React.useMemo(() => {
+    const data = scheduleData || [];
+    return data.filter(event => {
+        const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+        return isValid(eventDate) && isToday(eventDate);
+    });
+  }, [scheduleData]);
+
   if (!isClient) {
     return (
       <Card>
@@ -701,8 +671,8 @@ export function ScheduleView({
                       </div>
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="relative mt-2 space-y-2">
-                            {staffData?.map((staff) => {
-                                const events = (scheduleData || []).filter((e) => e.staffId === staff.id);
+                            {(staffData || []).map((staff) => {
+                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
                                 return (
                                     <StaffRow
                                         key={staff.id}
