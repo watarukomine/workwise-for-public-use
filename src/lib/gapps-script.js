@@ -11,9 +11,23 @@ const STAFF_SHEET_NAME = "スタッフマスタ";
 
 /**
  * GET リクエストを処理し、スプレッドシートのデータを JSON で返します
+ * 【メール送信テストのため一時的に改造】
  */
 function doGet(e) {
   try {
+    // --- START: メール送信テスト ---
+    try {
+        MailApp.sendEmail({
+            to: "kanagawa.toyota.parts@gmail.com",
+            subject: "GAS メール送信テスト (doGet)",
+            body: "このメールが届けば、MailApp.sendEmailの権限は有効です。"
+        });
+    } catch (mailError) {
+        // メール送信が失敗しても、メインのデータ取得は続行する
+        console.error("MailApp test failed in doGet:", mailError.message);
+    }
+    // --- END: メール送信テスト ---
+
     const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
     const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
     if (!sheet) throw new Error(`シート '${ORDER_SHEET_NAME}' がスプレッドシートID '${ORDER_SPREADSHEET_ID}' 内に見つかりません。`);
