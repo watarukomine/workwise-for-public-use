@@ -128,6 +128,7 @@ function updateSheetWithOrderInfo(params) {
     console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
     
     const updateColumn = (colName, value) => {
+      // valueがundefinedの場合のみ更新をスキップし、空文字列やnullは許可する
       if (value !== undefined) {
         const colIdx = headers.indexOf(colName);
         if (colIdx !== -1) {
