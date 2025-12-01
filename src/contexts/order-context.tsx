@@ -147,16 +147,16 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setOrderGasUrlState(url);
   };
   
-  const fetchAndProcessData = useCallback(async () => {
+  const fetchAndProcessData = useCallback(async (showLoading = true) => {
     if (!orderGasUrl) {
       setErrorState('GASのURLが設定されていません。');
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
       return;
     }
     
     if (isStaffLoading) return;
 
-    setIsLoading(true);
+    if (showLoading) setIsLoading(true);
     setErrorState(null);
 
     try {
@@ -171,13 +171,13 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       setErrorState(`受注データの取得または処理に失敗しました: ${e.message}`);
       setRawOrdersData([]);
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   }, [orderGasUrl, isStaffLoading]);
 
   // Initial data fetch
   useEffect(() => {
-    fetchAndProcessData();
+    fetchAndProcessData(true);
   }, [fetchAndProcessData]);
 
   // This effect is now solely responsible for processing data when it changes.
@@ -201,7 +201,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     scheduleEvents,
     setScheduleEvents,
     statuses,
-    refetchOrders: fetchAndProcessData,
+    refetchOrders: () => fetchAndProcessData(false), // Always refetch without global loading
     isLoading,
     orderGasUrl,
     setOrderGasUrl,
