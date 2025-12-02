@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import {
@@ -76,7 +77,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
         '作業予定日': ['作業予定日', 'scheduledDate'],
         '予定時間': ['予定時間', 'scheduledTime'],
         'タイヤサイズ': ['タイヤサイズ', 'tireSize'],
-        '本数': ['本数'],
+        '本数': ['本数', 'honsu'],
         '担当': ['担当', 'staffName'],
         '受注ステータス': ['受注ステータス', 'status'],
       };
