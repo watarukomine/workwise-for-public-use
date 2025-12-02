@@ -91,7 +91,7 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
     ...(customLocations || []).map(l => ({ lat: l.latitude, lng: l.longitude}))
   ];
 
-  const center = React.useMemo(() => {
+  const defaultCenter = React.useMemo(() => {
     if (optimizedRoute && optimizedRoute.length > 0) {
         const latSum = optimizedRoute.reduce((sum, loc) => sum + loc.latitude, 0);
         const lngSum = optimizedRoute.reduce((sum, loc) => sum + loc.longitude, 0);
@@ -113,7 +113,7 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
       <CardContent className="h-full p-0 rounded-lg overflow-hidden">
         <TooltipProvider>
           <Map
-            center={center}
+            defaultCenter={defaultCenter}
             defaultZoom={11}
             gestureHandling={'greedy'}
             disableDefaultUI={true}
