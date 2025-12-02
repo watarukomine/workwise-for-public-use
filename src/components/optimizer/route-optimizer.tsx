@@ -459,29 +459,14 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
                     <h3 className="font-semibold mb-2">巡回順</h3>
                     <ol className="relative border-l border-border space-y-4">
                     {state.data.optimizedRoute.map((location, index) => {
-                      const isLast = index === state.data!.optimizedRoute.length - 1;
                       return (
                         <li key={location.id} className="ml-6">
                           <span className="absolute -left-[10.5px] top-1 flex items-center justify-center w-5 h-5 bg-primary rounded-full text-primary-foreground text-xs font-bold">
                               {index + 1}
                           </span>
-                          <div className="pl-2 flex items-center gap-2">
-                              <div>
-                                  <h4 className="font-medium">{location.name}</h4>
-                                  <p className="text-sm text-muted-foreground">{location.address}</p>
-                              </div>
-                              {isLast && (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                      <TooltipTrigger>
-                                          <Flag className="h-5 w-5 text-destructive" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                          <p>目的地</p>
-                                      </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              )}
+                          <div className="pl-2">
+                              <h4 className="font-medium">{location.name}</h4>
+                              <p className="text-sm text-muted-foreground">{location.address}</p>
                           </div>
                         </li>
                       )

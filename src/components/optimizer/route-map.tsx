@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Location } from './route-optimizer';
-import { User, Building2, MapPin } from 'lucide-react';
+import { User, Building2, MapPin, Flag } from 'lucide-react';
 
 type StaffWithLocation = Staff & Partial<StaffStatus>;
 
@@ -106,6 +106,7 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
   }, [allCoordinates, optimizedRoute]);
 
   const showRoute = optimizedRoute && optimizedRoute.length > 1;
+  const destination = showRoute ? optimizedRoute[optimizedRoute.length - 1] : null;
 
   return (
     <Card className="h-[600px] lg:h-full">
@@ -183,6 +184,24 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
                   </Tooltip>
                 </AdvancedMarker>
               ) : null
+            )}
+            {showRoute && destination && (
+              <AdvancedMarker
+                  key={`destination-${destination.id}`}
+                  position={{ lat: destination.latitude, lng: destination.longitude }}
+                  zIndex={10}
+              >
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                         <div className="w-10 h-10 flex items-center justify-center">
+                           <Flag className="w-8 h-8 text-destructive animate-pulse" />
+                         </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                          <p className="font-bold">目的地: {destination.name}</p>
+                      </TooltipContent>
+                  </Tooltip>
+              </AdvancedMarker>
             )}
             {showRoute && (
                 <Directions route={optimizedRoute} avoidHighways={avoidHighways} />
