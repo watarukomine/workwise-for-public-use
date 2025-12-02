@@ -9,3 +9,10 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
+  availability: public
+
+# Define environment variables and secrets for the backend.
+# https://firebase.google.com/docs/app-hosting/configure-backend#environment-variables
+env:
+  - variable: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    secret: GOOGLE_MAPS_API_KEY
