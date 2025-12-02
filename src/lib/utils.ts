@@ -1,3 +1,4 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { isValid, format, parseISO } from 'date-fns';
@@ -118,6 +119,7 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
         staffName: findKey(rawOrder, ['担当']) || '',
         equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
         tireSize: tireSize,
+        '本数': findKey(rawOrder, ['本数', 'honsu']) || '',
         raw: rawOrder,
     };
 };
