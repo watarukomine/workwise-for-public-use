@@ -417,7 +417,6 @@ export function ScheduleView({
     const previousSchedule = [...(scheduleEvents || [])];
     const previousUnassigned = [...unassignedOrders];
 
-    // --- Dropping back to unassigned area ---
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
         if (item.rawOrderId) {
           await unassignTask(item);
@@ -437,21 +436,19 @@ export function ScheduleView({
     startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
 
     const getNewStartFromDrop = () => {
-      if (!active.rect.current.translated) return new Date();
-      const dropX = active.rect.current.translated.left - timelineRect.left;
+      if (!active.rect.current.initial) return new Date();
+      const dropX = active.rect.current.initial.left + delta.x - timelineRect.left;
       const newStartMinutes = pixelsToMinutes(dropX);
       return addMinutes(startOfTimelineDay, newStartMinutes);
     };
     
     const newStart = getNewStartFromDrop();
 
-    // --- Moving an existing event ---
     if ('staffId' in item) {
       const draggedEvent = item as WithId<ScheduleEvent>;
       const newStaff = getStaffById(newStaffId);
       if (!newStaff) return;
   
-      // Optimistic UI Update
       setScheduleEvents(prev => {
         const currentSchedule = prev || [];
         const otherEvents = currentSchedule.filter(e => e.id !== draggedEvent.id && e.tripId !== draggedEvent.tripId);
@@ -487,7 +484,6 @@ export function ScheduleView({
         return [...otherEvents, ...updatedTripEvents];
       });
       
-      // Backend Update
       (async () => {
           try {
               if (draggedEvent.rawOrderId) {
@@ -507,11 +503,11 @@ export function ScheduleView({
               refetchOrders();
           } catch (e: any) {
               toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
-              setScheduleEvents(previousSchedule); // Revert on error
+              setScheduleEvents(previousSchedule);
           }
       })();
   
-    } else if ('estimatedDuration' in item) { // --- Creating a new event ---
+    } else if ('estimatedDuration' in item) {
         const order = item as WithId<Order>;
         const staff = getStaffById(newStaffId);
         if (!staff) return;
@@ -551,7 +547,6 @@ export function ScheduleView({
              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
         }
         
-        // Backend Update
         (async () => {
             try {
                 if (isGeneric) {
@@ -567,7 +562,7 @@ export function ScheduleView({
                 }
             } catch (e: any) {
                 toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                setScheduleEvents(previousSchedule); // Revert UI
+                setScheduleEvents(previousSchedule);
                 setUnassignedOrders(previousUnassigned);
             }
         })();
