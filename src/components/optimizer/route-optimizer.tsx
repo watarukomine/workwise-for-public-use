@@ -7,7 +7,7 @@ import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon, ExternalLink } from 'lucide-react';
+import { ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon, ExternalLink, Flag } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -16,6 +16,7 @@ import { cn, findKey } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 type State = {
   data: OptimizeRouteOutput | null;
@@ -457,17 +458,34 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
                 <div>
                     <h3 className="font-semibold mb-2">巡回順</h3>
                     <ol className="relative border-l border-border space-y-4">
-                    {state.data.optimizedRoute.map((location, index) => (
+                    {state.data.optimizedRoute.map((location, index) => {
+                      const isLast = index === state.data!.optimizedRoute.length - 1;
+                      return (
                         <li key={location.id} className="ml-6">
-                        <span className="absolute -left-[10.5px] top-1 flex items-center justify-center w-5 h-5 bg-primary rounded-full text-primary-foreground text-xs font-bold">
-                            {index + 1}
-                        </span>
-                        <div className="pl-2">
-                            <h4 className="font-medium">{location.name}</h4>
-                            <p className="text-sm text-muted-foreground">{location.address}</p>
-                        </div>
+                          <span className="absolute -left-[10.5px] top-1 flex items-center justify-center w-5 h-5 bg-primary rounded-full text-primary-foreground text-xs font-bold">
+                              {index + 1}
+                          </span>
+                          <div className="pl-2 flex items-center gap-2">
+                              <div>
+                                  <h4 className="font-medium">{location.name}</h4>
+                                  <p className="text-sm text-muted-foreground">{location.address}</p>
+                              </div>
+                              {isLast && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                      <TooltipTrigger>
+                                          <Flag className="h-5 w-5 text-destructive" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                          <p>目的地</p>
+                                      </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                          </div>
                         </li>
-                    ))}
+                      )
+                    })}
                     </ol>
                 </div>
             </CardContent>
