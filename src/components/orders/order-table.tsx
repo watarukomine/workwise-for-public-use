@@ -12,22 +12,33 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, MoreHorizontal } from 'lucide-react';
-import { cn, findKey, formatDate, formatTime as formatTimeUtil } from '@/lib/utils';
+import { Search } from 'lucide-react';
+import { cn, findKey } from '@/lib/utils';
 import { format, isValid, parseISO } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
   isLoading: boolean;
 }
+
+const formatTime = (date: Date | string) => {
+  if (!date) return '';
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  if (!d || !isValid(d)) return '';
+  return format(d, 'HH:mm');
+};
+
+const formatDate = (dateString: string | undefined): string => {
+    if (!dateString) return '';
+    try {
+        const date = parseISO(dateString);
+        return format(date, 'yyyy/MM/dd');
+    } catch {
+        return dateString;
+    }
+};
 
 export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -86,10 +97,10 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     let value = findKey(order, keys);
     
     if (header === '作業予定日') {
-        value = formatDate(value, 'yyyy/MM/dd');
+        value = formatDate(value);
     }
     if (header === '予定時間') {
-        value = formatTimeUtil(value);
+        value = formatTime(value);
     }
     
     return value !== undefined && value !== null ? String(value) : '';
@@ -115,13 +126,12 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
             <TableHeader>
               <TableRow>
                 {headers.map(header => <TableHead key={header}>{header}</TableHead>)}
-                <TableHead><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={headers.length + 1} className="h-24 text-center">
+                  <TableCell colSpan={headers.length} className="h-24 text-center">
                     データを読み込んでいます...
                   </TableCell>
                 </TableRow>
@@ -144,28 +154,12 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                         }
                         return <TableCell key={header}>{cellValue}</TableCell>
                       })}
-                      <TableCell>
-                          <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" className="h-8 w-8 p-0">
-                                      <span className="sr-only">メニューを開く</span>
-                                      <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => handleRowClick(order)} disabled={!isAdmin || !order.Order_URL}>
-                                    スプレッドシートで開く
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>詳細を表示</DropdownMenuItem>
-                              </DropdownMenuContent>
-                          </DropdownMenu>
-                      </TableCell>
                     </TableRow>
                   )
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={headers.length + 1} className="h-24 text-center">
+                  <TableCell colSpan={headers.length} className="h-24 text-center">
                     {(rawOrders || []).length === 0 && !searchTerm ? "表示対象の受注情報が見つかりません。" : "検索条件に合う受注が見つかりません。"}
                   </TableCell>
                 </TableRow>
