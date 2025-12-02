@@ -29,6 +29,20 @@ export const findKey = (item: any, possibleKeys: string[]) => {
     return undefined;
 };
 
+export const formatDate = (dateString: string | undefined | null, formatString: string = 'yyyy/MM/dd'): string => {
+  if (!dateString) return '';
+  try {
+    const date = parseISO(dateString);
+    if (isValid(date)) {
+      return format(date, formatString);
+    }
+  } catch (e) {
+    // Fallback for non-ISO strings if necessary
+  }
+  return dateString; // Return original string if invalid
+};
+
+
 export const formatTime = (date: Date | string) => {
   if (!date) return '';
 

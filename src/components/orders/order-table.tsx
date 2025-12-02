@@ -1,4 +1,3 @@
-
 'use client';
 import * as React from 'react';
 import {
@@ -13,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, MoreHorizontal } from 'lucide-react';
-import { cn, findKey } from '@/lib/utils';
+import { cn, findKey, formatDate, formatTime as formatTimeUtil } from '@/lib/utils';
 import { format, isValid, parseISO } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Badge } from '@/components/ui/badge';
@@ -28,47 +27,6 @@ interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
   isLoading: boolean;
 }
-
-const formatDate = (dateString: string) => {
-  if (!dateString) return '';
-  try {
-    const date = parseISO(dateString);
-    if (isValid(date)) {
-      return format(date, 'yyyy-MM-dd');
-    }
-  } catch (e) {
-    // Fallback for non-ISO strings if necessary
-  }
-  return dateString; // Return original string if invalid
-};
-
-const formatTime = (timeString: string) => {
-    if (!timeString) return '';
-    
-    // Handle time formatted as a full date string (e.g., from Sheets)
-    try {
-        const date = parseISO(timeString);
-         if (isValid(date)) {
-            // Check if it's a "zero" date from Sheets for a time-only value like 1899-12-30...
-            if (date.getFullYear() < 1970) {
-                return format(date, 'HH:mm');
-            }
-            return format(date, 'HH:mm');
-        }
-    } catch(e) {
-        // Ignore parse error and proceed
-    }
-
-
-    // Handle HH:mm string
-    const timeRegex = /^\d{1,2}:\d{2}$/;
-    if(timeRegex.test(timeString)) {
-        return timeString;
-    }
-
-    return timeString; // Fallback
-};
-
 
 export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -127,10 +85,10 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     let value = findKey(order, keys);
     
     if (header === '作業予定日') {
-        value = formatDate(value);
+        value = formatDate(value, 'yyyy/MM/dd');
     }
     if (header === '予定時間') {
-        value = formatTime(value);
+        value = formatTimeUtil(value);
     }
     
     return value !== undefined && value !== null ? String(value) : '';

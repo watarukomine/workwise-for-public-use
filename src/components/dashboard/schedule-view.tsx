@@ -29,7 +29,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor } from '@/lib/utils';
+import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, formatDate } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -725,9 +725,18 @@ export function ScheduleView({
     );
   }
   
-  const renderDetailItem = (label: string, value: any) => (
-    value ? <div className="text-sm"><span className="font-semibold text-muted-foreground">{label}:</span> {String(value)}</div> : null
-  );
+  const renderDetailItem = (label: string, value: any) => {
+    if (!value) return null;
+    let displayValue = String(value);
+    if (label === '作業予定日') {
+        displayValue = formatDate(value, 'yyyy/MM/dd');
+    }
+    return (
+        <div className="text-sm">
+            <span className="font-semibold text-muted-foreground">{label}:</span> {displayValue}
+        </div>
+    );
+  }
 
   const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
   const activationConstraint: ActivationConstraint = {
