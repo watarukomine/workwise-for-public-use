@@ -29,11 +29,11 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
-    if (!rawOrdersData || !rawOrdersData.length || !allStaff || !allStaff.length) {
+    if (!rawOrdersData.length || !allStaff.length) {
       return { orders: [], scheduleEvents: [], statuses: [], unassignedOrders: [] };
     }
 
-    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any) => mapRawToOrder(o));
+    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any, index: number) => mapRawToOrder(o));
     
     const newScheduleEvents: WithId<ScheduleEvent>[] = [];
     const staffStatusMap = new Map<string, StaffStatus>();
@@ -43,7 +43,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
     
     const scheduledRawOrderIds = new Set<string>();
 
-    rawOrdersData.forEach((rawOrder: any) => {
+    rawOrdersData.forEach((rawOrder: any, index: number) => {
       const staffName = findKey(rawOrder, ['担当']);
       const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
       const scheduledTimeStr = findKey(rawOrder, ['チップ配置作業予定']);
@@ -99,10 +99,14 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
             if (lastUpdate.getTime() >= currentUpdate.getTime()) {
                 const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）']) || '';
                 const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
+                const orderId = findKey(rawOrder, ['受注 ID', 'id']);
+                const status = findKey(rawOrder, ['受注ステータス']) || '待機中';
+                const actionText = orderId ? `[${orderId}]` : '[汎用タスク]';
+                
                 staffStatusMap.set(staffMember.id, {
                     staffId: staffMember.id,
-                    status: findKey(rawOrder, ['受注ステータス']) || '待機中',
-                    lastAction: `[${findKey(rawOrder, ['受注 ID', 'id'])}] ${findKey(rawOrder, ['受注ステータス'])}`,
+                    status: status,
+                    lastAction: `${actionText} ${status}`,
                     latitude: !isNaN(lat) ? lat : undefined,
                     longitude: !isNaN(lon) ? lon : undefined,
                     lastUpdate: lastUpdate.toISOString(),
@@ -132,7 +136,6 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
     };
 };
 
-
 export function OrderProvider({ children }: { children: ReactNode }) {
   const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
   const [orders, setOrders] = useState<WithId<Order>[]>([]);
@@ -161,15 +164,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setErrorState(null);
 
     try {
-      // Force cache-busting by adding a dummy parameter with the current timestamp
-      const urlWithCacheBuster = `${orderGasUrl}${orderGasUrl.includes('?') ? '&' : '?'}dummy=${Date.now()}`;
-      const result = await fetchGasData(urlWithCacheBuster);
+      const result = await fetchGasData(orderGasUrl);
+      if (result.error && result.message) throw new Error(result.message);
       
-      if (result.error) {
-          throw new Error(result.error);
-      }
-
-      const newRawOrderData = result.data || [];
+      const newRawOrderData = result.data || (Array.isArray(result) ? result : []);
       setRawOrdersData(newRawOrderData);
       
     } catch (e: any) {
@@ -183,18 +181,12 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   // Initial data fetch
   useEffect(() => {
-    if (isStaffLoading) {
-      return;
-    }
-    
     fetchAndProcessData(true);
-    
-  }, [isStaffLoading, allStaff, fetchAndProcessData]);
-
+  }, [fetchAndProcessData]);
 
   // This effect is now solely responsible for processing data when it changes.
   useEffect(() => {
-    if (isStaffLoading) return;
+    if (isLoading || isStaffLoading) return;
 
     const { orders, scheduleEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff);
     setOrders(orders);
@@ -202,7 +194,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setStatuses(statuses);
     setUnassignedOrders(unassignedOrders);
     
-  }, [rawOrdersData, allStaff, isStaffLoading]);
+  }, [rawOrdersData, allStaff, isLoading, isStaffLoading]);
 
 
   const value: OrderContextType = {
@@ -213,7 +205,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     scheduleEvents,
     setScheduleEvents,
     statuses,
-    refetchOrders: () => fetchAndProcessData(false), // Manual refetch
+    refetchOrders: () => fetchAndProcessData(false), // Always refetch without global loading
     isLoading,
     orderGasUrl,
     setOrderGasUrl,
