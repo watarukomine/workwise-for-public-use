@@ -11,24 +11,24 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
+import { Search, MoreHorizontal } from 'lucide-react';
 import { cn, findKey } from '@/lib/utils';
-import { format, isValid, parseISO } from 'date-fns';
+import { format, isValid, parseISO, startOfToday, isAfter, isEqual } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from '../ui/button';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
   isLoading: boolean;
 }
-
-const formatTime = (date: Date | string) => {
-  if (!date) return '';
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  if (!d || !isValid(d)) return '';
-  return format(d, 'HH:mm');
-};
 
 const formatDate = (dateString: string | undefined): string => {
     if (!dateString) return '';
@@ -40,35 +40,50 @@ const formatDate = (dateString: string | undefined): string => {
     }
 };
 
+const formatTime = (date: Date | string) => {
+  if (!date) return '';
+  const d = typeof date === 'string' ? parseISO(date) : date;
+  if (!d || !isValid(d)) return '';
+  return format(d, 'HH:mm');
+};
+
 export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [page, setPage] = React.useState(1);
-  const rowsPerPage = 10;
   const { profile } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
 
-  const filteredOrders = React.useMemo(() => {
-    const ordersToDisplay = rawOrders || [];
+  const filteredAndSortedOrders = React.useMemo(() => {
+    const today = startOfToday();
+    let ordersToDisplay = (rawOrders || []).filter(order => {
+        const workDateStr = findKey(order, ['作業予定日', 'scheduledDate']);
+        if (!workDateStr) return false;
+        try {
+            const workDate = parseISO(workDateStr);
+            return isValid(workDate) && (isAfter(workDate, today) || isEqual(workDate, today));
+        } catch {
+            return false;
+        }
+    });
 
     if (searchTerm.trim() !== '') {
-        return ordersToDisplay.filter(order =>
+        ordersToDisplay = ordersToDisplay.filter(order =>
             ['受注ID', 'お取引先名', '担当'].some(key => 
                 String(findKey(order, [key]) || '').toLowerCase().includes(searchTerm.toLowerCase())
             )
         );
     }
     
+    // Sort by 作業予定日
+    ordersToDisplay.sort((a, b) => {
+        const dateA = parseISO(findKey(a, ['作業予定日']) || '0');
+        const dateB = parseISO(findKey(b, ['作業予定日']) || '0');
+        if (dateA < dateB) return -1;
+        if (dateA > dateB) return 1;
+        return 0;
+    });
+
     return ordersToDisplay;
   }, [rawOrders, searchTerm]);
-
-  const paginatedOrders = React.useMemo(() => {
-    return filteredOrders.slice(
-      (page - 1) * rowsPerPage,
-      page * rowsPerPage
-    );
-  }, [filteredOrders, page, rowsPerPage]);
-
-  const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
 
   const headers = [
     '受注ID', 'お取引先名', '機材有無', '作業予定日', '予定時間', 'タイヤサイズ', '本数', '担当', '受注ステータス'
@@ -102,6 +117,10 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     if (header === '予定時間') {
         value = formatTime(value);
     }
+     if (header === '本数') {
+      const honsu = findKey(order, ['本数', 'honsu']);
+      value = honsu !== undefined && honsu !== null ? String(honsu) : '';
+    }
     
     return value !== undefined && value !== null ? String(value) : '';
   };
@@ -121,9 +140,9 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
             />
           </div>
         </div>
-        <div className="rounded-md border">
+        <ScrollArea className="h-[60vh] rounded-md border">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                 {headers.map(header => <TableHead key={header}>{header}</TableHead>)}
               </TableRow>
@@ -135,8 +154,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     データを読み込んでいます...
                   </TableCell>
                 </TableRow>
-              ) : paginatedOrders.length > 0 ? (
-                paginatedOrders.map((order, index) => {
+              ) : filteredAndSortedOrders.length > 0 ? (
+                filteredAndSortedOrders.map((order, index) => {
                   const hasUrl = !!order.Order_URL;
                   return (
                     <TableRow 
@@ -166,28 +185,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
               )}
             </TableBody>
           </Table>
-        </div>
-        <div className="flex items-center justify-end space-x-2 py-4">
-          <span className="text-sm text-muted-foreground">
-            {totalPages > 0 ? `${totalPages}ページ中の${page}ページ` : '0ページ中の0ページ'}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            前へ
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || totalPages === 0}
-          >
-            次へ
-          </Button>
-        </div>
+        </ScrollArea>
       </CardContent>
     </Card>
   );
