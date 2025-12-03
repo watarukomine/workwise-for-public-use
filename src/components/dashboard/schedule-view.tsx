@@ -339,6 +339,7 @@ export function ScheduleView({
     currentDate,
     statuses,
 }: ScheduleViewProps) {
+  const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
   const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents } = useOrder();
@@ -358,6 +359,10 @@ export function ScheduleView({
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
   const [active, setActive] = React.useState<Active | null>(null);
+  
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActive(event.active);
@@ -715,6 +720,20 @@ export function ScheduleView({
   };
 
   const { event, staff, customer, title } = getDialogDetails();
+  
+  if (!isClient) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>スケジュール</CardTitle>
+          <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
+        </CardHeader>
+        <CardContent>
+           <div className="flex items-center justify-center h-64"><p>Loading schedule...</p></div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const renderDetailItem = (label: string, value: any) => (
     value ? <div className="text-sm"><span className="font-semibold text-muted-foreground">{label}:</span> {String(value)}</div> : null
