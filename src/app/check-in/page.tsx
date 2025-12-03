@@ -14,6 +14,7 @@ import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
+import { useOrder } from '@/contexts/order-context';
 
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait';
 type StatusValue = StaffStatus['status'];
@@ -27,6 +28,7 @@ function CheckInClient() {
   const { profile } = useUserProfile();
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
+  const { refetchOrders } = useOrder();
 
 
   const getJapaneseActionName = (action: ActionType) => {
@@ -47,7 +49,6 @@ function CheckInClient() {
     setError(null);
     const now = new Date();
     
-    // Actions that don't require location or sheet updates
     if (action === 'Clock In' || action === 'Clock Out') {
         console.log(`Action: ${action}`);
         setTimeout(() => {
@@ -62,7 +63,6 @@ function CheckInClient() {
         return;
     }
 
-    // Map actions to their corresponding status values for the sheet update
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
@@ -115,6 +115,8 @@ function CheckInClient() {
             if (result.status === 'error') {
                 throw new Error(result.message);
             }
+            
+            await refetchOrders();
 
             toast({
                 title: 'ステータスを更新しました',
