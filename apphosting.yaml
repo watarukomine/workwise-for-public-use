@@ -13,6 +13,8 @@ runConfig:
 
 # Define environment variables and secrets for the backend.
 # https://firebase.google.com/docs/app-hosting/configure-backend#environment-variables
+# The secret configuration has been removed to resolve build errors.
+# The API key should now be managed via the .env file.
 env:
-  - variable: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-    secret: GOOGLE_MAPS_API_KEY
+  - variable: NEXT_PUBLIC_NODE_ENV
+    value: production
