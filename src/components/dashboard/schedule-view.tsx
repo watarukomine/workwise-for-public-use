@@ -47,7 +47,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { updateSheetStatus, sendIcsEmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { Mail } from 'lucide-react';
 import { createContext, useContext } from 'react';
@@ -160,6 +160,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
 type DialogState = 
   | { mode: 'closed' }
   | { mode: 'edit'; event: WithId<ScheduleEvent> }
+  | { mode: 'details'; event: WithId<ScheduleEvent> }
   | { mode: 'new'; staffId: string; start: Date };
 
 
@@ -338,13 +339,14 @@ export function ScheduleView({
     currentDate,
     statuses,
 }: ScheduleViewProps) {
-  const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
   const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents } = useOrder();
   
+  const [isClient, setIsClient] = React.useState(false);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
+  const [active, setActive] = React.useState<Active | null>(null);
   
   const dailySchedule = React.useMemo(() => {
       if (!scheduleEvents) return [];
@@ -356,12 +358,24 @@ export function ScheduleView({
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
-
-  const [active, setActive] = React.useState<Active | null>(null);
   
   React.useEffect(() => {
     setIsClient(true);
   }, []);
+  
+  if (!isClient) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>スケジュール</CardTitle>
+          <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
+        </CardHeader>
+        <CardContent>
+           <div className="flex items-center justify-center h-64"><p>Loading schedule...</p></div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   const handleDragStart = (event: DragStartEvent) => {
     setActive(event.active);
@@ -559,7 +573,11 @@ export function ScheduleView({
                      toast({ title: "汎用タスクを追加しました" });
                 } else {
                      await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
-                     toast({ title: "タスクを割り当てました" });
+                     
+                     const taskEvent = scheduleEvents.find(e => e.start === taskStart.toISOString() && e.staffId === newStaffId);
+                     if(taskEvent) setDialogState({ mode: 'details', event: taskEvent });
+
+                     toast({ title: "タスクを割り当てました。詳細を確認しメールを送信してください。" });
                      refetchOrders();
                 }
             } catch (e: any) {
@@ -571,6 +589,9 @@ export function ScheduleView({
     }
   };
     const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
+    if (event.rawOrderId) {
+      setDialogState({ mode: 'details', event });
+    } else {
       setEditedEventDetails({
           title: event.title || '',
           description: event.description || '',
@@ -578,6 +599,7 @@ export function ScheduleView({
           endTime: formatTime(event.end),
       });
       setDialogState({ mode: 'edit', event });
+    }
   };
   
   const handleDoubleClickTimeline = (staffId: string, e: React.MouseEvent) => {
@@ -647,7 +669,7 @@ export function ScheduleView({
   };
 
   const handleDeleteEvent = async () => {
-    if (dialogState.mode !== 'edit') return;
+    if (dialogState.mode !== 'edit' && dialogState.mode !== 'details') return;
     const eventToDelete = dialogState.event;
     
     if (eventToDelete.rawOrderId) {
@@ -660,12 +682,37 @@ export function ScheduleView({
     setDialogState({ mode: 'closed' });
   };
   
+    const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
+    const staff = getStaffById(event.staffId);
+    if (!staff) {
+      toast({ variant: 'destructive', title: 'エラー', description: '担当者が見つかりません。' });
+      return;
+    }
+    try {
+      const result = await sendIcsEmail({
+        gasUrl: ORDER_GAS_URL,
+        staffName: staff.name,
+        title: event.title,
+        description: `顧客: ${findKey(event.raw, ['お取引先名', '店舗']) || 'N/A'}\n住所: ${findKey(event.raw, ['住所']) || 'N/A'}`,
+        startTime: event.start as string,
+        endTime: event.end as string,
+        location: findKey(event.raw, ['住所']) || '',
+      });
+      if (result.status === 'error') throw new Error(result.message);
+      
+      toast({ title: 'メール送信成功', description: `${staff.name}にiCalメールを送信しました。` });
+      setDialogState({ mode: 'closed' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'メール送信エラー', description: e.message });
+    }
+  };
+
   const getDialogDetails = () => {
-    if (dialogState.mode === 'edit') {
+    if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
       const { event } = dialogState;
       const staff = getStaffById(event.staffId);
       const customer = getCustomerByCode(event.locationId);
-      const title = '予定の編集';
+      const title = dialogState.mode === 'edit' ? '予定の編集' : '受注詳細';
       return { event, staff, customer, title };
     }
     if (dialogState.mode === 'new') {
@@ -676,25 +723,15 @@ export function ScheduleView({
   };
 
   const { event, staff, customer, title } = getDialogDetails();
+  
+  const renderDetailItem = (label: string, value: any) => (
+    value ? <div className="text-sm"><span className="font-semibold text-muted-foreground">{label}:</span> {String(value)}</div> : null
+  );
 
   const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
   const activationConstraint: ActivationConstraint = {
       distance: 5,
   };
-
-  if (!isClient) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>スケジュール</CardTitle>
-          <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
-        </CardHeader>
-        <CardContent>
-           <div className="flex items-center justify-center h-64"><p>Loading schedule...</p></div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <ScheduleViewContext.Provider value={contextValue}>
@@ -704,7 +741,7 @@ export function ScheduleView({
       activationConstraint={activationConstraint}
     >
       <TooltipProvider>
-        <div className="space-y-4">
+        <div className="space-y-6">
             <Card>
                 <div className="grid grid-cols-1 md:grid-cols-5">
                     <div className="md:col-span-3 md:border-r">
@@ -755,25 +792,62 @@ export function ScheduleView({
         </div>
         
         <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
-            <DialogContent>
+            <DialogContent className={cn(dialogState.mode === 'details' && "max-w-xl")}>
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription>{dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'}</DialogDescription>
+                    <DialogDescription>{dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : dialogState.mode === 'new' ? '新しい予定の詳細を入力してください。' : 'スプレッドシートから取得した受注の詳細情報です。'}</DialogDescription>
                 </DialogHeader>
+                 {dialogState.mode === 'details' && event ? (
+                  <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 py-4 max-h-[60vh] overflow-y-auto">
+                      {renderDetailItem('担当者', staff?.name)}
+                      {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
+                      {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
+                      {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
+                      {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
+                      {renderDetailItem('車名', findKey(event.raw, ['車名']))}
+                      {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
+                      {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
+                      {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
+                      {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
+                      {renderDetailItem('品名', findKey(event.raw, ['品名']))}
+                      {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
+                      {renderDetailItem('本数', findKey(event.raw, ['本数']))}
+                      {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
+                      {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
+                      {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
+                  </div>
+                   <DialogFooter className="sm:justify-between">
+                       <Button variant="outline" onClick={() => handleSendIcs(event)}>
+                          <Mail className="mr-2 h-4 w-4" />
+                          iCalメール送信
+                       </Button>
+                       <div>
+                         <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
+                         <DialogClose asChild>
+                            <Button className='ml-2'>閉じる</Button>
+                         </DialogClose>
+                       </div>
+                  </DialogFooter>
+                  </>
+                ) : (
+                <>
                 <div className="grid gap-4 py-4">
                         {dialogState.mode === 'edit' && (<div className="text-sm space-y-1"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p>{customer && <p><span className="font-semibold text-muted-foreground">顧客:</span> {customer?.storeName || 'N/A'}</p>}</div>)}
                          {dialogState.mode === 'new' && (<div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>)}
                         <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="title" className="text-right">タスク名</Label><Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/></div>
                          <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="description" className="text-right">詳細</Label><Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))} className="col-span-3" placeholder="予定の詳細やメモ"/></div>
-                        <div className="grid grid-cols-2 items-center gap-4">
-                            <div className="grid gap-2"><Label htmlFor="start-time">開始時間</Label><Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/></div>
-                            <div className="grid gap-2"><Label htmlFor="end-time">終了時間</Label><Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/></div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="col-span-2 grid gap-2"><Label htmlFor="start-time">開始時間</Label><Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/></div>
+                            <div className="col-span-2 grid gap-2"><Label htmlFor="end-time">終了時間</Label><Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/></div>
                         </div>
                     </div>
                     <DialogFooter className="sm:justify-between">
                         <div className="flex gap-2">{dialogState.mode === 'edit' && (<Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>)}</div>
                         <div className="flex gap-2 mt-4 sm:mt-0"><DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose><Button onClick={handleSaveEvent}>保存</Button></div>
                     </DialogFooter>
+                  </>
+                )}
                 </DialogContent>
             </Dialog>
         <RenderDragOverlay />
