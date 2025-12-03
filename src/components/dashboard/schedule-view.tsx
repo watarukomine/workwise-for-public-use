@@ -658,7 +658,7 @@ export function ScheduleView({
     setDialogState({ mode: 'closed' });
   };
   
-    const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
+    const handleSendIcs = async (event: WithId<ScheduleEvent>, isUpdate: boolean) => {
     const staff = getStaffById(event.staffId);
     if (!staff || !staff.email) {
       toast({ variant: 'destructive', title: 'エラー', description: '担当者またはそのメールアドレスが見つかりません。' });
@@ -674,6 +674,7 @@ export function ScheduleView({
         startTime: event.start as string,
         endTime: event.end as string,
         location: findKey(event.raw, ['住所']) || '',
+        isUpdate: isUpdate,
       });
       if (result.status === 'error') throw new Error(result.message);
       
@@ -835,7 +836,7 @@ export function ScheduleView({
                     </div>
                   )}
                    <DialogFooter className="sm:justify-between pt-4">
-                       <Button variant="outline" onClick={() => handleSendIcs(event)}>
+                       <Button variant="outline" onClick={() => handleSendIcs(event, true)}>
                           <Mail className="mr-2 h-4 w-4" />
                           iCalメール送信
                        </Button>

@@ -151,7 +151,7 @@ function updateSheetWithOrderInfo(params) {
 }
 
 function sendIcsEmail(params) {
-  const { staffName, staffEmail, title, description, startTime, endTime, location } = params;
+  const { staffName, staffEmail, title, description, startTime, endTime, location, isUpdate } = params;
   try {
     if (!staffEmail) throw new Error("宛先メールアドレスが指定されていません。");
     
@@ -197,8 +197,11 @@ function sendIcsEmail(params) {
       'END:VCALENDAR'
     ].join('\r\n');
 
-    const subject = "新規予定のお知らせ: " + title;
-    const body = "新しい予定が割り当てられました。添付のiCalendarファイルを開いてカレンダーに追加してください。";
+    const subject = isUpdate ? "【予定変更】" + title : "【新規予定】" + title;
+    const body = isUpdate 
+        ? "割り当てられた予定が変更されました。添付のiCalendarファイルを開いてカレンダーを更新してください。"
+        : "新しい予定が割り当てられました。添付のiCalendarファイルを開いてカレンダーに追加してください。";
+
     const options = {
       attachments: [{ fileName: "invite.ics", content: icsContent, mimeType: "text/calendar; charset=UTF-8; method=REQUEST" }]
     };
