@@ -55,10 +55,19 @@ function doGet(e) {
  */
 function doPost(e) {
   try {
+    console.log("doPost Request received:", JSON.stringify(e));
+    
     let params;
     if (e.postData && e.postData.type === "application/json") {
-      params = JSON.parse(e.postData.contents);
+      try {
+        params = JSON.parse(e.postData.contents);
+        console.log("JSON data parsed:", JSON.stringify(params));
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError.message);
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "JSONデータの解析に失敗しました: " + parseError.message })).setMimeType(ContentService.MimeType.JSON);
+      }
     } else {
+      console.error("No JSON data received in request");
       return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "リクエストにJSONデータがありません" })).setMimeType(ContentService.MimeType.JSON);
     }
     
@@ -85,12 +94,15 @@ function updateSheetWithOrderInfo(params) {
   } = params;
 
   try {
+    console.log("Updating sheet with:", JSON.stringify(params));
+    
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
     if (!match || !match[1] || match[1].toUpperCase() === 'N/A') {
       return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "汎用タスクまたはIDなしタスクのためシート更新はスキップされました。" })).setMimeType(ContentService.MimeType.JSON);
     }
     
     const orderId = match[1];
+    console.log("Extracted order ID:", orderId);
     
     const orderSpreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
     const sheet = orderSpreadsheet.getSheetByName(ORDER_SHEET_NAME);
@@ -113,11 +125,14 @@ function updateSheetWithOrderInfo(params) {
       throw new Error(`指定された受注ID: ${orderId} がシートに見つかりませんでした。`);
     }
     
+    console.log(`Updating row: ${rowNum}, ID: ${orderId}`);
+    
     const updateColumn = (colName, value) => {
       if (value !== undefined) {
         const colIdx = headers.indexOf(colName);
         if (colIdx !== -1) {
           sheet.getRange(rowNum, colIdx + 1).setValue(value);
+          console.log(`Updated column '${colName}' with value: ${value}`);
         }
       }
     };
@@ -143,9 +158,10 @@ function updateSheetWithOrderInfo(params) {
         }
     }
         
-    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `受注ID: ${orderId} を更新しました。` })).setMimeType(ContentService.MimeType.JSON);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `受注ID: ${orderId} を更新しました。`, })).setMimeType(ContentService.MimeType.JSON);
     
   } catch (error) {
+    console.error("Error in updateSheetWithOrderInfo:", error.message, error.stack);
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
   }
 }

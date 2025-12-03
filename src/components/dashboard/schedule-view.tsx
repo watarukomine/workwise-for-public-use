@@ -526,49 +526,47 @@ export function ScheduleView({
                 raw:{}
              };
              setScheduleEvents(prev => [...(prev || []), newEvent]);
+             toast({ title: "汎用タスクを追加しました" });
         } else {
-             const tripId = `trip-${order.rawOrderId}`;
-             const customer = getCustomerByCode(order.customerCode);
-             const travelEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-travel`, tripId,
-                title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                staffId: newStaffId, locationId: customer?.userCode || '',
-                start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(), end: taskStart.toISOString(),
-                rawOrderId: order.rawOrderId, raw: order.raw,
-             };
-             const taskEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-task`, tripId,
-                title: order.taskDetails,
-                staffId: newStaffId, locationId: customer?.userCode || '',
-                start: taskStart.toISOString(), end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
-                rawOrderId: order.rawOrderId, raw: order.raw,
-             };
-             setScheduleEvents(prev => [...(prev || []).filter(e => e.rawOrderId !== order.rawOrderId), travelEvent, taskEvent]);
              setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-        }
+             setScheduleEvents(prev => [...(prev || []), {
+                id: `trip-${order.rawOrderId}-task`,
+                tripId: `trip-${order.rawOrderId}`,
+                title: order.taskDetails,
+                staffId: newStaffId,
+                locationId: order.customerCode || '',
+                start: taskStart.toISOString(),
+                end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
+                rawOrderId: order.rawOrderId,
+                raw: order.raw,
+             }, {
+                id: `trip-${order.rawOrderId}-travel`,
+                tripId: `trip-${order.rawOrderId}`,
+                title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
+                staffId: newStaffId,
+                locationId: order.customerCode || '',
+                start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(),
+                end: taskStart.toISOString(),
+                rawOrderId: order.rawOrderId,
+                raw: order.raw,
+             }]);
         
-        (async () => {
-            try {
-                if (isGeneric) {
-                     toast({ title: "汎用タスクを追加しました" });
-                } else {
+            (async () => {
+                try {
                      await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
-                     
-                     const taskEvent = (scheduleEvents || []).find(e => e.start === taskStart.toISOString() && e.staffId === newStaffId);
-                     if(taskEvent) setDialogState({ mode: 'edit', event: taskEvent });
-
-                     toast({ title: "タスクを割り当てました。詳細を確認しメールを送信してください。" });
+                     toast({ title: "タスクを割り当てました。" });
                      refetchOrders();
+                } catch (e: any) {
+                    toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+                    setScheduleEvents(previousSchedule);
+                    setUnassignedOrders(previousUnassigned);
                 }
-            } catch (e: any) {
-                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                setScheduleEvents(previousSchedule);
-                setUnassignedOrders(previousUnassigned);
-            }
-        })();
+            })();
+        }
     }
   };
-    const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
+
+  const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
       setEditedEventDetails({
           title: event.title || '',
           description: event.description || '',
@@ -610,9 +608,6 @@ export function ScheduleView({
 
     try {
         if (dialogState.mode === 'new') {
-            const staff = getStaffById(dialogState.staffId);
-            if (!staff) throw new Error("担当スタッフが見つかりません。");
-            
             const newEvent: WithId<ScheduleEvent> = {
                 id: `event-${Date.now()}`,
                 title, description,
@@ -622,20 +617,21 @@ export function ScheduleView({
                 raw:{}
             };
             setScheduleEvents(prev => [...(prev || []), newEvent]);
-
+            toast({ title: '新しい予定を作成しました。' });
         } else if (dialogState.mode === 'edit') {
-            if (dialogState.event.rawOrderId) { // Sheet-based event
+            if (dialogState.event.rawOrderId) {
                 await updateSheetStatus({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${dialogState.event.rawOrderId})`,
                     scheduledTime: newStart.toISOString(),
                     timestamp: new Date().toISOString(),
                 });
-                refetchOrders();
-
-            } else { // Generic event
+                await refetchOrders();
+                toast({ title: '予定時刻を更新しました。' });
+            } else { 
                 const updatedEvent = { ...dialogState.event, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
                 setScheduleEvents(prev => (prev || []).map(e => e.id === updatedEvent.id ? updatedEvent : e));
+                toast({ title: '予定を更新しました。' });
             }
         }
         setDialogState({ mode: 'closed' });
