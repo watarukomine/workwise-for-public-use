@@ -47,7 +47,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { updateSheetStatus } from '@/app/actions/update-sheet-status';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { Mail } from 'lucide-react';
 import { createContext, useContext } from 'react';
@@ -339,7 +339,6 @@ export function ScheduleView({
     currentDate,
     statuses,
 }: ScheduleViewProps) {
-  const [isClient, setIsClient] = React.useState(false);
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
   const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents } = useOrder();
@@ -347,14 +346,18 @@ export function ScheduleView({
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleEvents) return [];
+      return scheduleEvents.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+      });
+  }, [scheduleEvents, currentDate]);
+
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
 
   const [active, setActive] = React.useState<Active | null>(null);
-  
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActive(event.active);
@@ -387,7 +390,7 @@ export function ScheduleView({
         });
         
         toast({ title: 'タスクを未割り当てに戻しました' });
-        refetchOrders();
+        await refetchOrders();
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
@@ -599,7 +602,7 @@ export function ScheduleView({
   };
   
   const handleSaveEvent = async () => {
-    if (dialogState.mode === 'closed') return;
+    if (dialogState.mode !== 'edit' && dialogState.mode !== 'new') return;
     
     const newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
     const newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
@@ -662,7 +665,7 @@ export function ScheduleView({
     setDialogState({ mode: 'closed' });
   };
   
-  const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
+    const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
     const staff = getStaffById(event.staffId);
     if (!staff) {
       toast({ variant: 'destructive', title: 'エラー', description: '担当者が見つかりません。' });
@@ -687,14 +690,6 @@ export function ScheduleView({
     return { event: undefined, staff: undefined, customer: undefined, start: undefined, title: '' };
   };
 
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-      });
-  }, [scheduleEvents, currentDate]);
-
   const { event, staff, customer, title } = getDialogDetails();
 
   const renderDetailItem = (label: string, value: any) => (
@@ -705,20 +700,6 @@ export function ScheduleView({
   const activationConstraint: ActivationConstraint = {
       distance: 5,
   };
-  
-  if (!isClient) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>スケジュール</CardTitle>
-          <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
-        </CardHeader>
-        <CardContent>
-           <div className="flex items-center justify-center h-64"><p>Loading schedule...</p></div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <ScheduleViewContext.Provider value={contextValue}>
@@ -756,7 +737,7 @@ export function ScheduleView({
                               </div>
                               <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                           </div>
-                           <div className="relative mt-2 space-y-2">
+                          <div className="relative mt-2 space-y-2">
                               {isToday(currentDate) && (
                               <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
                                   <TimeIndicator />
