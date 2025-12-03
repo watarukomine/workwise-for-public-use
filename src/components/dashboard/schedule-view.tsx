@@ -47,7 +47,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { updateSheetStatus, sendIcsEmail } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { Mail } from 'lucide-react';
 import { createContext, useContext } from 'react';
@@ -570,6 +570,7 @@ export function ScheduleView({
         })();
     }
   };
+
     const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
     setEditedEventDetails({
         title: event.title || '',
@@ -671,8 +672,31 @@ export function ScheduleView({
       toast({ variant: 'destructive', title: 'エラー', description: '担当者が見つかりません。' });
       return;
     }
-    // This function seems to be missing from gas-actions.ts, let's assume it should exist or be created
-    toast({ title: 'メール送信機能は現在実装中です。' });
+    
+    if (!staff.email) {
+      toast({ variant: 'destructive', title: 'エラー', description: '担当者のメールアドレスが設定されていません。' });
+      return;
+    }
+
+    try {
+      const result = await sendIcsEmail({
+        gasUrl: ORDER_GAS_URL,
+        staffName: staff.name,
+        staffEmail: staff.email,
+        title: event.title,
+        description: `顧客: ${findKey(event.raw, ['お取引先名', '店舗']) || 'N/A'}\n住所: ${findKey(event.raw, ['住所']) || 'N/A'}`,
+        startTime: event.start as string,
+        endTime: event.end as string,
+        location: findKey(event.raw, ['住所']) || '',
+        isUpdate: false, // This could be enhanced to detect if it's an update
+      });
+      if (result.status === 'error') throw new Error(result.message);
+      
+      toast({ title: 'メール送信成功', description: `${staff.name}にiCalメールを送信しました。` });
+      setDialogState({ mode: 'closed' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'メール送信エラー', description: e.message });
+    }
   };
 
   const getDialogDetails = () => {
