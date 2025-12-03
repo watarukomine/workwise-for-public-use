@@ -21,6 +21,7 @@ export default function RootLayout({
       <head>
         <title>WorkWise</title>
         <meta name="description" content="Efficiently manage your workforce." />
+        <link rel="icon" href="/icons/icon-192x192.png" sizes="any" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
