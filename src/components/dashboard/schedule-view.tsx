@@ -43,7 +43,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { updateSheetStatus, handleCalendarEvent } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -184,9 +184,9 @@ interface ScheduleViewProps {
 }
 
 const genericTasks: WithId<Order>[] = [
-      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30 },
-      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60 },
-      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60 },
+      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
+      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
+      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
 ];
 
 function GenericTasks() {
@@ -301,6 +301,9 @@ export function ScheduleView({
   
   const [unassignedOrders, setUnassignedOrders] = React.useState<WithId<Order>[]>([]);
   
+  const [activeItem, setActiveItem] = React.useState<any | null>(null);
+  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
+
   React.useEffect(() => {
     setIsClient(true);
   }, []);
@@ -321,16 +324,13 @@ export function ScheduleView({
 
         const scheduledDate = parseISO(workDate);
         return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(currentDate));
-    }).map(mapRawToOrder);
+    }).map(o => mapRawToOrder(o));
 
     setUnassignedOrders(newUnassignedOrders);
   }, [rawOrdersData, currentDate, scheduleEvents]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
-
-  const [activeItem, setActiveItem] = React.useState<any | null>(null);
-  const [currentOverStaffId, setCurrentOverStaffId] = React.useState<string | null>(null);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActiveItem(event.active.data.current);
@@ -380,7 +380,7 @@ export function ScheduleView({
         if (item.rawOrderId) {
           await unassignTask(item);
         } else {
-           setScheduleEvents(prev => prev.filter(e => e.id !== item.id));
+           setScheduleEvents(prev => (prev || []).filter(e => e.id !== item.id));
            toast({ title: '汎用タスクを削除しました' });
         }
         return;
@@ -427,7 +427,7 @@ export function ScheduleView({
                 const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
                 const newEnd = addMinutes(newStart, duration);
                 const updatedEvent = { ...draggedEvent, staffId: newStaffId, start: newStart.toISOString(), end: newEnd.toISOString() };
-                setScheduleEvents(prev => prev.map(e => e.id === draggedEvent.id ? updatedEvent : e));
+                setScheduleEvents(prev => (prev || []).map(e => e.id === draggedEvent.id ? updatedEvent : e));
             }
             toast({ title: "スケジュールを更新しました" });
         } catch(e: any) {
@@ -454,7 +454,7 @@ export function ScheduleView({
                     start: taskStart.toISOString(),
                     end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
                  };
-                 setScheduleEvents(prev => [...prev, newEvent]);
+                 setScheduleEvents(prev => [...(prev || []), newEvent]);
             } else {
               await updateSheetStatus({
                   gasUrl: ORDER_GAS_URL,
@@ -554,7 +554,7 @@ export function ScheduleView({
     if (eventToDelete.rawOrderId) {
         await unassignTask(eventToDelete);
     } else {
-        setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+        setScheduleEvents(prev => (prev || []).filter(e => e.id !== eventToDelete.id));
         toast({ title: '予定を削除しました' });
     }
 
@@ -576,6 +576,14 @@ export function ScheduleView({
   };
 
   const { event, staff, customer, title } = getDialogDetails();
+  
+  const dailySchedule = React.useMemo(() => {
+      if (!scheduleEvents) return [];
+      return scheduleEvents.filter(event => {
+          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+      });
+  }, [scheduleEvents, currentDate]);
 
   if (!isClient) {
     return (
@@ -592,14 +600,6 @@ export function ScheduleView({
       </Card>
     );
   }
-
-  const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-      });
-  }, [scheduleEvents, currentDate]);
 
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver}>
