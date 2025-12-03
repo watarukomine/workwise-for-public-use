@@ -15,7 +15,7 @@ import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Send Message';
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait';
 type StatusValue = StaffStatus['status'];
 
 function CheckInClient() {
@@ -23,7 +23,6 @@ function CheckInClient() {
   const [location, setLocation] = React.useState<{ latitude: number, longitude: number } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [lastAction, setLastAction] = React.useState<{ action: ActionType, time: string } | null>(null);
-  const [message, setMessage] = React.useState('');
   const { toast } = useToast();
   const { profile } = useUserProfile();
   const searchParams = useSearchParams();
@@ -39,7 +38,6 @@ function CheckInClient() {
         'Begin Task': '作業開始',
         'Finish Task': '作業完了',
         'Wait': '位置情報更新',
-        'Send Message': 'メッセージ送信'
     };
     return map[action];
   };
@@ -59,26 +57,6 @@ function CheckInClient() {
             title: 'アクションを記録しました',
             description: `${getJapaneseActionName(action)} at ${currentTime}`,
           });
-          setIsLoading(null);
-        }, 1000);
-        return;
-    }
-    
-    if (action === 'Send Message') {
-        if (!message.trim()) {
-            setError('メッセージを入力してください。');
-            setIsLoading(null);
-            return;
-        }
-        console.log(`Message to admin: ${message}`);
-        setTimeout(() => {
-          toast({
-            title: 'メッセージを送信しました',
-            description: '管理者にメッセージが送信されました。',
-          });
-          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action: 'Send Message', time: currentTime });
-          setMessage('');
           setIsLoading(null);
         }, 1000);
         return;
@@ -212,7 +190,7 @@ function CheckInClient() {
                   action === 'Wait' && "col-span-2"
                 )}
                 onClick={() => handleAction(action)}
-                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Send Message', 'Wait'].includes(action))}
+                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Wait'].includes(action))}
               >
                 {isLoading === action ? (
                   <Loader2 className="h-6 w-6 animate-spin" />
@@ -250,40 +228,10 @@ function CheckInClient() {
               <AlertTitle>最後の記録</AlertTitle>
               <AlertDescription>
                 {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
-                {location && !['Clock In', 'Clock Out', 'Send Message'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
+                {location && !['Clock In', 'Clock Out'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
               </AlertDescription>
             </Alert>
           )}
-        </CardContent>
-      </Card>
-
-       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            管理者へ連絡
-          </CardTitle>
-          <CardDescription>緊急の連絡や報告がある場合に使用してください。</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Textarea
-            placeholder="メッセージを入力..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            disabled={isLoading === 'Send Message'}
-          />
-          <Button
-            className="w-full"
-            onClick={() => handleAction('Send Message')}
-            disabled={!!isLoading}
-          >
-            {isLoading === 'Send Message' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4 mr-2" />
-            )}
-            メッセージ送信
-          </Button>
         </CardContent>
       </Card>
     </div>
