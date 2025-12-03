@@ -23,7 +23,7 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b
  * 受注情報を取得・更新し、カレンダー連携も行うGoogle Apps ScriptのURL。
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
-export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyR85R_XUhwsoAGMgJTiier00PNbE6ngJz3nioPw-_uSC8wGtmaAhWM80YEXNCVFwPl/exec';
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyPFr1hzyBPDCTlQvDEaWCF0j2gBkfeu--ZOHldPAkDarbY7efvm8TrU4NksLc1x6g/exec';
 
 
 // --- スプレッドシート本体のURL ---
@@ -32,19 +32,19 @@ export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyR85R_XUh
  * スタッフ情報が記載されているスプレッドシートのURL。
  * staff/page.tsx のヘッダークリックで開かれます。
  */
-export const STAFF_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo/edit?usp=sharing';
+export const STAFF_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Staff sheet URL
 
 /**
  * 販売店情報が記載されているスプレッドシートのURL。
  * customers/page.tsx のヘッダークリックで開かれます。
  */
-export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1jZdToM75DunESxVU07QjSCbYEsqd_nSwxzjr09a52CA/edit?usp=sharing';
+export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing';
 
 /**
  * 受注情報が記載されているスプレッドシートのURL。
  * orders/page.tsx のヘッダークリックで開かれます。
  */
-export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s/edit?usp=sharing';
+export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Order sheet URL
 
 
 // --- その他設定 ---
