@@ -49,11 +49,11 @@ const OptimizeRouteOutputSchema = z.object({
   estimatedTravelTime: z
     .string()
     .optional()
-    .describe('The estimated travel time for the optimized route.'),
+    .describe('The estimated travel time for the optimized route, in Japanese format (e.g., "1時間15分").'),
   estimatedTravelDistance: z
     .string()
     .optional()
-    .describe('The estimated travel distance for the optimized route.'),
+    .describe('The estimated travel distance for the optimized route, in Japanese format (e.g., "75.0 km").'),
 });
 export type OptimizeRouteOutput = z.infer<typeof OptimizeRouteOutputSchema>;
 
@@ -65,30 +65,30 @@ const prompt = ai.definePrompt({
   name: 'optimizeRoutePrompt',
   input: {schema: OptimizeRouteInputSchema},
   output: {schema: OptimizeRouteOutputSchema},
-  prompt: `You are an expert route optimizer, skilled at finding the most efficient routes between multiple locations.
+  prompt: `あなたは、複数の地点間の最も効率的なルートを見つけ出す、熟練したルート最適化のエキスパートです。
 
-  Given a starting location, an ending location, and a list of intermediate waypoints, your task is to determine the optimal route that starts at the start location, visits all waypoints, and ends at the end location. The goal is to minimize travel time and fuel costs.
-  The optimization is based on {{{optimizeFor}}}.
-  {{#if avoidHighways}}
-  The route should avoid highways.
-  {{/if}}
+出発地、目的地、そして中間地点のリストが与えられます。あなたのタスクは、出発地から始まり、すべての中間地点を巡り、目的地で終わる最適なルートを決定することです。目的は、移動時間と燃料コストを最小限に抑えることです。
+最適化の基準は「{{{optimizeFor}}}」です。
+{{#if avoidHighways}}
+ルートは高速道路を避ける必要があります。
+{{/if}}
 
-  Start Location:
-  - ID: {{startLocation.id}}, Name: {{startLocation.name}}, Address: {{startLocation.address}}, Latitude: {{startLocation.latitude}}, Longitude: {{startLocation.longitude}}
+出発地:
+- ID: {{startLocation.id}}, 名称: {{startLocation.name}}, 住所: {{startLocation.address}}, 緯度: {{startLocation.latitude}}, 経度: {{startLocation.longitude}}
 
-  Waypoints:
-  {{#each waypoints}}
-  - ID: {{this.id}}, Name: {{this.name}}, Address: {{this.address}}, Latitude: {{this.latitude}}, Longitude: {{this.longitude}}
-  {{else}}
-  No waypoints provided.
-  {{/each}}
+中間地点:
+{{#each waypoints}}
+- ID: {{this.id}}, 名称: {{this.name}}, 住所: {{this.address}}, 緯度: {{this.latitude}}, 経度: {{this.longitude}}
+{{else}}
+中間地点はありません。
+{{/each}}
   
-  End Location:
-  - ID: {{endLocation.id}}, Name: {{endLocation.name}}, Address: {{endLocation.address}}, Latitude: {{endLocation.latitude}}, Longitude: {{endLocation.longitude}}
+目的地:
+- ID: {{endLocation.id}}, 名称: {{endLocation.name}}, 住所: {{endLocation.address}}, 緯度: {{endLocation.latitude}}, 経度: {{endLocation.longitude}}
 
-  Please provide the optimized route as an ordered list of all locations (start, waypoints, and end). Also include the estimated travel time and estimated travel distance.
-  Ensure that the locations in the optimizedRoute array contain all the original fields (id, name, address, latitude, longitude) from the input. The final optimizedRoute array must include the start location, all waypoints, and the end location in the calculated optimal order.
-  `,
+最適化されたルートを、全地点（出発地、中間地点、目的地）の順序付きリストとして提供してください。また、推定所要時間と推定移動距離も日本語で含めてください（例：1時間15分、75.0 km）。
+optimizedRoute配列内の各地点には、入力から受け取った元のフィールド（id, name, address, latitude, longitude, type）がすべて含まれていることを確認してください。最終的なoptimizedRoute配列には、計算された最適な順序で、出発地、すべての中間地点、および目的地が含まれている必要があります。
+`,
 });
 
 const optimizeRouteFlow = ai.defineFlow(

@@ -1,3 +1,4 @@
+
 'use client';
 import * as React from 'react';
 import { useFormStatus } from 'react-dom';
@@ -461,8 +462,13 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
                     {state.data.optimizedRoute.map((location, index) => {
                       return (
                         <li key={location.id} className="ml-6">
-                          <span className="absolute -left-[10.5px] top-1 flex items-center justify-center w-5 h-5 bg-primary rounded-full text-primary-foreground text-xs font-bold">
-                              {index + 1}
+                           <span className={cn(
+                            "absolute -left-[10.5px] top-1 flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold",
+                            index === 0 ? "bg-green-600 text-white" : 
+                            index === state.data!.optimizedRoute.length - 1 ? "bg-red-600 text-white" :
+                            "bg-primary text-primary-foreground"
+                          )}>
+                            {index === 0 ? <UserIcon className="h-3 w-3" /> : index === state.data!.optimizedRoute.length - 1 ? <Flag className="h-3 w-3" /> : index + 1}
                           </span>
                           <div className="pl-2">
                               <h4 className="font-medium">{location.name}</h4>
