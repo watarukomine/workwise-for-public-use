@@ -775,22 +775,21 @@ export function ScheduleView({
                     <CardTitle>タイムライン</CardTitle>
                 </CardHeader>
                 <CardContent className="w-full">
-                  <ScrollArea className="w-full" type="auto">
-                      <div className="relative">
-                          <div className="sticky top-0 z-30 flex bg-background/95 backdrop-blur-sm" style={{top: `calc(65px + 230px)`}}>
-                              <div className="flex-shrink-0 font-semibold p-2 sticky left-0 z-10 bg-background/95 backdrop-blur-sm border-r" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                              <div className="relative h-[34px] flex-1 border-l border-b">
+                  <div className="overflow-x-auto">
+                    <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                          <div className="sticky top-[295px] z-30 flex bg-background/95 backdrop-blur-sm border-y">
+                              <div className="flex-shrink-0 font-semibold p-2 sticky left-0 z-10 bg-inherit" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                              <div className="relative h-[34px] flex-1">
                                   {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                                       <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
                                           <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
                                       </div>
                                   ))}
                               </div>
-                              <div className="flex-shrink-0 font-semibold p-2 border-l border-b sticky right-0 z-10 bg-background/95 backdrop-blur-sm" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                              <div className="flex-shrink-0 font-semibold p-2 border-l sticky right-0 z-10 bg-inherit" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                           </div>
                           
-                          <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                            <ScrollArea className="h-[50vh]">
+                          <div className="relative h-[50vh] overflow-y-auto">
                                 <div className="relative space-y-2">
                                     {isToday(currentDate) && (
                                     <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
@@ -805,11 +804,9 @@ export function ScheduleView({
                                         );
                                     })}
                                 </div>
-                            </ScrollArea>
                           </div>
                       </div>
-                     <ScrollBar orientation="horizontal" />
-                  </ScrollArea>
+                  </div>
                 </CardContent>
             </Card>
         </div>
@@ -818,9 +815,14 @@ export function ScheduleView({
             <DialogContent className={cn(dialogState.mode === 'details' && "max-w-xl")}>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                      {title}
-                      {dialogState.mode === 'details' && (
-                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDialogState({mode: 'edit', event: dialogState.event})}>
+                      {dialogState.mode === 'details' ? '受注詳細' : dialogState.mode === 'edit' ? '予定の編集' : '新規予定の作成'}
+                      {(dialogState.mode === 'details') && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                              if (dialogState.mode === 'details') {
+                                setDialogState({mode: 'edit', event: dialogState.event})
+                              }
+                            }
+                          }>
                             <Pencil className="h-4 w-4 text-muted-foreground"/>
                           </Button>
                       )}
@@ -831,43 +833,70 @@ export function ScheduleView({
                       }
                     </DialogDescription>
                 </DialogHeader>
-                 {dialogState.mode === 'details' && event ? (
+                 {(dialogState.mode === 'details' || dialogState.mode === 'edit') && event ? (
                   <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 py-4 max-h-[50vh] overflow-y-auto">
-                        {renderDetailItem('担当者', staff?.name)}
-                        {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
-                        {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
-                        {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
-                        {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
-                        {renderDetailItem('車名', findKey(event.raw, ['車名']))}
-                        {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
-                        {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
-                        {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
-                        {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
-                        {renderDetailItem('品名', findKey(event.raw, ['品名']))}
-                        {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
-                        {renderDetailItem('本数', findKey(event.raw, ['本数']))}
-                        {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
-                        {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
-                        {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
-                    </div>
-                    <DialogFooter className="sm:justify-between pt-4 border-t">
-                        <div className="flex flex-wrap gap-2">
-                            <Button variant="outline" onClick={() => handleSendIcs(event)}>
-                                <Mail className="mr-2 h-4 w-4" />
-                                iCalメール送信
-                            </Button>
-                            <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
+                  <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                    {/* Details section */}
+                    {dialogState.mode === 'details' && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
+                          {renderDetailItem('担当者', staff?.name)}
+                          {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
+                          {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
+                          {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
+                          {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
+                          {renderDetailItem('車名', findKey(event.raw, ['車名']))}
+                          {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
+                          {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
+                          {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
+                          {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
+                          {renderDetailItem('品名', findKey(event.raw, ['品名']))}
+                          {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
+                          {renderDetailItem('本数', findKey(event.raw, ['本数']))}
+                          {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
+                          {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
+                          {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
                         </div>
-                        <div className='flex gap-2 mt-4 sm:mt-0'>
-                            <DialogClose asChild><Button variant="ghost">閉じる</Button></DialogClose>
+                    )}
+
+                    {/* Edit form */}
+                     <div className="grid gap-4 pt-4 border-t">
+                        <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
+                        {!event.rawOrderId && (
+                             <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="title" className="text-right">タスク名</Label>
+                                <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/>
+                             </div>
+                        )}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor="start-time">開始時間</Label>
+                                <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
+                            </div>
+                            <div>
+                                <Label htmlFor="end-time">終了時間</Label>
+                                <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
+                            </div>
                         </div>
-                    </DialogFooter>
+                      </div>
+                  </div>
+                   <DialogFooter className="sm:justify-between pt-4 border-t">
+                       <div className="flex flex-wrap gap-2">
+                           <Button variant="outline" onClick={() => handleSendIcs(event)}>
+                               <Mail className="mr-2 h-4 w-4" />
+                               iCalメール送信
+                           </Button>
+                           <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
+                       </div>
+                       <div className='flex gap-2 mt-4 sm:mt-0'>
+                         <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
+                         <Button onClick={handleSaveEvent}>保存</Button>
+                       </div>
+                  </DialogFooter>
                   </>
-                ) : (dialogState.mode === 'edit' || dialogState.mode === 'new') ? (
+                ) : (dialogState.mode === 'new') ? (
                      <>
                       <div className="grid gap-4 py-4">
-                          {(dialogState.mode === 'edit' || dialogState.mode === 'new') && <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>}
+                          <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
                           <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="title" className="text-right">タスク名</Label>
                             <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/>
@@ -888,7 +917,7 @@ export function ScheduleView({
                           </div>
                       </div>
                       <DialogFooter className="sm:justify-between">
-                         <div className="flex gap-2">{dialogState.mode === 'edit' && (<Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>)}</div>
+                         <div className="flex gap-2"></div>
                          <div className="flex gap-2 mt-4 sm:mt-0">
                             <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
                             <Button onClick={handleSaveEvent}>保存</Button>
@@ -922,19 +951,19 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
   const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r h-16", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+    <div className={cn("flex relative h-16 border-b", areaBgClass)}>
+      <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit")} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
             <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
             <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
-      <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-16 border-b", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)} style={{ width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+      <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
         <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)}/>))}
         </div>
       </div>
-      <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
+      <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit")} style={{ width: `${STATUS_COL_WIDTH}px`}}>
         {status && isToday(new Date()) && (<div className="text-xs text-center font-medium">{status.status}</div>)}
       </div>
     </div>
@@ -971,19 +1000,19 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   
   const divStyle: React.CSSProperties = { backgroundColor: staff.color || 'hsl(var(--primary))' };
   
-  let textColorClass = getContrastingTextColor(staff.color || 'hsl(var(--primary))') === '#FFFFFF' ? 'text-white' : 'text-black';
+  const textColorClass = getContrastingTextColor(staff.color || 'hsl(var(--primary))') === '#FFFFFF' ? 'text-white' : 'text-black';
   
   if (isTravelEvent) {
     divStyle.backgroundColor = 'hsl(var(--accent))';
-    textColorClass = 'text-accent-foreground';
+    divStyle.color = 'hsl(var(--accent-foreground))';
   } 
   
   if (event.title === '業務') {
     divStyle.backgroundColor = 'rgb(156 163 175)';
-    textColorClass = 'text-white';
+    divStyle.color = 'white';
   } else if (event.title === '休憩') {
     divStyle.backgroundColor = 'rgb(34 197 94)';
-    textColorClass = 'text-white';
+    divStyle.color = 'white';
   }
 
   const [line1, ...rest] = (event.title || '').split('\n');
@@ -994,7 +1023,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const eventContent = (
       <div
           className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && !isOverlay && "opacity-50")}
-          style={{...divStyle, width: isOverlay ? `${width}px` : '100%'}}
+          style={{...divStyle, width: isOverlay ? `${width}px` : '100%', color: divStyle.color}}
       >
         <p className="text-xs font-semibold truncate pointer-events-none">{line1}</p>
         {line2 && (<p className="text-xs opacity-80 truncate pointer-events-none">{line2}</p>)}
