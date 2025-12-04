@@ -192,7 +192,7 @@ function GenericTasks() {
     };
 
     return (
-        <Card className="h-full">
+        <Card className="h-full border">
             <CardHeader>
                 <CardTitle className="text-lg font-semibold">汎用タスク</CardTitle>
                 <CardDescription>休憩や移動など、受注以外のタスクです。</CardDescription>
@@ -227,7 +227,7 @@ function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[],
     return (
         <Card 
             ref={setNodeRef}
-            className={cn("transition-colors h-full", isOver && "bg-primary/10")}
+            className={cn("transition-colors h-full border", isOver && "bg-primary/10")}
         >
             <CardHeader>
                 <CardTitle className="text-lg font-semibold">{titleText}</CardTitle>
@@ -776,36 +776,38 @@ export function ScheduleView({
                 </CardHeader>
                 <CardContent className="w-full">
                   <ScrollArea className="w-full" type="auto">
-                    <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                      <div className="sticky top-0 z-30 flex bg-background/95 backdrop-blur-sm border-b">
-                          <div className="flex-shrink-0 font-semibold p-2 sticky left-0 z-10 bg-background/95 backdrop-blur-sm" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                          <div className="relative h-[34px] flex-1 border-l">
-                              {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                  <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
-                                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
-                                  </div>
-                              ))}
+                      <div className="relative">
+                          <div className="sticky top-0 z-30 flex bg-background/95 backdrop-blur-sm" style={{top: `calc(65px + 230px)`}}>
+                              <div className="flex-shrink-0 font-semibold p-2 sticky left-0 z-10 bg-background/95 backdrop-blur-sm border-r" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                              <div className="relative h-[34px] flex-1 border-l border-b">
+                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                      <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
+                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
+                                      </div>
+                                  ))}
+                              </div>
+                              <div className="flex-shrink-0 font-semibold p-2 border-l border-b sticky right-0 z-10 bg-background/95 backdrop-blur-sm" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
                           </div>
-                          <div className="flex-shrink-0 font-semibold p-2 border-l sticky right-0 z-10 bg-background/95 backdrop-blur-sm" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                          
+                          <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                            <ScrollArea className="h-[50vh]">
+                                <div className="relative space-y-2">
+                                    {isToday(currentDate) && (
+                                    <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                                        <TimeIndicator />
+                                    </div>
+                                    )}
+                                    {staffData?.map((staff) => {
+                                        const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                        const status = statuses.find(s => s.staffId === staff.id);
+                                        return (
+                                            <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
+                                        );
+                                    })}
+                                </div>
+                            </ScrollArea>
+                          </div>
                       </div>
-                      
-                      <ScrollArea className="h-[50vh]">
-                        <div className="relative mt-2 space-y-2">
-                            {isToday(currentDate) && (
-                            <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
-                                <TimeIndicator />
-                            </div>
-                            )}
-                            {staffData?.map((staff) => {
-                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                const status = statuses.find(s => s.staffId === staff.id);
-                                return (
-                                    <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
-                                );
-                            })}
-                        </div>
-                      </ScrollArea>
-                    </div>
                      <ScrollBar orientation="horizontal" />
                   </ScrollArea>
                 </CardContent>
@@ -815,9 +817,16 @@ export function ScheduleView({
         <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
             <DialogContent className={cn(dialogState.mode === 'details' && "max-w-xl")}>
                 <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
+                    <DialogTitle className="flex items-center gap-2">
+                      {title}
+                      {dialogState.mode === 'details' && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDialogState({mode: 'edit', event: dialogState.event})}>
+                            <Pencil className="h-4 w-4 text-muted-foreground"/>
+                          </Button>
+                      )}
+                    </DialogTitle>
                     <DialogDescription>
-                      {dialogState.mode === 'details' ? 'スプレッドシートから取得した受注の詳細情報です。時間を編集して保存できます。' :
+                      {dialogState.mode === 'details' ? 'スプレッドシートから取得した受注の詳細情報です。' :
                        dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'
                       }
                     </DialogDescription>
@@ -842,17 +851,7 @@ export function ScheduleView({
                         {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
                         {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
                     </div>
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                        <div>
-                            <Label htmlFor="start-time">開始時間</Label>
-                            <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
-                        </div>
-                        <div>
-                            <Label htmlFor="end-time">終了時間</Label>
-                            <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
-                        </div>
-                    </div>
-                    <DialogFooter className="sm:justify-between pt-4">
+                    <DialogFooter className="sm:justify-between pt-4 border-t">
                         <div className="flex flex-wrap gap-2">
                             <Button variant="outline" onClick={() => handleSendIcs(event)}>
                                 <Mail className="mr-2 h-4 w-4" />
@@ -861,45 +860,14 @@ export function ScheduleView({
                             <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
                         </div>
                         <div className='flex gap-2 mt-4 sm:mt-0'>
-                            <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
-                            <Button onClick={handleSaveEvent}>保存</Button>
+                            <DialogClose asChild><Button variant="ghost">閉じる</Button></DialogClose>
                         </div>
                     </DialogFooter>
                   </>
-                ) : dialogState.mode === 'edit' && event ? (
-                  <>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="title" className="text-right">タスク名</Label>
-                        <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/>
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="description" className="text-right">詳細</Label>
-                        <Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))} className="col-span-3" placeholder="予定の詳細やメモ"/>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label htmlFor="start-time">開始時間</Label>
-                            <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
-                        </div>
-                        <div>
-                            <Label htmlFor="end-time">終了時間</Label>
-                            <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
-                        </div>
-                      </div>
-                    </div>
-                    <DialogFooter>
-                       <Button variant="destructive" onClick={handleDeleteEvent} className="mr-auto">削除</Button>
-                       <div className="flex gap-2 ml-auto">
-                        <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
-                        <Button onClick={handleSaveEvent}>保存</Button>
-                       </div>
-                    </DialogFooter>
-                  </>
-                ) : dialogState.mode === 'new' ? (
+                ) : (dialogState.mode === 'edit' || dialogState.mode === 'new') ? (
                      <>
                       <div className="grid gap-4 py-4">
-                          <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
+                          {(dialogState.mode === 'edit' || dialogState.mode === 'new') && <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>}
                           <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="title" className="text-right">タスク名</Label>
                             <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/>
@@ -919,9 +887,12 @@ export function ScheduleView({
                               </div>
                           </div>
                       </div>
-                      <DialogFooter>
-                         <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
-                         <Button onClick={handleSaveEvent}>保存</Button>
+                      <DialogFooter className="sm:justify-between">
+                         <div className="flex gap-2">{dialogState.mode === 'edit' && (<Button variant="destructive" onClick={handleDeleteEvent}>削除</Button>)}</div>
+                         <div className="flex gap-2 mt-4 sm:mt-0">
+                            <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
+                            <Button onClick={handleSaveEvent}>保存</Button>
+                         </div>
                       </DialogFooter>
                     </>
                 ) : null}
