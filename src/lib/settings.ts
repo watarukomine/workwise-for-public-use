@@ -32,7 +32,7 @@ export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbw-jHNhx6A
  * スタッフ情報が記載されているスプレッドシートのURL。
  * staff/page.tsx のヘッダークリックで開かれます。
  */
-export const STAFF_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Staff sheet URL
+export const STAFF_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo/edit?usp=sharing';
 
 /**
  * 販売店情報が記載されているスプレッドシートのURL。
@@ -44,7 +44,7 @@ export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHX
  * 受注情報が記載されているスプレッドシートのURL。
  * orders/page.tsx のヘッダークリックで開かれます。
  */
-export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing'; // TODO: Replace with your actual Order sheet URL
+export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s/edit?usp=sharing';
 
 
 // --- その他設定 ---
