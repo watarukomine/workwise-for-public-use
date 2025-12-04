@@ -620,8 +620,19 @@ export function ScheduleView({
     
     try {
         if (dialogState.mode === 'new') {
-            // This is for creating new generic tasks, which doesn't seem to be the user's focus.
-            // Keeping it simple for now.
+             const staff = getStaffById(dialogState.staffId);
+            if (!staff) throw new Error("担当スタッフが見つかりません。");
+
+            const { title, description } = editedEventDetails;
+            const newEvent: WithId<ScheduleEvent> = {
+                id: `event-${Date.now()}`,
+                title, description,
+                staffId: dialogState.staffId, locationId: '',
+                start: newStart.toISOString(),
+                end: newEnd.toISOString(),
+                raw:{}
+            };
+            setScheduleEvents(prev => [...prev, newEvent]);
         } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
             const eventToUpdate = dialogState.event;
             const { title, description } = editedEventDetails;
@@ -631,9 +642,11 @@ export function ScheduleView({
                     gasUrl: ORDER_GAS_URL,
                     eventTitle: `(ID: ${eventToUpdate.rawOrderId})`,
                     scheduledTime: newStart.toISOString(),
+                    scheduledEndTime: newEnd.toISOString(),
                     timestamp: new Date().toISOString(),
                 });
                 await refetchOrders();
+
             } else { // Generic event (not from sheet)
                 const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
                 setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));

@@ -90,7 +90,7 @@ function doPost(e) {
 function updateSheetWithOrderInfo(params) {
   const { 
       eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, 
-      actionTimestamp, scheduledTime
+      actionTimestamp, scheduledTime, scheduledEndTime
   } = params;
 
   try {
@@ -144,6 +144,11 @@ function updateSheetWithOrderInfo(params) {
       updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
     }
     updateColumn("チップ配置作業予定", scheduledTime ? new Date(scheduledTime) : (scheduledTime === "" ? "" : undefined)); 
+    
+    // Also update作業完了 time if scheduledEndTime is provided
+    if (scheduledEndTime) {
+       updateColumn("作業完了", new Date(scheduledEndTime));
+    }
     
     if (actionType && actionTimestamp) {
         const dateValue = new Date(actionTimestamp);
