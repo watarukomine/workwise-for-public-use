@@ -351,10 +351,6 @@ export function ScheduleView({
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
   
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
-
   const dailySchedule = React.useMemo(() => {
       if (!scheduleEvents) return [];
       return scheduleEvents.filter(event => {
@@ -363,6 +359,9 @@ export function ScheduleView({
       });
   }, [scheduleEvents, currentDate]);
 
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   const handleDragStart = (event: DragStartEvent) => {
     setActive(event.active);
@@ -609,8 +608,8 @@ export function ScheduleView({
   };
   
   const handleSaveEvent = async () => {
-    if (dialogState.mode === 'closed' || dialogState.mode === 'new') return;
-    
+    if (dialogState.mode === 'closed') return;
+
     const newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
     const newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
 
@@ -620,38 +619,44 @@ export function ScheduleView({
     }
     
     try {
-      if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
-          const eventToUpdate = dialogState.event;
+        if (dialogState.mode === 'new') {
+            // This is for creating new generic tasks, which doesn't seem to be the user's focus.
+            // Keeping it simple for now.
+        } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
+            const eventToUpdate = dialogState.event;
+            const { title, description } = editedEventDetails;
 
-          if (eventToUpdate.rawOrderId) { // Sheet-based event
-              await updateSheetStatus({
-                  gasUrl: ORDER_GAS_URL,
-                  eventTitle: `(ID: ${eventToUpdate.rawOrderId})`,
-                  scheduledTime: newStart.toISOString(),
-                  timestamp: new Date().toISOString(),
-              });
-              await refetchOrders();
-
-          } else { // Generic event
-              const updatedEvent = { ...eventToUpdate, start: newStart.toISOString(), end: newEnd.toISOString() };
-              setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
-          }
-      }
-      toast({ title: '予定を保存しました' });
-      setDialogState({ mode: 'closed' });
+            if (eventToUpdate.rawOrderId) { // Sheet-based event
+                await updateSheetStatus({
+                    gasUrl: ORDER_GAS_URL,
+                    eventTitle: `(ID: ${eventToUpdate.rawOrderId})`,
+                    scheduledTime: newStart.toISOString(),
+                    timestamp: new Date().toISOString(),
+                });
+                await refetchOrders();
+            } else { // Generic event (not from sheet)
+                const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
+                setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+            }
+        }
+        toast({ title: '予定を保存しました' });
+        setDialogState({ mode: 'closed' });
     } catch (e: any) {
         toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });
     }
-  };
+};
 
 
   const handleDeleteEvent = async () => {
-    if (dialogState.mode !== 'details') return;
+    if (dialogState.mode !== 'details' && dialogState.mode !== 'edit') return;
     const eventToDelete = dialogState.event;
     
     if (eventToDelete.rawOrderId) {
         await unassignTask(eventToDelete);
-    } 
+    } else {
+        setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+        toast({ title: '予定を削除しました' });
+    }
 
     setDialogState({ mode: 'closed' });
   };
@@ -789,47 +794,47 @@ export function ScheduleView({
                 </DialogHeader>
                  {dialogState.mode === 'details' && event ? (
                   <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 py-4 max-h-[50vh] overflow-y-auto">
-                      {renderDetailItem('担当者', staff?.name)}
-                      {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
-                      {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
-                      {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
-                      {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
-                      {renderDetailItem('車名', findKey(event.raw, ['車名']))}
-                      {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
-                      {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
-                      {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
-                      {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
-                      {renderDetailItem('品名', findKey(event.raw, ['品名']))}
-                      {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
-                      {renderDetailItem('本数', findKey(event.raw, ['本数']))}
-                      {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
-                      {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
-                      {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                      <div>
-                          <Label htmlFor="start-time">開始時間</Label>
-                          <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
-                      </div>
-                      <div>
-                          <Label htmlFor="end-time">終了時間</Label>
-                          <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
-                      </div>
-                  </div>
-                   <DialogFooter className="sm:justify-between pt-4">
-                       <div className="flex gap-2">
-                         <Button variant="outline" onClick={() => handleSendIcs(event)}>
-                            <Mail className="mr-2 h-4 w-4" />
-                            iCalメール送信
-                         </Button>
-                         <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
-                       </div>
-                       <div className='flex gap-2'>
-                         <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
-                         <Button onClick={handleSaveEvent}>保存</Button>
-                       </div>
-                  </DialogFooter>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 py-4 max-h-[50vh] overflow-y-auto">
+                        {renderDetailItem('担当者', staff?.name)}
+                        {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
+                        {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
+                        {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
+                        {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
+                        {renderDetailItem('車名', findKey(event.raw, ['車名']))}
+                        {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
+                        {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
+                        {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
+                        {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
+                        {renderDetailItem('品名', findKey(event.raw, ['品名']))}
+                        {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
+                        {renderDetailItem('本数', findKey(event.raw, ['本数']))}
+                        {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
+                        {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
+                        {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                        <div>
+                            <Label htmlFor="start-time">開始時間</Label>
+                            <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
+                        </div>
+                        <div>
+                            <Label htmlFor="end-time">終了時間</Label>
+                            <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
+                        </div>
+                    </div>
+                    <DialogFooter className="sm:justify-between pt-4">
+                        <div className="flex flex-wrap gap-2">
+                            <Button variant="outline" onClick={() => handleSendIcs(event)}>
+                                <Mail className="mr-2 h-4 w-4" />
+                                iCalメール送信
+                            </Button>
+                            <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
+                        </div>
+                        <div className='flex gap-2 mt-4 sm:mt-0'>
+                            <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
+                            <Button onClick={handleSaveEvent}>保存</Button>
+                        </div>
+                    </DialogFooter>
                   </>
                 ) : (
                 <>
