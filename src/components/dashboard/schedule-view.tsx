@@ -192,7 +192,7 @@ function GenericTasks() {
     };
 
     return (
-        <Card>
+        <Card className="h-full">
             <CardHeader>
                 <CardTitle className="text-lg font-semibold">汎用タスク</CardTitle>
                 <CardDescription>休憩や移動など、受注以外のタスクです。</CardDescription>
@@ -706,15 +706,17 @@ export function ScheduleView({
   };
 
   const getDialogDetails = () => {
-    if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
+    if (dialogState.mode === 'details') {
       const { event } = dialogState;
       const staff = getStaffById(event.staffId);
       const customer = getCustomerByCode(event.locationId);
-      let title = '予定の編集';
-      if (dialogState.mode === 'details') {
-          title = '受注詳細・時間編集';
-      }
-      return { event, staff, customer, title };
+      return { event, staff, customer, title: '受注詳細・時間編集' };
+    }
+    if (dialogState.mode === 'edit') {
+      const { event } = dialogState;
+      const staff = getStaffById(event.staffId);
+      const customer = getCustomerByCode(event.locationId);
+      return { event, staff, customer, title: '予定の編集' };
     }
     if (dialogState.mode === 'new') {
       const staff = getStaffById(dialogState.staffId);
@@ -757,14 +759,16 @@ export function ScheduleView({
     >
       <TooltipProvider>
         <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                <div className="md:col-span-3">
-                   <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
-                </div>
-                <div className="md:col-span-2">
-                   <GenericTasks />
-                </div>
-            </div>
+          <div className="sticky top-[65px] bg-background/95 backdrop-blur-sm z-20 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                  <div className="md:col-span-3">
+                    <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <GenericTasks />
+                  </div>
+              </div>
+          </div>
 
             <Card>
                 <CardHeader>
@@ -786,7 +790,7 @@ export function ScheduleView({
                           </div>
                           <div className="relative mt-2 space-y-2">
                                {isToday(currentDate) && (
-                                <div className="absolute top-0 h-full pointer-events-none z-50" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                                <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
                                     <TimeIndicator />
                                 </div>
                                )}
@@ -858,37 +862,65 @@ export function ScheduleView({
                         </div>
                     </DialogFooter>
                   </>
-                ) : (
-                <>
-                <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="title" className="text-right">タスク名</Label>
-                          <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/>
+                ) : dialogState.mode === 'edit' && event ? (
+                  <>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="title" className="text-right">タスク名</Label>
+                        <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/>
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="description" className="text-right">詳細</Label>
+                        <Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))} className="col-span-3" placeholder="予定の詳細やメモ"/>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="start-time">開始時間</Label>
+                            <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
                         </div>
-                         <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="description" className="text-right">詳細</Label>
-                          <Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))} className="col-span-3" placeholder="予定の詳細やメモ"/>
-                         </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <div className="col-span-2 grid gap-2">
-                              <Label htmlFor="start-time">開始時間</Label>
-                              <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
-                            </div>
-                            <div className="col-span-2 grid gap-2">
-                              <Label htmlFor="end-time">終了時間</Label>
-                              <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
-                            </div>
+                        <div>
+                            <Label htmlFor="end-time">終了時間</Label>
+                            <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
                         </div>
+                      </div>
                     </div>
                     <DialogFooter>
-                       {dialogState.mode === 'edit' && <Button variant="destructive" onClick={handleDeleteEvent} className="mr-auto">削除</Button>}
+                       <Button variant="destructive" onClick={handleDeleteEvent} className="mr-auto">削除</Button>
                        <div className="flex gap-2 ml-auto">
                         <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
                         <Button onClick={handleSaveEvent}>保存</Button>
                        </div>
                     </DialogFooter>
                   </>
-                )}
+                ) : dialogState.mode === 'new' ? (
+                     <>
+                      <div className="grid gap-4 py-4">
+                          <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="title" className="text-right">タスク名</Label>
+                            <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/>
+                          </div>
+                           <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="description" className="text-right">詳細</Label>
+                            <Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))} className="col-span-3" placeholder="予定の詳細やメモ"/>
+                           </div>
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <Label htmlFor="start-time">開始時間</Label>
+                                <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
+                              </div>
+                              <div>
+                                <Label htmlFor="end-time">終了時間</Label>
+                                <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
+                              </div>
+                          </div>
+                      </div>
+                      <DialogFooter>
+                         <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
+                         <Button onClick={handleSaveEvent}>保存</Button>
+                      </DialogFooter>
+                    </>
+                ) : null}
                 </DialogContent>
             </Dialog>
         <RenderDragOverlay />
@@ -963,12 +995,12 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const isTravelEvent = event.title?.startsWith('移動');
   
   const divStyle: React.CSSProperties = { backgroundColor: staff.color || 'hsl(var(--primary))' };
+  let textColorClass = getContrastingTextColor(staff.color || 'hsl(var(--primary))') === '#FFFFFF' ? 'text-white' : 'text-black';
+
   if (isTravelEvent) {
     divStyle.backgroundColor = divStyle.backgroundColor ? `${divStyle.backgroundColor.replace(')', ', 0.5)').replace('rgb', 'rgba')}` : 'hsla(var(--primary), 0.5)'
+    textColorClass = 'text-foreground';
   }
-  
-  const textColor = staff.color ? getContrastingTextColor(staff.color) : 'white';
-  let textColorClass = textColor === '#FFFFFF' ? 'text-white' : 'text-black';
   
   if (event.title === '業務') {
     divStyle.backgroundColor = 'rgb(156 163 175)';
