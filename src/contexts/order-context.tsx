@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
@@ -33,7 +32,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
       return { orders: [], scheduleEvents: [], statuses: [], unassignedOrders: [] };
     }
 
-    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any, index: number) => mapRawToOrder(o));
+    const mappedOrders: WithId<Order>[] = rawOrdersData.map((o: any) => mapRawToOrder(o));
     
     const newScheduleEvents: WithId<ScheduleEvent>[] = [];
     const staffStatusMap = new Map<string, StaffStatus>();
@@ -43,7 +42,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
     
     const scheduledRawOrderIds = new Set<string>();
 
-    rawOrdersData.forEach((rawOrder: any, index: number) => {
+    rawOrdersData.forEach((rawOrder: any) => {
       const staffName = findKey(rawOrder, ['担当']);
       const staffMember = staffName ? allStaff.find(s => s.name === staffName) : undefined;
       const scheduledTimeStr = findKey(rawOrder, ['チップ配置作業予定']);
@@ -58,6 +57,11 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
 
               const tripId = `trip-${mappedOrder.rawOrderId}`;
               
+              const scheduledEndTimeStr = findKey(rawOrder, ['チップ配置作業完了予定']);
+              const taskEndTime = scheduledEndTimeStr && isValid(parseISO(scheduledEndTimeStr)) 
+                ? parseISO(scheduledEndTimeStr)
+                : addMinutes(scheduledTime, mappedOrder.estimatedDuration);
+
               const taskEvent: WithId<ScheduleEvent> = {
                   id: `${tripId}-task`,
                   tripId,
@@ -65,7 +69,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
                   staffId: staffMember.id,
                   locationId: mappedOrder.customerCode || '',
                   start: scheduledTime.toISOString(),
-                  end: addMinutes(scheduledTime, mappedOrder.estimatedDuration).toISOString(),
+                  end: taskEndTime.toISOString(),
                   rawOrderId: mappedOrder.rawOrderId,
                   raw: rawOrder,
               };
