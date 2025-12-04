@@ -23,7 +23,7 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b
  * 受注情報を取得・更新し、カレンダー連携も行うGoogle Apps ScriptのURL。
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
-export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbxK5XjP7tF8g9bbu-TJaWcOBbfpPjokSlw2ZPUN8CIEXMgldGLi8EdtsFFTLpvjl45n/exec';
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbw-jHNhx6AxN_X9BpZuISyaWpldSBY8IsYzz7iWtFqb1oivB_33ePLt2agYeMJj0dDo/exec';
 
 
 // --- スプレッドシート本体のURL ---
