@@ -397,8 +397,8 @@ export function ScheduleView({
             timestamp: new Date().toISOString(),
         });
         
-        toast({ title: 'タスクを未割り当てに戻しました' });
         await refetchOrders();
+        toast({ title: 'タスクを未割り当てに戻しました' });
       } catch(e: any) {
           console.error("Unassignment failed:", e);
           toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
@@ -775,26 +775,26 @@ export function ScheduleView({
                     <CardTitle>タイムライン</CardTitle>
                 </CardHeader>
                 <CardContent className="w-full">
-                    <div className="w-full relative">
-                        <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-b">
-                            <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                            <div className="relative h-[34px] flex-1 border-l">
-                                {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                    <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
-                                        <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
+                    <ScrollArea className="w-full whitespace-nowrap">
+                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                          <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-b">
+                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                              <div className="relative h-[34px] flex-1 border-l">
+                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                      <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
+                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
+                                      </div>
+                                  ))}
+                                  {isToday(currentDate) && (
+                                    <div className="absolute top-0 h-full w-full pointer-events-none">
+                                      <TimeIndicator />
                                     </div>
-                                ))}
-                            </div>
-                            <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
-                        </div>
-                        <ScrollArea className="w-full whitespace-nowrap h-[50vh]">
-                            <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                                {isToday(currentDate) && (
-                                <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
-                                    <TimeIndicator />
-                                </div>
-                                )}
-                                <div className="relative mt-2 space-y-2">
+                                  )}
+                              </div>
+                              <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                          </div>
+                          <ScrollArea className="h-[50vh]">
+                            <div className="relative mt-2 space-y-2">
                                 {staffData?.map((staff) => {
                                     const events = dailySchedule.filter((e) => e.staffId === staff.id);
                                     const status = statuses.find(s => s.staffId === staff.id);
@@ -802,10 +802,10 @@ export function ScheduleView({
                                         <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
                                     );
                                 })}
-                                </div>
                             </div>
-                        </ScrollArea>
-                    </div>
+                          </ScrollArea>
+                        </div>
+                    </ScrollArea>
                 </CardContent>
             </Card>
         </div>
@@ -998,16 +998,19 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   
   const divStyle: React.CSSProperties = { backgroundColor: staff.color || 'hsl(var(--primary))' };
   
-  const textColorClass = getContrastingTextColor(staff.color || 'hsl(var(--primary))') === '#FFFFFF' ? 'text-white' : 'text-black';
+  let textColorClass = getContrastingTextColor(staff.color || 'hsl(var(--primary))') === '#FFFFFF' ? 'text-white' : 'text-black';
   
   if (isTravelEvent) {
-    divStyle.backgroundColor = divStyle.backgroundColor ? `${divStyle.backgroundColor.replace(')', ', 0.5)').replace('rgb', 'rgba')}` : 'hsla(var(--primary), 0.5)'
-  }
+    divStyle.backgroundColor = divStyle.backgroundColor ? `${divStyle.backgroundColor.replace(')', ', 0.5)').replace('rgb', 'rgba')}` : 'hsla(var(--primary), 0.5)';
+    textColorClass = 'text-foreground';
+  } 
   
   if (event.title === '業務') {
     divStyle.backgroundColor = 'rgb(156 163 175)';
+    textColorClass = 'text-white';
   } else if (event.title === '休憩') {
     divStyle.backgroundColor = 'rgb(34 197 94)';
+    textColorClass = 'text-white';
   }
 
   const [line1, ...rest] = (event.title || '').split('\n');
