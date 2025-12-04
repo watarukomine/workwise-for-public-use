@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
 import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor } from '@/lib/utils';
-import { ScrollArea } from '../ui/scroll-area';
+import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -653,7 +653,7 @@ export function ScheduleView({
 
             } else { // Generic event (not from sheet)
                 const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
-                setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+                 setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
             }
         }
         toast({ title: '予定を保存しました' });
@@ -775,37 +775,39 @@ export function ScheduleView({
                     <CardTitle>タイムライン</CardTitle>
                 </CardHeader>
                 <CardContent className="w-full">
-                    <ScrollArea className="w-full whitespace-nowrap">
-                        <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                          <div className="sticky top-0 z-20 flex bg-background/95 backdrop-blur-sm border-b">
-                              <div className="flex-shrink-0 font-semibold p-2" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                              <div className="relative h-[34px] flex-1 border-l">
-                                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                                      <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
-                                          <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
-                                      </div>
-                                  ))}
-                                  {isToday(currentDate) && (
-                                    <div className="absolute top-0 h-full w-full pointer-events-none">
-                                      <TimeIndicator />
-                                    </div>
-                                  )}
-                              </div>
-                              <div className="flex-shrink-0 font-semibold p-2 border-l" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                  <ScrollArea className="w-full" type="auto">
+                    <div className="relative" style={{ minWidth: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
+                      <div className="sticky top-0 z-30 flex bg-background/95 backdrop-blur-sm border-b">
+                          <div className="flex-shrink-0 font-semibold p-2 sticky left-0 z-10 bg-background/95 backdrop-blur-sm" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                          <div className="relative h-[34px] flex-1 border-l">
+                              {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                                  <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
+                                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
+                                  </div>
+                              ))}
                           </div>
-                          <ScrollArea className="h-[50vh]">
-                            <div className="relative mt-2 space-y-2">
-                                {staffData?.map((staff) => {
-                                    const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                                    const status = statuses.find(s => s.staffId === staff.id);
-                                    return (
-                                        <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
-                                    );
-                                })}
+                          <div className="flex-shrink-0 font-semibold p-2 border-l sticky right-0 z-10 bg-background/95 backdrop-blur-sm" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                      </div>
+                      
+                      <ScrollArea className="h-[50vh]">
+                        <div className="relative mt-2 space-y-2">
+                            {isToday(currentDate) && (
+                            <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
+                                <TimeIndicator />
                             </div>
-                          </ScrollArea>
+                            )}
+                            {staffData?.map((staff) => {
+                                const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                                const status = statuses.find(s => s.staffId === staff.id);
+                                return (
+                                    <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
+                                );
+                            })}
                         </div>
-                    </ScrollArea>
+                      </ScrollArea>
+                    </div>
+                     <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
                 </CardContent>
             </Card>
         </div>
@@ -950,7 +952,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
 
   return (
     <div className={cn("flex relative", areaBgClass)}>
-      <div className={cn("sticky left-0 z-10 flex-shrink-0 px-2 flex items-center border-r h-16", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+      <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r h-16", areaBgClass)} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
             <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
             <span className='truncate flex-1'>{staff.name}</span>
@@ -961,7 +963,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
           {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)}/>))}
         </div>
       </div>
-      <div className={cn("sticky right-0 z-10 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
+      <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l border-b h-16", areaBgClass)} style={{ width: `${STATUS_COL_WIDTH}px`}}>
         {status && isToday(new Date()) && (<div className="text-xs text-center font-medium">{status.status}</div>)}
       </div>
     </div>
@@ -1001,8 +1003,8 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   let textColorClass = getContrastingTextColor(staff.color || 'hsl(var(--primary))') === '#FFFFFF' ? 'text-white' : 'text-black';
   
   if (isTravelEvent) {
-    divStyle.backgroundColor = divStyle.backgroundColor ? `${divStyle.backgroundColor.replace(')', ', 0.5)').replace('rgb', 'rgba')}` : 'hsla(var(--primary), 0.5)';
-    textColorClass = 'text-foreground';
+    divStyle.backgroundColor = 'hsl(var(--accent))';
+    textColorClass = 'text-accent-foreground';
   } 
   
   if (event.title === '業務') {
