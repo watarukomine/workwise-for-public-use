@@ -706,7 +706,10 @@ export function ScheduleView({
       const { event } = dialogState;
       const staff = getStaffById(event.staffId);
       const customer = getCustomerByCode(event.locationId);
-      const title = dialogState.mode === 'edit' ? '予定の編集' : '受注詳細・時間編集';
+      let title = '予定の編集';
+      if (dialogState.mode === 'details') {
+          title = '受注詳細・時間編集';
+      }
       return { event, staff, customer, title };
     }
     if (dialogState.mode === 'new') {
@@ -774,7 +777,7 @@ export function ScheduleView({
                                   </div>
                               ))}
                               {isToday(currentDate) && (
-                                <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: 0, right: 0 }}>
+                                <div className="absolute top-0 h-full pointer-events-none z-[101]" style={{ left: `0px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
                                     <TimeIndicator />
                                 </div>
                               )}
@@ -852,11 +855,23 @@ export function ScheduleView({
                 ) : (
                 <>
                 <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="title" className="text-right">タスク名</Label><Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/></div>
-                         <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="description" className="text-right">詳細</Label><Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))} className="col-span-3" placeholder="予定の詳細やメモ"/></div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <div className="col-span-2 grid gap-2"><Label htmlFor="start-time">開始時間</Label><Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/></div>
-                            <div className="col-span-2 grid gap-2"><Label htmlFor="end-time">終了時間</Label><Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/></div>
+                          <Label htmlFor="title" className="text-right">タスク名</Label>
+                          <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/>
+                        </div>
+                         <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="description" className="text-right">詳細</Label>
+                          <Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))} className="col-span-3" placeholder="予定の詳細やメモ"/>
+                         </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="col-span-2 grid gap-2">
+                              <Label htmlFor="start-time">開始時間</Label>
+                              <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
+                            </div>
+                            <div className="col-span-2 grid gap-2">
+                              <Label htmlFor="end-time">終了時間</Label>
+                              <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
+                            </div>
                         </div>
                     </div>
                     <DialogFooter>
