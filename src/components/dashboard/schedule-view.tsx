@@ -14,6 +14,7 @@ import {
   ActivationConstraint,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import type { ScheduleEvent, Staff, Customer, Order, WithId, StaffStatus } from '@/lib/types';
 import {
   Card,
@@ -29,7 +30,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor } from '@/lib/utils';
+import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor } from '@/lib/utils';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
@@ -62,14 +63,14 @@ const STAFF_COL_WIDTH = 144;
 const STATUS_COL_WIDTH = 120;
 
 const timeStringToDate = (timeStr: string, baseDate: Date) => {
-    if (!/^\d{2}:\d{2}$/.test(timeStr)) {
-        console.error("Invalid time string format:", timeStr);
-        return new Date(NaN);
-    }
-    const date = new Date(baseDate);
-    const [hours, minutes] = timeStr.split(':').map(Number);
-    date.setHours(hours, minutes, 0, 0);
-    return date;
+  if (!/^\d{2}:\d{2}$/.test(timeStr)) {
+    console.error("Invalid time string format:", timeStr);
+    return new Date(NaN);
+  }
+  const date = new Date(baseDate);
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  date.setHours(hours, minutes, 0, 0);
+  return date;
 };
 
 const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
@@ -81,9 +82,9 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
   const end = typeof eventEnd === 'string' ? parseISO(eventEnd) : eventEnd;
 
   if (!start || !end || !isValid(start) || !isValid(end)) {
-    return { left: 0, width: minutesToPixels(60) }; 
+    return { left: 0, width: minutesToPixels(60) };
   }
-  
+
   const startOfTimelineDay = new Date(start);
   startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
 
@@ -92,7 +93,7 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
   return {
     left: minutesToPixels(leftInMinutes),
-    width: minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30), 
+    width: minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30),
   };
 };
 
@@ -101,9 +102,10 @@ interface OrderChipProps {
   customer?: WithId<Customer>;
   className?: string;
   style?: React.CSSProperties;
+  isOverlay?: boolean;
 }
 
-const OrderChip: React.FC<OrderChipProps> = ({ order, className, style }) => {
+const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverlay }) => {
   const [line1, line2] = order.taskDetails.split('\n');
 
   const tooltipContent = (
@@ -114,17 +116,23 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style }) => {
     </>
   );
 
+  const content = (
+    <div style={style} className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}>
+      <p className="text-xs font-semibold truncate pointer-events-none">
+        {line1}
+      </p>
+      {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
+        {line2}
+      </p>}
+    </div>
+  );
+
+  if (isOverlay) return content;
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div style={style} className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}>
-            <p className="text-xs font-semibold truncate pointer-events-none">
-              {line1}
-            </p>
-            {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
-              {line2}
-            </p>}
-        </div>
+        {content}
       </TooltipTrigger>
       <TooltipContent>{tooltipContent}</TooltipContent>
     </Tooltip>
@@ -136,9 +144,10 @@ interface DraggableOrderProps {
   order: WithId<Order>;
   customer?: WithId<Customer>;
   className?: string;
+  onDoubleClick?: () => void;
 }
 
-const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className }) => {
+const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, className, onDoubleClick }) => {
   const { attributes, listeners, setNodeRef, isDragging } =
     useDraggable({
       id: `order-${order.id}`,
@@ -150,203 +159,213 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
     width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
   };
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    if (onDoubleClick) {
+      e.stopPropagation();
+      onDoubleClick();
+    }
+  };
+
   return (
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
-        <OrderChip order={order} className={className} />
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} onDoubleClick={handleDoubleClick}>
+      <OrderChip order={order} className={className} />
     </div>
   );
 };
 
-type DialogState = 
+type DialogState =
   | { mode: 'closed' }
   | { mode: 'edit'; event: WithId<ScheduleEvent> }
   | { mode: 'details'; event: WithId<ScheduleEvent> }
+  | { mode: 'order-details'; order: WithId<Order> }
   | { mode: 'new'; staffId: string; start: Date };
 
 
 type EditedEventDetails = {
-    title: string;
-    description: string;
-    startTime: string;
-    endTime: string;
+  title: string;
+  description: string;
+  startTime: string;
+  endTime: string;
 };
 
 interface ScheduleViewProps {
-    staffData: WithId<Staff>[];
-    currentDate: Date;
-    statuses: StaffStatus[];
+  staffData: WithId<Staff>[];
+  currentDate: Date;
+  statuses: StaffStatus[];
 }
 
 const genericTasks: WithId<Order>[] = [
-      { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
-      { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
-      { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
+  { id: 'generic-travel', customerCode: '', taskDetails: '移動', estimatedDuration: 30, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
+  { id: 'generic-work', customerCode: '', taskDetails: '業務', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
+  { id: 'generic-break', customerCode: '', taskDetails: '休憩', estimatedDuration: 60, customerName: '', address: '', serviceType: '', status: '', scheduledDate: '', value: 0, raw: {} },
 ];
 
 function GenericTasks() {
-    const getDraggableClassName = (task: Order) => {
-        if (task.id === 'generic-travel') return 'bg-yellow-500 text-black';
-        if (task.id === 'generic-work') return 'bg-gray-400 text-white';
-        if (task.id === 'generic-break') return 'bg-green-500 text-white';
-        return 'bg-primary text-primary-foreground';
-    };
+  const getDraggableClassName = (task: Order) => {
+    if (task.id === 'generic-travel') return 'bg-yellow-500 text-black';
+    if (task.id === 'generic-work') return 'bg-gray-400 text-white';
+    if (task.id === 'generic-break') return 'bg-green-500 text-white';
+    return 'bg-primary text-primary-foreground';
+  };
 
-    return (
-        <Card className="h-full border">
-            <CardHeader>
-                <CardTitle className="text-lg font-semibold">汎用タスク</CardTitle>
-                <CardDescription>休憩や移動など、受注以外のタスクです。</CardDescription>
-            </CardHeader>
-            <CardContent>
-                 <div className="flex flex-wrap gap-2">
-                    {genericTasks.map((task) => (
-                        <DraggableOrder
-                            key={task.id}
-                            order={task}
-                            className={getDraggableClassName(task)}
-                        />
-                    ))}
-                </div>
-            </CardContent>
-        </Card>
-    );
+  return (
+    <Card className="h-full border">
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold">汎用タスク</CardTitle>
+        <CardDescription>休憩や移動など、受注以外のタスクです。</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-2">
+          {genericTasks.map((task) => (
+            <DraggableOrder
+              key={task.id}
+              order={task}
+              className={getDraggableClassName(task)}
+            />
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
-function UnassignedTasks({ orders, customers, date }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date }) {
-    const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
-    const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
-    
-    const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
-    
-    const dailyOrders = orders.filter(order => {
-        if (!order.scheduledDate) return false;
-        const scheduledDate = parseISO(order.scheduledDate);
-        return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(date));
-    });
+function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date, onDoubleClickOrder: (order: WithId<Order>) => void }) {
+  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
+  const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
 
-    return (
-        <Card 
-            ref={setNodeRef}
-            className={cn("transition-colors h-full border", isOver && "bg-primary/10")}
-        >
-            <CardHeader>
-                <CardTitle className="text-lg font-semibold">{titleText}</CardTitle>
-                <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <ScrollArea className="w-full whitespace-nowrap h-32">
-                    <div className="pr-4 min-h-[6rem]">
-                        <div className="flex flex-wrap gap-2">
-                            {dailyOrders.map((order) => (
-                                <DraggableOrder
-                                    key={order.id}
-                                    order={order}
-                                    customer={getCustomerByCode(order.customerCode)}
-                                />
-                            ))}
-                            {dailyOrders.length === 0 && (
-                                <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
-                                    <p>未割り当てオーダーはありません。</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </ScrollArea>
-            </CardContent>
-        </Card>
-    );
+  const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
+
+  const dailyOrders = orders.filter(order => {
+    if (!order.scheduledDate) return false;
+    const scheduledDate = parseISO(order.scheduledDate);
+    return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(date));
+  });
+
+  return (
+    <Card
+      ref={setNodeRef}
+      className={cn("transition-colors h-full border", isOver && "bg-primary/10")}
+    >
+      <CardHeader>
+        <CardTitle className="text-lg font-semibold">{titleText}</CardTitle>
+        <CardDescription>下のタイムラインにタスクをドラッグして割り当てます。</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ScrollArea className="w-full whitespace-nowrap h-32">
+          <div className="pr-4 min-h-[6rem]">
+            <div className="flex flex-wrap gap-2">
+              {dailyOrders.map((order) => (
+                <DraggableOrder
+                  key={order.id}
+                  order={order}
+                  customer={getCustomerByCode(order.customerCode)}
+                  onDoubleClick={() => onDoubleClickOrder(order)}
+                />
+              ))}
+              {dailyOrders.length === 0 && (
+                <div className="flex items-center justify-center h-12 text-center text-muted-foreground">
+                  <p>未割り当てオーダーはありません。</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </ScrollArea>
+      </CardContent>
+    </Card>
+  );
 }
 
 const TimeIndicator = () => {
-    const [now, setNow] = React.useState<Date | null>(null);
+  const [now, setNow] = React.useState<Date | null>(null);
 
-    React.useEffect(() => {
-        setNow(new Date());
-        const timer = setInterval(() => {
-            setNow(new Date());
-        }, 60000); 
-        return () => clearInterval(timer);
-    }, []);
+  React.useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
-    if (!now) return null; 
-    
-    const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
-    if (!isVisible) return null;
-    
-    const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
-    const leftPosition = minutesToPixels(minutesFromStart);
+  if (!now) return null;
 
-    return (
-        <div
-            className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
-            style={{ left: `${leftPosition}px`, zIndex: 101 }}
-        >
-            <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
-        </div>
-    );
+  const isVisible = now.getHours() >= timelineStartHour && now.getHours() < timelineEndHour;
+  if (!isVisible) return null;
+
+  const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
+  const leftPosition = minutesToPixels(minutesFromStart);
+
+  return (
+    <div
+      className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
+      style={{ left: `${leftPosition}px`, zIndex: 101 }}
+    >
+      <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
+    </div>
+  );
 };
 
 const RenderDragOverlay = () => {
-    const { active, delta } = useDndContext();
-    const { getCustomerByCode, getStaffById } = useScheduleView();
-    
-    const style: React.CSSProperties = {
-        transform: CSS.Translate.toString(delta),
-    };
+  const { active, delta } = useDndContext();
+  const { getCustomerByCode, getStaffById } = useScheduleView();
 
-    if (!active) return null;
+  // Remove manual transform application as DragOverlay handles it
+  // const style: React.CSSProperties = {
+  //   transform: CSS.Translate.toString(delta),
+  // };
 
-    const activeItem = active.data.current;
+  if (!active) return null;
 
-    return (
-        <DragOverlay>
-            <div style={style}>
-            {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
-              <OrderChip order={activeItem} style={{ width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px` }} />
-            ) : activeItem && 'staffId' in activeItem ? (
-              (() => {
-                const staff = getStaffById(activeItem.staffId);
-                if (!staff) return null;
-                return (
-                  <DraggableEvent
-                    event={activeItem}
-                    staff={staff}
-                    getCustomerByCode={getCustomerByCode}
-                    onDoubleClick={() => { }}
-                    isOverlay={true}
-                  />
-                );
-              })()
-            ) : null}
-            </div>
-        </DragOverlay>
-    );
+  const activeItem = active.data.current;
+
+  return (
+    <DragOverlay modifiers={[snapCenterToCursor]} dropAnimation={null}>
+      <div>
+        {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
+          <OrderChip order={activeItem} style={{ width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px` }} isOverlay={true} />
+        ) : activeItem && 'staffId' in activeItem ? (
+          (() => {
+            const staff = getStaffById(activeItem.staffId);
+            if (!staff) return null;
+            return (
+              <DraggableEvent
+                event={activeItem}
+                staff={staff}
+                getCustomerByCode={getCustomerByCode}
+                onDoubleClick={() => { }}
+                isOverlay={true}
+              />
+            );
+          })()
+        ) : null}
+      </div>
+    </DragOverlay>
+  );
 }
 
 interface ScheduleViewContextType {
-    getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
-    getStaffById: (id: string | undefined) => WithId<Staff> | undefined;
+  getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
+  getStaffById: (id: string | undefined) => WithId<Staff> | undefined;
 }
 
 const ScheduleViewContext = createContext<ScheduleViewContextType | undefined>(undefined);
 
 const useScheduleView = () => {
-    const context = useContext(ScheduleViewContext);
-    if (!context) {
-        throw new Error('useScheduleView must be used within a ScheduleView');
-    }
-    return context;
+  const context = useContext(ScheduleViewContext);
+  if (!context) {
+    throw new Error('useScheduleView must be used within a ScheduleView');
+  }
+  return context;
 }
 
-export function ScheduleView({ 
-    staffData, 
-    currentDate,
-    statuses,
+export function ScheduleView({
+  staffData,
+  currentDate,
+  statuses,
 }: ScheduleViewProps) {
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
   const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents } = useOrder();
-  
+
   const [isClient, setIsClient] = React.useState(false);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
@@ -354,68 +373,68 @@ export function ScheduleView({
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
-  
+
   const dailySchedule = React.useMemo(() => {
-      if (!scheduleEvents) return [];
-      return scheduleEvents.filter(event => {
-          const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-      });
+    if (!scheduleEvents) return [];
+    return scheduleEvents.filter(event => {
+      const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+      return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+    });
   }, [scheduleEvents, currentDate]);
 
   React.useEffect(() => {
     setIsClient(true);
   }, []);
-  
+
   const handleDragStart = (event: DragStartEvent) => {
     setActive(event.active);
   };
-  
-    const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
-      if (!eventToUnassign.rawOrderId) return;
-      
-      const staff = getStaffById(eventToUnassign.staffId);
-      if (!staff) {
-          toast({ variant: 'destructive', title: 'エラー', description: '担当スタッフが見つかりません。' });
-          return;
-      }
 
-      const previousSchedule = [...scheduleEvents];
-      const orderToUnassign = mapRawToOrder(eventToUnassign.raw);
+  const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
+    if (!eventToUnassign.rawOrderId) return;
 
-      // Optimistic UI update
-      setScheduleEvents(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
-      setUnassignedOrders(prev => [...prev, orderToUnassign]);
+    const staff = getStaffById(eventToUnassign.staffId);
+    if (!staff) {
+      toast({ variant: 'destructive', title: 'エラー', description: '担当スタッフが見つかりません。' });
+      return;
+    }
 
-      try {
-        await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
-            staffName: "",
-            statusValue: "未割当",
-            scheduledTime: "",
-            timestamp: new Date().toISOString(),
-        });
-        
-        await refetchOrders();
-        toast({ title: 'タスクを未割り当てに戻しました' });
-      } catch(e: any) {
-          console.error("Unassignment failed:", e);
-          toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-          // Revert UI on error
-          setScheduleEvents(previousSchedule);
-          setUnassignedOrders(prev => prev.filter(o => o.id !== orderToUnassign.id));
-      }
-    };
+    const previousSchedule = [...scheduleEvents];
+    const orderToUnassign = mapRawToOrder(eventToUnassign.raw);
+
+    // Optimistic UI update
+    setScheduleEvents(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
+    setUnassignedOrders(prev => [...prev, orderToUnassign]);
+
+    try {
+      await updateSheetStatus({
+        gasUrl: ORDER_GAS_URL,
+        eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
+        staffName: "",
+        statusValue: "未割当",
+        scheduledTime: "",
+        timestamp: new Date().toISOString(),
+      });
+
+      await refetchOrders();
+      toast({ title: 'タスクを未割り当てに戻しました' });
+    } catch (e: any) {
+      console.error("Unassignment failed:", e);
+      toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
+      // Revert UI on error
+      setScheduleEvents(previousSchedule);
+      setUnassignedOrders(prev => prev.filter(o => o.id !== orderToUnassign.id));
+    }
+  };
 
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over, delta } = event;
     setActive(null);
-    
+
     if (!over) return;
-    
+
     if (Math.abs(delta.x) < 5 && Math.abs(delta.y) < 5) {
-        return;
+      return;
     }
 
     const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
@@ -425,19 +444,19 @@ export function ScheduleView({
 
     // --- Dropping back to unassigned area ---
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
-        if (item.rawOrderId) {
-          await unassignTask(item);
-        } else {
-           setScheduleEvents(prev => prev.filter(e => e.id !== item.id));
-           toast({ title: '汎用タスクを削除しました' });
-        }
-        return;
+      if (item.rawOrderId) {
+        await unassignTask(item);
+      } else {
+        setScheduleEvents(prev => prev.filter(e => e.id !== item.id));
+        toast({ title: '汎用タスクを削除しました' });
+      }
+      return;
     }
-    
+
     const newStaffId = over.id as string;
     const staffRowElement = document.getElementById(`staff-row-${newStaffId}`);
     if (!staffRowElement) return;
-    
+
     const timelineRect = staffRowElement.getBoundingClientRect();
     const startOfTimelineDay = new Date(currentDate);
     startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
@@ -448,7 +467,7 @@ export function ScheduleView({
       const newStartMinutes = pixelsToMinutes(dropX);
       return addMinutes(startOfTimelineDay, newStartMinutes);
     };
-    
+
     const newStart = getNewStartFromDrop();
 
     // --- Moving an existing event ---
@@ -456,31 +475,31 @@ export function ScheduleView({
       const draggedEvent = item as WithId<ScheduleEvent>;
       const newStaff = getStaffById(newStaffId);
       if (!newStaff) return;
-  
+
       // Optimistic UI Update
       setScheduleEvents(prev => {
         const otherEvents = prev.filter(e => e.id !== draggedEvent.id && e.tripId !== draggedEvent.tripId);
-        
+
         let eventsToUpdate: WithId<ScheduleEvent>[];
         if (draggedEvent.tripId) {
-            eventsToUpdate = previousSchedule.filter(e => e.tripId === draggedEvent.tripId);
+          eventsToUpdate = previousSchedule.filter(e => e.tripId === draggedEvent.tripId);
         } else {
-            eventsToUpdate = [draggedEvent];
+          eventsToUpdate = [draggedEvent];
         }
 
         const taskEventInTrip = eventsToUpdate.find(e => e.id.endsWith('-task') || !e.tripId) || eventsToUpdate[0];
         const travelEventInTrip = eventsToUpdate.find(e => e.id.endsWith('-travel'));
-        
+
         const taskDuration = differenceInMinutes(parseISO(taskEventInTrip.end as string), parseISO(taskEventInTrip.start as string));
         const travelDuration = travelEventInTrip ? differenceInMinutes(parseISO(travelEventInTrip.end as string), parseISO(travelEventInTrip.start as string)) : TRAVEL_TIME_MINUTES;
-  
+
         let newTaskStart = newStart;
         if (draggedEvent.id.endsWith('-travel')) {
-            newTaskStart = addMinutes(newStart, travelDuration);
+          newTaskStart = addMinutes(newStart, travelDuration);
         }
         const newTaskEnd = addMinutes(newTaskStart, taskDuration);
         const newTravelStart = subMinutes(newTaskStart, travelDuration);
-        
+
         const updatedTripEvents: WithId<ScheduleEvent>[] = [];
         const updatedTask = { ...taskEventInTrip, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
         updatedTripEvents.push(updatedTask);
@@ -488,104 +507,104 @@ export function ScheduleView({
           const updatedTravel = { ...travelEventInTrip, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
           updatedTripEvents.push(updatedTravel);
         }
-        
+
         return [...otherEvents, ...updatedTripEvents];
       });
-      
+
       // Backend Update
       (async () => {
-          try {
-              if (draggedEvent.rawOrderId) {
-                  let taskStart = newStart;
-                  if(draggedEvent.id.endsWith('-travel')) {
-                      const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-                      taskStart = addMinutes(newStart, travelDuration);
-                  }
-                  await updateSheetStatus({
-                      gasUrl: ORDER_GAS_URL,
-                      eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-                      staffName: newStaff.name,
-                      scheduledTime: taskStart.toISOString(),
-                  });
-              }
-              toast({ title: "スケジュールを更新しました" });
-              await refetchOrders();
-          } catch (e: any) {
-              toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
-              setScheduleEvents(previousSchedule); // Revert on error
-          }
-      })();
-  
-    } else if ('estimatedDuration' in item) { // --- Creating a new event ---
-        const order = item as WithId<Order>;
-        const staff = getStaffById(newStaffId);
-        if (!staff) return;
-
-        const isGeneric = order.id.startsWith('generic-');
-        
-        const taskStart = getNewStartFromDrop();
-        
-        // Optimistic UI Update
-        if (isGeneric) {
-             const newEvent: WithId<ScheduleEvent> = {
-                id: `event-${Date.now()}`,
-                title: order.taskDetails, description: '',
-                staffId: newStaffId, locationId: '',
-                start: taskStart.toISOString(),
-                end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
-                raw:{}
-             };
-             setScheduleEvents(prev => [...prev, newEvent]);
-        } else {
-             const tripId = `trip-${order.rawOrderId}`;
-             const customer = getCustomerByCode(order.customerCode);
-             const travelEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-travel`, tripId,
-                title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
-                staffId: newStaffId, locationId: customer?.userCode || '',
-                start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(), end: taskStart.toISOString(),
-                rawOrderId: order.rawOrderId, raw: order.raw,
-             };
-             const taskEvent: WithId<ScheduleEvent> = {
-                id: `${tripId}-task`, tripId,
-                title: order.taskDetails,
-                staffId: newStaffId, locationId: customer?.userCode || '',
-                start: taskStart.toISOString(), end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
-                rawOrderId: order.rawOrderId, raw: order.raw,
-             };
-             setScheduleEvents(prev => [...prev.filter(e => e.rawOrderId !== order.rawOrderId), travelEvent, taskEvent]);
-             setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
-        }
-        
-        // Backend Update
-        (async () => {
-            try {
-                if (isGeneric) {
-                     toast({ title: "汎用タスクを追加しました" });
-                } else {
-                     await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
-                     await refetchOrders();
-                     
-                     const taskEvent = scheduleEvents.find(e => e.start === taskStart.toISOString() && e.staffId === newStaffId);
-                     if(taskEvent) setDialogState({ mode: 'details', event: taskEvent });
-
-                     toast({ title: "タスクを割り当てました。詳細を確認しメールを送信してください。" });
-                }
-            } catch (e: any) {
-                toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
-                setScheduleEvents(previousSchedule); // Revert UI
-                setUnassignedOrders(previousUnassigned);
+        try {
+          if (draggedEvent.rawOrderId) {
+            let taskStart = newStart;
+            if (draggedEvent.id.endsWith('-travel')) {
+              const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+              taskStart = addMinutes(newStart, travelDuration);
             }
-        })();
+            await updateSheetStatus({
+              gasUrl: ORDER_GAS_URL,
+              eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+              staffName: newStaff.name,
+              scheduledTime: taskStart.toISOString(),
+            });
+          }
+          toast({ title: "スケジュールを更新しました" });
+          await refetchOrders();
+        } catch (e: any) {
+          toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
+          setScheduleEvents(previousSchedule); // Revert on error
+        }
+      })();
+
+    } else if ('estimatedDuration' in item) { // --- Creating a new event ---
+      const order = item as WithId<Order>;
+      const staff = getStaffById(newStaffId);
+      if (!staff) return;
+
+      const isGeneric = order.id.startsWith('generic-');
+
+      const taskStart = getNewStartFromDrop();
+
+      // Optimistic UI Update
+      if (isGeneric) {
+        const newEvent: WithId<ScheduleEvent> = {
+          id: `event-${Date.now()}`,
+          title: order.taskDetails, description: '',
+          staffId: newStaffId, locationId: '',
+          start: taskStart.toISOString(),
+          end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
+          raw: {}
+        };
+        setScheduleEvents(prev => [...prev, newEvent]);
+      } else {
+        const tripId = `trip-${order.rawOrderId}`;
+        const customer = getCustomerByCode(order.customerCode);
+        const travelEvent: WithId<ScheduleEvent> = {
+          id: `${tripId}-travel`, tripId,
+          title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
+          staffId: newStaffId, locationId: customer?.userCode || '',
+          start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(), end: taskStart.toISOString(),
+          rawOrderId: order.rawOrderId, raw: order.raw,
+        };
+        const taskEvent: WithId<ScheduleEvent> = {
+          id: `${tripId}-task`, tripId,
+          title: order.taskDetails,
+          staffId: newStaffId, locationId: customer?.userCode || '',
+          start: taskStart.toISOString(), end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
+          rawOrderId: order.rawOrderId, raw: order.raw,
+        };
+        setScheduleEvents(prev => [...prev.filter(e => e.rawOrderId !== order.rawOrderId), travelEvent, taskEvent]);
+        setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
+      }
+
+      // Backend Update
+      (async () => {
+        try {
+          if (isGeneric) {
+            toast({ title: "汎用タスクを追加しました" });
+          } else {
+            await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
+            await refetchOrders();
+
+            const taskEvent = scheduleEvents.find(e => e.start === taskStart.toISOString() && e.staffId === newStaffId);
+            if (taskEvent) setDialogState({ mode: 'details', event: taskEvent });
+
+            toast({ title: "タスクを割り当てました。詳細を確認しメールを送信してください。" });
+          }
+        } catch (e: any) {
+          toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
+          setScheduleEvents(previousSchedule); // Revert UI
+          setUnassignedOrders(previousUnassigned);
+        }
+      })();
     }
   };
 
   const handleDoubleClickEvent = (event: WithId<ScheduleEvent>) => {
     setEditedEventDetails({
-        title: event.title || '',
-        description: event.description || '',
-        startTime: formatTime(event.start),
-        endTime: formatTime(event.end),
+      title: event.title || '',
+      description: event.description || '',
+      startTime: formatTime(event.start),
+      endTime: formatTime(event.end),
     });
     if (event.rawOrderId) {
       setDialogState({ mode: 'details', event });
@@ -593,7 +612,7 @@ export function ScheduleView({
       setDialogState({ mode: 'edit', event });
     }
   };
-  
+
   const handleDoubleClickTimeline = (staffId: string, e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('[data-event-chip="true"]')) {
       return;
@@ -602,7 +621,7 @@ export function ScheduleView({
     const timelineRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const clickX = e.clientX - timelineRect.left;
     const clickMinutes = pixelsToMinutes(clickX);
-    
+
     const startOfTimelineDay = new Date(currentDate);
     startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
     const newStart = addMinutes(startOfTimelineDay, clickMinutes);
@@ -610,7 +629,7 @@ export function ScheduleView({
     setEditedEventDetails({ title: '', description: '', startTime: formatTime(newStart), endTime: formatTime(addMinutes(newStart, 60)) });
     setDialogState({ mode: 'new', staffId, start: newStart });
   };
-  
+
   const handleSaveEvent = async () => {
     if (dialogState.mode === 'closed') return;
 
@@ -618,67 +637,67 @@ export function ScheduleView({
     const newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
 
     if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
-        toast({ variant: 'destructive', title: 'エラー', description: '無効な時間形式です。' });
-        return;
+      toast({ variant: 'destructive', title: 'エラー', description: '無効な時間形式です。' });
+      return;
     }
-    
+
     try {
-        if (dialogState.mode === 'new') {
-             const staff = getStaffById(dialogState.staffId);
-            if (!staff) throw new Error("担当スタッフが見つかりません。");
+      if (dialogState.mode === 'new') {
+        const staff = getStaffById(dialogState.staffId);
+        if (!staff) throw new Error("担当スタッフが見つかりません。");
 
-            const { title, description } = editedEventDetails;
-            const newEvent: WithId<ScheduleEvent> = {
-                id: `event-${Date.now()}`,
-                title, description,
-                staffId: dialogState.staffId, locationId: '',
-                start: newStart.toISOString(),
-                end: newEnd.toISOString(),
-                raw:{}
-            };
-            setScheduleEvents(prev => [...prev, newEvent]);
-        } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
-            const eventToUpdate = dialogState.event;
-            const { title, description } = editedEventDetails;
+        const { title, description } = editedEventDetails;
+        const newEvent: WithId<ScheduleEvent> = {
+          id: `event-${Date.now()}`,
+          title, description,
+          staffId: dialogState.staffId, locationId: '',
+          start: newStart.toISOString(),
+          end: newEnd.toISOString(),
+          raw: {}
+        };
+        setScheduleEvents(prev => [...prev, newEvent]);
+      } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
+        const eventToUpdate = dialogState.event;
+        const { title, description } = editedEventDetails;
 
-            if (eventToUpdate.rawOrderId) { // Sheet-based event
-                await updateSheetStatus({
-                    gasUrl: ORDER_GAS_URL,
-                    eventTitle: `(ID: ${eventToUpdate.rawOrderId})`,
-                    scheduledTime: newStart.toISOString(),
-                    scheduledEndTime: newEnd.toISOString(),
-                    timestamp: new Date().toISOString(),
-                });
-                await refetchOrders();
+        if (eventToUpdate.rawOrderId) { // Sheet-based event
+          await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: `(ID: ${eventToUpdate.rawOrderId})`,
+            scheduledTime: newStart.toISOString(),
+            scheduledEndTime: newEnd.toISOString(),
+            timestamp: new Date().toISOString(),
+          });
+          await refetchOrders();
 
-            } else { // Generic event (not from sheet)
-                const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
-                 setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
-            }
+        } else { // Generic event (not from sheet)
+          const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
+          setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
         }
-        toast({ title: '予定を保存しました' });
-        setDialogState({ mode: 'closed' });
+      }
+      toast({ title: '予定を保存しました' });
+      setDialogState({ mode: 'closed' });
     } catch (e: any) {
-        toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });
+      toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });
     }
-};
+  };
 
 
   const handleDeleteEvent = async () => {
     if (dialogState.mode !== 'details' && dialogState.mode !== 'edit') return;
     const eventToDelete = dialogState.event;
-    
+
     if (eventToDelete.rawOrderId) {
-        await unassignTask(eventToDelete);
+      await unassignTask(eventToDelete);
     } else {
-        setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
-        toast({ title: '予定を削除しました' });
+      setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+      toast({ title: '予定を削除しました' });
     }
 
     setDialogState({ mode: 'closed' });
   };
-  
-    const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
+
+  const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
     const staff = getStaffById(event.staffId);
     if (!staff) {
       toast({ variant: 'destructive', title: 'エラー', description: '担当者が見つかりません。' });
@@ -697,7 +716,7 @@ export function ScheduleView({
         isUpdate: false,
       });
       if (result.status === 'error') throw new Error(result.message);
-      
+
       toast({ title: 'メール送信成功', description: `${staff.name}にiCalメールを送信しました。` });
       setDialogState({ mode: 'closed' });
     } catch (e: any) {
@@ -726,14 +745,14 @@ export function ScheduleView({
   };
 
   const { event, staff, customer, title } = getDialogDetails();
-  
+
   const renderDetailItem = (label: string, value: any) => (
     value ? <div className="text-sm"><span className="font-semibold text-muted-foreground">{label}:</span> {String(value)}</div> : null
   );
 
   const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
   const activationConstraint: ActivationConstraint = {
-      distance: 5,
+    distance: 5,
   };
 
   if (!isClient) {
@@ -744,7 +763,7 @@ export function ScheduleView({
           <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
         </CardHeader>
         <CardContent>
-           <div className="flex items-center justify-center h-64"><p>Loading schedule...</p></div>
+          <div className="flex items-center justify-center h-64"><p>Loading schedule...</p></div>
         </CardContent>
       </Card>
     );
@@ -752,173 +771,200 @@ export function ScheduleView({
 
   return (
     <ScheduleViewContext.Provider value={contextValue}>
-      <DndContext 
-        onDragStart={handleDragStart} 
+      <DndContext
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         activationConstraint={activationConstraint}
       >
         <TooltipProvider>
           <div className="space-y-6">
             <div className="sticky top-[65px] bg-background/95 backdrop-blur-sm z-20 py-4">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                    <div className="md:col-span-3">
-                      <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} />
-                    </div>
-                    <div className="md:col-span-2">
-                      <GenericTasks />
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+                <div className="md:col-span-3">
+                  <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} onDoubleClickOrder={(order) => setDialogState({ mode: 'order-details', order })} />
                 </div>
+                <div className="md:col-span-2">
+                  <GenericTasks />
+                </div>
+              </div>
             </div>
 
             <div>
               <div className="sticky top-[280px] z-30 flex bg-background/95 backdrop-blur-sm border-y">
-                  <div className="flex-shrink-0 font-semibold p-2 sticky left-0 z-10 bg-inherit" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                  <div className="relative h-[34px] flex-1">
-                      {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                          <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
-                              <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
-                          </div>
-                      ))}
-                  </div>
-                  <div className="flex-shrink-0 font-semibold p-2 border-l sticky right-0 z-10 bg-inherit" style={{ width: `${STATUS_COL_WIDTH}px`}}>ステータス</div>
+                <div className="flex-shrink-0 font-semibold p-2 sticky left-0 z-10 bg-inherit" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                <div className="relative h-[34px] flex-1">
+                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                    <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
+                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex-shrink-0 font-semibold p-2 border-l sticky right-0 z-10 bg-inherit" style={{ width: `${STATUS_COL_WIDTH}px` }}>ステータス</div>
               </div>
               <ScrollArea className="w-full" style={{ height: 'calc(100vh - 400px)' }}>
-                <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px`}}>
-                    <div className="relative space-y-2">
-                        {isToday(currentDate) && (
-                          <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px`}}>
-                              <TimeIndicator />
-                          </div>
-                        )}
-                        {staffData?.map((staff) => {
-                            const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                            const status = statuses.find(s => s.staffId === staff.id);
-                            return (
-                                <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
-                            );
-                        })}
-                    </div>
+                <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px` }}>
+                  <div className="relative space-y-2">
+                    {isToday(currentDate) && (
+                      <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
+                        <TimeIndicator />
+                      </div>
+                    )}
+                    {staffData?.map((staff) => {
+                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                      const status = statuses.find(s => s.staffId === staff.id);
+                      return (
+                        <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
+                      );
+                    })}
+                  </div>
                 </div>
               </ScrollArea>
             </div>
           </div>
-          
-          <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
-              <DialogContent className={cn(dialogState.mode === 'details' && "max-w-xl")}>
-                  <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2">
-                        {dialogState.mode === 'details' ? '受注詳細' : dialogState.mode === 'edit' ? '予定の編集' : '新規予定の作成'}
-                        {(dialogState.mode === 'details') && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                                if (dialogState.mode === 'details') {
-                                  setDialogState({mode: 'edit', event: dialogState.event})
-                                }
-                              }
-                            }>
-                              <Pencil className="h-4 w-4 text-muted-foreground"/>
-                            </Button>
-                        )}
-                      </DialogTitle>
-                      <DialogDescription>
-                        {dialogState.mode === 'details' ? 'スプレッドシートから取得した受注の詳細情報です。' :
-                         dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' : '新しい予定の詳細を入力してください。'
-                        }
-                      </DialogDescription>
-                  </DialogHeader>
-                   {(dialogState.mode === 'details' || dialogState.mode === 'edit') && event ? (
-                    <>
-                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                      {/* Details section */}
-                      {dialogState.mode === 'details' && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
-                            {renderDetailItem('担当者', staff?.name)}
-                            {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
-                            {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
-                            {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
-                            {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
-                            {renderDetailItem('車名', findKey(event.raw, ['車名']))}
-                            {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
-                            {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
-                            {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
-                            {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
-                            {renderDetailItem('品名', findKey(event.raw, ['品名']))}
-                            {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
-                            {renderDetailItem('本数', findKey(event.raw, ['本数']))}
-                            {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
-                            {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
-                            {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
-                          </div>
-                      )}
 
-                      {/* Edit form */}
-                       <div className="grid gap-4 pt-4 border-t">
-                          <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
-                          {!event.rawOrderId && (
-                               <div className="grid grid-cols-4 items-center gap-4">
-                                  <Label htmlFor="title" className="text-right">タスク名</Label>
-                                  <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/>
-                               </div>
-                          )}
-                          <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                  <Label htmlFor="start-time">開始時間</Label>
-                                  <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
-                              </div>
-                              <div>
-                                  <Label htmlFor="end-time">終了時間</Label>
-                                  <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
-                              </div>
-                          </div>
+          <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
+            <DialogContent className={cn(dialogState.mode === 'details' && "max-w-xl")}>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {dialogState.mode === 'details' ? '受注詳細' : dialogState.mode === 'edit' ? '予定の編集' : dialogState.mode === 'order-details' ? '未割当オーダー詳細' : '新規予定の作成'}
+                  {(dialogState.mode === 'details') && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                      if (dialogState.mode === 'details') {
+                        setDialogState({ mode: 'edit', event: dialogState.event })
+                      }
+                    }
+                    }>
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  )}
+                </DialogTitle>
+                <DialogDescription>
+                  {dialogState.mode === 'details' ? 'スプレッドシートから取得した受注の詳細情報です。' :
+                    dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' :
+                      dialogState.mode === 'order-details' ? '未割当オーダーの詳細情報です。' : '新しい予定の詳細を入力してください。'
+                  }
+                </DialogDescription>
+              </DialogHeader>
+              {(dialogState.mode === 'details' || dialogState.mode === 'edit') && event ? (
+                <>
+                  <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                    {/* Details section */}
+                    {dialogState.mode === 'details' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
+                        {renderDetailItem('担当者', staff?.name)}
+                        {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
+                        {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
+                        {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
+                        {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
+                        {renderDetailItem('車名', findKey(event.raw, ['車名']))}
+                        {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
+                        {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
+                        {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
+                        {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
+                        {renderDetailItem('品名', findKey(event.raw, ['品名']))}
+                        {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
+                        {renderDetailItem('本数', findKey(event.raw, ['本数']))}
+                        {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
+                        {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
+                        {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
+                      </div>
+                    )}
+
+                    {/* Edit form */}
+                    <div className="grid gap-4 pt-4 border-t">
+                      <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
+                      {!event.rawOrderId && (
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="title" className="text-right">タスク名</Label>
+                          <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, title: e.target.value }))} className="col-span-3" placeholder="例：定期メンテナンス" />
                         </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="start-time">開始時間</Label>
+                          <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, startTime: e.target.value }))} />
+                        </div>
+                        <div>
+                          <Label htmlFor="end-time">終了時間</Label>
+                          <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, endTime: e.target.value }))} />
+                        </div>
+                      </div>
                     </div>
-                     <DialogFooter className="sm:justify-between pt-4 border-t">
-                         <div className="flex flex-wrap gap-2">
-                             <Button variant="outline" onClick={() => handleSendIcs(event)}>
-                                 <Mail className="mr-2 h-4 w-4" />
-                                 iCalメール送信
-                             </Button>
-                             <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
-                         </div>
-                         <div className='flex gap-2 mt-4 sm:mt-0'>
-                           <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
-                           <Button onClick={handleSaveEvent}>保存</Button>
-                         </div>
-                    </DialogFooter>
-                    </>
-                  ) : (dialogState.mode === 'new') ? (
-                       <>
-                        <div className="grid gap-4 py-4">
-                            <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
-                            <div className="grid grid-cols-4 items-center gap-4">
-                              <Label htmlFor="title" className="text-right">タスク名</Label>
-                              <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({...prev, title: e.target.value}))} className="col-span-3" placeholder="例：定期メンテナンス"/>
-                            </div>
-                             <div className="grid grid-cols-4 items-center gap-4">
-                              <Label htmlFor="description" className="text-right">詳細</Label>
-                              <Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({...prev, description: e.target.value}))} className="col-span-3" placeholder="予定の詳細やメモ"/>
-                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                  <Label htmlFor="start-time">開始時間</Label>
-                                  <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, startTime: e.target.value}))}/>
-                                </div>
-                                <div>
-                                  <Label htmlFor="end-time">終了時間</Label>
-                                  <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({...prev, endTime: e.target.value}))}/>
-                                </div>
-                            </div>
-                        </div>
-                        <DialogFooter className="sm:justify-between">
-                           <div className="flex gap-2"></div>
-                           <div className="flex gap-2 mt-4 sm:mt-0">
-                              <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
-                              <Button onClick={handleSaveEvent}>保存</Button>
-                           </div>
-                        </DialogFooter>
-                      </>
-                  ) : null}
-                  </DialogContent>
-              </Dialog>
+                  </div>
+                  <DialogFooter className="sm:justify-between pt-4 border-t">
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" onClick={() => handleSendIcs(event)}>
+                        <Mail className="mr-2 h-4 w-4" />
+                        iCalメール送信
+                      </Button>
+                      <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
+                    </div>
+                    <div className='flex gap-2 mt-4 sm:mt-0'>
+                      <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
+                      <Button onClick={handleSaveEvent}>保存</Button>
+                    </div>
+                  </DialogFooter>
+                </>
+              ) : (dialogState.mode === 'new') ? (
+                <>
+                  <div className="grid gap-4 py-4">
+                    <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="title" className="text-right">タスク名</Label>
+                      <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, title: e.target.value }))} className="col-span-3" placeholder="例：定期メンテナンス" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="description" className="text-right">詳細</Label>
+                      <Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, description: e.target.value }))} className="col-span-3" placeholder="予定の詳細やメモ" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="start-time">開始時間</Label>
+                        <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, startTime: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label htmlFor="end-time">終了時間</Label>
+                        <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, endTime: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter className="sm:justify-between">
+                    <div className="flex gap-2"></div>
+                    <div className="flex gap-2 mt-4 sm:mt-0">
+                      <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
+                      <Button onClick={handleSaveEvent}>保存</Button>
+                    </div>
+                  </DialogFooter>
+                </>
+              ) : (dialogState.mode === 'order-details') ? (
+                <>
+                  <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
+                      {renderDetailItem('受注ID', dialogState.order.id)}
+                      {renderDetailItem('お取引先名', findKey(dialogState.order.raw, ['お取引先名', '店舗']))}
+                      {renderDetailItem('機材有無', findKey(dialogState.order.raw, ['機材有無']))}
+                      {renderDetailItem('作業予定日', findKey(dialogState.order.raw, ['作業予定日']))}
+                      {renderDetailItem('予定時間', formatTime(findKey(dialogState.order.raw, ['予定時間', 'チップ配置作業予定'])))}
+                      {renderDetailItem('車名', findKey(dialogState.order.raw, ['車名']))}
+                      {renderDetailItem('登録ナンバー', findKey(dialogState.order.raw, ['登録ナンバー(下４桁)']))}
+                      {renderDetailItem('入庫状況', findKey(dialogState.order.raw, ['入庫状況']))}
+                      {renderDetailItem('タイヤ品番', findKey(dialogState.order.raw, ['タイヤ品番']))}
+                      {renderDetailItem('タイヤサイズ', findKey(dialogState.order.raw, ['タイヤサイズ']))}
+                      {renderDetailItem('品名', findKey(dialogState.order.raw, ['品名']))}
+                      {renderDetailItem('作業内容', findKey(dialogState.order.raw, ['作業内容']))}
+                      {renderDetailItem('本数', findKey(dialogState.order.raw, ['本数']))}
+                      {renderDetailItem('タイヤ手配状況', findKey(dialogState.order.raw, ['タイヤ手配状況']))}
+                      {renderDetailItem('廃タイヤ処分', findKey(dialogState.order.raw, ['廃タイヤ処分']))}
+                    </div>
+                  </div>
+                  <DialogFooter className="sm:justify-between">
+                    <div className="flex gap-2"></div>
+                    <DialogClose asChild><Button variant="ghost">閉じる</Button></DialogClose>
+                  </DialogFooter>
+                </>
+              ) : null}
+            </DialogContent>
+          </Dialog>
           <RenderDragOverlay />
         </TooltipProvider>
       </DndContext>
@@ -946,16 +992,16 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
     <div className={cn("flex relative h-16 border-b", areaBgClass)}>
       <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit")} style={{ width: `${STAFF_COL_WIDTH}px` }}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
-            <div className='w-2 h-8 rounded-full' style={{backgroundColor: staff.color}}></div>
-            <span className='truncate flex-1'>{staff.name}</span>
+          <div className='w-2 h-8 rounded-full' style={{ backgroundColor: staff.color }}></div>
+          <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
       <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
         <div className="absolute top-0 left-0 h-full w-full">
-          {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)}/>))}
+          {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)} />))}
         </div>
       </div>
-      <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit")} style={{ width: `${STATUS_COL_WIDTH}px`}}>
+      <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit")} style={{ width: `${STATUS_COL_WIDTH}px` }}>
         {status && isToday(new Date()) && (<div className="text-xs text-center font-medium">{status.status}</div>)}
       </div>
     </div>
@@ -974,31 +1020,34 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: event.id, data: event });
   const { left, width } = getEventDimensions(event.start, event.end);
 
-  const style: React.CSSProperties = isOverlay ? 
+  const style: React.CSSProperties = isOverlay ?
     {} :
     {
-        left: `${left}px`,
-        width: `${width}px`,
-        opacity: isDragging ? 0 : 1,
-        position: 'absolute',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        zIndex: 50,
-      };
+      left: `${left}px`,
+      width: `${width}px`,
+      opacity: isDragging ? 0 : 1,
+      position: 'absolute',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      zIndex: 50,
+    };
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
-  
+
   const isTravelEvent = event.title?.startsWith('移動');
-  
+
   const divStyle: React.CSSProperties = { backgroundColor: staff.color || 'hsl(var(--primary))' };
-  
+
   let textColorClass = getContrastingTextColor(staff.color || 'hsl(var(--primary))') === '#FFFFFF' ? 'text-white' : 'text-black';
-  
+
   if (isTravelEvent) {
-    divStyle.backgroundColor = 'hsl(var(--accent))';
-    textColorClass = 'text-accent-foreground';
-  } 
-  
+    // Lighten the staff color to make it look "thinner" or "mixed with white"
+    const lightenedColor = lightenColor(staff.color || 'hsl(var(--primary))', 0.6);
+    divStyle.backgroundColor = lightenedColor;
+    // Recalculate contrast for the new light background (likely needs black text)
+    textColorClass = getContrastingTextColor(lightenedColor) === '#FFFFFF' ? 'text-white' : 'text-black';
+  }
+
   if (event.title === '業務') {
     divStyle.backgroundColor = 'rgb(156 163 175)';
     textColorClass = 'text-white';
@@ -1013,37 +1062,37 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
 
   const eventContent = (
-      <div
-          className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && !isOverlay && "opacity-50")}
-          style={{...divStyle, width: isOverlay ? `${width}px` : '100%'}}
-      >
-        <p className="text-xs font-semibold truncate pointer-events-none">{line1}</p>
-        {line2 && (<p className="text-xs opacity-80 truncate pointer-events-none">{line2}</p>)}
-      </div>
+    <div
+      className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && !isOverlay && "opacity-50")}
+      style={{ ...divStyle, width: isOverlay ? `${width}px` : '100%' }}
+    >
+      <p className="text-xs font-semibold truncate pointer-events-none">{line1}</p>
+      {line2 && (<p className="text-xs opacity-80 truncate pointer-events-none">{line2}</p>)}
+    </div>
   );
 
   return (
     <div
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-        onDoubleClick={handleDoubleClick}
-        className={cn("rounded-md flex flex-col justify-center cursor-move h-12", isOverlay ? 'shadow-lg' : '')}
-        data-event-chip="true"
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      onDoubleClick={handleDoubleClick}
+      className={cn("rounded-md flex flex-col justify-center cursor-move h-12", isOverlay ? 'shadow-lg' : '')}
+      data-event-chip="true"
     >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {eventContent}
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
-            {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
-            <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
-            <p className="text-sm">担当: {staff.name}</p>
-            {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
-          </TooltipContent>
-        </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {eventContent}
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
+          {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
+          <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
+          <p className="text-sm">担当: {staff.name}</p>
+          {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 };

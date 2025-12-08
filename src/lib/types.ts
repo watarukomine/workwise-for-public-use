@@ -8,12 +8,12 @@ export type Staff = {
   name: string;
   email: string | null;
   photoURL?: string | null;
-  avatarUrl?: string; 
-  color?: string; 
+  avatarUrl?: string;
+  color?: string;
   role: 'admin' | 'staff';
   area?: '県西' | '県央' | '県東';
   '母店'?: string;
-  password?: string; 
+  password?: string;
   'ロール'?: 'admin' | 'staff';
   department?: string; // from user's code
   createdAt?: Timestamp;
@@ -22,7 +22,7 @@ export type Staff = {
 };
 
 export type Customer = {
-  id:string;
+  id: string;
   No?: string;
   'ユーザーコード'?: string;
   '旧 チャネル SEQ'?: string;
@@ -34,7 +34,7 @@ export type Customer = {
   '経度'?: number;
   '電話番号'?: string;
   '営業時間'?: string;
-  name?: string; 
+  name?: string;
   address?: string;
   latitude?: number;
   longitude?: number;
@@ -60,11 +60,12 @@ export type Order = {
   tireSize?: string;
   taskCalendarEventId?: string;
   travelCalendarEventId?: string;
+  '本数'?: string;
 };
 
 export type ScheduleEvent = WithId<Order> & {
-  tripId?: string; 
-  orderId?: string; 
+  tripId?: string;
+  orderId?: string;
   title: string;
   description?: string;
   locationId?: string;
