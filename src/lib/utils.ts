@@ -87,6 +87,7 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
 
   return {
     id: String(orderId || `ord-${Math.random()}`),
+    rawOrderId: orderId ? String(orderId) : undefined,
     customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
     taskDetails: taskDetails, // Simplified for initial view, detailed view can show more
     status: findKey(rawOrder, ['受注ステータス']) || '未割当',
@@ -98,6 +99,9 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
     tireSize: tireSize,
     '本数': findKey(rawOrder, ['本数', 'honsu']) || '',
+    customerName: customerName,
+    address: findKey(rawOrder, ['住所']) || '',
+    serviceType: findKey(rawOrder, ['サービス種別', 'サービス区分']) || '',
     raw: rawOrder,
   };
 };

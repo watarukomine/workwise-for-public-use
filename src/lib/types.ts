@@ -61,6 +61,7 @@ export type Order = {
   taskCalendarEventId?: string;
   travelCalendarEventId?: string;
   '本数'?: string;
+  raw?: Record<string, any>;
 };
 
 export type ScheduleEvent = WithId<Order> & {

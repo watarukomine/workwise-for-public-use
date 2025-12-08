@@ -12,7 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Location } from './route-optimizer';
-import { User, Building2, MapPin, Flag } from 'lucide-react';
+import { User, Building2, MapPin } from 'lucide-react';
 
 type StaffWithLocation = Staff & Partial<StaffStatus>;
 
@@ -34,7 +34,7 @@ function Directions({ route, avoidHighways }: { route: Location[], avoidHighways
   React.useEffect(() => {
     if (!routesLibrary || !map) return;
     setDirectionsService(new routesLibrary.DirectionsService());
-    setDirectionsRenderer(new routesLibrary.DirectionsRenderer({ 
+    setDirectionsRenderer(new routesLibrary.DirectionsRenderer({
       map,
       polylineOptions: {
         strokeColor: '#4285F4', // Blue color for the route
@@ -47,10 +47,10 @@ function Directions({ route, avoidHighways }: { route: Location[], avoidHighways
 
   React.useEffect(() => {
     if (!directionsService || !directionsRenderer || !route || route.length < 2) {
-        if (directionsRenderer) {
-            directionsRenderer.set('directions', null);
-        }
-        return;
+      if (directionsRenderer) {
+        directionsRenderer.set('directions', null);
+      }
+      return;
     };
 
     const origin = new google.maps.LatLng(route[0].latitude, route[0].longitude);
@@ -70,13 +70,13 @@ function Directions({ route, avoidHighways }: { route: Location[], avoidHighways
       directionsRenderer.setDirections(response);
       setRoutes(response.routes);
     }).catch(e => {
-        console.error("Directions request failed due to " + e);
+      console.error("Directions request failed due to " + e);
     });
 
     return () => {
-       if (directionsRenderer) {
-          directionsRenderer.set('directions', null);
-       }
+      if (directionsRenderer) {
+        directionsRenderer.set('directions', null);
+      }
     }
   }, [directionsService, directionsRenderer, route, avoidHighways]);
 
@@ -88,14 +88,14 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
   const allCoordinates = [
     ...staff.filter(s => s.latitude && s.longitude).map(s => ({ lat: s.latitude!, lng: s.longitude! })),
     ...customers.filter(c => c.latitude && c.longitude).map(c => ({ lat: c.latitude!, lng: c.longitude! })),
-    ...(customLocations || []).map(l => ({ lat: l.latitude, lng: l.longitude}))
+    ...(customLocations || []).map(l => ({ lat: l.latitude, lng: l.longitude }))
   ];
 
   const defaultCenter = React.useMemo(() => {
     if (optimizedRoute && optimizedRoute.length > 0) {
-        const latSum = optimizedRoute.reduce((sum, loc) => sum + loc.latitude, 0);
-        const lngSum = optimizedRoute.reduce((sum, loc) => sum + loc.longitude, 0);
-        return { lat: latSum / optimizedRoute.length, lng: lngSum / optimizedRoute.length };
+      const latSum = optimizedRoute.reduce((sum, loc) => sum + loc.latitude, 0);
+      const lngSum = optimizedRoute.reduce((sum, loc) => sum + loc.longitude, 0);
+      return { lat: latSum / optimizedRoute.length, lng: lngSum / optimizedRoute.length };
     }
     if (allCoordinates.length === 0) {
       return { lat: 35.6895, lng: 139.6917 }; // Default to Tokyo
@@ -122,37 +122,37 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
             {staff.map((s) =>
               s.latitude && s.longitude ? (
                 <AdvancedMarker key={`staff-${s.id}`} position={{ lat: s.latitude, lng: s.longitude }}>
-                   <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div 
-                          className="w-8 h-8 rounded-full bg-white border-2 flex items-center justify-center"
-                          style={{ borderColor: s.color }}
-                        >
-                            <User className="w-5 h-5" style={{ color: s.color }} />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p className="font-bold">{s.name}</p>
-                        <p>{s.lastAction}</p>
-                      </TooltipContent>
-                    </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div
+                        className="w-8 h-8 rounded-full bg-white border-2 flex items-center justify-center"
+                        style={{ borderColor: s.color }}
+                      >
+                        <User className="w-5 h-5" style={{ color: s.color }} />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-bold">{s.name}</p>
+                      <p>{s.lastAction}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </AdvancedMarker>
               ) : null
             )}
-            {customers.map((c) => 
-               c.latitude && c.longitude ? (
+            {customers.map((c) =>
+              c.latitude && c.longitude ? (
                 <AdvancedMarker
                   key={`customer-${c.userCode}`}
-                  position={{ 
-                    lat: c.latitude, 
+                  position={{
+                    lat: c.latitude,
                     lng: c.longitude
                   }}
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
-                       <div className="w-8 h-8 rounded-full bg-blue-500 border-2 border-white shadow-md flex items-center justify-center">
-                          <Building2 className="w-5 h-5 text-white" />
-                        </div>
+                      <div className="w-8 h-8 rounded-full bg-blue-500 border-2 border-white shadow-md flex items-center justify-center">
+                        <Building2 className="w-5 h-5 text-white" />
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="font-bold">{c['店舗'] || c.name}</p>
@@ -162,20 +162,20 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
                 </AdvancedMarker>
               ) : null
             )}
-             {customLocations?.map((l) => 
-               l.latitude && l.longitude ? (
+            {customLocations?.map((l) =>
+              l.latitude && l.longitude ? (
                 <AdvancedMarker
                   key={`custom-${l.id}`}
-                  position={{ 
-                    lat: l.latitude, 
+                  position={{
+                    lat: l.latitude,
                     lng: l.longitude
                   }}
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
-                       <div className="w-8 h-8 rounded-full bg-purple-600 border-2 border-white shadow-md flex items-center justify-center">
-                          <MapPin className="w-5 h-5 text-white" />
-                        </div>
+                      <div className="w-8 h-8 rounded-full bg-purple-600 border-2 border-white shadow-md flex items-center justify-center">
+                        <MapPin className="w-5 h-5 text-white" />
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="font-bold">{l.name}</p>
@@ -185,26 +185,44 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
                 </AdvancedMarker>
               ) : null
             )}
+            {showRoute && optimizedRoute && optimizedRoute.length > 0 && (
+              <AdvancedMarker
+                key={`start-${optimizedRoute[0].id}`}
+                position={{ lat: optimizedRoute[0].latitude, lng: optimizedRoute[0].longitude }}
+                zIndex={10}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-10 h-10 rounded-full bg-green-500 border-2 border-white shadow-md flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">S</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-bold">出発地: {optimizedRoute[0].name}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </AdvancedMarker>
+            )}
             {showRoute && destination && (
               <AdvancedMarker
-                  key={`destination-${destination.id}`}
-                  position={{ lat: destination.latitude, lng: destination.longitude }}
-                  zIndex={10}
+                key={`destination-${destination.id}`}
+                position={{ lat: destination.latitude, lng: destination.longitude }}
+                zIndex={10}
               >
-                  <Tooltip>
-                      <TooltipTrigger asChild>
-                         <div className="w-10 h-10 flex items-center justify-center">
-                           <Flag className="w-8 h-8 text-destructive animate-pulse" />
-                         </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                          <p className="font-bold">目的地: {destination.name}</p>
-                      </TooltipContent>
-                  </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="w-10 h-10 rounded-full bg-red-500 border-2 border-white shadow-md flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">G</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-bold">目的地: {destination.name}</p>
+                  </TooltipContent>
+                </Tooltip>
               </AdvancedMarker>
             )}
             {showRoute && (
-                <Directions route={optimizedRoute} avoidHighways={avoidHighways} />
+              <Directions route={optimizedRoute} avoidHighways={avoidHighways} />
             )}
           </Map>
         </TooltipProvider>

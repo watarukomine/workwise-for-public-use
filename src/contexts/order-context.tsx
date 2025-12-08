@@ -122,14 +122,22 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
 
   // 3. Determine unassigned orders
   const newUnassignedOrders = mappedOrders.filter(order => {
-    if (!order.rawOrderId || scheduledRawOrderIds.has(order.rawOrderId)) return false;
+    const hasRawOrderId = !!order.rawOrderId;
+    const isAlreadyScheduled = order.rawOrderId ? scheduledRawOrderIds.has(order.rawOrderId) : false;
+
+    if (!hasRawOrderId || isAlreadyScheduled) {
+      return false;
+    }
 
     const staffName = findKey(order.raw, ['担当']);
     const scheduledTime = findKey(order.raw, ['チップ配置作業予定']);
-    if (staffName || scheduledTime) return false;
+    if (staffName || scheduledTime) {
+      return false;
+    }
 
     const scheduledDate = order.scheduledDate ? parseISO(order.scheduledDate) : null;
-    return scheduledDate && isValid(scheduledDate);
+    const hasValidScheduledDate = scheduledDate && isValid(scheduledDate);
+    return hasValidScheduledDate;
   });
 
   return {
@@ -162,7 +170,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (isStaffLoading) return;
+    // Decoupled from staff loading to allow parallel fetching
+    // if (isStaffLoading) return; 
 
     if (showLoading) setIsLoading(true);
     setErrorState(null);
@@ -181,7 +190,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } finally {
       if (showLoading) setIsLoading(false);
     }
-  }, [orderGasUrl, isStaffLoading]);
+  }, [orderGasUrl]);
 
   // Initial data fetch
   useEffect(() => {

@@ -18,29 +18,34 @@ export async function fetchGasData(url: string): Promise<{ data?: any; error?: s
   }
 
   try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
     const response = await fetch(url, {
       method: 'GET',
-      cache: 'no-store', 
-      redirect: 'follow', 
+      cache: 'no-store',
+      redirect: 'follow',
+      signal: controller.signal,
     });
-    
+    clearTimeout(id);
+
     if (response.url.includes('accounts.google.com')) {
-        return { error: 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings.' };
+      return { error: 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings.' };
     }
-    
+
     if (!response.ok) {
       let errorMessage = `GAS request failed. Status: ${response.status}.`;
       try {
         const responseText = await response.text();
         if (responseText.toLowerCase().includes('<title>google') || responseText.toLowerCase().includes('signin')) {
-            errorMessage = 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings and that you have deployed a new version after any changes.';
+          errorMessage = 'Failed to fetch data. The Google Apps Script is likely not deployed for public access. Please ensure "Who has access" is set to "Anyone" in your GAS deployment settings and that you have deployed a new version after any changes.';
         } else if (response.status >= 300 && response.status < 400) {
-            errorMessage = "GAS request was redirected. This usually indicates a permission issue. Please ensure your script is deployed with 'Who has access' set to 'Anyone' and that you have deployed a new version after any changes to the script. The doGet() function must also correctly return ContentService output, not an HTML page.";
+          errorMessage = "GAS request was redirected. This usually indicates a permission issue. Please ensure your script is deployed with 'Who has access' set to 'Anyone' and that you have deployed a new version after any changes to the script. The doGet() function must also correctly return ContentService output, not an HTML page.";
         } else {
-            errorMessage += ` Response: ${responseText}`;
+          errorMessage += ` Response: ${responseText}`;
         }
       } catch (e) { /* Ignore if we can't read the body */ }
-      
+
       return { error: errorMessage };
     }
 
@@ -48,11 +53,14 @@ export async function fetchGasData(url: string): Promise<{ data?: any; error?: s
     if (result.status === 'error' && result.message) {
       return { error: `GAS script returned an error: ${result.message}` };
     }
-    
+
     return { data: result.data || (Array.isArray(result) ? result : []) };
-    
+
   } catch (error: any) {
     console.error('Server-side fetch to GAS failed:', error.message);
+    if (error.name === 'AbortError') {
+      return { error: 'Request timed out after 30 seconds.' };
+    }
     return { error: error.message || 'An unknown error occurred during the server fetch.' };
   }
 }

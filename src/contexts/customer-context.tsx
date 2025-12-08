@@ -35,30 +35,71 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     setErrorState(error);
   };
 
+  const CUSTOMER_CACHE_KEY = 'cached_customer_data';
+
   useEffect(() => {
     const fetchCustomers = async () => {
-      if (customerGasUrl) {
-        setIsLoading(true);
-        setErrorState(null);
-        try {
-          const result = await fetchGasData(customerGasUrl);
+      if (!customerGasUrl) {
+        setErrorState('販売店情報を取得するためのGoogle Apps Script URLが設定されていません。');
+        setCustomers([]);
+        setIsLoading(false);
+        return;
+      }
 
-          if (result.error) {
-            throw new Error(result.error);
+      setErrorState(null);
+
+      // Step 1: Load cached data immediately (optimistic)
+      try {
+        const cachedData = localStorage.getItem(CUSTOMER_CACHE_KEY);
+        if (cachedData) {
+          const { customers: cachedCustomers, timestamp } = JSON.parse(cachedData);
+          if (cachedCustomers && cachedCustomers.length > 0) {
+            setCustomers(cachedCustomers);
+            // Show UI immediately with cached data
+            setIsLoading(false);
           }
+        }
+      } catch (e) {
+        console.warn('Failed to load cached customer data:', e);
+      }
 
-          const customerData = result.data || [];
+      // Step 2: Fetch fresh data in background
+      try {
+        if (customers.length === 0) {
+          setIsLoading(true);
+        }
+
+        const result = await fetchGasData(customerGasUrl);
+
+        if (result.error) {
+          if (customers.length === 0) {
+            throw new Error(result.error);
+          } else {
+            console.warn('Background refresh failed, using cached data:', result.error);
+          }
+        }
+
+        const customerData = result.data || [];
+        if (customerData.length > 0) {
           setCustomers(customerData);
-        } catch (e: any) {
+
+          // Cache the fresh data
+          try {
+            localStorage.setItem(CUSTOMER_CACHE_KEY, JSON.stringify({
+              customers: customerData,
+              timestamp: Date.now()
+            }));
+          } catch (e) {
+            console.warn('Failed to cache customer data:', e);
+          }
+        }
+      } catch (e: any) {
+        if (customers.length === 0) {
           console.error("Failed to fetch customers from GAS:", e);
           setErrorState(`販売店情報の取得に失敗しました: ${e.message}`);
           setCustomers([]);
-        } finally {
-          setIsLoading(false);
         }
-      } else {
-        setErrorState('販売店情報を取得するためのGoogle Apps Script URLが設定されていません。');
-        setCustomers([]);
+      } finally {
         setIsLoading(false);
       }
     };

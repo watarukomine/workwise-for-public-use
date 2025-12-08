@@ -21,6 +21,11 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    // Safety timeout to ensure loading doesn't stick forever (e.g. if localStorage access fails silently)
+    const timeoutId = setTimeout(() => {
+      setIsLoading(false);
+    }, 2000);
+
     try {
       // On initial load, try to get the user from session storage
       const user = getCurrentUser();
@@ -31,6 +36,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
       setError(e instanceof Error ? e : new Error('Failed to load user profile'));
     } finally {
       setIsLoading(false);
+      clearTimeout(timeoutId);
     }
   }, []);
 

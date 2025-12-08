@@ -11,7 +11,10 @@ import {
   DragOverlay,
   type Active,
   useDndContext,
-  ActivationConstraint,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  pointerWithin,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
@@ -108,22 +111,54 @@ interface OrderChipProps {
 const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverlay }) => {
   const [line1, line2] = order.taskDetails.split('\n');
 
+  // Convert equipment status to symbol: 有→○, 無/空欄→×, △→△
+  const getEquipmentSymbol = (status: string | undefined): string => {
+    if (!status || status.trim() === '') return '×';
+    if (status === '有' || status.includes('有')) return '○';
+    if (status === '無' || status.includes('無')) return '×';
+    if (status === '△' || status.includes('△')) return '△';
+    return '×'; // Default to × for unknown values
+  };
+
+  const equipmentSymbol = getEquipmentSymbol(order.equipmentStatus);
+  const scheduledTime = order.scheduledTime ? formatTime(order.scheduledTime) : '';
+
+  // Format 本数 to include 本 suffix if not already present
+  const formatHonsu = (honsu: string | number | undefined): string => {
+    if (honsu === undefined || honsu === null || honsu === '') return '';
+    const str = String(honsu).trim();
+    if (str === '') return '';
+    if (str.endsWith('本')) return str;
+    return `${str}本`;
+  };
+
   const tooltipContent = (
-    <>
-      <p className="font-bold">{line1}</p>
-      {line2 && <p>{line2}</p>}
-      <p className="text-xs text-muted-foreground">所要時間: {order.estimatedDuration}分</p>
-    </>
+    <div className="space-y-1">
+      <p className="font-bold">
+        {order.customerName || line1}
+        <span className="ml-1">({equipmentSymbol})</span>
+        {scheduledTime && <span className="ml-2">{scheduledTime}</span>}
+      </p>
+      {(order.tireSize || order['本数']) && (
+        <p className="text-sm">
+          {order.tireSize && <span>{order.tireSize}</span>}
+          {order.tireSize && order['本数'] && <span className="mx-1"></span>}
+          {order['本数'] && <span>{formatHonsu(order['本数'])}</span>}
+        </p>
+      )}
+    </div>
   );
 
   const content = (
     <div style={style} className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}>
       <p className="text-xs font-semibold truncate pointer-events-none">
-        {line1}
+        {order.customerName || line1}
       </p>
-      {line2 && <p className="text-xs opacity-80 truncate pointer-events-none">
-        {line2}
-      </p>}
+      {scheduledTime && (
+        <p className="text-xs opacity-80 truncate pointer-events-none">
+          {scheduledTime}
+        </p>
+      )}
     </div>
   );
 
@@ -236,9 +271,14 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
   const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
 
   const dailyOrders = orders.filter(order => {
-    if (!order.scheduledDate) return false;
+    if (!order.scheduledDate) {
+      return false;
+    }
     const scheduledDate = parseISO(order.scheduledDate);
-    return isValid(scheduledDate) && isEqual(startOfDay(scheduledDate), startOfDay(date));
+    const scheduledStartOfDay = startOfDay(scheduledDate);
+    const currentStartOfDay = startOfDay(date);
+    const matches = isValid(scheduledDate) && isEqual(scheduledStartOfDay, currentStartOfDay);
+    return matches;
   });
 
   return (
@@ -254,9 +294,9 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
         <ScrollArea className="w-full whitespace-nowrap h-32">
           <div className="pr-4 min-h-[6rem]">
             <div className="flex flex-wrap gap-2">
-              {dailyOrders.map((order) => (
+              {dailyOrders.map((order, index) => (
                 <DraggableOrder
-                  key={order.id}
+                  key={`${order.id}-${index}`}
                   order={order}
                   customer={getCustomerByCode(order.customerCode)}
                   onDoubleClick={() => onDoubleClickOrder(order)}
@@ -751,9 +791,13 @@ export function ScheduleView({
   );
 
   const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
-  const activationConstraint: ActivationConstraint = {
-    distance: 5,
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
 
   if (!isClient) {
     return (
@@ -772,9 +816,10 @@ export function ScheduleView({
   return (
     <ScheduleViewContext.Provider value={contextValue}>
       <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        activationConstraint={activationConstraint}
       >
         <TooltipProvider>
           <div className="space-y-6">
@@ -1059,15 +1104,54 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const [line1, ...rest] = (event.title || '').split('\n');
   const line2 = rest.join('\n');
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
-  const tooltipTitle = event.title?.includes('(ID:') ? line1 : event.title;
+
+  // Get equipment status and other details from raw order data
+  const getEquipmentSymbol = (status: string | undefined): string => {
+    if (!status || status.trim() === '') return '×';
+    if (status === '有' || status.includes('有')) return '○';
+    if (status === '無' || status.includes('無')) return '×';
+    if (status === '△' || status.includes('△')) return '△';
+    return '×';
+  };
+
+  const formatHonsu = (honsu: string | number | undefined): string => {
+    if (honsu === undefined || honsu === null || honsu === '') return '';
+    const str = String(honsu).trim();
+    if (str === '') return '';
+    if (str.endsWith('本')) return str;
+    return `${str}本`;
+  };
+
+  const equipmentStatus = event.raw ? findKey(event.raw, ['機材有無']) : undefined;
+  const equipmentSymbol = getEquipmentSymbol(equipmentStatus);
+  const tireSize = event.raw ? findKey(event.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
+  const honsu = event.raw ? findKey(event.raw, ['本数', 'honsu']) : undefined;
+  const customerName = event.raw ? findKey(event.raw, ['お取引先名', '店舗', '取引先']) : (customer?.storeName || line1);
 
   const eventContent = (
     <div
       className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && !isOverlay && "opacity-50")}
       style={{ ...divStyle, width: isOverlay ? `${width}px` : '100%' }}
     >
-      <p className="text-xs font-semibold truncate pointer-events-none">{line1}</p>
-      {line2 && (<p className="text-xs opacity-80 truncate pointer-events-none">{line2}</p>)}
+      <p className="text-xs font-semibold truncate pointer-events-none">{customerName || line1}</p>
+      <p className="text-xs opacity-80 truncate pointer-events-none">{formatTime(event.start)}</p>
+    </div>
+  );
+
+  const tooltipContent = (
+    <div className="space-y-1">
+      <p className="font-bold">
+        {customerName || line1}
+        {!isTravelEvent && <span className="ml-1">({equipmentSymbol})</span>}
+        <span className="ml-2">{formatTime(event.start)}</span>
+      </p>
+      {!isTravelEvent && (tireSize || honsu) && (
+        <p className="text-sm">
+          {tireSize && <span>{tireSize}</span>}
+          {tireSize && honsu && <span className="mx-1"></span>}
+          {honsu && <span>{formatHonsu(honsu)}</span>}
+        </p>
+      )}
     </div>
   );
 
@@ -1085,13 +1169,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         <TooltipTrigger asChild>
           {eventContent}
         </TooltipTrigger>
-        <TooltipContent side="bottom">
-          <p className="font-bold">{tooltipTitle || '未定のタスク'}</p>
-          {customer && <p className="text-sm">顧客: {customer?.storeName || '未定'}</p>}
-          <p className="text-sm">時間: {formatTime(event.start)} - {formatTime(event.end)}</p>
-          <p className="text-sm">担当: {staff.name}</p>
-          {event.description && <p className="text-xs text-muted-foreground mt-1">{event.description}</p>}
-        </TooltipContent>
+        <TooltipContent side="bottom">{tooltipContent}</TooltipContent>
       </Tooltip>
     </div>
   );

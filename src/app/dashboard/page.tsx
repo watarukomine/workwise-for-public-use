@@ -26,18 +26,18 @@ import { useEffect } from 'react';
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
   const router = useRouter();
-  
-  const { 
-    isLoading: isLoadingOrders, 
+
+  const {
+    isLoading: isLoadingOrders,
     statuses,
   } = useOrder();
-  
+
   const { isLoading: isLoadingCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
   const { forceMobileView, setForceMobileView } = useAppShell();
-  
+
   useEffect(() => {
     if (!isProfileLoading && !profile) {
       router.push('/login');
@@ -72,7 +72,7 @@ export default function DashboardPage() {
     });
 
   }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
-  
+
   const selectedStaffNames = React.useMemo(() => {
     if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
       return null;
@@ -87,75 +87,93 @@ export default function DashboardPage() {
 
   const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading || isLoadingCustomers;
 
+  console.log('Dashboard Loading States:', {
+    profile: isProfileLoading,
+    orders: isLoadingOrders,
+    staff: isStaffLoading,
+    customers: isLoadingCustomers,
+    total: isLoading
+  });
+
   const handleDateChange = (direction: 'next' | 'prev' | 'today') => {
-      setCurrentDate(current => {
-          if (direction === 'today') return startOfToday();
-          return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
-      });
+    setCurrentDate(current => {
+      if (direction === 'today') return startOfToday();
+      return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
+    });
   };
 
   if (isLoading || !profile) {
-      return (
-        <div className="flex items-center justify-center p-10">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+    return (
+      <div className="flex flex-col items-center justify-center p-10 gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="text-sm text-muted-foreground">
+          <p>Loading Status:</p>
+          <ul className="list-disc pl-5 text-left">
+            <li>Profile: {isProfileLoading ? 'Loading...' : 'Done'}</li>
+            <li>Orders: {isLoadingOrders ? 'Loading...' : 'Done'}</li>
+            <li>Staff: {isStaffLoading ? 'Loading...' : 'Done'}</li>
+            <li>Customers: {isLoadingCustomers ? 'Loading...' : 'Done'}</li>
+          </ul>
+          <p className="mt-2 text-xs">Profile Object: {profile ? 'Loaded' : 'Null'}</p>
         </div>
-      );
+      </div>
+    );
   }
-  
+
   const showVerticalView = forceMobileView || (isMobile && profile.role !== 'admin');
 
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight">
-                {isToday(currentDate) ? "ダッシュボード" : format(currentDate, "M月d日 (E)")}
-            </h1>
-            <p className="text-muted-foreground">
-              スタッフのスケジュールと現在の状況を一覧で確認できます。
-            </p>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {isToday(currentDate) ? "ダッシュボード" : format(currentDate, "M月d日 (E)")}
+          </h1>
+          <p className="text-muted-foreground">
+            スタッフのスケジュールと現在の状況を一覧で確認できます。
+          </p>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" onClick={() => handleDateChange('today')} disabled={isToday(currentDate)}>今日</Button>
+            <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}>
-                    <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" onClick={() => handleDateChange('today')} disabled={isToday(currentDate)}>今日</Button>
-                <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}>
-                    <ChevronRight className="h-4 w-4" />
-                </Button>
-            </div>
-             <div className="flex items-center space-x-2">
-                <Smartphone className="h-5 w-5" />
-                <Switch
-                    id="mobile-view-switch"
-                    checked={forceMobileView}
-                    onCheckedChange={setForceMobileView}
-                />
-                <Label htmlFor="mobile-view-switch" className="hidden sm:inline">モバイル表示</Label>
-            </div>
+          <div className="flex items-center space-x-2">
+            <Smartphone className="h-5 w-5" />
+            <Switch
+              id="mobile-view-switch"
+              checked={forceMobileView}
+              onCheckedChange={setForceMobileView}
+            />
+            <Label htmlFor="mobile-view-switch" className="hidden sm:inline">モバイル表示</Label>
           </div>
+        </div>
       </div>
-      
-       {selectedStaffNames && (
+
+      {selectedStaffNames && (
         <div className="rounded-lg bg-muted p-3">
-            <p className="text-sm font-medium text-muted-foreground">
-              <span className="font-semibold text-foreground">表示中のスタッフ:</span> {selectedStaffNames}
-            </p>
+          <p className="text-sm font-medium text-muted-foreground">
+            <span className="font-semibold text-foreground">表示中のスタッフ:</span> {selectedStaffNames}
+          </p>
         </div>
       )}
 
       {showVerticalView ? (
-          <VerticalScheduleView 
-              staffData={filteredStaff}
-              currentDate={currentDate}
-          />
+        <VerticalScheduleView
+          staffData={filteredStaff}
+          currentDate={currentDate}
+        />
       ) : (
-          <ScheduleView 
-              staffData={filteredStaff} 
-              currentDate={currentDate}
-              statuses={statuses}
-          />
+        <ScheduleView
+          staffData={filteredStaff}
+          currentDate={currentDate}
+          statuses={statuses}
+        />
       )}
     </div>
   );
