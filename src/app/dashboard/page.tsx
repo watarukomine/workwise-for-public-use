@@ -104,18 +104,9 @@ export default function DashboardPage() {
 
   if (isLoading || !profile) {
     return (
-      <div className="flex flex-col items-center justify-center p-10 gap-4">
+      <div className="flex flex-col items-center justify-center p-10 gap-4 min-h-[50vh]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <div className="text-sm text-muted-foreground">
-          <p>Loading Status:</p>
-          <ul className="list-disc pl-5 text-left">
-            <li>Profile: {isProfileLoading ? 'Loading...' : 'Done'}</li>
-            <li>Orders: {isLoadingOrders ? 'Loading...' : 'Done'}</li>
-            <li>Staff: {isStaffLoading ? 'Loading...' : 'Done'}</li>
-            <li>Customers: {isLoadingCustomers ? 'Loading...' : 'Done'}</li>
-          </ul>
-          <p className="mt-2 text-xs">Profile Object: {profile ? 'Loaded' : 'Null'}</p>
-        </div>
+        <p className="text-sm text-muted-foreground">データを読み込み中...</p>
       </div>
     );
   }
