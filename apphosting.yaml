@@ -18,3 +18,17 @@ runConfig:
 env:
   - variable: NEXT_PUBLIC_NODE_ENV
     value: production
+  - variable: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+    value: AIzaSyDfAmBI1EdkkioSggCVhsUTi-oSQBIWdHw
+  - variable: NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
+    value: DEMO_MAP_ID
+  - variable: GOOGLE_API_KEY
+    value: AIzaSyDfAmBI1EdkkioSggCVhsUTi-oSQBIWdHw
+  - variable: GEMINI_API_KEY
+    value: AIzaSyDfAmBI1EdkkioSggCVhsUTi-oSQBIWdHw
+  - variable: NEXT_PUBLIC_STAFF_GAS_URL
+    value: https://script.google.com/macros/s/AKfycbyjdlLbXbsqg3bRM-FyHElXqwdBIhB82mKnf8IydWjG_1OgVwmejURN0psdjgmLndhj/exec
+  - variable: NEXT_PUBLIC_CUSTOMER_GAS_URL
+    value: https://script.google.com/macros/s/AKfycbygUg4b1tD4Y489xg0Fz09e84DtDAy_35KhJ_VD4RyJ3J1DavI0B_aZP5ck8hssWPCi/exec
+  - variable: NEXT_PUBLIC_ORDER_GAS_URL
+    value: https://script.google.com/macros/s/AKfycbw-jHNhx6AxN_X9BpZuISyaWpldSBY8IsYzz7iWtFqb1oivB_33ePLt2agYeMJj0dDo/exec
