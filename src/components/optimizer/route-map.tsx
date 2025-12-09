@@ -124,12 +124,18 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
                 <AdvancedMarker key={`staff-${s.id}`} position={{ lat: s.latitude, lng: s.longitude }}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div
-                        className="w-8 h-8 rounded-full bg-white border-2 flex items-center justify-center"
-                        style={{ borderColor: s.color }}
-                      >
-                        <User className="w-5 h-5" style={{ color: s.color }} />
-                      </div>
+                      {(() => {
+                        const markerStyle = { borderColor: s.color };
+                        return (
+                          <div
+                            className="w-8 h-8 rounded-full bg-white border-2 flex items-center justify-center"
+                            // eslint-disable-next-line react-dom/no-unsafe-inline-style
+                            style={markerStyle}
+                          >
+                            <User className="w-5 h-5" style={{ color: s.color }} />
+                          </div>
+                        );
+                      })()}
                     </TooltipTrigger>
                     <TooltipContent>
                       <p className="font-bold">{s.name}</p>

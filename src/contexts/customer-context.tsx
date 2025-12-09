@@ -5,9 +5,11 @@ import React, { createContext, useState, useContext, ReactNode, useEffect } from
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { CUSTOMER_GAS_URL } from '@/lib/settings';
 
+import type { WithId, Customer } from '@/lib/types';
+
 interface CustomerContextType {
-  customers: any[];
-  setCustomers: (customers: any[]) => void;
+  customers: WithId<Customer>[];
+  setCustomers: (customers: WithId<Customer>[]) => void;
   isLoading: boolean;
   customerGasUrl: string;
   setCustomerGasUrl: (url: string) => void;
@@ -18,7 +20,7 @@ interface CustomerContextType {
 const CustomerContext = createContext<CustomerContextType | undefined>(undefined);
 
 export function CustomerProvider({ children }: { children: ReactNode }) {
-  const [customers, setCustomersState] = useState<any[]>([]);
+  const [customers, setCustomersState] = useState<WithId<Customer>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [customerGasUrl, setCustomerGasUrlState] = useState(CUSTOMER_GAS_URL);
   const [error, setErrorState] = useState<string | null>(null);

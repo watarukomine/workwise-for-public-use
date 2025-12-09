@@ -53,6 +53,7 @@ export type Order = {
   status: string;
   scheduledDate: string;
   scheduledTime?: string;
+  scheduledEndTime?: string; // Added field
   estimatedDuration: number;
   value: number;
   staffName?: string;

@@ -345,7 +345,7 @@ const TimeIndicator = () => {
 };
 
 const RenderDragOverlay = () => {
-  const { active, delta } = useDndContext();
+  const { active } = useDndContext();
   const { getCustomerByCode, getStaffById } = useScheduleView();
 
   // Remove manual transform application as DragOverlay handles it
