@@ -432,47 +432,6 @@ export function ScheduleView({
   const handleDragStart = (event: DragStartEvent) => {
     setActive(event.active);
   };
-  // ... (unassignTask, handleDragEnd functions - skipped for brevity in replace block, keep them identical if possible or just target the return)
-  // Wait, I cannot easily replace just the return without including the HUGE logic functions in between if I target 'export function ...'
-  // I should target the return statement specifically if possible, OR declare the constant outside.
-  // The plan was "Define TOTAL_TIMELINE_WIDTH constant". It can be outside the component.
-
-  // Let's declare the constant at the top of the file layout section (around line 67) and then update the RETURN statement layout.
-
-  // RE-STRATEGIZING:
-  // 1. Add constant definition near other constants.
-  // 2. Update the main return layout div style.
-  // 3. Update the scroll area width style.
-
-  // This tool call is attempting to do too much/replacing wrong block. I will cancel and split.
-
-  const { customers: allCustomers } = useCustomer();
-  const { toast } = useToast();
-  const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents } = useOrder();
-
-  const [isClient, setIsClient] = React.useState(false);
-  const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
-  const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
-  const [active, setActive] = React.useState<Active | null>(null);
-
-  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
-  const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
-
-  const dailySchedule = React.useMemo(() => {
-    if (!scheduleEvents) return [];
-    return scheduleEvents.filter(event => {
-      const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-      return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
-    });
-  }, [scheduleEvents, currentDate]);
-
-  React.useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActive(event.active);
-  };
 
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
     if (!eventToUnassign.rawOrderId) return;
