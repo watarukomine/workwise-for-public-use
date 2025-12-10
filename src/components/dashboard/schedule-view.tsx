@@ -64,6 +64,7 @@ const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
 const STAFF_COL_WIDTH = 144;
 const STATUS_COL_WIDTH = 120;
+const TOTAL_TIMELINE_WIDTH = STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH;
 
 const timeStringToDate = (timeStr: string, baseDate: Date) => {
   if (!/^\d{2}:\d{2}$/.test(timeStr)) {
@@ -397,11 +398,54 @@ const useScheduleView = () => {
   return context;
 }
 
+
 export function ScheduleView({
   staffData,
   currentDate,
   statuses,
 }: ScheduleViewProps) {
+
+  const { customers: allCustomers } = useCustomer();
+  const { toast } = useToast();
+  const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents } = useOrder();
+
+  const [isClient, setIsClient] = React.useState(false);
+  const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
+  const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
+  const [active, setActive] = React.useState<Active | null>(null);
+
+  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
+  const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
+
+  const dailySchedule = React.useMemo(() => {
+    if (!scheduleEvents) return [];
+    return scheduleEvents.filter(event => {
+      const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+      return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+    });
+  }, [scheduleEvents, currentDate]);
+
+  React.useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActive(event.active);
+  };
+  // ... (unassignTask, handleDragEnd functions - skipped for brevity in replace block, keep them identical if possible or just target the return)
+  // Wait, I cannot easily replace just the return without including the HUGE logic functions in between if I target 'export function ...'
+  // I should target the return statement specifically if possible, OR declare the constant outside.
+  // The plan was "Define TOTAL_TIMELINE_WIDTH constant". It can be outside the component.
+
+  // Let's declare the constant at the top of the file layout section (around line 67) and then update the RETURN statement layout.
+
+  // RE-STRATEGIZING:
+  // 1. Add constant definition near other constants.
+  // 2. Update the main return layout div style.
+  // 3. Update the scroll area width style.
+
+  // This tool call is attempting to do too much/replacing wrong block. I will cancel and split.
+
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
   const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents } = useOrder();
@@ -821,8 +865,9 @@ export function ScheduleView({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
+
         <TooltipProvider>
-          <div className="space-y-6">
+          <div className="space-y-6" style={{ maxWidth: `${TOTAL_TIMELINE_WIDTH + 2}px` }}>
             <div className="sticky top-[65px] bg-background/95 backdrop-blur-sm z-20 py-4">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                 <div className="md:col-span-3">
@@ -837,7 +882,7 @@ export function ScheduleView({
             <div>
               <div>
                 <ScrollArea className="w-full border rounded-md" style={{ height: 'calc(100vh - 350px)' }}>
-                  <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px` }}>
+                  <div className="relative" style={{ width: `${TOTAL_TIMELINE_WIDTH}px` }}>
 
                     {/* Header Row - Now inside ScrollArea for perfect alignment */}
                     <div className="sticky top-0 z-40 flex h-[34px] border-b bg-background/95 backdrop-blur-sm">
