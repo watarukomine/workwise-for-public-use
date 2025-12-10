@@ -110,11 +110,16 @@ export function AnalyticsDashboard() {
 
     const handleExportExcel = () => {
         const title = `${format(filteredData.start, 'yyyy年MM月')}活動レポート`;
+
+        // Calculate total tasks for percentage
+        const totalTasks = staffWorkloadData.reduce((sum, d) => sum + d.tasks, 0);
+
         // Flatten data for export
         // Export 1: Staff Summary
         const staffSheet = staffWorkloadData.map(d => ({
             'スタッフ名': d.name,
             '担当件数': d.tasks,
+            '構成比': totalTasks > 0 ? `${(d.tasks / totalTasks * 100).toFixed(1)}%` : '0.0%',
             '推定稼働時間(h)': d.hours.toFixed(1)
         }));
         exportToExcel(staffSheet, title, 'スタッフ稼働状況');
@@ -122,8 +127,17 @@ export function AnalyticsDashboard() {
 
     const handleExportPDF = async () => {
         const title = `${format(filteredData.start, 'yyyy年MM月')} 活動レポート`;
-        const headers = ['スタッフ名', '担当件数', '稼働時間(h)'];
-        const data = staffWorkloadData.map(d => [d.name, d.tasks, d.hours.toFixed(1)]);
+        const headers = ['スタッフ名', '担当件数', '構成比', '稼働時間(h)'];
+
+        // Calculate total tasks for percentage
+        const totalTasks = staffWorkloadData.reduce((sum, d) => sum + d.tasks, 0);
+
+        const data = staffWorkloadData.map(d => [
+            d.name,
+            d.tasks,
+            totalTasks > 0 ? `${(d.tasks / totalTasks * 100).toFixed(1)}%` : '0.0%',
+            d.hours.toFixed(1)
+        ]);
         await exportToPDF(title, headers, data, title);
     };
 
