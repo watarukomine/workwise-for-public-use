@@ -110,7 +110,7 @@ const DesktopNav = () => {
     }
 
     return (
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-1">
             {navItems.map((item) => (
                 <Link
                     key={item.href}
@@ -118,10 +118,10 @@ const DesktopNav = () => {
                     target={item.target ? item.target : undefined}
                     className={cn(
                         buttonVariants({ variant: pathname === item.href ? 'secondary' : 'ghost', size: 'sm' }),
-                        'font-medium'
+                        'font-medium px-2'
                     )}
                 >
-                    <item.icon className="mr-2 h-4 w-4" />
+                    <item.icon className="mr-1 h-4 w-4" />
                     {item.label}
                 </Link>
             ))}
