@@ -191,7 +191,7 @@ const PlacesAutocompleteSelector: React.FC<{
                     onSelect={() => handlePredefinedSelect(location)}
                     className="flex items-center"
                   >
-                    <UserIcon className="mr-2 h-4 w-4" />
+                    <UserIcon className="mr-2 h-4 w-4" style={{ color: (location as any).color }} />
                     <p className="truncate">{location.name}</p>
                   </CommandItem>
                 ))}
