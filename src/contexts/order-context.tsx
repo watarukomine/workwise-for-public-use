@@ -23,6 +23,7 @@ interface OrderContextType {
   orderGasUrl: string;
   setOrderGasUrl: (url: string) => void;
   error: string | null;
+  saveLocalEvent: (event: WithId<ScheduleEvent>) => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -149,39 +150,36 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
 };
 
 export function OrderProvider({ children }: { children: ReactNode }) {
-  const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
-  const [orders, setOrders] = useState<WithId<Order>[]>([]);
-  const [unassignedOrders, setUnassignedOrders] = useState<WithId<Order>[]>([]);
-  const [scheduleEvents, setScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
-  const [statuses, setStatuses] = useState<StaffStatus[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [localScheduleEvents, setLocalScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
 
-  // Initialize with default, will update from localStorage in useEffect
-  const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
-
-  const [error, setErrorState] = useState<string | null>(null);
-  const { allStaff, isLoading: isStaffLoading } = useSelectedStaff();
-  const URL_STORAGE_KEY = 'custom_order_gas_url';
-
-  const setOrderGasUrl = (url: string) => {
-    setOrderGasUrlState(url);
-    try {
-      localStorage.setItem(URL_STORAGE_KEY, url);
-    } catch (e) {
-      console.warn('Failed to save order GAS URL to localStorage:', e);
-    }
-  };
-
+  // Load local events on mount
   useEffect(() => {
-    // Load saved URL from localStorage
     try {
-      const savedUrl = localStorage.getItem(URL_STORAGE_KEY);
-      if (savedUrl) {
-        setOrderGasUrlState(savedUrl);
+      const saved = localStorage.getItem('local_schedule_events');
+      if (saved) {
+        setLocalScheduleEvents(JSON.parse(saved));
       }
     } catch (e) {
-      console.warn('Failed to load saved URL:', e);
+      console.warn('Failed to load local schedule events:', e);
     }
+  }, []);
+
+  const saveLocalEvent = useCallback((event: WithId<ScheduleEvent>) => {
+    setLocalScheduleEvents(prev => {
+      const exists = prev.some(e => e.id === event.id);
+      let newEvents;
+      if (exists) {
+        newEvents = prev.map(e => e.id === event.id ? event : e);
+      } else {
+        newEvents = [...prev, event];
+      }
+      try {
+        localStorage.setItem('local_schedule_events', JSON.stringify(newEvents));
+      } catch (e) {
+        console.error('Failed to save local event:', e);
+      }
+      return newEvents;
+    });
   }, []);
 
   const fetchAndProcessData = useCallback(async (showLoading = true) => {
@@ -224,19 +222,23 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     if (isLoading || isStaffLoading) return;
 
     try {
-      const { orders, scheduleEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff);
+      const { orders, scheduleEvents: backendEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff);
+
+      // Merge backend events with local events
+      // Prioritize local events if IDs clash (unlikely for generic tasks)
+      setScheduleEvents([...backendEvents, ...localScheduleEvents]);
+
       setOrders(orders);
-      setScheduleEvents(scheduleEvents);
       setStatuses(statuses);
       setUnassignedOrders(unassignedOrders);
     } catch (e) {
       console.error("Error processing order data:", e);
       // Optionally set an error state here, but crucial to ensure app doesn't hang
     }
-  }, [rawOrdersData, allStaff, isLoading, isStaffLoading]);
+  }, [rawOrdersData, allStaff, isLoading, isStaffLoading, localScheduleEvents]);
 
 
-  const value: OrderContextType = {
+  const value: OrderContextType & { saveLocalEvent: (event: WithId<ScheduleEvent>) => void } = {
     rawOrdersData,
     orders,
     unassignedOrders,
@@ -249,6 +251,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     orderGasUrl,
     setOrderGasUrl,
     error,
+    saveLocalEvent,
   };
 
   return (
@@ -265,3 +268,4 @@ export function useOrder() {
   }
   return context;
 }
+

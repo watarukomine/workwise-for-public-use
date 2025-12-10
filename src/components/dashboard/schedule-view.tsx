@@ -407,7 +407,7 @@ export function ScheduleView({
 
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
-  const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents } = useOrder();
+  const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent } = useOrder();
 
   const [isClient, setIsClient] = React.useState(false);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
@@ -432,6 +432,17 @@ export function ScheduleView({
   const handleDragStart = (event: DragStartEvent) => {
     setActive(event.active);
   };
+
+  // ... (lines 436-580 are mostly unchanged, just jumping to specific updates around line 590)
+
+  // Wait, I can't use replace_file_content for non-contiguous blocks like this easily.
+  // I need to use multi_replace for schedule-view.tsx.
+  // The first chunk is adding saveLocalEvent to destructuring.
+  // The second chunk is updating handleDragEnd to use saveLocalEvent.
+  // The third chunk is fixing the icon logic.
+
+  // Cancelling this tool call to use multi_replace.
+
 
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
     if (!eventToUnassign.rawOrderId) return;
@@ -587,9 +598,11 @@ export function ScheduleView({
 
       const taskStart = getNewStartFromDrop();
 
+      let newEvent: WithId<ScheduleEvent> | undefined;
+
       // Optimistic UI Update
       if (isGeneric) {
-        const newEvent: WithId<ScheduleEvent> = {
+        newEvent = {
           id: `event-${Date.now()}`,
           title: order.taskDetails, description: '',
           staffId: newStaffId, locationId: '',
@@ -597,7 +610,7 @@ export function ScheduleView({
           end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
           raw: {}
         };
-        setScheduleEvents(prev => [...prev, newEvent]);
+        setScheduleEvents(prev => [...prev, newEvent!]);
       } else {
         const tripId = `trip-${order.rawOrderId}`;
         const customer = getCustomerByCode(order.customerCode);
@@ -623,15 +636,8 @@ export function ScheduleView({
       (async () => {
         try {
           if (isGeneric) {
-            await updateSheetStatus({
-              gasUrl: ORDER_GAS_URL,
-              eventTitle: order.taskDetails,
-              staffName: staff.name,
-              statusValue: '未着手', // Or appropriate status
-              scheduledTime: taskStart.toISOString(),
-              timestamp: new Date().toISOString()
-            });
-            await refetchOrders();
+            // Save to localStorage using the context method
+            if (newEvent) saveLocalEvent(newEvent);
             toast({ title: "汎用タスクを追加しました" });
           } else {
             await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
@@ -1160,7 +1166,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     <div className="space-y-1">
       <p className="font-bold">
         {customerName || line1}
-        {(!isTravelEvent && !['業務', '休憩'].includes(event.title || '')) && <span className="ml-1">({equipmentSymbol})</span>}
+        {(!isTravelEvent && !['移動', '業務', '休憩'].some(t => (event.title || '').includes(t))) && <span className="ml-1">({equipmentSymbol})</span>}
         <span className="ml-2">{formatTime(event.start)}</span>
       </p>
       {!isTravelEvent && (tireSize || honsu) && (
