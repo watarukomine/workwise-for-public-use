@@ -22,22 +22,22 @@ import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import { cn } from '@/lib/utils';
+import { cn, lightenColor } from '@/lib/utils';
 
 interface StaffTableProps {
-    staff: (WithId<Staff> & { Order_URL?: string })[] | null;
-    isLoading: boolean;
+  staff: (WithId<Staff> & { Order_URL?: string })[] | null;
+  isLoading: boolean;
 }
 
 export function StaffTable({ staff, isLoading }: StaffTableProps) {
   const { profile } = useUserProfile();
-  const { 
-    pendingSelectedStaffIds, 
+  const {
+    pendingSelectedStaffIds,
     togglePendingStaffSelection,
     applyPendingSelection,
     appliedSelectedStaffIds,
   } = useSelectedStaff();
-  
+
   const staffList = staff || [];
   const isAdmin = profile?.role === 'admin';
   const isAllSelected = staffList.length > 0 && pendingSelectedStaffIds.length === staffList.length;
@@ -72,16 +72,16 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>スタッフ一覧</CardTitle>
-          {isAdmin && (
-            <Button 
-                onClick={applyPendingSelection}
-                disabled={!isSelectionChanged}
-            >
-                <Check className="mr-2 h-4 w-4" />
-                選択を適用
-            </Button>
-          )}
+        <CardTitle>スタッフ一覧</CardTitle>
+        {isAdmin && (
+          <Button
+            onClick={applyPendingSelection}
+            disabled={!isSelectionChanged}
+          >
+            <Check className="mr-2 h-4 w-4" />
+            選択を適用
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         <div className="rounded-md border">
@@ -89,14 +89,14 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
             <TableHeader>
               <TableRow>
                 {isAdmin && (
-                    <TableHead className="w-[50px]">
-                        <Checkbox
-                            checked={isAllSelected}
-                            onCheckedChange={handleSelectAll}
-                            aria-label="すべてのスタッフを選択"
-                            disabled={staffList.length === 0}
-                        />
-                    </TableHead>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={isAllSelected}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="すべてのスタッフを選択"
+                      disabled={staffList.length === 0}
+                    />
+                  </TableHead>
                 )}
                 <TableHead>スタッフ名</TableHead>
                 <TableHead>メールアドレス</TableHead>
@@ -107,33 +107,34 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                      スタッフ情報を読み込んでいます...
-                    </TableCell>
-                  </TableRow>
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    スタッフ情報を読み込んでいます...
+                  </TableCell>
+                </TableRow>
               ) : staffList && staffList.length > 0 ? (
                 staffList.map((member) => (
-                  <TableRow 
-                    key={member.id} 
+                  <TableRow
+                    key={member.id}
                     data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''}
                     onDoubleClick={() => handleRowDoubleClick(member)}
                     className={cn(isAdmin && member.Order_URL && "cursor-pointer hover:bg-muted/50")}
+                    style={member.color ? { backgroundColor: lightenColor(member.color, 0.85) } : {}}
                   >
                     {isAdmin && (
-                        <TableCell>
-                            <Checkbox
-                                checked={pendingSelectedStaffIds.includes(member.id)}
-                                onCheckedChange={() => togglePendingStaffSelection(member.id)}
-                                aria-label={`${member.name}を選択`}
-                            />
-                        </TableCell>
+                      <TableCell>
+                        <Checkbox
+                          checked={pendingSelectedStaffIds.includes(member.id)}
+                          onCheckedChange={() => togglePendingStaffSelection(member.id)}
+                          aria-label={`${member.name}を選択`}
+                        />
+                      </TableCell>
                     )}
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div 
-                          className="h-6 w-6 rounded-full border" 
-                          style={{ backgroundColor: member.color }} 
+                        <div
+                          className="h-6 w-6 rounded-full border"
+                          style={{ backgroundColor: member.color }}
                         />
                         <span className="font-medium">{member.name}</span>
                       </div>
@@ -141,18 +142,18 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                     <TableCell className="text-muted-foreground">{member.email}</TableCell>
                     <TableCell className="text-muted-foreground">{member['母店']}</TableCell>
                     <TableCell>
-                        <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>
-                            {member.role}
-                        </Badge>
+                      <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>
+                        {member.role}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground font-mono text-xs">{member.id}</TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
-                      表示するスタッフ情報がありません。
-                    </TableCell>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    表示するスタッフ情報がありません。
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
