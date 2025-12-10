@@ -618,13 +618,26 @@ export function ScheduleView({
           staffId: newStaffId, locationId: '',
           start: taskStart.toISOString(),
           end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
-          raw: {}
+          raw: {},
+          // Add missing Order fields
+          customerCode: '',
+          customerName: '',
+          address: '',
+          taskDetails: order.taskDetails,
+          serviceType: '',
+          status: '未割当',
+          scheduledDate: '',
+          estimatedDuration: order.estimatedDuration,
+          value: 0,
+          staffName: staff.name,
+          equipmentStatus: '',
         };
         setScheduleEvents(prev => [...prev, newEvent!]);
       } else {
         const tripId = `trip-${order.rawOrderId}`;
         const customer = getCustomerByCode(order.customerCode);
         const travelEvent: WithId<ScheduleEvent> = {
+          ...order, // Spread order properties
           id: `${tripId}-travel`, tripId,
           title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
           staffId: newStaffId, locationId: customer?.userCode || '',
@@ -632,6 +645,7 @@ export function ScheduleView({
           rawOrderId: order.rawOrderId, raw: order.raw,
         };
         const taskEvent: WithId<ScheduleEvent> = {
+          ...order, // Spread order properties
           id: `${tripId}-task`, tripId,
           title: order.taskDetails,
           staffId: newStaffId, locationId: customer?.userCode || '',
@@ -721,7 +735,19 @@ export function ScheduleView({
           staffId: dialogState.staffId, locationId: '',
           start: newStart.toISOString(),
           end: newEnd.toISOString(),
-          raw: {}
+          raw: {},
+          // Add missing Order fields
+          customerCode: '',
+          customerName: '',
+          address: '',
+          taskDetails: title,
+          serviceType: '',
+          status: '未割当',
+          scheduledDate: '',
+          estimatedDuration: (newEnd.getTime() - newStart.getTime()) / (1000 * 60),
+          value: 0,
+          staffName: staff.name,
+          equipmentStatus: '',
         };
         setScheduleEvents(prev => [...prev, newEvent]);
       } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {

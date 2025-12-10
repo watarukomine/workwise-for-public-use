@@ -64,6 +64,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
             : addMinutes(scheduledTime, mappedOrder.estimatedDuration);
 
           const taskEvent: WithId<ScheduleEvent> = {
+            ...mappedOrder, // Spread all order properties to satisfy inheritance
             id: `${tripId}-task`,
             tripId,
             title: mappedOrder.taskDetails,
@@ -76,6 +77,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
           };
 
           const travelEvent: WithId<ScheduleEvent> = {
+            ...mappedOrder, // Spread all order properties
             id: `${tripId}-travel`,
             tripId,
             title: `移動: ${mappedOrder.customerName || mappedOrder.taskDetails.split('\n')[0]}`,

@@ -57,6 +57,7 @@ export type Order = {
   estimatedDuration: number;
   value: number;
   staffName?: string;
+  staffId?: string; // Added field
   equipmentStatus?: string;
   tireSize?: string;
   taskCalendarEventId?: string;
