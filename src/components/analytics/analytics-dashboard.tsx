@@ -120,11 +120,11 @@ export function AnalyticsDashboard() {
         exportToExcel(staffSheet, title, 'スタッフ稼働状況');
     };
 
-    const handleExportPDF = () => {
+    const handleExportPDF = async () => {
         const title = `${format(filteredData.start, 'yyyy年MM月')} 活動レポート`;
         const headers = ['スタッフ名', '担当件数', '稼働時間(h)'];
         const data = staffWorkloadData.map(d => [d.name, d.tasks, d.hours.toFixed(1)]);
-        exportToPDF(title, headers, data, title);
+        await exportToPDF(title, headers, data, title);
     };
 
     if (isOrdersLoading || isStaffLoading) {

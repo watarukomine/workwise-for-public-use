@@ -23,14 +23,29 @@ export const exportToExcel = <T extends object>(data: T[], fileName: string, she
  * @param data テーブルのデータ配列（2次元配列）
  * @param fileName 保存するファイル名
  */
-export const exportToPDF = (title: string, headers: string[], data: any[][], fileName: string) => {
+export const exportToPDF = async (title: string, headers: string[], data: any[][], fileName: string) => {
     const doc = new jsPDF();
 
-    // 日本語フォント対応が必要な場合、本来はフォント追加が必要ですが、
-    // クライアントサイドのみでの簡易実装としては、英数字中心のレポートにするか、
-    // あるいは画像化して貼り付けるアプローチがありますが、今回は標準フォントで実装します。
-    // ※日本語は文字化けする可能性があるため、実運用ではフォント読み込みが必要です。
-    // ここでは一旦、基本的な英数字データが主力と仮定しつつ、注意書きなどを入れます。
+    try {
+        const fontResponse = await fetch('/fonts/NotoSansJP-Regular.ttf');
+        if (fontResponse.ok) {
+            const fontBuffer = await fontResponse.arrayBuffer();
+            const fontUint8Array = new Uint8Array(fontBuffer);
+            let fontBinary = '';
+            for (let i = 0; i < fontUint8Array.length; i++) {
+                fontBinary += String.fromCharCode(fontUint8Array[i]);
+            }
+            const fontBase64 = btoa(fontBinary);
+
+            doc.addFileToVFS('NotoSansJP.ttf', fontBase64);
+            doc.addFont('NotoSansJP.ttf', 'NotoSansJP', 'normal');
+            doc.setFont('NotoSansJP');
+        } else {
+            console.error('Failed to load font: response not ok');
+        }
+    } catch (error) {
+        console.error('Failed to load Japanese font, using default:', error);
+    }
 
     doc.text(title, 14, 22);
 
@@ -38,7 +53,7 @@ export const exportToPDF = (title: string, headers: string[], data: any[][], fil
         head: [headers],
         body: data,
         startY: 30,
-        styles: { font: 'helvetica' }, // 日本語フォントがないため、日本語は文字化けする可能性が高いことに注意
+        styles: { font: 'NotoSansJP' },
     });
 
     doc.save(`${fileName}.pdf`);
