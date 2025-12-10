@@ -835,35 +835,40 @@ export function ScheduleView({
             </div>
 
             <div>
-              <div className="sticky top-[280px] z-30 flex bg-background/95 backdrop-blur-sm border-y">
-                <div className="flex-shrink-0 font-semibold p-2 sticky left-0 z-10 bg-inherit" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
-                <div className="relative h-[34px] flex-1">
-                  {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                    <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
-                      <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex-shrink-0 font-semibold p-2 border-l sticky right-0 z-10 bg-inherit" style={{ width: `${STATUS_COL_WIDTH}px` }}>ステータス</div>
-              </div>
-              <ScrollArea className="w-full" style={{ height: 'calc(100vh - 400px)' }}>
-                <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px` }}>
-                  <div className="relative space-y-2">
-                    {isToday(currentDate) && (
-                      <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
-                        <TimeIndicator />
+              <div>
+                <ScrollArea className="w-full border rounded-md" style={{ height: 'calc(100vh - 350px)' }}>
+                  <div className="relative" style={{ width: `${STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH}px` }}>
+
+                    {/* Header Row - Now inside ScrollArea for perfect alignment */}
+                    <div className="sticky top-0 z-40 flex h-[34px] border-b bg-background/95 backdrop-blur-sm">
+                      <div className="sticky left-0 z-50 flex-shrink-0 font-semibold p-2 border-r bg-background" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                      <div className="relative flex-1 h-full">
+                        {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                          <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
+                            <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                    {staffData?.map((staff) => {
-                      const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                      const status = statuses.find(s => s.staffId === staff.id);
-                      return (
-                        <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
-                      );
-                    })}
+                      <div className="sticky right-0 z-50 flex-shrink-0 font-semibold p-2 border-l bg-background" style={{ width: `${STATUS_COL_WIDTH}px` }}>ステータス</div>
+                    </div>
+
+                    <div className="relative space-y-2 pb-2">
+                      {isToday(currentDate) && (
+                        <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
+                          <TimeIndicator />
+                        </div>
+                      )}
+                      {staffData?.map((staff) => {
+                        const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                        const status = statuses.find(s => s.staffId === staff.id);
+                        return (
+                          <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              </ScrollArea>
+                </ScrollArea>
+              </div>
             </div>
           </div>
 
