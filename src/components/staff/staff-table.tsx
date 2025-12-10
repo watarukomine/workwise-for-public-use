@@ -67,6 +67,8 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     }
   };
 
+  const areaColors: Record<string, string> = { '横浜店': 'bg-blue-50', '東名川崎店': 'bg-green-50', '綾瀬店': 'bg-orange-50' };
+
   const isSelectionChanged = JSON.stringify(pendingSelectedStaffIds.sort()) !== JSON.stringify(appliedSelectedStaffIds.sort());
 
   return (
@@ -113,42 +115,44 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   </TableCell>
                 </TableRow>
               ) : staffList && staffList.length > 0 ? (
-                staffList.map((member) => (
-                  <TableRow
-                    key={member.id}
-                    data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''}
-                    onDoubleClick={() => handleRowDoubleClick(member)}
-                    className={cn(isAdmin && member.Order_URL && "cursor-pointer hover:bg-muted/50")}
-                    style={member.color ? { backgroundColor: lightenColor(member.color, 0.85) } : {}}
-                  >
-                    {isAdmin && (
+                staffList.map((member) => {
+                  const areaBgClass = member['母店'] ? areaColors[member['母店']] || '' : '';
+                  return (
+                    <TableRow
+                      key={member.id}
+                      data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''}
+                      onDoubleClick={() => handleRowDoubleClick(member)}
+                      className={cn(isAdmin && member.Order_URL && "cursor-pointer hover:bg-muted/50", areaBgClass)}
+                    >
+                      {isAdmin && (
+                        <TableCell>
+                          <Checkbox
+                            checked={pendingSelectedStaffIds.includes(member.id)}
+                            onCheckedChange={() => togglePendingStaffSelection(member.id)}
+                            aria-label={`${member.name}を選択`}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
-                        <Checkbox
-                          checked={pendingSelectedStaffIds.includes(member.id)}
-                          onCheckedChange={() => togglePendingStaffSelection(member.id)}
-                          aria-label={`${member.name}を選択`}
-                        />
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="h-6 w-6 rounded-full border"
+                            style={{ backgroundColor: member.color }}
+                          />
+                          <span className="font-medium">{member.name}</span>
+                        </div>
                       </TableCell>
-                    )}
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="h-6 w-6 rounded-full border"
-                          style={{ backgroundColor: member.color }}
-                        />
-                        <span className="font-medium">{member.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{member.email}</TableCell>
-                    <TableCell className="text-muted-foreground">{member['母店']}</TableCell>
-                    <TableCell>
-                      <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>
-                        {member.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-xs">{member.id}</TableCell>
-                  </TableRow>
-                ))
+                      <TableCell className="text-muted-foreground">{member.email}</TableCell>
+                      <TableCell className="text-muted-foreground">{member['母店']}</TableCell>
+                      <TableCell>
+                        <Badge variant={member.role === 'admin' ? 'default' : 'secondary'}>
+                          {member.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-xs">{member.id}</TableCell>
+                    </TableRow>
+                  );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center">
