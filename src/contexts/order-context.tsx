@@ -150,6 +150,41 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
 };
 
 export function OrderProvider({ children }: { children: ReactNode }) {
+  const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
+  const [orders, setOrders] = useState<WithId<Order>[]>([]);
+  const [unassignedOrders, setUnassignedOrders] = useState<WithId<Order>[]>([]);
+  const [scheduleEvents, setScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
+  const [statuses, setStatuses] = useState<StaffStatus[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Initialize with default, will update from localStorage in useEffect
+  const [currentOrderGasUrl, setCurrentOrderGasUrl] = useState(ORDER_GAS_URL);
+
+  const [error, setErrorState] = useState<string | null>(null);
+  const { allStaff, isLoading: isStaffLoading } = useSelectedStaff();
+  const URL_STORAGE_KEY = 'custom_order_gas_url';
+
+  const setOrderGasUrl = (url: string) => {
+    setCurrentOrderGasUrl(url);
+    try {
+      localStorage.setItem(URL_STORAGE_KEY, url);
+    } catch (e) {
+      console.warn('Failed to save order GAS URL to localStorage:', e);
+    }
+  };
+
+  useEffect(() => {
+    // Load saved URL from localStorage
+    try {
+      const savedUrl = localStorage.getItem(URL_STORAGE_KEY);
+      if (savedUrl) {
+        setCurrentOrderGasUrl(savedUrl);
+      }
+    } catch (e) {
+      console.warn('Failed to load saved URL:', e);
+    }
+  }, []);
+
   const [localScheduleEvents, setLocalScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
 
   // Load local events on mount
@@ -184,7 +219,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   const fetchAndProcessData = useCallback(async (showLoading = true) => {
     // Use current state orderGasUrl
-    if (!orderGasUrl) {
+    if (!currentOrderGasUrl) {
       setErrorState('GASのURLが設定されていません。');
       if (showLoading) setIsLoading(false);
       return;
@@ -197,7 +232,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setErrorState(null);
 
     try {
-      const result = await fetchGasData(orderGasUrl);
+      const result = await fetchGasData(currentOrderGasUrl);
       if (result.error && result.message) throw new Error(result.message);
 
       const newRawOrderData = result.data || (Array.isArray(result) ? result : []);
@@ -210,7 +245,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } finally {
       if (showLoading) setIsLoading(false);
     }
-  }, [orderGasUrl]);
+  }, [currentOrderGasUrl]);
 
   // Initial data fetch - Triggered when orderGasUrl is set (initially or from storage)
   useEffect(() => {
@@ -248,7 +283,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     statuses,
     refetchOrders: () => fetchAndProcessData(false), // Always refetch without global loading
     isLoading,
-    orderGasUrl,
+    orderGasUrl: currentOrderGasUrl,
     setOrderGasUrl,
     error,
     saveLocalEvent,

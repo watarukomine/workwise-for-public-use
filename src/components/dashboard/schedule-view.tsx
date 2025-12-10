@@ -137,7 +137,7 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
     <div className="space-y-1">
       <p className="font-bold">
         {order.customerName || line1}
-        <span className="ml-1">({equipmentSymbol})</span>
+        {!['移動', '業務', '休憩'].some(t => (line1 || '').includes(t)) && <span className="ml-1">({equipmentSymbol})</span>}
         {scheduledTime && <span className="ml-2">{scheduledTime}</span>}
       </p>
       {(order.tireSize || order['本数']) && (
@@ -568,7 +568,17 @@ export function ScheduleView({
       // Backend Update
       (async () => {
         try {
-          if (draggedEvent.rawOrderId) {
+          if (draggedEvent.id.startsWith('event-')) {
+            const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+            const updatedEvent = {
+              ...draggedEvent,
+              staffId: newStaffId,
+              start: newStart.toISOString(),
+              end: addMinutes(newStart, duration).toISOString()
+            };
+            saveLocalEvent(updatedEvent);
+            toast({ title: "スケジュールを更新しました" });
+          } else if (draggedEvent.rawOrderId) {
             let taskStart = newStart;
             if (draggedEvent.id.endsWith('-travel')) {
               const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
@@ -580,9 +590,9 @@ export function ScheduleView({
               staffName: newStaff.name,
               scheduledTime: taskStart.toISOString(),
             });
+            toast({ title: "スケジュールを更新しました" });
+            await refetchOrders();
           }
-          toast({ title: "スケジュールを更新しました" });
-          await refetchOrders();
         } catch (e: any) {
           toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
           setScheduleEvents(previousSchedule); // Revert on error
