@@ -1,7 +1,7 @@
 
 'use client';
 import Link from 'next/link';
-import Image from 'next/image';
+// import Image from 'next/image'; // Unused now
 import { usePathname, useRouter } from 'next/navigation';
 import {
     Users,
@@ -212,7 +212,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <SidebarHeader>
                         <div className="flex items-center gap-2 p-2">
                             <Button variant="ghost" size="icon" className="shrink-0 text-primary hover:bg-primary/10 rounded-full">
-                                <Image src="/icons/icon-192x192.png" alt="Logo" width={24} height={24} className="rounded-sm" />
+                                {/* Use standard img tag to avoid Next.js Image optimization issues with local assets if they occur */}
+                                {/* Use standard img tag to avoid Next.js Image optimization issues with local assets if they occur */}
+                                <img src="/icons/icon-192x192.png" alt="Logo" width={24} height={24} className="rounded-sm" />
                             </Button>
                             <h1 className="text-xl font-bold tracking-tight text-primary">WorkWise</h1>
                         </div>
@@ -277,7 +279,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                         <Button variant="ghost" size="icon" className="shrink-0 text-primary hover:bg-primary/10 rounded-full">
-                            <Image src="/icons/icon-192x192.png" alt="Logo" width={24} height={24} className="rounded-sm" />
+                            {/* Use standard img tag to avoid Next.js Image optimization issues with local assets if they occur */}
+                            <img src="/icons/icon-192x192.png" alt="Logo" width={24} height={24} className="rounded-sm" />
                         </Button>
                         <h1 className="text-xl font-bold tracking-tight text-primary">WorkWise</h1>
                     </div>
