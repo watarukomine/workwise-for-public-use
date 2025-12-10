@@ -98,7 +98,7 @@ async function generatePDF() {
             checkPageBreak(15);
             y += 5;
             doc.setFontSize(14);
-            doc.setFont('IPAexGothic', 'bold'); // fake bold if needed or just normal
+            doc.setFont('IPAexGothic', 'normal'); // Use normal as we don't have bold font file
             doc.text(line.replace('## ', ''), margin, y);
             y += 10;
             doc.setFontSize(10);
