@@ -14,8 +14,8 @@ import { Download } from 'lucide-react';
 import { Staff, Order } from '@/lib/types';
 
 export function AnalyticsDashboard() {
-    const { allOrders, isLoading: isOrdersLoading } = useOrder();
-    const { allStaff, isLoading: isStaffLoading } = useSelectedStaff();
+    const { orders: allOrders = [], isLoading: isOrdersLoading } = useOrder();
+    const { allStaff = [], isLoading: isStaffLoading } = useSelectedStaff();
     const [dateRange, setDateRange] = useState('this-month');
 
     // Filter Logic
