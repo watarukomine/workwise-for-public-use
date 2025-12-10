@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useOrder } from '@/contexts/order-context';
-import useSelectedStaff from '@/contexts/selected-staff-context';
+import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { StaffWorkloadChart } from './staff-workload-chart';
 import { ShopDistributionChart } from './shop-distribution-chart';
 import { Button } from '@/components/ui/button';
