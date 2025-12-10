@@ -362,14 +362,14 @@ const RenderDragOverlay = () => {
     <DragOverlay modifiers={[snapCenterToCursor]} dropAnimation={null}>
       <div>
         {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
-          <OrderChip order={activeItem} style={{ width: `${minutesToPixels(activeItem.estimatedDuration || 60)}px` }} isOverlay={true} />
+          <OrderChip order={activeItem as WithId<Order>} style={{ width: `${minutesToPixels((activeItem as WithId<Order>).estimatedDuration || 60)}px` }} isOverlay={true} />
         ) : activeItem && 'staffId' in activeItem ? (
           (() => {
-            const staff = getStaffById(activeItem.staffId);
+            const staff = getStaffById((activeItem as WithId<ScheduleEvent>).staffId);
             if (!staff) return null;
             return (
               <DraggableEvent
-                event={activeItem}
+                event={activeItem as WithId<ScheduleEvent>}
                 staff={staff}
                 getCustomerByCode={getCustomerByCode}
                 onDoubleClick={() => { }}
@@ -491,7 +491,7 @@ export function ScheduleView({
       return;
     }
 
-    const item = active.data.current as (WithId<Order> | WithId<ScheduleEvent>);
+    const item = active.data.current as unknown as (WithId<Order> | WithId<ScheduleEvent>);
 
     const previousSchedule = [...scheduleEvents];
     const previousUnassigned = [...unassignedOrders];
@@ -499,7 +499,7 @@ export function ScheduleView({
     // --- Dropping back to unassigned area ---
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
       if (item.rawOrderId) {
-        await unassignTask(item);
+        await unassignTask(item as WithId<ScheduleEvent>);
       } else {
         setScheduleEvents(prev => prev.filter(e => e.id !== item.id));
         toast({ title: '汎用タスクを削除しました' });

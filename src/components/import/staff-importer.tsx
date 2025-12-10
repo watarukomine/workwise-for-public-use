@@ -13,7 +13,7 @@ import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { useRouter } from 'next/navigation';
-import { fetchStaffDataFromGAS } from '@/lib/auth';
+import { fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
 
 // A simple type guard to check if the error is a fetch error
 function isFetchError(error: unknown): error is TypeError {
@@ -30,7 +30,7 @@ export function StaffImporter() {
   const [error, setError] = React.useState<string | null>(null);
   const [importSuccess, setImportSuccess] = React.useState(false);
   const [columnHeaders, setColumnHeaders] = React.useState<string[] | null>(null);
-  
+
   const { setAllStaff } = useSelectedStaff();
   const { toast } = useToast();
   const router = useRouter();
@@ -54,28 +54,33 @@ export function StaffImporter() {
     setRawData(null);
     setImportSuccess(false);
     setColumnHeaders(null);
-    localStorage.setItem(STAFF_GAS_URL_KEY, gasUrl); 
+    localStorage.setItem(STAFF_GAS_URL_KEY, gasUrl);
 
     try {
-      // Use the function from auth.ts which now reads from localStorage
-      const staffList = await fetchStaffDataFromGAS(); 
+      // Use the function from context
+      const { staffList, error: fetchError } = await fetchStaffDataFromGAS();
+
+      if (fetchError || !staffList) {
+        throw new Error(fetchError || 'スタッフデータの取得に失敗しました。');
+      }
+
       setAllStaff(staffList);
-      
+
       // For preview purposes, we still need to fetch and display raw data here
       const response = await fetch(gasUrl, { cache: 'no-store' });
-       if (!response.ok) {
+      if (!response.ok) {
         throw new Error(`HTTPエラー: ${response.status} ${response.statusText}`);
       }
       const result = await response.json();
       setRawData(result);
-      
+
       let dataToProcess = result.data || (Array.isArray(result) ? result : []);
 
       if (dataToProcess) {
-         setTableData(dataToProcess);
-         if (dataToProcess.length > 0) {
-           setColumnHeaders(Object.keys(dataToProcess[0]));
-         }
+        setTableData(dataToProcess);
+        if (dataToProcess.length > 0) {
+          setColumnHeaders(Object.keys(dataToProcess[0]));
+        }
       }
 
       setImportSuccess(true);
@@ -88,29 +93,29 @@ export function StaffImporter() {
 
     } catch (e: unknown) {
       console.error('GAS Fetch Error:', e);
-       if (isFetchError(e)) {
-         if (e.message.includes('Failed to fetch')) {
-             setError('データの取得に失敗しました。CORSポリシーまたはネットワークの問題が考えられます。GAS側で正しくCORSヘッダーが設定されているか確認してください。');
-         } else {
-            setError(`予期せぬネットワークエラー: ${e.message}`);
-         }
-       } else if (e instanceof Error) {
+      if (isFetchError(e)) {
+        if (e.message.includes('Failed to fetch')) {
+          setError('データの取得に失敗しました。CORSポリシーまたはネットワークの問題が考えられます。GAS側で正しくCORSヘッダーが設定されているか確認してください。');
+        } else {
+          setError(`予期せぬネットワークエラー: ${e.message}`);
+        }
+      } else if (e instanceof Error) {
         setError(`エラーが発生しました: ${e.message}`);
-       } else {
+      } else {
         setError('不明なエラーが発生しました。');
-       }
+      }
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   const headers = tableData && tableData.length > 0 ? Object.keys(tableData[0]) : [];
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-           <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
             <Users className="h-6 w-6" />
             スタッフデータ取得
           </CardTitle>
@@ -138,7 +143,7 @@ export function StaffImporter() {
           </div>
         </CardContent>
       </Card>
-      
+
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
@@ -147,7 +152,7 @@ export function StaffImporter() {
         </Alert>
       )}
 
-       {importSuccess && (
+      {importSuccess && (
         <Alert variant="default" className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
           <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-500" />
           <AlertTitle className="text-green-800 dark:text-green-400">インポート完了</AlertTitle>
@@ -161,8 +166,8 @@ export function StaffImporter() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-                <Columns className="h-6 w-6" />
-                取得データのカラム構成
+              <Columns className="h-6 w-6" />
+              取得データのカラム構成
             </CardTitle>
             <CardDescription>
               GASから取得したデータヘッダー（1行目のキー）の一覧です。この中に権限に関するカラムが存在するかご確認ください。
@@ -170,9 +175,9 @@ export function StaffImporter() {
           </CardHeader>
           <CardContent>
             <ul className="list-disc list-inside bg-muted rounded-md p-4 space-y-1 font-mono text-sm">
-                {columnHeaders.map((header) => (
-                    <li key={header}>{header}</li>
-                ))}
+              {columnHeaders.map((header) => (
+                <li key={header}>{header}</li>
+              ))}
             </ul>
           </CardContent>
         </Card>
@@ -195,15 +200,15 @@ export function StaffImporter() {
       )}
 
       {tableData && (
-         <Card>
-           <CardHeader>
-             <CardTitle>取得データプレビュー</CardTitle>
-              <CardDescription>
-                {tableData.length > 0 ? `取得した ${tableData.length} 件のデータを表示しています。` : '表示するテーブルデータがありません。生のデータ（Raw Response）を確認してください。'}
-              </CardDescription>
-           </CardHeader>
-           <CardContent>
-             <div className="rounded-md border">
+        <Card>
+          <CardHeader>
+            <CardTitle>取得データプレビュー</CardTitle>
+            <CardDescription>
+              {tableData.length > 0 ? `取得した ${tableData.length} 件のデータを表示しています。` : '表示するテーブルデータがありません。生のデータ（Raw Response）を確認してください。'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -232,16 +237,16 @@ export function StaffImporter() {
                   )}
                 </TableBody>
               </Table>
-             </div>
-           </CardContent>
-           {tableData && tableData.length > 5 && (
-              <CardFooter>
-                  <p className="text-sm text-muted-foreground">
-                      {`他 ${tableData.length - 5} 件のデータがインポートされました...`}
-                  </p>
-              </CardFooter>
-           )}
-         </Card>
+            </div>
+          </CardContent>
+          {tableData && tableData.length > 5 && (
+            <CardFooter>
+              <p className="text-sm text-muted-foreground">
+                {`他 ${tableData.length - 5} 件のデータがインポートされました...`}
+              </p>
+            </CardFooter>
+          )}
+        </Card>
       )}
     </div>
   );

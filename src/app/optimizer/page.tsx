@@ -115,16 +115,23 @@ function OptimizerPageContent() {
     const staffLocs = filteredStaffFromSelection
       .map(staffMember => {
         const status = statuses.find(s => s.staffId === staffMember.id);
-        return status && status.latitude && status.longitude ? { ...staffMember, ...status } : null;
+        return status && status.latitude && status.longitude ? { ...staffMember, ...status, type: 'staff' as const } : null;
       })
-      .filter((s): s is Staff & StaffStatus => s !== null);
+      .filter((s): s is Staff & StaffStatus & { type: 'staff' } => s !== null);
 
-    const customLocationsInRoute = optimizedRoute?.optimizedRoute.filter(r => r.type === 'custom') || [];
+    const customLocationsInRoute = optimizedRoute?.optimizedRoute
+      .filter(r => r.type === 'custom')
+      .map(r => ({ ...r, type: 'custom' as const })) || [];
+
+    const routeLocations = optimizedRoute?.optimizedRoute.map(r => ({
+      ...r,
+      type: r.type || 'custom'
+    })) || [];
 
     return {
       staff: staffLocs,
       customers: allCustomers || [],
-      route: optimizedRoute?.optimizedRoute || [],
+      route: routeLocations,
       custom: customLocationsInRoute
     };
 

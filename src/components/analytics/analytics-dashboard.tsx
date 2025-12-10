@@ -41,7 +41,7 @@ export function AnalyticsDashboard() {
 
     // Aggregation Logic (Staff Workload)
     const staffWorkloadData = useMemo(() => {
-        const workloadMap = new Map<string, { name: string, tasks: number, hours: number, color: string }>();
+        const workloadMap = new Map<string, { name: string, tasks: number, hours: number, actualHours: number, color: string }>();
 
         // Initialize with all staff to show 0s
         allStaff.forEach((staff: Staff) => {
@@ -49,6 +49,7 @@ export function AnalyticsDashboard() {
                 name: staff.name,
                 tasks: 0,
                 hours: 0,
+                actualHours: 0,
                 color: staff.color || '#cccccc'
             });
         });
@@ -65,10 +66,27 @@ export function AnalyticsDashboard() {
 
             if (staffId && workloadMap.has(staffId)) {
                 const current = workloadMap.get(staffId)!;
+
+                // Calculate actual duration if timestamps exist
+                let durationHours = (order.estimatedDuration || 60) / 60;
+                let actualDurationHours = 0;
+
+                if (order.actualStartTime && order.actualEndTime) {
+                    const start = new Date(order.actualStartTime);
+                    const end = new Date(order.actualEndTime);
+                    if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                        const diffMs = end.getTime() - start.getTime();
+                        if (diffMs > 0) {
+                            actualDurationHours = diffMs / (1000 * 60 * 60);
+                        }
+                    }
+                }
+
                 workloadMap.set(staffId, {
                     ...current,
                     tasks: current.tasks + 1,
-                    hours: current.hours + (order.estimatedDuration || 60) / 60
+                    hours: current.hours + durationHours,
+                    actualHours: (current.actualHours || 0) + actualDurationHours
                 });
             }
         });
@@ -120,14 +138,15 @@ export function AnalyticsDashboard() {
             'スタッフ名': d.name,
             '担当件数': d.tasks,
             '構成比': totalTasks > 0 ? `${(d.tasks / totalTasks * 100).toFixed(1)}%` : '0.0%',
-            '推定稼働時間(h)': d.hours.toFixed(1)
+            '推定稼働時間(h)': d.hours.toFixed(1),
+            '実稼働時間(h)': d.actualHours.toFixed(1)
         }));
         exportToExcel(staffSheet, title, 'スタッフ稼働状況');
     };
 
     const handleExportPDF = async () => {
         const title = `${format(filteredData.start, 'yyyy年MM月')} 活動レポート`;
-        const headers = ['スタッフ名', '担当件数', '構成比', '稼働時間(h)'];
+        const headers = ['スタッフ名', '担当件数', '構成比', '推定稼働(h)', '実稼働(h)'];
 
         // Calculate total tasks for percentage
         const totalTasks = staffWorkloadData.reduce((sum, d) => sum + d.tasks, 0);
@@ -136,7 +155,8 @@ export function AnalyticsDashboard() {
             d.name,
             d.tasks,
             totalTasks > 0 ? `${(d.tasks / totalTasks * 100).toFixed(1)}%` : '0.0%',
-            d.hours.toFixed(1)
+            d.hours.toFixed(1),
+            d.actualHours.toFixed(1)
         ]);
         await exportToPDF(title, headers, data, title);
     };

@@ -96,6 +96,14 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     value: parseFloat(findKey(rawOrder, ['金額']) || 0),
     staffName: findKey(rawOrder, ['担当']) || '',
+    actualStartTime: (() => {
+      const val = findKey(rawOrder, ['作業開始時間', '開始時間', 'startTime', 'startedAt', 'actualStartTime']);
+      return val ? new Date(val) : undefined;
+    })(),
+    actualEndTime: (() => {
+      const val = findKey(rawOrder, ['作業完了時間', '作業終了時間', '終了時間', 'completionTime', 'completedAt', 'actualEndTime', 'finishedAt']);
+      return val ? new Date(val) : undefined;
+    })(),
     equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
     tireSize: tireSize,
     '本数': findKey(rawOrder, ['本数', 'honsu']) || '',

@@ -49,7 +49,7 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
   const endLocationString = formData.get('endLocation') as string;
   const waypointStrings = formData.getAll('waypoints') as string[];
   const optimizeFor = formData.get('optimizeFor') as OptimizeRouteInput['optimizeFor'];
-  const avoidHighways = formData.get('avoidHighways') === 'on';
+  const avoidsHighways = formData.get('avoidHighways') === 'on';
 
   const parseLocation = (locString: string | null): Location | null => {
     if (!locString) return null;
@@ -65,11 +65,11 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
   const waypoints = waypointStrings.map(parseLocation).filter((loc): loc is Location => !!loc);
 
   if (!startLocation || !endLocation) {
-    return { data: null, error: '出発地と目的地を選択または入力してください。', options: { avoidHighways } };
+    return { data: null, error: '出発地と目的地を選択または入力してください。', options: { avoidHighways: avoidsHighways } };
   }
 
   if (!startLocation.latitude || !startLocation.longitude || !endLocation.latitude || !endLocation.longitude) {
-    return { data: null, error: '出発地または目的地の座標が取得できませんでした。', options: { avoidHighways } };
+    return { data: null, error: '出発地または目的地の座標が取得できませんでした。', options: { avoidHighways: avoidsHighways } };
   }
 
   try {
@@ -78,12 +78,12 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
       endLocation,
       waypoints,
       optimizeFor: optimizeFor,
-      avoidHighways: avoidHighways,
+      avoidHighways: avoidsHighways,
     });
-    return { data: result, error: null, options: { avoidHighways } };
+    return { data: result, error: null, options: { avoidHighways: avoidsHighways } };
   } catch (e) {
     console.error(e);
-    return { data: null, error: 'ルートの最適化に失敗しました。もう一度お試しください。', options: { avoidHighways } };
+    return { data: null, error: 'ルートの最適化に失敗しました。もう一度お試しください。', options: { avoidHighways: avoidsHighways } };
   }
 }
 
@@ -116,7 +116,6 @@ const PlacesAutocompleteSelector: React.FC<{
       componentRestrictions: { country: 'jp' },
     },
     debounce: 300,
-    disabled: !placesLibraryReady,
   });
 
   const [open, setOpen] = React.useState(false);
@@ -247,7 +246,13 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     const staffWithLocation = staff.map(s => {
       const status = staffStatus.find(ss => ss.staffId === s.id);
       return status ? { ...s, ...status } : s;
-    }).filter((s): s is (Staff & StaffStatus) => s !== null && s.latitude !== undefined && s.longitude !== undefined);
+    }).filter((s): s is (Staff & StaffStatus) => {
+      return s !== null &&
+        'latitude' in s &&
+        'longitude' in s &&
+        s.latitude !== undefined &&
+        s.longitude !== undefined;
+    });
 
     const staffLocs: Location[] = staffWithLocation.map(s => ({
       id: s.id,
@@ -258,7 +263,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
       type: 'staff',
     }));
 
-    const customerLocs: Location[] = (allCustomers || []).map(c => {
+    const customerLocs = (allCustomers || []).map(c => {
       let latitude: number | undefined = Number(findKey(c, ['緯度']));
       let longitude: number | undefined = Number(findKey(c, ['経度']));
 
@@ -285,7 +290,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
         longitude: longitude,
         type: 'customer' as const,
       };
-    }).filter((l): l is Location => l !== null);
+    }).filter((l) => l !== null);
 
     return [...staffLocs, ...customerLocs];
   }, [staff, staffStatus, allCustomers]);

@@ -58,6 +58,8 @@ export type Order = {
   value: number;
   staffName?: string;
   staffId?: string; // Added field
+  actualStartTime?: Date; // Added for analytics
+  actualEndTime?: Date; // Added for analytics
   equipmentStatus?: string;
   tireSize?: string;
   taskCalendarEventId?: string;

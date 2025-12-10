@@ -9,7 +9,7 @@ import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCi
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import { updateSheetStatus } from '@/app/actions/update-sheet-status';
+import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -32,14 +32,14 @@ export function CheckInClient() {
 
   const getJapaneseActionName = (action: ActionType) => {
     const map: Record<ActionType, string> = {
-        'Clock In': '出勤',
-        'Clock Out': '退勤',
-        'Start Travel': '移動開始',
-        'Arrive': '現場到着',
-        'Begin Task': '作業開始',
-        'Finish Task': '作業終了',
-        'Wait': '位置情報更新',
-        'Send Message': 'メッセージ送信'
+      'Clock In': '出勤',
+      'Clock Out': '退勤',
+      'Start Travel': '移動開始',
+      'Arrive': '現場到着',
+      'Begin Task': '作業開始',
+      'Finish Task': '作業終了',
+      'Wait': '位置情報更新',
+      'Send Message': 'メッセージ送信'
     };
     return map[action];
   };
@@ -48,40 +48,40 @@ export function CheckInClient() {
     setIsLoading(action);
     setError(null);
     const now = new Date();
-    
+
     // Actions that don't require location or sheet updates
     if (action === 'Clock In' || action === 'Clock Out') {
-        console.log(`Action: ${action}`);
-        setTimeout(() => {
-          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action, time: currentTime });
-          toast({
-            title: 'アクションを記録しました',
-            description: `${getJapaneseActionName(action)} at ${currentTime}`,
-          });
-          setIsLoading(null);
-        }, 1000);
-        return;
+      console.log(`Action: ${action}`);
+      setTimeout(() => {
+        const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        setLastAction({ action, time: currentTime });
+        toast({
+          title: 'アクションを記録しました',
+          description: `${getJapaneseActionName(action)} at ${currentTime}`,
+        });
+        setIsLoading(null);
+      }, 1000);
+      return;
     }
-    
+
     if (action === 'Send Message') {
-        if (!message.trim()) {
-            setError('メッセージを入力してください。');
-            setIsLoading(null);
-            return;
-        }
-        console.log(`Message to admin: ${message}`);
-        setTimeout(() => {
-          toast({
-            title: 'メッセージを送信しました',
-            description: '管理者にメッセージが送信されました。',
-          });
-          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action: 'Send Message', time: currentTime });
-          setMessage('');
-          setIsLoading(null);
-        }, 1000);
+      if (!message.trim()) {
+        setError('メッセージを入力してください。');
+        setIsLoading(null);
         return;
+      }
+      console.log(`Message to admin: ${message}`);
+      setTimeout(() => {
+        toast({
+          title: 'メッセージを送信しました',
+          description: '管理者にメッセージが送信されました。',
+        });
+        const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        setLastAction({ action: 'Send Message', time: currentTime });
+        setMessage('');
+        setIsLoading(null);
+      }, 1000);
+      return;
     }
 
     // Map actions to their corresponding status values for the sheet update
@@ -94,11 +94,11 @@ export function CheckInClient() {
     };
 
     const statusValue = statusMap[action];
-    
+
     if (!statusValue) {
-        console.error("No status defined for this action:", action);
-        setIsLoading(null);
-        return;
+      console.error("No status defined for this action:", action);
+      setIsLoading(null);
+      return;
     }
 
     if (!navigator.geolocation) {
@@ -111,50 +111,50 @@ export function CheckInClient() {
       async (position) => {
         const { latitude, longitude } = position.coords;
         setLocation({ latitude, longitude });
-        
+
         console.log(`Action: ${action}`, { latitude, longitude });
-        
+
         if (!profile?.name) {
-            setError('ユーザー情報が取得できません。ログインしているか確認してください。');
-            setIsLoading(null);
-            return;
+          setError('ユーザー情報が取得できません。ログインしているか確認してください。');
+          setIsLoading(null);
+          return;
         }
 
         try {
-            const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
-            const result = await updateSheetStatus({
-                gasUrl: ORDER_GAS_URL,
-                eventTitle: eventTitleForUpdate,
-                staffName: profile.name,
-                statusValue: statusValue,
-                timestamp: now.toISOString(),
-                latitude: latitude,
-                longitude: longitude,
-                actionType: action,
-                actionTimestamp: now.toISOString()
-            });
+          const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
+          const result = await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: eventTitleForUpdate,
+            staffName: profile.name,
+            statusValue: statusValue,
+            timestamp: now.toISOString(),
+            latitude: latitude,
+            longitude: longitude,
+            actionType: action,
+            actionTimestamp: now.toISOString()
+          });
 
-            if (result.status === 'error') {
-                throw new Error(result.message);
-            }
+          if (result.status === 'error') {
+            throw new Error(result.message);
+          }
 
-            toast({
-                title: 'ステータスを更新しました',
-                description: result.message,
-            });
+          toast({
+            title: 'ステータスを更新しました',
+            description: result.message,
+          });
 
-            const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-            setLastAction({ action, time: currentTime });
+          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          setLastAction({ action, time: currentTime });
 
         } catch (e: any) {
-            setError(e.message || 'スプレッドシートの更新に失敗しました。');
-            toast({
-                variant: 'destructive',
-                title: '更新エラー',
-                description: e.message || 'スプレッドシートの更新に失敗しました。'
-            });
+          setError(e.message || 'スプレッドシートの更新に失敗しました。');
+          toast({
+            variant: 'destructive',
+            title: '更新エラー',
+            description: e.message || 'スプレッドシートの更新に失敗しました。'
+          });
         }
-        
+
         setIsLoading(null);
       },
       (err) => {
@@ -233,7 +233,7 @@ export function CheckInClient() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
+
           {!orderId && (
             <Alert>
               <AlertCircle className="h-4 w-4" />
@@ -245,7 +245,7 @@ export function CheckInClient() {
           )}
 
           {lastAction && (
-             <Alert>
+            <Alert>
               <MapPin className="h-4 w-4" />
               <AlertTitle>最後の記録</AlertTitle>
               <AlertDescription>
@@ -257,7 +257,7 @@ export function CheckInClient() {
         </CardContent>
       </Card>
 
-       <Card>
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />

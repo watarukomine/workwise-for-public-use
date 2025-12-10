@@ -17,6 +17,7 @@ interface StaffWorkloadChartProps {
         name: string;
         tasks: number;
         hours: number;
+        actualHours?: number;
         color: string;
     }[];
 }
@@ -27,7 +28,7 @@ export function StaffWorkloadChart({ data }: StaffWorkloadChartProps) {
             <CardHeader>
                 <CardTitle>スタッフ別稼働状況</CardTitle>
                 <CardDescription>
-                    期間内の担当タスク数と推定稼働時間
+                    期間内の担当タスク数、推定稼働、および実稼働時間
                 </CardDescription>
             </CardHeader>
             <CardContent className="pl-2">
@@ -54,7 +55,8 @@ export function StaffWorkloadChart({ data }: StaffWorkloadChartProps) {
                         />
                         <Legend />
                         <Bar dataKey="tasks" name="タスク数" fill="#adfa1d" radius={[4, 4, 0, 0]} barSize={20} />
-                        <Bar dataKey="hours" name="稼働時間(h)" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={20} />
+                        <Bar dataKey="hours" name="推定稼働(h)" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={20} />
+                        <Bar dataKey="actualHours" name="実稼働(h)" fill="#f97316" radius={[4, 4, 0, 0]} barSize={20} />
                     </BarChart>
                 </ResponsiveContainer>
             </CardContent>
