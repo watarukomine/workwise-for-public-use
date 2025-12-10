@@ -623,6 +623,15 @@ export function ScheduleView({
       (async () => {
         try {
           if (isGeneric) {
+            await updateSheetStatus({
+              gasUrl: ORDER_GAS_URL,
+              eventTitle: order.taskDetails,
+              staffName: staff.name,
+              statusValue: '未着手', // Or appropriate status
+              scheduledTime: taskStart.toISOString(),
+              timestamp: new Date().toISOString()
+            });
+            await refetchOrders();
             toast({ title: "汎用タスクを追加しました" });
           } else {
             await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
