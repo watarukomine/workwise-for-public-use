@@ -25,8 +25,10 @@ export const exportToExcel = <T extends object>(data: T[], fileName: string, she
  */
 export const exportToPDF = async (title: string, headers: string[], data: any[][], fileName: string) => {
     const doc = new jsPDF();
+    const fontName = 'NotoSansJP';
 
     try {
+        console.log('Starting font load...');
         const fontResponse = await fetch('/fonts/NotoSansJP-Regular.ttf');
         if (fontResponse.ok) {
             const fontBuffer = await fontResponse.arrayBuffer();
@@ -37,23 +39,28 @@ export const exportToPDF = async (title: string, headers: string[], data: any[][
             }
             const fontBase64 = btoa(fontBinary);
 
+            console.log('Font loaded and converted to base64. Registering...');
             doc.addFileToVFS('NotoSansJP.ttf', fontBase64);
-            doc.addFont('NotoSansJP.ttf', 'NotoSansJP', 'normal');
-            doc.setFont('NotoSansJP');
+            doc.addFont('NotoSansJP.ttf', fontName, 'normal');
+            doc.setFont(fontName);
+            console.log('Font registered successfully.');
         } else {
-            console.error('Failed to load font: response not ok');
+            console.error('Failed to load font: response not ok', fontResponse.status);
         }
     } catch (error) {
         console.error('Failed to load Japanese font, using default:', error);
     }
 
+    doc.setFont(fontName); // Ensure doc uses it for text() calls
     doc.text(title, 14, 22);
 
     autoTable(doc, {
         head: [headers],
         body: data,
         startY: 30,
-        styles: { font: 'NotoSansJP' },
+        styles: { font: fontName, fontStyle: 'normal' },
+        headStyles: { font: fontName, fontStyle: 'normal' },
+        bodyStyles: { font: fontName, fontStyle: 'normal' },
     });
 
     doc.save(`${fileName}.pdf`);
