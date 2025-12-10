@@ -18,8 +18,7 @@ const simpleHash = (str: string) => {
   return Math.abs(hash);
 };
 
-export const fetchStaffDataFromGAS = async (): Promise<{ staffList?: WithId<Staff>[]; error?: string }> => {
-  const url = STAFF_GAS_URL;
+export const fetchStaffDataFromGAS = async (url: string = STAFF_GAS_URL): Promise<{ staffList?: WithId<Staff>[]; error?: string }> => {
   if (!url || url.includes('TODO_REPLACE_THIS_URL')) {
     const errorMessage = "スタッフ情報を取得するためのURLが /src/lib/settings.ts で設定されていません。";
     console.warn(errorMessage);
@@ -85,6 +84,8 @@ interface SelectedStaffContextType {
   applyPendingSelection: () => void;
   isLoading: boolean;
   error: string | null;
+  staffGasUrl: string;
+  setStaffGasUrl: (url: string) => void;
 }
 
 const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>(undefined);
@@ -97,59 +98,92 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [appliedSelectedStaffIds, setAppliedSelectedStaffIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Initialize with default, will update from localStorage in useEffect
+  const [staffGasUrl, setStaffGasUrlState] = useState(STAFF_GAS_URL);
+
   const LOCAL_STORAGE_KEY = 'appliedStaffIds';
+  const URL_STORAGE_KEY = 'custom_staff_gas_url';
 
   const initialLoadDone = useRef(false);
   const STAFF_CACHE_KEY = 'cached_staff_data';
 
+  const setStaffGasUrl = (url: string) => {
+    setStaffGasUrlState(url);
+    try {
+      localStorage.setItem(URL_STORAGE_KEY, url);
+    } catch (e) {
+      console.warn('Failed to save staff GAS URL to localStorage:', e);
+    }
+  };
+
   useEffect(() => {
-    if (initialLoadDone.current) return;
-    initialLoadDone.current = true;
+    // Load saved URL from localStorage
+    try {
+      const savedUrl = localStorage.getItem(URL_STORAGE_KEY);
+      if (savedUrl) {
+        setStaffGasUrlState(savedUrl);
+      }
+    } catch (e) {
+      console.warn('Failed to load saved URL:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Rely on effect dependency to reload when staffGasUrl changes
+    // But verify if we need to reset initialLoadDone or just call loadStaff directly
+
+    // We can't rely strictly on initialLoadDone ref if we want to support URL updates triggering re-fetch
+    // So we reset it or just allow re-fetching
 
     const loadStaff = async () => {
       setError(null);
+      setIsLoading(true);
 
-      if (!STAFF_GAS_URL || STAFF_GAS_URL.includes('TODO_REPLACE_THIS_URL')) {
+      const currentUrl = staffGasUrl;
+
+      if (!currentUrl || currentUrl.includes('TODO_REPLACE_THIS_URL')) {
         setError("スタッフ情報を取得するためのURLが設定されていません。「/src/lib/settings.ts」ファイルで設定してください。");
         setIsLoading(false);
         return;
       }
 
       // Step 1: Load cached data immediately (optimistic)
-      try {
-        const cachedData = localStorage.getItem(STAFF_CACHE_KEY);
-        if (cachedData) {
-          const { staffList: cachedStaff, timestamp } = JSON.parse(cachedData);
-          if (cachedStaff && cachedStaff.length > 0) {
-            setAllStaffState(cachedStaff);
+      if (!initialLoadDone.current) {
+        try {
+          const cachedData = localStorage.getItem(STAFF_CACHE_KEY);
+          if (cachedData) {
+            const { staffList: cachedStaff, timestamp } = JSON.parse(cachedData);
+            if (cachedStaff && cachedStaff.length > 0) {
+              setAllStaffState(cachedStaff);
 
-            const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
-            if (savedIds) {
-              const parsedIds = JSON.parse(savedIds);
-              setAppliedSelectedStaffIds(parsedIds);
-              setPendingSelectedStaffIds(parsedIds);
-            } else {
-              const allStaffIds = cachedStaff.map((s: WithId<Staff>) => s.id);
-              setAppliedSelectedStaffIds(allStaffIds);
-              setPendingSelectedStaffIds(allStaffIds);
+              const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
+              if (savedIds) {
+                const parsedIds = JSON.parse(savedIds);
+                setAppliedSelectedStaffIds(parsedIds);
+                setPendingSelectedStaffIds(parsedIds);
+              } else {
+                const allStaffIds = cachedStaff.map((s: WithId<Staff>) => s.id);
+                setAppliedSelectedStaffIds(allStaffIds);
+                setPendingSelectedStaffIds(allStaffIds);
+              }
+              // Show UI immediately with cached data
+              setIsLoading(false);
             }
-
-            // Show UI immediately with cached data
-            // Show UI immediately with cached data
-            setIsLoading(false);
           }
+        } catch (e) {
+          console.warn('Failed to load cached staff data:', e);
         }
-      } catch (e) {
-        console.warn('Failed to load cached staff data:', e);
+        initialLoadDone.current = true;
       }
 
-      // Step 2: Fetch fresh data in background
+      // Step 2: Fetch fresh data in background (or foreground if URL changed)
       try {
-        setIsLoading(allStaff.length === 0); // Only show loading if no cached data
-        const { staffList, error: fetchError } = await fetchStaffDataFromGAS();
+        if (allStaff.length === 0) setIsLoading(true);
+
+        const { staffList, error: fetchError } = await fetchStaffDataFromGAS(currentUrl);
 
         if (fetchError) {
-          // If we have cached data, don't show error
           if (allStaff.length === 0) {
             throw new Error(fetchError);
           } else {
@@ -170,8 +204,8 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
             console.warn('Failed to cache staff data:', e);
           }
 
-          // Update selection if this is the first load
-          if (allStaff.length === 0) {
+          // Update selection if no selection exists
+          if (appliedSelectedStaffIds.length === 0) {
             const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (savedIds) {
               const parsedIds = JSON.parse(savedIds);
@@ -195,7 +229,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
       }
     };
     loadStaff();
-  }, []);
+  }, [staffGasUrl]); // Re-run when URL changes
 
 
   const setAllStaff = (staff: WithId<Staff>[]) => {
@@ -242,6 +276,8 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     applyPendingSelection,
     isLoading: isLoading,
     error,
+    staffGasUrl,
+    setStaffGasUrl,
   };
 
   return (

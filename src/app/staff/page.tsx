@@ -17,10 +17,12 @@ import { useRouter } from 'next/navigation';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
-  const { allStaff, isLoading: isStaffLoading, error } = useSelectedStaff();
+  // Destructure staffGasUrl and setStaffGasUrl from context
+  const { allStaff, isLoading: isStaffLoading, error, staffGasUrl, setStaffGasUrl } = useSelectedStaff();
   const router = useRouter();
-  
-  const [localUrl, setLocalUrl] = useState(STAFF_GAS_URL);
+
+  // Local state for the input field, initialized with context value
+  const [localUrl, setLocalUrl] = useState(staffGasUrl);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
 
@@ -30,13 +32,33 @@ export default function StaffPage() {
     }
   }, [isProfileLoading, profile, router]);
 
+  // Sync local input with context value when it changes (e.g. loaded from storage)
+  useEffect(() => {
+    if (staffGasUrl) {
+      setLocalUrl(staffGasUrl);
+    }
+  }, [staffGasUrl]);
+
   const handleUrlUpdate = async () => {
     setIsUpdating(true);
-    toast({
-        title: "URLを更新しました",
-        description: "ページを再読み込みして、新しいURLからスタッフデータを取得します。",
+    try {
+      if (localUrl !== staffGasUrl) {
+        setStaffGasUrl(localUrl);
+        toast({
+          title: "URLを更新しました",
+          description: "新しいURLからスタッフデータを取得し、設定をブラウザに保存しました。",
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      toast({
+        variant: "destructive",
+        title: "エラー",
+        description: "URLの更新に失敗しました。",
       });
-    window.location.href = `${window.location.origin}${window.location.pathname}?gasUrl=${encodeURIComponent(localUrl)}`;
+    } finally {
+      setIsUpdating(false);
+    }
   };
 
 
@@ -58,17 +80,17 @@ export default function StaffPage() {
   }, [profile, allStaff, isLoading]);
 
   if (isLoading || !profile) {
-      return (
-        <div className="flex items-center justify-center p-10">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      );
+    return (
+      <div className="flex items-center justify-center p-10">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1 
+        <h1
           onClick={handleHeaderClick}
           className={profile?.role === 'admin' && STAFF_SHEET_URL ? "text-2xl font-semibold tracking-tight cursor-pointer hover:underline flex items-center gap-2" : "text-2xl font-semibold tracking-tight flex items-center gap-2"}
         >
@@ -77,18 +99,18 @@ export default function StaffPage() {
         </h1>
         <p className="text-muted-foreground">
           {profile?.role === 'admin'
-            ? "スプレッドシートから取得したスタッフの一覧です。表示するスタッフを選択し、「選択を適用」ボタンで他ページに反映します。" 
+            ? "スプレッドシートから取得したスタッフの一覧です。表示するスタッフを選択し、「選択を適用」ボタンで他ページに反映します。"
             : "ご自身の情報を確認できます。"}
         </p>
       </div>
-      
+
       {error && !isStaffLoading && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>データ取得エラー</AlertTitle>
           <AlertDescription>
             {error}
-             <p className="mt-2">下のフォームでURLが正しいか確認・更新するか、`src/lib/settings.ts`の`STAFF_GAS_URL`を確認してください。</p>
+            <p className="mt-2">下のフォームでURLが正しいか確認・更新するか、`src/lib/settings.ts`の`STAFF_GAS_URL`を確認してください。</p>
           </AlertDescription>
         </Alert>
       )}
@@ -101,7 +123,7 @@ export default function StaffPage() {
       ) : (
         <StaffTable staff={staffToDisplay} isLoading={isLoading} />
       )}
-      
+
       {!isLoading && allStaff.length === 0 && !error && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
@@ -117,7 +139,7 @@ export default function StaffPage() {
           <CardHeader>
             <CardTitle>スタッフマスタ用 データソースURL設定</CardTitle>
             <CardDescription>
-              スタッフ情報を取得しているGoogle Apps ScriptのURLです。恒久的な変更は `src/lib/settings.ts` ファイルで行ってください。
+              スタッフ情報を取得しているGoogle Apps ScriptのURLです。設定はブラウザに保存され、次回以降も使用されます。
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -129,20 +151,20 @@ export default function StaffPage() {
                 onChange={(e) => setLocalUrl(e.target.value)}
                 disabled={isUpdating}
               />
-              <Button onClick={handleUrlUpdate} disabled={isUpdating || localUrl === STAFF_GAS_URL}>
+              <Button onClick={handleUrlUpdate} disabled={isUpdating || localUrl === staffGasUrl}>
                 {isUpdating ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
                   <Save className="mr-2 h-4 w-4" />
                 )}
-                このセッションでURLを更新
+                URLを保存して更新
               </Button>
             </div>
           </CardContent>
-           <CardFooter>
-              <p className="text-xs text-muted-foreground">
-                  ここでの更新は一時的なものです。ページをリロードすると`settings.ts`の値に戻ります。
-              </p>
+          <CardFooter>
+            <p className="text-xs text-muted-foreground">
+              ここでの変更はブラウザ(localStorage)に保存され、`src/lib/settings.ts`のデフォルト値より優先されます。
+            </p>
           </CardFooter>
         </Card>
       )}

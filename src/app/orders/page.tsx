@@ -24,9 +24,12 @@ export default function OrdersPage() {
   const [localUrl, setLocalUrl] = useState(orderGasUrl);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
-  
+
   useEffect(() => {
-    setLocalUrl(orderGasUrl);
+    // Update local state if context URL changes (e.g. initial load from storage)
+    if (orderGasUrl) {
+      setLocalUrl(orderGasUrl);
+    }
   }, [orderGasUrl]);
 
   useEffect(() => {
@@ -42,7 +45,7 @@ export default function OrdersPage() {
         setOrderGasUrl(localUrl);
         toast({
           title: "URLを更新しました",
-          description: "新しいURLからデータを再取得・更新します。",
+          description: "新しいURLからデータを再取得し、設定をブラウザに保存しました。",
         });
       }
     } catch (e) {
@@ -67,32 +70,32 @@ export default function OrdersPage() {
 
   if (isLoading || !profile) {
     return (
-        <div className="flex items-center justify-center p-10">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+      <div className="flex items-center justify-center p-10">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
     );
   }
 
   if (!isAdmin) {
-      return (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>権限がありません</AlertTitle>
-          <AlertDescription>
-            このページは管理者のみがアクセスできます。
-          </AlertDescription>
-        </Alert>
-      )
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>権限がありません</AlertTitle>
+        <AlertDescription>
+          このページは管理者のみがアクセスできます。
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (
     <div className="space-y-8">
-       <div>
-        <h1 
+      <div>
+        <h1
           className="text-2xl font-semibold tracking-tight flex items-center gap-2"
         >
-            <ShoppingBag className="h-6 w-6" />
-            受注管理
+          <ShoppingBag className="h-6 w-6" />
+          受注管理
         </h1>
         <p className="text-muted-foreground">
           スプレッドシートから自動取得された受注情報の一覧です。
@@ -111,7 +114,7 @@ export default function OrdersPage() {
         </CardHeader>
         <CardContent>
           {orderError && !isLoadingOrders ? (
-             <Alert variant="destructive" className="mb-6">
+            <Alert variant="destructive" className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>データ取得エラー</AlertTitle>
               <AlertDescription>
@@ -123,12 +126,12 @@ export default function OrdersPage() {
           <OrderTable orders={orders} isLoading={isLoading} />
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>データソースURL設定</CardTitle>
           <CardDescription>
-            受注情報の読み込み、および担当者更新を行うGoogle Apps ScriptのURLです。恒久的な変更は `src/lib/settings.ts` ファイルで行ってください。
+            受注情報の読み込み、および担当者更新を行うGoogle Apps ScriptのURLです。設定はブラウザに保存され、次回以降も使用されます。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -146,14 +149,14 @@ export default function OrdersPage() {
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              このセッションでURLを更新
+              URLを保存して更新
             </Button>
           </div>
         </CardContent>
         <CardFooter>
-            <p className="text-xs text-muted-foreground">
-                ここでの更新は一時的なものです。ページをリロードすると`settings.ts`の値に戻ります。
-            </p>
+          <p className="text-xs text-muted-foreground">
+            ここでの変更はブラウザ(localStorage)に保存され、`src/lib/settings.ts`のデフォルト値より優先されます。
+          </p>
         </CardFooter>
       </Card>
     </div>

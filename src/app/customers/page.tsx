@@ -24,9 +24,12 @@ export default function CustomersPage() {
   const [localUrl, setLocalUrl] = useState(customerGasUrl);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
-  
+
   useEffect(() => {
-    setLocalUrl(customerGasUrl);
+    // Update local state if context URL changes (e.g. initial load from storage)
+    if (customerGasUrl) {
+      setLocalUrl(customerGasUrl);
+    }
   }, [customerGasUrl]);
 
   useEffect(() => {
@@ -42,7 +45,7 @@ export default function CustomersPage() {
         setCustomerGasUrl(localUrl);
         toast({
           title: "URLを更新しました",
-          description: "新しいURLからデータを再取得します。",
+          description: "新しいURLからデータを再取得し、設定をブラウザに保存しました。",
         });
       }
     } catch (e) {
@@ -67,29 +70,29 @@ export default function CustomersPage() {
 
   if (isLoading || !profile) {
     return (
-        <div className="flex items-center justify-center p-10">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+      <div className="flex items-center justify-center p-10">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
     );
   }
 
   if (!isAdmin) {
-      return (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>権限がありません</AlertTitle>
-          <AlertDescription>
-            このページは管理者のみがアクセスできます。
-          </AlertDescription>
-        </Alert>
-      )
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>権限がありません</AlertTitle>
+        <AlertDescription>
+          このページは管理者のみがアクセスできます。
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (
     <div className="space-y-8">
       <Card>
         <CardHeader>
-          <CardTitle 
+          <CardTitle
             onClick={handleHeaderClick}
             className={isAdmin && CUSTOMER_SHEET_URL ? "cursor-pointer hover:underline flex items-center gap-2" : "flex items-center gap-2"}
           >
@@ -102,7 +105,7 @@ export default function CustomersPage() {
         </CardHeader>
         <CardContent>
           {customerError && !isLoadingCustomers ? (
-             <Alert variant="destructive" className="mb-6">
+            <Alert variant="destructive" className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>データ取得エラー</AlertTitle>
               <AlertDescription>
@@ -114,12 +117,12 @@ export default function CustomersPage() {
           <CustomerTable customers={customers} isLoading={isLoading} />
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle>データソースURL設定</CardTitle>
           <CardDescription>
-            販売店情報を取得しているGoogle Apps ScriptのURLです。恒久的な変更は `src/lib/settings.ts` ファイルで行ってください。
+            販売店情報を取得しているGoogle Apps ScriptのURLです。設定はブラウザに保存され、次回以降も使用されます。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -137,14 +140,14 @@ export default function CustomersPage() {
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              このセッションでURLを更新
+              URLを保存して更新
             </Button>
           </div>
         </CardContent>
         <CardFooter>
-            <p className="text-xs text-muted-foreground">
-                ここでの更新は一時的なものです。ページをリロードすると`settings.ts`の値に戻ります。
-            </p>
+          <p className="text-xs text-muted-foreground">
+            ここでの変更はブラウザ(localStorage)に保存され、`src/lib/settings.ts`のデフォルト値より優先されます。
+          </p>
         </CardFooter>
       </Card>
 

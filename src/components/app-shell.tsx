@@ -1,6 +1,7 @@
 
 'use client';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import {
     Users,
@@ -14,6 +15,7 @@ import {
     ShoppingBag,
     CalendarDays,
     BarChart,
+    BookOpen,
 } from 'lucide-react';
 
 import {
@@ -55,6 +57,7 @@ const allNavItems = [
     { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'] },
     { href: '/admin/analytics', label: '分析レポート', icon: BarChart, roles: ['admin'] },
     { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['admin', 'staff'], mobileOnly: true },
+    { href: '/user_manual.pdf', label: 'マニュアル', icon: BookOpen, roles: ['admin', 'staff'], target: '_blank' },
 ];
 
 interface AppShellContextType {
@@ -112,6 +115,7 @@ const DesktopNav = () => {
                 <Link
                     key={item.href}
                     href={item.href}
+                    target={item.target ? item.target : undefined}
                     className={cn(
                         buttonVariants({ variant: pathname === item.href ? 'secondary' : 'ghost', size: 'sm' }),
                         'font-medium'
@@ -188,7 +192,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             tooltip={item.label}
                             className="font-medium"
                         >
-                            <Link href={item.href}>
+                            <Link href={item.href} target={item.target ? item.target : undefined}>
                                 <item.icon />
                                 <span>{item.label}</span>
                             </Link>
@@ -208,7 +212,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <SidebarHeader>
                         <div className="flex items-center gap-2 p-2">
                             <Button variant="ghost" size="icon" className="shrink-0 text-primary hover:bg-primary/10 rounded-full">
-                                <Briefcase className="size-5" />
+                                <Image src="/icons/icon-192x192.png" alt="Logo" width={24} height={24} className="rounded-sm" />
                             </Button>
                             <h1 className="text-xl font-bold tracking-tight text-primary">WorkWise</h1>
                         </div>
@@ -273,7 +277,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                         <Button variant="ghost" size="icon" className="shrink-0 text-primary hover:bg-primary/10 rounded-full">
-                            <Briefcase className="size-5" />
+                            <Image src="/icons/icon-192x192.png" alt="Logo" width={24} height={24} className="rounded-sm" />
                         </Button>
                         <h1 className="text-xl font-bold tracking-tight text-primary">WorkWise</h1>
                     </div>

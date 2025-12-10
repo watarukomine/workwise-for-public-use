@@ -22,11 +22,20 @@ const CustomerContext = createContext<CustomerContextType | undefined>(undefined
 export function CustomerProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomersState] = useState<WithId<Customer>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Initialize with default, will update from localStorage in useEffect
   const [customerGasUrl, setCustomerGasUrlState] = useState(CUSTOMER_GAS_URL);
+
   const [error, setErrorState] = useState<string | null>(null);
+  const URL_STORAGE_KEY = 'custom_customer_gas_url';
 
   const setCustomerGasUrl = (url: string) => {
     setCustomerGasUrlState(url);
+    try {
+      localStorage.setItem(URL_STORAGE_KEY, url);
+    } catch (e) {
+      console.warn('Failed to save customer GAS URL to localStorage:', e);
+    }
   };
 
   const setCustomers = (data: any[]) => {
@@ -40,7 +49,20 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const CUSTOMER_CACHE_KEY = 'cached_customer_data';
 
   useEffect(() => {
+    // Load saved URL from localStorage
+    try {
+      const savedUrl = localStorage.getItem(URL_STORAGE_KEY);
+      if (savedUrl) {
+        setCustomerGasUrlState(savedUrl);
+      }
+    } catch (e) {
+      console.warn('Failed to load saved URL:', e);
+    }
+  }, []);
+
+  useEffect(() => {
     const fetchCustomers = async () => {
+      // Use current state customerGasUrl
       if (!customerGasUrl) {
         setErrorState('販売店情報を取得するためのGoogle Apps Script URLが設定されていません。');
         setCustomers([]);
@@ -107,7 +129,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     };
 
     fetchCustomers();
-  }, [customerGasUrl]);
+  }, [customerGasUrl]); // Re-run when URL changes
 
 
   const value = {
