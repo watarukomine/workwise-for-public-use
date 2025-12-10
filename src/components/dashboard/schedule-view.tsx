@@ -1151,7 +1151,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     <div className="space-y-1">
       <p className="font-bold">
         {customerName || line1}
-        {!isTravelEvent && <span className="ml-1">({equipmentSymbol})</span>}
+        {(!isTravelEvent && !['業務', '休憩'].includes(event.title || '')) && <span className="ml-1">({equipmentSymbol})</span>}
         <span className="ml-2">{formatTime(event.start)}</span>
       </p>
       {!isTravelEvent && (tireSize || honsu) && (
