@@ -25,11 +25,11 @@ export const exportToExcel = <T extends object>(data: T[], fileName: string, she
  */
 export const exportToPDF = async (title: string, headers: string[], data: any[][], fileName: string) => {
     const doc = new jsPDF();
-    const fontName = 'NotoSansJP';
+    const fontName = 'IPAexGothic';
 
     try {
-        console.log('Starting font load...');
-        const fontResponse = await fetch('/fonts/NotoSansJP-Regular.ttf');
+        console.log('Starting font load for IPAexGothic...');
+        const fontResponse = await fetch('/fonts/ipaexg.ttf');
         if (fontResponse.ok) {
             const fontBuffer = await fontResponse.arrayBuffer();
             const fontUint8Array = new Uint8Array(fontBuffer);
@@ -39,11 +39,11 @@ export const exportToPDF = async (title: string, headers: string[], data: any[][
             }
             const fontBase64 = btoa(fontBinary);
 
-            console.log('Font loaded and converted to base64. Registering...');
-            doc.addFileToVFS('NotoSansJP.ttf', fontBase64);
-            doc.addFont('NotoSansJP.ttf', fontName, 'normal');
+            console.log('IPAexGothic loaded. Registering...');
+            doc.addFileToVFS('ipaexg.ttf', fontBase64);
+            doc.addFont('ipaexg.ttf', fontName, 'normal');
             doc.setFont(fontName);
-            console.log('Font registered successfully.');
+            console.log('IPAexGothic registered successfully.');
         } else {
             console.error('Failed to load font: response not ok', fontResponse.status);
         }
@@ -51,7 +51,7 @@ export const exportToPDF = async (title: string, headers: string[], data: any[][
         console.error('Failed to load Japanese font, using default:', error);
     }
 
-    doc.setFont(fontName); // Ensure doc uses it for text() calls
+    doc.setFont(fontName);
     doc.text(title, 14, 22);
 
     autoTable(doc, {
