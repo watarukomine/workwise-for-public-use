@@ -24,37 +24,37 @@ const formatTime = (date: Date | string | undefined) => {
 };
 
 export function VerticalScheduleView({ staffData, currentDate }: VerticalScheduleViewProps) {
-    const { customers } = useCustomer();
-    const { scheduleEvents } = useOrder();
-    
-    const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => {
-        if (!id) return undefined;
-        // customer.id is userCode in some contexts. Let's find by either.
-        return customers.find(c => c.id === id || c.userCode === id);
-    };
-    
-    // Filter for events assigned to the currently displayed staff for the current date and sort by start time
-    const staffIds = new Set(staffData.map(s => s.id));
-    const relevantEvents = (scheduleEvents || [])
-        .filter(event => {
-            const eventDate = parseISO(event.start as string);
-            return event.staffId && 
-                   staffIds.has(event.staffId) &&
-                   isValid(eventDate) &&
-                   isEqual(startOfDay(eventDate), startOfDay(currentDate));
-        })
-        .sort((a, b) => {
-            const startA = typeof a.start === 'string' ? parseISO(a.start) : a.start;
-            const startB = typeof b.start === 'string' ? parseISO(b.start) : b.start;
-            return startA.getTime() - startB.getTime();
-        });
+  const { customers } = useCustomer();
+  const { scheduleEvents } = useOrder();
+
+  const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => {
+    if (!id) return undefined;
+    // customer.id is userCode in some contexts. Let's find by either.
+    return customers.find(c => c.id === id || c.userCode === id);
+  };
+
+  // Filter for events assigned to the currently displayed staff for the current date and sort by start time
+  const staffIds = new Set(staffData.map(s => s.id));
+  const relevantEvents = (scheduleEvents || [])
+    .filter(event => {
+      const eventDate = parseISO(event.start as string);
+      return event.staffId &&
+        staffIds.has(event.staffId) &&
+        isValid(eventDate) &&
+        isEqual(startOfDay(eventDate), startOfDay(currentDate));
+    })
+    .sort((a, b) => {
+      const startA = typeof a.start === 'string' ? parseISO(a.start) : a.start;
+      const startB = typeof b.start === 'string' ? parseISO(b.start) : b.start;
+      return startA.getTime() - startB.getTime();
+    });
 
 
   if (relevantEvents.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>本日の予定</CardTitle>
+          <CardTitle>ダッシュボード</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center h-48 text-center text-muted-foreground">
@@ -72,30 +72,30 @@ export function VerticalScheduleView({ staffData, currentDate }: VerticalSchedul
       {relevantEvents.map((event, index) => {
         const customer = getCustomerById(event.locationId);
         const isTravel = event.title.includes('移動');
-        
+
         const eventCard = (
-            <Card className={cn("cursor-pointer hover:bg-muted/50", isTravel && "bg-secondary/50 border-dashed")}>
-              <CardHeader className="p-4">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg leading-tight">{event.title}</CardTitle>
-                    <div 
-                        className="w-3 h-10 rounded-full" 
-                        style={{ backgroundColor: staffData.find(s => s.id === event.staffId)?.color || 'gray' }}
-                    />
-                </div>
-                {customer && <CardDescription>{customer.storeName}</CardDescription>}
-              </CardHeader>
-              <CardContent className="p-4 pt-0 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>{formatTime(event.start)} - {formatTime(event.end)}</span>
-                </div>
-                 {customer?.address && <div className="flex items-start gap-2 mt-2">
-                    <MapPin className="h-4 w-4 mt-0.5" />
-                    <span>{customer.address}</span>
-                </div>}
-              </CardContent>
-            </Card>
+          <Card className={cn("cursor-pointer hover:bg-muted/50", isTravel && "bg-secondary/50 border-dashed")}>
+            <CardHeader className="p-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg leading-tight">{event.title}</CardTitle>
+                <div
+                  className="w-3 h-10 rounded-full"
+                  style={{ backgroundColor: staffData.find(s => s.id === event.staffId)?.color || 'gray' }}
+                />
+              </div>
+              {customer && <CardDescription>{customer.storeName}</CardDescription>}
+            </CardHeader>
+            <CardContent className="p-4 pt-0 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                <span>{formatTime(event.start)} - {formatTime(event.end)}</span>
+              </div>
+              {customer?.address && <div className="flex items-start gap-2 mt-2">
+                <MapPin className="h-4 w-4 mt-0.5" />
+                <span>{customer.address}</span>
+              </div>}
+            </CardContent>
+          </Card>
         );
 
         return (
