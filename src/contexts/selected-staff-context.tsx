@@ -82,6 +82,7 @@ interface SelectedStaffContextType {
   togglePendingStaffSelection: (staffId: string) => void;
   setPendingSelection: (staffIds: string[]) => void;
   applyPendingSelection: () => void;
+  setSelectedStaffIds: (ids: string[]) => void; // New method for direct update
   isLoading: boolean;
   error: string | null;
   staffGasUrl: string;
@@ -266,6 +267,17 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const setSelectedStaffIds = (ids: string[]) => {
+    setAppliedSelectedStaffIds(ids);
+    setPendingSelectedStaffIds(ids);
+    // We update local storage silently to keep state consistent across reloads
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(ids));
+    } catch (e) {
+      console.warn('Failed to save staff IDs to localStorage', e);
+    }
+  };
+
   const contextValue = {
     pendingSelectedStaffIds,
     appliedSelectedStaffIds,
@@ -274,6 +286,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     togglePendingStaffSelection,
     setPendingSelection,
     applyPendingSelection,
+    setSelectedStaffIds,
     isLoading: isLoading,
     error,
     staffGasUrl,

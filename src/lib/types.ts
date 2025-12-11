@@ -92,3 +92,10 @@ export type StaffStatus = {
   lastUpdate?: string;
   message?: string;
 };
+
+export type DailyAttendance = {
+  id: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD
+  staffIds: string[];
+  updatedAt?: Timestamp;
+};

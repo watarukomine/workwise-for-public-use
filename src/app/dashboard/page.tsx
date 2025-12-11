@@ -20,7 +20,10 @@ import { useAppShell } from '@/components/app-shell';
 import { Loader2 } from 'lucide-react';
 import { useCustomer } from '@/contexts/customer-context';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
+import { getDailyAttendance, saveDailyAttendance } from '@/services/attendance-service';
+import { ShiftImportDialog } from '@/components/dashboard/shift-import-dialog';
 
 
 export default function DashboardPage() {
@@ -34,9 +37,12 @@ export default function DashboardPage() {
 
   const { isLoading: isLoadingCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
-  const { allStaff, appliedSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
+  const { allStaff, appliedSelectedStaffIds, setSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
+  const isMobile = useIsMobile();
+  const { allStaff, appliedSelectedStaffIds, setSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const isMobile = useIsMobile();
   const { forceMobileView, setForceMobileView } = useAppShell();
+  const isDateLoading = useRef(false);
 
   useEffect(() => {
     if (!isProfileLoading && !profile) {
@@ -100,72 +106,118 @@ export default function DashboardPage() {
       if (direction === 'today') return startOfToday();
       return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
     });
+  });
+};
+
+// Sync attendance when date changes
+useEffect(() => {
+  const syncAttendance = async () => {
+    isDateLoading.current = true;
+    try {
+      const attendedStaffIds = await getDailyAttendance(currentDate);
+      if (attendedStaffIds && attendedStaffIds.length > 0) {
+        setSelectedStaffIds(attendedStaffIds);
+      }
+      // If no record, we currently keep the previous selection (or default) as a feature to allow easy copy-over.
+    } catch (e) {
+      console.error("Failed to sync attendance:", e);
+    } finally {
+      // Short timeout to ensure state updates trigger effects before we re-enable saving
+      setTimeout(() => {
+        isDateLoading.current = false;
+      }, 500);
+    }
   };
+  syncAttendance();
+}, [currentDate, setSelectedStaffIds]);
 
-  if (isLoading || !profile) {
-    return (
-      <div className="flex flex-col items-center justify-center p-10 gap-4 min-h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">データを読み込み中...</p>
-      </div>
-    );
+// Save attendance when selection changes
+useEffect(() => {
+  // Skip saving if we are currently loading data for a new date
+  if (isDateLoading.current) return;
+
+  // Skip saving if we are in admin mode but haven't selected anyone (optional safeguard)
+  // Only save if we are admin? Users might want to save their own attendance? 
+  // Usually only admins or managers set the daily list.
+  if (profile?.role === 'admin' && appliedSelectedStaffIds.length > 0) {
+    // Debounce or just save? Firestore is fast. Let's just save.
+    saveDailyAttendance(currentDate, appliedSelectedStaffIds).catch(e => {
+      console.error("Failed to save daily attendance:", e);
+    });
   }
+}, [appliedSelectedStaffIds, currentDate, profile]);
 
-  const showVerticalView = forceMobileView || (isMobile && profile.role !== 'admin');
 
+if (isLoading || !profile) {
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {isToday(currentDate) ? "ダッシュボード" : format(currentDate, "M月d日 (E)")}
-          </h1>
-          <p className="text-muted-foreground">
-            スタッフのスケジュールと現在の状況を一覧で確認できます。
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={() => handleDateChange('today')} disabled={isToday(currentDate)}>今日</Button>
-            <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Smartphone className="h-5 w-5" />
-            <Switch
-              id="mobile-view-switch"
-              checked={forceMobileView}
-              onCheckedChange={setForceMobileView}
-            />
-            <Label htmlFor="mobile-view-switch" className="hidden sm:inline">モバイル表示</Label>
-          </div>
-        </div>
-      </div>
-
-      {selectedStaffNames && (
-        <div className="rounded-lg bg-muted p-3">
-          <p className="text-sm font-medium text-muted-foreground">
-            <span className="font-semibold text-foreground">表示中のスタッフ:</span> {selectedStaffNames}
-          </p>
-        </div>
-      )}
-
-      {showVerticalView ? (
-        <VerticalScheduleView
-          staffData={filteredStaff}
-          currentDate={currentDate}
-        />
-      ) : (
-        <ScheduleView
-          staffData={filteredStaff}
-          currentDate={currentDate}
-          statuses={statuses}
-        />
-      )}
+    <div className="flex flex-col items-center justify-center p-10 gap-4 min-h-[50vh]">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">データを読み込み中...</p>
     </div>
   );
+}
+
+const showVerticalView = forceMobileView || (isMobile && profile.role !== 'admin');
+
+return (
+  <div className="space-y-8">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {isToday(currentDate) ? "ダッシュボード" : format(currentDate, "M月d日 (E)")}
+        </h1>
+        <p className="text-muted-foreground">
+          スタッフのスケジュールと現在の状況を一覧で確認できます。
+        </p>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={() => handleDateChange('prev')}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" onClick={() => handleDateChange('today')} disabled={isToday(currentDate)}>今日</Button>
+          <Button variant="outline" size="icon" onClick={() => handleDateChange('next')}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="flex items-center space-x-2">
+          <Smartphone className="h-5 w-5" />
+          <Switch
+            id="mobile-view-switch"
+            checked={forceMobileView}
+            onCheckedChange={setForceMobileView}
+          />
+          <Switch
+            id="mobile-view-switch"
+            checked={forceMobileView}
+            onCheckedChange={setForceMobileView}
+          />
+          <Label htmlFor="mobile-view-switch" className="hidden sm:inline">モバイル表示</Label>
+        </div>
+        {profile.role === 'admin' && <ShiftImportDialog />}
+      </div>
+    </div>
+
+    {selectedStaffNames && (
+      <div className="rounded-lg bg-muted p-3">
+        <p className="text-sm font-medium text-muted-foreground">
+          <span className="font-semibold text-foreground">表示中のスタッフ:</span> {selectedStaffNames}
+        </p>
+      </div>
+    )}
+
+    {showVerticalView ? (
+      <VerticalScheduleView
+        staffData={filteredStaff}
+        currentDate={currentDate}
+      />
+    ) : (
+      <ScheduleView
+        staffData={filteredStaff}
+        currentDate={currentDate}
+        statuses={statuses}
+      />
+    )}
+  </div>
+);
 }
