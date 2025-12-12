@@ -2,18 +2,20 @@
 'use client';
 
 import * as React from 'react';
-import type { ScheduleEvent, Staff, Customer, WithId } from '@/lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import type { WithId, Staff, Customer } from '../../lib/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { format, parseISO, isEqual, startOfDay, isValid } from 'date-fns';
 import { Clock, MapPin, Briefcase } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useCustomer } from '@/contexts/customer-context';
+import { cn } from '../../lib/utils';
+import { useCustomer } from '../../contexts/customer-context';
 import Link from 'next/link';
-import { useOrder } from '@/contexts/order-context';
+import { useOrder } from '../../contexts/order-context';
+import { STORE_COLORS } from '../../lib/constants';
 
 interface VerticalScheduleViewProps {
   staffData: WithId<Staff>[];
   currentDate: Date;
+  checkedOutStaffIds?: Set<string>;
 }
 
 const formatTime = (date: Date | string | undefined) => {
@@ -23,7 +25,7 @@ const formatTime = (date: Date | string | undefined) => {
   return format(d, 'HH:mm');
 };
 
-export function VerticalScheduleView({ staffData, currentDate }: VerticalScheduleViewProps) {
+export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffIds }: VerticalScheduleViewProps) {
   const { customers } = useCustomer();
   const { scheduleEvents } = useOrder();
 
@@ -72,15 +74,22 @@ export function VerticalScheduleView({ staffData, currentDate }: VerticalSchedul
       {relevantEvents.map((event, index) => {
         const customer = getCustomerById(event.locationId);
         const isTravel = event.title.includes('移動');
+        const staffMember = staffData.find(s => s.id === event.staffId);
+        const areaBgClass = staffMember?.['母店'] ? STORE_COLORS[staffMember['母店']] || '' : '';
 
         const eventCard = (
-          <Card className={cn("cursor-pointer hover:bg-muted/50", isTravel && "bg-secondary/50 border-dashed")}>
+          <Card className={cn(
+            "cursor-pointer hover:bg-muted/50",
+            areaBgClass, // Apply store background color
+            isTravel && "bg-secondary/50 border-dashed",
+            checkedOutStaffIds?.has(event.staffId || '') && "opacity-50 grayscale bg-gray-100 dark:bg-gray-800"
+          )}>
             <CardHeader className="p-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg leading-tight">{event.title}</CardTitle>
                 <div
                   className="w-3 h-10 rounded-full"
-                  style={{ backgroundColor: staffData.find(s => s.id === event.staffId)?.color || 'gray' }}
+                  style={{ backgroundColor: staffMember?.color || 'gray' }}
                 />
               </div>
               {customer && <CardDescription>{customer.storeName}</CardDescription>}

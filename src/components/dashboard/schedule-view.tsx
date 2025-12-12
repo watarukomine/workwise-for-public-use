@@ -18,24 +18,24 @@ import {
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
-import type { ScheduleEvent, Staff, Customer, Order, WithId, StaffStatus } from '@/lib/types';
+import { Staff, StaffStatus, WithId, Order, Customer, ScheduleEvent } from '../../lib/types';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from '../ui/card';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
+} from '../ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor } from '@/lib/utils';
+import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor } from '../../lib/utils';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
-import { Button } from '@/components/ui/button';
+import { Button } from '../ui/button';
 import {
   Dialog,
   DialogContent,
@@ -44,17 +44,18 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "@/components/ui/dialog";
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useCustomer } from '@/contexts/customer-context';
-import { useToast } from '@/hooks/use-toast';
+} from "../ui/dialog";
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { useCustomer } from '../../contexts/customer-context';
+import { useToast } from '../../hooks/use-toast';
 import { Textarea } from '../ui/textarea';
-import { useOrder } from '@/contexts/order-context';
-import { updateSheetStatus, sendIcsEmail } from '@/app/actions/gas-actions';
-import { ORDER_GAS_URL } from '@/lib/settings';
+import { useOrder } from '../../contexts/order-context';
+import { updateSheetStatus, sendIcsEmail } from '../../app/actions/gas-actions';
+import { ORDER_GAS_URL } from '../../lib/settings';
 import { Mail, Pencil } from 'lucide-react';
 import { createContext, useContext } from 'react';
+import { STORE_COLORS } from '../../lib/constants';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -228,6 +229,7 @@ interface ScheduleViewProps {
   staffData: WithId<Staff>[];
   currentDate: Date;
   statuses: StaffStatus[];
+  checkedOutStaffIds?: Set<string>;
 }
 
 const genericTasks: WithId<Order>[] = [
@@ -1089,9 +1091,7 @@ interface StaffRowProps {
 
 const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
-
-  const areaColors: Record<string, string> = { '横浜店': 'bg-blue-50', '東名川崎店': 'bg-green-50', '綾瀬店': 'bg-orange-50' };
-  const areaBgClass = staff['母店'] ? areaColors[staff['母店']] || 'bg-background' : 'bg-background';
+  const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
     <div className={cn("flex relative h-16 border-b", areaBgClass)}>

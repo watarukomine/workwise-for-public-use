@@ -1,6 +1,5 @@
-
 'use client';
-import type { Staff, WithId } from '@/lib/types';
+import * as React from 'react';
 import {
   Table,
   TableBody,
@@ -8,21 +7,23 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '../ui/table';
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import React from 'react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { useSelectedStaff } from '@/contexts/selected-staff-context';
-import { Button } from '@/components/ui/button';
-import { Check } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { useUserProfile } from '@/hooks/use-user-profile';
-import { cn, lightenColor } from '@/lib/utils';
+} from '../ui/card';
+import { Checkbox } from '../ui/checkbox';
+import { useSelectedStaff } from '../../contexts/selected-staff-context';
+import { Button } from '../ui/button';
+import { Check, Grid, List, ExternalLink, Trash2, Pencil } from 'lucide-react';
+import { Staff, WithId } from '../../lib/types';
+import { Badge } from '../ui/badge';
+import { useUserProfile } from '../../hooks/use-user-profile';
+import { cn } from '../../lib/utils';
+import { STORE_COLORS } from '../../lib/constants';
 
 interface StaffTableProps {
   staff: (WithId<Staff> & { Order_URL?: string })[] | null;
@@ -66,8 +67,6 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
       window.open(member.Order_URL, '_blank', 'noopener,noreferrer');
     }
   };
-
-  const areaColors: Record<string, string> = { '横浜店': 'bg-blue-50', '東名川崎店': 'bg-green-50', '綾瀬店': 'bg-orange-50' };
 
   const isSelectionChanged = JSON.stringify(pendingSelectedStaffIds.sort()) !== JSON.stringify(appliedSelectedStaffIds.sort());
 
@@ -116,13 +115,16 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                 </TableRow>
               ) : staffList && staffList.length > 0 ? (
                 staffList.map((member) => {
-                  const areaBgClass = member['母店'] ? areaColors[member['母店']] || '' : '';
+                  const areaBgClass = member['母店'] ? STORE_COLORS[member['母店']] || '' : '';
                   return (
                     <TableRow
                       key={member.id}
                       data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''}
                       onDoubleClick={() => handleRowDoubleClick(member)}
-                      className={cn(isAdmin && member.Order_URL && "cursor-pointer hover:bg-muted/50", areaBgClass)}
+                      className={cn(
+                        isAdmin && member.Order_URL && "cursor-pointer hover:bg-muted/50",
+                        member['母店'] ? STORE_COLORS[member['母店']] || '' : '' // Used STORE_COLORS directly
+                      )}
                     >
                       {isAdmin && (
                         <TableCell>

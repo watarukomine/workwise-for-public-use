@@ -97,5 +97,6 @@ export type DailyAttendance = {
   id: string; // YYYY-MM-DD
   date: string; // YYYY-MM-DD
   staffIds: string[];
+  checkedOutIds?: string[]; // New field for managing clock-out status
   updatedAt?: Timestamp;
 };

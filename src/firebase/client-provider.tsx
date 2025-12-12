@@ -14,6 +14,26 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     return initializeFirebase();
   }, []); // Empty dependency array ensures this runs only once on mount
 
+  // Automatically sign in anonymously to satisfy Firestore rules (auth != null)
+  React.useEffect(() => {
+    const { auth } = firebaseServices;
+    import('firebase/auth').then(({ signInAnonymously, onAuthStateChanged }) => {
+      onAuthStateChanged(auth, (user) => {
+        if (user) {
+          console.log('✅ Firebase Auth: User is signed in:', user.uid);
+        } else {
+          console.log('❌ Firebase Auth: User is signed out.');
+        }
+      });
+
+      signInAnonymously(auth).then(() => {
+        console.log('✅ Anonymous login successful.');
+      }).catch((e) => {
+        console.error('❌ Failed to sign in anonymously:', e);
+      });
+    });
+  }, [firebaseServices]);
+
   return (
     <FirebaseProvider
       firebaseApp={firebaseServices.firebaseApp}

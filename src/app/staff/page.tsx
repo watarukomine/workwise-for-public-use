@@ -2,18 +2,21 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { StaffTable } from '@/components/staff/staff-table';
-import { useSelectedStaff } from '@/contexts/selected-staff-context';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { StaffTable } from '../../components/staff/staff-table';
+import { useSelectedStaff } from '../../contexts/selected-staff-context';
+import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
 import { AlertCircle, Loader2, Save, ExternalLink } from 'lucide-react';
-import { useUserProfile } from '@/hooks/use-user-profile';
+import { useUserProfile } from '../../hooks/use-user-profile';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
-import { STAFF_GAS_URL, STAFF_SHEET_URL } from '@/lib/settings';
+import { Button } from '../../components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../../components/ui/card';
+import { Input } from '../../components/ui/input';
+import { useToast } from '../../hooks/use-toast';
+import { STAFF_GAS_URL, STAFF_SHEET_URL } from '../../lib/settings';
 import { useRouter } from 'next/navigation';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { MonthlyShiftTable } from '../../components/staff/monthly-shift-table';
+import { ShiftImportDialog } from '../../components/dashboard/shift-import-dialog';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -79,6 +82,14 @@ export default function StaffPage() {
     return self ? [self] : [];
   }, [profile, allStaff, isLoading]);
 
+  // Refresh trigger for the shift table
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleUpload = () => {
+    // Trigger a refresh of the shift table
+    setRefreshTrigger(prev => prev + 1);
+  };
+
   if (isLoading || !profile) {
     return (
       <div className="flex items-center justify-center p-10">
@@ -90,13 +101,18 @@ export default function StaffPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1
-          onClick={handleHeaderClick}
-          className={profile?.role === 'admin' && STAFF_SHEET_URL ? "text-2xl font-semibold tracking-tight cursor-pointer hover:underline flex items-center gap-2" : "text-2xl font-semibold tracking-tight flex items-center gap-2"}
-        >
-          スタッフ管理
-          {profile?.role === 'admin' && STAFF_SHEET_URL && <ExternalLink className="h-5 w-5 text-muted-foreground" />}
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1
+            onClick={handleHeaderClick}
+            className={profile?.role === 'admin' && STAFF_SHEET_URL ? "text-2xl font-semibold tracking-tight cursor-pointer hover:underline flex items-center gap-2" : "text-2xl font-semibold tracking-tight flex items-center gap-2"}
+          >
+            スタッフ管理
+            {profile?.role === 'admin' && STAFF_SHEET_URL && <ExternalLink className="h-5 w-5 text-muted-foreground" />}
+          </h1>
+          {profile?.role === 'admin' && (
+            <ShiftImportDialog onUpload={handleUpload} />
+          )}
+        </div>
         <p className="text-muted-foreground">
           {profile?.role === 'admin'
             ? "スプレッドシートから取得したスタッフの一覧です。表示するスタッフを選択し、「選択を適用」ボタンで他ページに反映します。"
@@ -121,7 +137,28 @@ export default function StaffPage() {
           <p className="ml-4">最新のスタッフ情報を読み込んでいます...</p>
         </div>
       ) : (
-        <StaffTable staff={staffToDisplay} isLoading={isLoading} />
+        <Tabs defaultValue="list" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-[400px]">
+            <TabsTrigger value="list">スタッフ一覧</TabsTrigger>
+            <TabsTrigger value="shift">月間シフト表</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="list" className="mt-4">
+            <StaffTable staff={staffToDisplay} isLoading={isLoading} />
+          </TabsContent>
+
+          <TabsContent value="shift" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>月間シフト確認</CardTitle>
+                <CardDescription>各スタッフの出勤状況を確認できます。</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <MonthlyShiftTable staffList={staffToDisplay} refreshTrigger={refreshTrigger} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       )}
 
       {!isLoading && allStaff.length === 0 && !error && (

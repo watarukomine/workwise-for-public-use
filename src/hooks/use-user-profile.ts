@@ -2,7 +2,7 @@
 'use client';
 
 import { useContext } from 'react';
-import { UserProfileContext } from '@/contexts/user-profile-provider';
+import { UserProfileContext } from '../contexts/user-profile-provider';
 
 /**
  * Hook to access the user's profile, loading state, and error state.

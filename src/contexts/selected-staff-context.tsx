@@ -233,23 +233,23 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   }, [staffGasUrl]); // Re-run when URL changes
 
 
-  const setAllStaff = (staff: WithId<Staff>[]) => {
+  const setAllStaff = React.useCallback((staff: WithId<Staff>[]) => {
     setAllStaffState(staff);
-  };
+  }, []);
 
-  const togglePendingStaffSelection = (staffId: string) => {
+  const togglePendingStaffSelection = React.useCallback((staffId: string) => {
     setPendingSelectedStaffIds(prevIds =>
       prevIds.includes(staffId)
         ? prevIds.filter(id => id !== staffId)
         : [...prevIds, staffId]
     );
-  };
+  }, []);
 
-  const setPendingSelection = (staffIds: string[]) => {
+  const setPendingSelection = React.useCallback((staffIds: string[]) => {
     setPendingSelectedStaffIds(staffIds);
-  };
+  }, []);
 
-  const applyPendingSelection = () => {
+  const applyPendingSelection = React.useCallback(() => {
     setAppliedSelectedStaffIds(pendingSelectedStaffIds);
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pendingSelectedStaffIds));
@@ -265,9 +265,9 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         description: "設定を保存できませんでした。",
       });
     }
-  };
+  }, [pendingSelectedStaffIds, toast]);
 
-  const setSelectedStaffIds = (ids: string[]) => {
+  const setSelectedStaffIds = React.useCallback((ids: string[]) => {
     setAppliedSelectedStaffIds(ids);
     setPendingSelectedStaffIds(ids);
     // We update local storage silently to keep state consistent across reloads
@@ -276,9 +276,9 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.warn('Failed to save staff IDs to localStorage', e);
     }
-  };
+  }, []);
 
-  const contextValue = {
+  const contextValue = React.useMemo(() => ({
     pendingSelectedStaffIds,
     appliedSelectedStaffIds,
     allStaff,
@@ -291,7 +291,14 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     error,
     staffGasUrl,
     setStaffGasUrl,
-  };
+  }), [
+    pendingSelectedStaffIds,
+    appliedSelectedStaffIds,
+    allStaff,
+    isLoading,
+    error,
+    staffGasUrl
+  ]);
 
   return (
     <SelectedStaffContext.Provider value={contextValue}>

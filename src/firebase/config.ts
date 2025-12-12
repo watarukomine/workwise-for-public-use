@@ -1,8 +1,9 @@
 export const firebaseConfig = {
-  "projectId": "studio-9545980025-bf83e",
-  "appId": "1:21224099607:web:9acfbae7cd9451e23af152",
-  "apiKey": "AIzaSyCl1WOEKb9hTh1cXh9TmmuKFzE0gR0hBxU",
-  "authDomain": "studio-9545980025-bf83e.firebaseapp.com",
-  "measurementId": "G-4191E301S8",
-  "messagingSenderId": "21224099607"
+  apiKey: "AIzaSyDoWLRBcQyzkItN9jvXqu1naadp8P8YFDI",
+  authDomain: "workwisebu2-31559534-cd9ee.firebaseapp.com",
+  databaseURL: "https://workwisebu2-31559534-cd9ee-default-rtdb.firebaseio.com",
+  projectId: "workwisebu2-31559534-cd9ee",
+  storageBucket: "workwisebu2-31559534-cd9ee.firebasestorage.app",
+  messagingSenderId: "1030153269382",
+  appId: "1:1030153269382:web:f9bee44d7e2b38a087a107"
 };
