@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const { allStaff, appliedSelectedStaffIds, setSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const [checkedOutStaffIds, setCheckedOutStaffIds] = useState<Set<string>>(new Set());
   const isDateLoading = useRef(false);
+  const [isSyncing, setIsSyncing] = useState(true); // Add syncing state, default true for initial load
 
   useEffect(() => {
     if (!isProfileLoading && !profile) {
@@ -91,17 +92,19 @@ export default function DashboardPage() {
     return selectedStaff.map(s => s.name).join('、');
   }, [allStaff, appliedSelectedStaffIds, profile]);
 
-  const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading || isLoadingCustomers;
+  const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading || isLoadingCustomers || isSyncing; // Include isSyncing
 
   console.log('Dashboard Loading States:', {
     profile: isProfileLoading,
     orders: isLoadingOrders,
     staff: isStaffLoading,
     customers: isLoadingCustomers,
+    syncing: isSyncing,
     total: isLoading
   });
 
   const handleDateChange = (direction: 'next' | 'prev' | 'today') => {
+    setIsSyncing(true); // Block UI immediately
     setCurrentDate(current => {
       if (direction === 'today') return startOfToday();
       return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
@@ -112,6 +115,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const syncAttendance = async () => {
       isDateLoading.current = true;
+      setIsSyncing(true); // Ensure syncing is true
       try {
         // 1. Fetch explicitly attended staff from Firestore with details
         const { staffIds: attendedStaffIds, checkedOutIds = [] } = await getDailyAttendanceDetails(currentDate);
@@ -144,6 +148,7 @@ export default function DashboardPage() {
         // Short timeout to ensure state updates trigger effects before we re-enable saving
         setTimeout(() => {
           isDateLoading.current = false;
+          setIsSyncing(false); // Unblock UI
         }, 500);
       }
     };
