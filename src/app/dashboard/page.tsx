@@ -180,6 +180,9 @@ export default function DashboardPage() {
             // MERGE with existing selection to preserve localStorage state or manual changes
             setSelectedStaffIds(prev => Array.from(new Set([...prev, ...combinedStaffIds])));
           }
+        } else if (isRealDateSwitch) {
+          // If switching date and no staff found, CLEAR the selection
+          setSelectedStaffIds([]);
         }
       } catch (e) {
         console.error("Failed to sync attendance:", e);
