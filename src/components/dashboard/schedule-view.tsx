@@ -274,14 +274,24 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
   const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
 
   const dailyOrders = orders.filter(order => {
+    // Show undated tasks
     if (!order.scheduledDate) {
-      return false;
+      return true;
     }
     const scheduledDate = parseISO(order.scheduledDate);
-    const scheduledStartOfDay = startOfDay(scheduledDate);
-    const currentStartOfDay = startOfDay(date);
-    const matches = isValid(scheduledDate) && isEqual(scheduledStartOfDay, currentStartOfDay);
-    return matches;
+    if (!isValid(scheduledDate)) return true;
+
+    // Show tasks scheduled for today
+    if (isEqual(startOfDay(scheduledDate), startOfDay(date))) {
+      return true;
+    }
+
+    // Show backlog: Past date AND Unassigned status
+    if (scheduledDate < startOfDay(date) && order.status === '未割当') {
+      return true;
+    }
+
+    return false;
   });
 
   return (
