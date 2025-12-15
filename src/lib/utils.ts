@@ -91,7 +91,7 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
     taskDetails: taskDetails, // Simplified for initial view, detailed view can show more
     status: findKey(rawOrder, ['受注ステータス']) || '未割当',
-    scheduledDate: formatDate(String(findKey(rawOrder, ['作業予定日']) || '')),
+    scheduledDate: formatDate(String(findKey(rawOrder, ['作業予定日']) || ''), 'yyyy-MM-dd'),
     scheduledTime: scheduledTime || '',
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     value: parseFloat(findKey(rawOrder, ['金額']) || 0),
