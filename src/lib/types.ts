@@ -84,7 +84,7 @@ export type ScheduleEvent = WithId<Order> & {
 
 export type StaffStatus = {
   staffId: string;
-  status: '未割当' | '作業待ち' | '移動中' | '作業中' | '作業完了' | '待機中';
+  status: '未割当' | '作業待ち' | '移動中' | '作業中' | '作業完了' | '待機中' | '移動開始' | '現場到着' | '作業開始' | '出勤済' | '退勤済' | string;
   lastAction: string;
   distanceFromSite?: string;
   latitude?: number;

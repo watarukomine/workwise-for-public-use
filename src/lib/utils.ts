@@ -96,6 +96,9 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     value: parseFloat(findKey(rawOrder, ['金額']) || 0),
     staffName: findKey(rawOrder, ['担当']) || '',
+    customerName: customerName,
+    address: findKey(rawOrder, ['住所', 'Address']) || '',
+    scheduledEndTime: findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime']) || '',
     actualStartTime: (() => {
       const val = findKey(rawOrder, ['作業開始時間', '開始時間', 'startTime', 'startedAt', 'actualStartTime']);
       return val ? new Date(val) : undefined;
@@ -107,10 +110,8 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
     tireSize: tireSize,
     '本数': findKey(rawOrder, ['本数', 'honsu']) || '',
-    customerName: customerName,
-    address: findKey(rawOrder, ['住所']) || '',
     serviceType: findKey(rawOrder, ['サービス種別', 'サービス区分']) || '',
-    raw: rawOrder,
+    raw: rawOrder // Preserve raw data for context processing
   };
 };
 

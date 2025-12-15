@@ -82,8 +82,9 @@ interface SelectedStaffContextType {
   togglePendingStaffSelection: (staffId: string) => void;
   setPendingSelection: (staffIds: string[]) => void;
   applyPendingSelection: () => void;
-  setSelectedStaffIds: (ids: string[]) => void; // New method for direct update
+  setSelectedStaffIds: (ids: string[] | ((prev: string[]) => string[])) => void; // Support functional update
   isLoading: boolean;
+  isStaffLoading: boolean;
   error: string | null;
   staffGasUrl: string;
   setStaffGasUrl: (url: string) => void;
@@ -104,10 +105,42 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [staffGasUrl, setStaffGasUrlState] = useState(STAFF_GAS_URL);
 
   const LOCAL_STORAGE_KEY = 'appliedStaffIds';
+  const LOCAL_STORAGE_SELECTION_KEY = 'workwise_staff_selection'; // { date: string, ids: string[] }
   const URL_STORAGE_KEY = 'custom_staff_gas_url';
 
   const initialLoadDone = useRef(false);
   const STAFF_CACHE_KEY = 'cached_staff_data';
+
+  // Persist selection
+  useEffect(() => {
+    if (initialLoadDone.current && appliedSelectedStaffIds.length > 0) {
+      try {
+        const today = new Date().toDateString();
+        localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
+          date: today,
+          ids: appliedSelectedStaffIds
+        }));
+      } catch (e) {
+        console.warn('Failed to save selection to localStorage:', e);
+      }
+    }
+  }, [appliedSelectedStaffIds]);
+
+  // Restore selection on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY);
+      if (saved) {
+        const { date, ids } = JSON.parse(saved);
+        if (date === new Date().toDateString() && Array.isArray(ids) && ids.length > 0) {
+          setAppliedSelectedStaffIds(ids);
+          setPendingSelectedStaffIds(ids);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to restore selection:', e);
+    }
+  }, []);
 
   const setStaffGasUrl = (url: string) => {
     setStaffGasUrlState(url);
@@ -267,15 +300,16 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     }
   }, [pendingSelectedStaffIds, toast]);
 
-  const setSelectedStaffIds = React.useCallback((ids: string[]) => {
-    setAppliedSelectedStaffIds(ids);
-    setPendingSelectedStaffIds(ids);
-    // We update local storage silently to keep state consistent across reloads
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(ids));
-    } catch (e) {
-      console.warn('Failed to save staff IDs to localStorage', e);
-    }
+  const setSelectedStaffIds = React.useCallback((idsOrFn: string[] | ((prev: string[]) => string[])) => {
+    setAppliedSelectedStaffIds(prev => {
+      const newIds = typeof idsOrFn === 'function' ? idsOrFn(prev) : idsOrFn;
+      return newIds;
+    });
+    // Sync pending with applied
+    setPendingSelectedStaffIds(prev => {
+      const newIds = typeof idsOrFn === 'function' ? idsOrFn(prev) : idsOrFn;
+      return newIds;
+    });
   }, []);
 
   const contextValue = React.useMemo(() => ({
@@ -288,6 +322,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     applyPendingSelection,
     setSelectedStaffIds,
     isLoading: isLoading,
+    isStaffLoading: isLoading,
     error,
     staffGasUrl,
     setStaffGasUrl,

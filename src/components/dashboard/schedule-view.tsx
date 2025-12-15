@@ -152,7 +152,7 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
   );
 
   const content = (
-    <div style={style} className={cn("h-12 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}>
+    <div style={style} className={cn("h-10 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}>
       <p className="text-xs font-semibold truncate pointer-events-none">
         {order.customerName || line1}
       </p>
@@ -879,9 +879,9 @@ export function ScheduleView({
       >
 
         <TooltipProvider>
-          <div className="space-y-6" style={{ maxWidth: `${TOTAL_TIMELINE_WIDTH + 2}px` }}>
-            <div className="sticky top-[65px] bg-background/95 backdrop-blur-sm z-20 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          <div className="space-y-1" style={{ maxWidth: `${TOTAL_TIMELINE_WIDTH + 2}px` }}>
+            <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-20 py-1">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                 <div className="md:col-span-3">
                   <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} onDoubleClickOrder={(order) => setDialogState({ mode: 'order-details', order })} />
                 </div>
@@ -893,12 +893,12 @@ export function ScheduleView({
 
             <div>
               <div>
-                <ScrollArea className="w-full border rounded-md" style={{ height: 'calc(100vh - 350px)' }}>
+                <ScrollArea className="w-full border rounded-md h-[calc(100vh-200px)]">
                   <div className="relative" style={{ width: `${TOTAL_TIMELINE_WIDTH}px` }}>
 
                     {/* Header Row - Now inside ScrollArea for perfect alignment */}
                     <div className="sticky top-0 z-40 flex h-[34px] border-b bg-background/95 backdrop-blur-sm">
-                      <div className="sticky left-0 z-50 flex-shrink-0 font-semibold p-2 border-r bg-background" style={{ width: `${STAFF_COL_WIDTH}px` }}>スタッフ</div>
+                      <div className="sticky left-0 z-50 flex-shrink-0 font-semibold p-2 border-r bg-background w-[144px]">スタッフ</div>
                       <div className="relative flex-1 h-full">
                         {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                           <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
@@ -906,7 +906,7 @@ export function ScheduleView({
                           </div>
                         ))}
                       </div>
-                      <div className="sticky right-0 z-50 flex-shrink-0 font-semibold p-2 border-l bg-background" style={{ width: `${STATUS_COL_WIDTH}px` }}>ステータス</div>
+                      <div className="sticky right-0 z-50 flex-shrink-0 font-semibold p-2 border-l bg-background w-[120px]">ステータス</div>
                     </div>
 
                     <div className="relative space-y-2 pb-2">
@@ -919,7 +919,7 @@ export function ScheduleView({
                         const events = dailySchedule.filter((e) => e.staffId === staff.id);
                         const status = statuses.find(s => s.staffId === staff.id);
                         return (
-                          <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} />
+                          <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} isToday={isToday(currentDate)} />
                         );
                       })}
                     </div>
@@ -1087,15 +1087,16 @@ interface StaffRowProps {
   isOver: boolean;
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
+  isToday: boolean;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, isToday }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
   const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
 
   return (
-    <div className={cn("flex relative h-16 border-b", areaBgClass)}>
-      <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit")} style={{ width: `${STAFF_COL_WIDTH}px` }}>
+    <div className={cn("flex relative h-14 border-b", areaBgClass)}>
+      <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit w-[144px]")}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
           <div className='w-2 h-8 rounded-full' style={{ backgroundColor: staff.color }}></div>
           <span className='truncate flex-1'>{staff.name}</span>
@@ -1106,8 +1107,8 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
           {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)} />))}
         </div>
       </div>
-      <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit")} style={{ width: `${STATUS_COL_WIDTH}px` }}>
-        {status && isToday(new Date()) && (<div className="text-xs text-center font-medium">{status.status}</div>)}
+      <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[120px]")}>
+        {status && isToday && (<div className="text-xs text-center font-medium">{status.status}</div>)}
       </div>
     </div>
   )
