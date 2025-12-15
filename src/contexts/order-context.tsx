@@ -2,16 +2,12 @@
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import {
-  syncOrdersFromGasToFirestore,
-  getDailyOrdersFromFirestore,
-  getNoDateOrdersFromFirestore
-} from '@/services/order-service';
+import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
-import { findKey } from '@/lib/utils';
+import { findKey, mapRawToOrder } from '@/lib/utils';
 import { addMinutes, subMinutes, parseISO, isValid, format } from 'date-fns';
 import { useSelectedStaff } from './selected-staff-context';
 import { ORDER_GAS_URL } from '@/lib/settings';
-// Remove duplicate import if present or ensure it's imported correctly
 
 
 const TRAVEL_TIME_MINUTES = 30;
@@ -37,11 +33,12 @@ interface OrderContextType {
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-const processOrders = (orders: WithId<Order>[], allStaff: WithId<Staff>[]) => {
-  if (!orders.length || !allStaff.length) {
+const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
+  if (!rawOrdersData || !Array.isArray(rawOrdersData) || !allStaff.length) {
     return { orders: [], scheduleEvents: [], statuses: [], unassignedOrders: [] };
   }
 
+  const orders: WithId<Order>[] = [];
   const newScheduleEvents: WithId<ScheduleEvent>[] = [];
   const staffStatusMap = new Map<string, StaffStatus>();
 
@@ -52,12 +49,20 @@ const processOrders = (orders: WithId<Order>[], allStaff: WithId<Staff>[]) => {
 
   const scheduledRawOrderIds = new Set<string>();
 
-  orders.forEach((order) => {
-    // 1. Process Staff Status (using raw data if available)
-    const rawOrder = order.raw;
+  rawOrdersData.forEach((rawOrder, index) => {
+    // Basic Mapping using utility
+    const mappedOrder = mapRawToOrder(rawOrder);
+    const order: WithId<Order> = {
+      ...mappedOrder,
+      id: mappedOrder.id || `order-${index}`, // Ensure ID
+      raw: rawOrder
+    };
+    orders.push(order);
+
+    // 1. Process Staff Status
     const staffMember = order.staffName ? allStaff.find(s => s.name === order.staffName) : undefined;
 
-    if (staffMember && rawOrder) {
+    if (staffMember) {
       const lastUpdateStr = findKey(rawOrder, ['最終更新日時']);
       if (lastUpdateStr) {
         const lastUpdate = new Date(lastUpdateStr);
@@ -84,16 +89,18 @@ const processOrders = (orders: WithId<Order>[], allStaff: WithId<Staff>[]) => {
 
     // 2. Process Scheduled Events
     if (staffMember && order.scheduledTime) {
-      // Check validity of date/time
       let scheduledTime: Date | null = null;
-      const dateStr = order.scheduledDate || format(new Date(), 'yyyy-MM-dd'); // Fallback if needed?
+      let dateStr = order.scheduledDate;
 
-      // Construct full ISO string if strictly time provided, or use existing ISO if full
-      // mapRawToOrder puts 'scheduledTime' as formatted HH:mm usually?
-      // Wait. Order.scheduledTime is STRING.
-      // We need to combine date + time.
+      // Ensure dateStr is valid YYYY-MM-DD
+      if (!dateStr || !isValid(parseISO(dateStr))) {
+        // If date is missing in mapped order, try to parse from raw or use Today?
+        // For direct fetch, we might rely on 'scheduledTime' containing date if it's ISO?
+        // Or fallback to today.
+        dateStr = format(new Date(), 'yyyy-MM-dd');
+      }
+
       try {
-        // If scheduledTime is HH:mm
         if (/^\d{1,2}:\d{2}$/.test(order.scheduledTime)) {
           scheduledTime = parseISO(`${dateStr}T${order.scheduledTime}`);
         } else {
@@ -105,10 +112,9 @@ const processOrders = (orders: WithId<Order>[], allStaff: WithId<Staff>[]) => {
         if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
 
         const tripId = `trip-${order.rawOrderId || order.id}`;
-
         let taskEndTime: Date;
+
         if (order.scheduledEndTime) {
-          // Handle HH:mm end time
           if (/^\d{1,2}:\d{2}$/.test(order.scheduledEndTime)) {
             taskEndTime = parseISO(`${dateStr}T${order.scheduledEndTime}`);
           } else {
@@ -150,24 +156,20 @@ const processOrders = (orders: WithId<Order>[], allStaff: WithId<Staff>[]) => {
   });
 
   // 3. Determine Unassigned Orders
-  const newUnassignedOrders = orders.filter(order => {
+  const unassignedOrders = orders.filter(order => {
     const hasRawOrderId = !!order.rawOrderId;
     const isAlreadyScheduled = order.rawOrderId ? scheduledRawOrderIds.has(order.rawOrderId) : false;
-
     if (!hasRawOrderId || isAlreadyScheduled) return false;
-
-    // If staff is assigned and time is set, it's scheduled (handled above)
     if (order.staffName && order.scheduledTime) return false;
-
-    const d = parseISO(order.scheduledDate);
-    return isValid(d);
+    // Show undated or dated-but-unassigned
+    return true;
   });
 
   return {
     orders,
     scheduleEvents: newScheduleEvents,
     statuses: Array.from(staffStatusMap.values()),
-    unassignedOrders: newUnassignedOrders
+    unassignedOrders
   };
 };
 
@@ -235,61 +237,58 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const loadOrders = useCallback(async (date: Date) => {
-    setIsLoading(true);
+  /* Removed loadOrders and syncOrders/date params */
+  const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
+
+  const fetchAndProcessData = useCallback(async (showLoading = true) => {
+    // Use state orderGasUrl
+    if (!orderGasUrl) {
+      setErrorState('GASのURLが設定されていません。');
+      if (showLoading) setIsLoading(false);
+      return;
+    }
+
+    if (showLoading) setIsLoading(true);
     setErrorState(null);
-    setCurrentDate(date); // Track current date for refetch logic
 
     try {
-      const daily = await getDailyOrdersFromFirestore(date);
-      const undated = await getNoDateOrdersFromFirestore();
+      const result = await fetchGasData(orderGasUrl);
+      if (result.error && result.message) throw new Error(result.message);
 
-      // Combine
-      const allOrders = [...undated, ...daily];
+      const newRaw = result.data || (Array.isArray(result) ? result : []);
+      setRawOrdersData(newRaw);
+    } catch (e: any) {
+      console.error("Failed to fetch from GAS:", e);
+      setErrorState(`受注データ取得エラー: ${e.message}`);
+      setRawOrdersData([]);
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  }, [orderGasUrl]);
 
-      const { scheduleEvents: backendEvents, statuses, unassignedOrders } = processOrders(allOrders, allStaff);
+  // Initial Fetch
+  useEffect(() => {
+    fetchAndProcessData(true);
+  }, [fetchAndProcessData]);
 
-      setOrders(allOrders);
+  // Process data when raw data or staff changes
+  useEffect(() => {
+    // Logic to process raw data into orders/events
+    if (isLoading && !rawOrdersData.length) return; // Wait if loading initial
+
+    try {
+      // We need processOrderData to handle raw objects
+      const { orders, scheduleEvents: backendEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff);
+
+      setOrders(orders);
       setScheduleEvents([...backendEvents, ...localScheduleEvents]);
       setStatuses(statuses);
       setUnassignedOrders(unassignedOrders);
-
-    } catch (e: any) {
-      console.error("Failed to load orders:", e);
-      setErrorState(e.message);
-    } finally {
-      setIsLoading(false);
+    } catch (e) {
+      console.error("Error processing orders:", e);
     }
-  }, [allStaff, localScheduleEvents]);
 
-  const syncOrders = useCallback(async () => {
-    setIsSyncingOrders(true);
-    setErrorState(null);
-    try {
-      const result = await syncOrdersFromGasToFirestore();
-      if (!result.success) throw new Error(result.error);
-
-      // Reload current date
-      await loadOrders(currentDate);
-    } catch (e: any) {
-      console.error("Sync failed:", e);
-      setErrorState(e.message);
-    } finally {
-      setIsSyncingOrders(false);
-    }
-  }, [currentDate, loadOrders]);
-
-  // Recalculate if staff loads late (but orders already loaded?)
-  // If orders loaded before staff, processOrders needs to run again.
-  // We can use an effect.
-  useEffect(() => {
-    if (orders.length > 0 && allStaff.length > 0) {
-      const { scheduleEvents: backendEvents, statuses, unassignedOrders: ua } = processOrders(orders, allStaff);
-      setScheduleEvents([...backendEvents, ...localScheduleEvents]);
-      setStatuses(statuses);
-      setUnassignedOrders(ua);
-    }
-  }, [allStaff, localScheduleEvents]); // orders change via loadOrders which sets states. But if allStaff updates?
+  }, [rawOrdersData, allStaff, localScheduleEvents]);
 
   const value: OrderContextType = {
     orders,
@@ -298,14 +297,15 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     scheduleEvents,
     setScheduleEvents,
     statuses,
-    loadOrders,
-    syncOrders,
+    // Compat stubs for interface (although we should update interface too, but for speed just stub)
+    loadOrders: async () => { },
+    syncOrders: async () => { await fetchAndProcessData(false); },
     isLoading,
-    isSyncingOrders,
+    isSyncingOrders: isLoading, // map to loading
     error,
     saveLocalEvent,
-    refetchOrders: () => loadOrders(currentDate),
-    rawOrdersData: orders,
+    refetchOrders: async () => { await fetchAndProcessData(false); },
+    rawOrdersData: orders, // mapped orders
     orderGasUrl,
     setOrderGasUrl
   };

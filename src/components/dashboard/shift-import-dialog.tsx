@@ -362,18 +362,9 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                 // Close dialog immediately to prevent UI blocking
                 setIsOpen(false);
                 setParsedData([]);
-                toast({ title: 'シフト取込完了', description: 'シフトデータの保存が完了しました。続けて案件データの同期をバックグラウンドで開始します。' });
-
-                // Trigger Order Sync to Firestore in background
-                syncOrdersFromGasToFirestore().then((syncResult) => {
-                    if (syncResult.success) {
-                        toast({ title: '同期完了', description: `シフトと案件データ(${syncResult.count}件)の同期が完了しました。` });
-                    } else {
-                        toast({ variant: 'destructive', title: '案件同期エラー', description: `案件同期に失敗しました: ${syncResult.error}` });
-                    }
-                }).catch((syncError: any) => {
-                    console.error("Auto-sync failed:", syncError);
-                    toast({ variant: 'destructive', title: '案件同期エラー', description: `案件同期に失敗しました: ${syncError.message}` });
+                toast({
+                    title: "シフト登録完了",
+                    description: `${finalBatchRecords.length}件のシフトデータを登録しました。`,
                 });
 
                 // For batch upload, we might not need specific args for onUpload if it just triggers a refresh.
