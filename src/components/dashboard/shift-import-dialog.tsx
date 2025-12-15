@@ -17,6 +17,7 @@ import { useToast } from '../../hooks/use-toast';
 import { read, utils } from 'xlsx';
 import { format, parse, isValid } from 'date-fns';
 import { saveDailyAttendanceBatch, getMonthlyAttendance } from '../../services/attendance-service';
+import { syncOrdersFromGasToFirestore } from '../../services/order-service';
 import { Loader2, Upload } from 'lucide-react';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';
 import type { WithId, Staff } from '../../lib/types';
@@ -358,8 +359,20 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                 // Execute batch
                 await saveDailyAttendanceBatch(finalBatchRecords);
 
+                // Trigger Order Sync to Firestore to ensure Dashboard is fast and up-to-date
+                try {
+                    toast({ title: 'シフト取込完了', description: '続けて案件データの同期を実行しています...' });
+                    const syncResult = await syncOrdersFromGasToFirestore();
+                    if (syncResult.success) {
+                        toast({ title: '同期完了', description: `シフトと案件データ(${syncResult.count}件)の同期が完了しました。` });
+                    } else {
+                        toast({ variant: 'destructive', title: '案件同期エラー', description: `シフトは保存されましたが、案件同期に失敗しました: ${syncResult.error}` });
+                    }
+                } catch (syncError: any) {
+                    console.error("Auto-sync failed:", syncError);
+                    toast({ variant: 'destructive', title: '案件同期エラー', description: `シフトは保存されましたが、案件同期に失敗しました: ${syncError.message}` });
+                }
 
-                toast({ title: 'インポート完了', description: `${batchRecords.length}日分のシフトを取り込みました。` });
                 setIsOpen(false);
                 setParsedData([]);
                 // For batch upload, we might not need specific args for onUpload if it just triggers a refresh.
