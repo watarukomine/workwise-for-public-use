@@ -359,26 +359,24 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                 // Execute batch
                 await saveDailyAttendanceBatch(finalBatchRecords);
 
-                // Trigger Order Sync to Firestore to ensure Dashboard is fast and up-to-date
-                try {
-                    toast({ title: 'シフト取込完了', description: '続けて案件データの同期を実行しています...' });
-                    const syncResult = await syncOrdersFromGasToFirestore();
+                // Close dialog immediately to prevent UI blocking
+                setIsOpen(false);
+                setParsedData([]);
+                toast({ title: 'シフト取込完了', description: 'シフトデータの保存が完了しました。続けて案件データの同期をバックグラウンドで開始します。' });
+
+                // Trigger Order Sync to Firestore in background
+                syncOrdersFromGasToFirestore().then((syncResult) => {
                     if (syncResult.success) {
                         toast({ title: '同期完了', description: `シフトと案件データ(${syncResult.count}件)の同期が完了しました。` });
                     } else {
-                        toast({ variant: 'destructive', title: '案件同期エラー', description: `シフトは保存されましたが、案件同期に失敗しました: ${syncResult.error}` });
+                        toast({ variant: 'destructive', title: '案件同期エラー', description: `案件同期に失敗しました: ${syncResult.error}` });
                     }
-                } catch (syncError: any) {
+                }).catch((syncError: any) => {
                     console.error("Auto-sync failed:", syncError);
-                    toast({ variant: 'destructive', title: '案件同期エラー', description: `シフトは保存されましたが、案件同期に失敗しました: ${syncError.message}` });
-                }
+                    toast({ variant: 'destructive', title: '案件同期エラー', description: `案件同期に失敗しました: ${syncError.message}` });
+                });
 
-                setIsOpen(false);
-                setParsedData([]);
                 // For batch upload, we might not need specific args for onUpload if it just triggers a refresh.
-                // However, the signature requires (date, staffIds).
-                // We'll pass the first record's data to trigger the refresh, or we might need to adjust the prop type.
-                // For now, let's just trigger it with the first date found to ensure refresh happens.
                 if (batchRecords.length > 0) {
                     onUpload(batchRecords[0].date, batchRecords[0].staffIds);
                 }
@@ -476,12 +474,12 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                     )}
                 </div>
 
-                <DialogFooter>
-                    <Button type="button" variant="ghost" size="sm" onClick={handleTestConnection} className="mr-auto text-xs">
+                <DialogFooter className="sm:justify-between">
+                    <Button type="button" variant="ghost" size="sm" onClick={handleTestConnection} className="text-xs">
                         接続テスト
                     </Button>
-                    <Button type="button" variant="secondary" onClick={() => setIsOpen(false)}>キャンセル</Button>
-                    <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                        <Button type="button" variant="secondary" onClick={() => setIsOpen(false)}>キャンセル</Button>
                         <Button onClick={handleImport} disabled={isLoading || parsedData.length === 0}>
                             {isLoading ? 'インポート中...' : 'インポート実行'}
                         </Button>
