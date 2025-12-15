@@ -103,7 +103,14 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
         if (/^\d{1,2}:\d{2}$/.test(order.scheduledTime)) {
           scheduledTime = parseISO(`${dateStr}T${order.scheduledTime}`);
         } else {
-          scheduledTime = parseISO(order.scheduledTime);
+          // If existing ISO string (likely 1899 date from GAS), extract time and apply to dateStr
+          const timeComponent = parseISO(order.scheduledTime);
+          if (isValid(timeComponent)) {
+            const timeStr = format(timeComponent, 'HH:mm:ss');
+            scheduledTime = parseISO(`${dateStr}T${timeStr}`);
+          } else {
+            scheduledTime = parseISO(order.scheduledTime);
+          }
         }
       } catch (e) { }
 
