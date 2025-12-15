@@ -286,11 +286,6 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
       return true;
     }
 
-    // Show backlog: Past date AND Unassigned status
-    if (scheduledDate < startOfDay(date) && order.status === '未割当') {
-      return true;
-    }
-
     return false;
   });
 
