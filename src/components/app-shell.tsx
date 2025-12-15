@@ -203,7 +203,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )
     }
 
-    const showLoginButton = !profile && pathname !== '/login';
+    const showLoginButton = !profile && pathname !== '/login' && pathname !== '/order-form';
 
     if (isMobile) {
         return (

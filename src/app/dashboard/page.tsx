@@ -15,6 +15,7 @@ import { VerticalScheduleView } from '../../components/dashboard/vertical-schedu
 import { Switch } from '../../components/ui/switch';
 import { Label } from '../../components/ui/label';
 import { useAppShell } from '../../components/app-shell';
+import { ShareOrderFormModal } from '../../components/dashboard/share-order-form-modal';
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -342,6 +343,8 @@ export default function DashboardPage() {
           </div>
           <div className="hidden md:flex items-center space-x-2">
             <div className="flex items-center space-x-2 mr-4">
+              <ShareOrderFormModal />
+              <div className="w-px h-6 bg-border mx-2" />
               <Button
                 variant="outline"
                 size="sm"
@@ -393,6 +396,6 @@ export default function DashboardPage() {
           />
         )}
       </div>
-    </div>
+    </div >
   );
 }
