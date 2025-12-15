@@ -31,13 +31,13 @@ async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
             cache: 'no-store',
             redirect: 'follow',
         });
-        
+
         console.log("GAS response status:", response.status);
 
         if (response.redirected && response.url.includes('accounts.google.com')) {
-             throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
+            throw new Error('GASへのアクセス権限がありません。GASのデプロイ設定で「アクセスできるユーザー」を「全員」にしてください。');
         }
-        
+
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`GASへのリクエストに失敗しました。 Status: ${response.status}. Response: ${errorText}`);
@@ -45,7 +45,7 @@ async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
 
         const result = await response.json();
         console.log("GAS response:", result);
-        
+
         if (result.status === 'error' || result.error) {
             const errorMessage = result.message || 'GASスクリプトでエラーが発生しました。';
             throw new Error(`GASスクリプトエラー: ${errorMessage}`);
@@ -90,4 +90,28 @@ export async function sendIcsEmail(args: {
     isUpdate: boolean;
 }): Promise<GasResponse> {
     return callGasApi({ ...args, operation: 'sendEmail' });
+}
+
+export async function createOrder(args: {
+    gasUrl: string;
+    userCode: string;
+    storeName: string;
+    scheduledDate: string;
+    scheduledTime: string;
+    picName: string;
+    orderNo?: string;
+    comment?: string;
+    carName?: string;
+    regNo: string;
+    status?: string;
+    tireNumber: string;
+    tireSize: string;
+    productName?: string;
+    quantity: string;
+    sensor?: string;
+    arrangement?: string;
+    disposal: string;
+    contact: string;
+}): Promise<GasResponse> {
+    return callGasApi({ ...args, action: 'createOrder' });
 }
