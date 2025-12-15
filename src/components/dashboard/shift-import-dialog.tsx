@@ -410,7 +410,7 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                     「空欄＝出勤」のルールにも対応しています。
                 </DialogDescription>
 
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-4 py-4 overflow-y-auto min-h-0 flex-1 px-1">
                     <div className="grid w-full max-w-sm items-center gap-1.5">
                         <Label htmlFor="target-month">対象年月</Label>
                         <Input
