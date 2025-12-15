@@ -65,7 +65,7 @@ export function getSdks(firebaseApp: FirebaseApp) {
       localCache: memoryLocalCache(),
       // @ts-ignore
       useFetchStreams: false,
-    });
+    }, 'workwise');
     console.log('[Firestore] Successfully initialized with experimentalForceLongPolling: true');
   } catch (e: any) {
     if (e.code === 'failed-precondition') {
@@ -74,7 +74,7 @@ export function getSdks(firebaseApp: FirebaseApp) {
       console.warn('[Firestore] Initialization warning:', e);
     }
     // If already initialized, get the existing instance
-    firestore = getFirestore(firebaseApp);
+    firestore = getFirestore(firebaseApp, 'workwise');
   }
 
   return {
