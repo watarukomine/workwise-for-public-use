@@ -56,8 +56,25 @@ export function initializeFirebase() {
 export function getSdks(firebaseApp: FirebaseApp) {
   const region = 'asia-northeast1';
 
-  // Initialize Firestore with specific database ID 'workwise'
-  const firestore = getFirestore(firebaseApp, 'workwise');
+  let firestore;
+  try {
+    // Attempt to initialize with Long Polling (User requested to keep this)
+    firestore = initializeFirestore(firebaseApp, {
+      experimentalForceLongPolling: true,
+      localCache: memoryLocalCache(),
+      // @ts-ignore
+      useFetchStreams: false,
+    }, 'workwise');
+    console.log('[Firestore] Successfully initialized with experimentalForceLongPolling: true');
+  } catch (e: any) {
+    if (e.code === 'failed-precondition') {
+      console.log('[Firestore] Already initialized. Using existing instance. (Assuming Long Polling was set on first init)');
+    } else {
+      console.warn('[Firestore] Initialization warning:', e);
+    }
+    // If already initialized, get the existing instance
+    firestore = getFirestore(firebaseApp, 'workwise');
+  }
 
   return {
     firebaseApp,
