@@ -234,8 +234,18 @@ export default function DashboardPage() {
     return filteredStaff.map(staff => {
       // 1. Get Base Status from Order Context
       const orderStatusObj = statuses.find(s => s.staffId === staff.id);
-      let displayStatus = orderStatusObj?.status || '未割当';
-      const lastAction = orderStatusObj?.lastAction || '';
+
+      let displayStatus = '未割当';
+      let lastAction = '情報なし';
+
+      // Check if status update is from TODAY. If old, ignore it (reset to daily start).
+      if (orderStatusObj?.lastUpdate) {
+        const lastUpdateDate = new Date(orderStatusObj.lastUpdate);
+        if (isToday(lastUpdateDate)) {
+          displayStatus = orderStatusObj.status || '未割当';
+          lastAction = orderStatusObj.lastAction || '';
+        }
+      }
 
       // 2. Map Raw Statuses to User Requested Display
       if (displayStatus === '移動開始' || displayStatus === '移動中') displayStatus = '移動中';
@@ -249,13 +259,11 @@ export default function DashboardPage() {
       if (displayStatus === '待機中' || displayStatus === '未割当') {
         // If "Clocked In" (in selectedStaffIds) AND no specific last action implying work completion?
         // User said: "Clock In -> 出勤済". "Work Complete -> 待機中".
-        // Typically, fresh clock-in has displayStatus='未割当' or '待機中' depending on initialization.
-        // If `lastAction` is '情報なし' (default in context), we can say '出勤済'.
         if (appliedSelectedStaffIds.includes(staff.id)) {
           if (lastAction === '情報なし' || displayStatus === '未割当') {
             displayStatus = '出勤済';
           } else {
-            // If we have history, it's '待機中' (Waiting for next order)
+            // If we have history today, it's '待機中' (Waiting for next order)
             displayStatus = '待機中';
           }
         }
