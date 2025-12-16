@@ -350,18 +350,7 @@ export default function DashboardPage() {
           <div className="hidden md:flex items-center space-x-2">
             <div className="flex items-center space-x-2 mr-4">
               <ShareOrderFormModal />
-              <div className="w-px h-6 bg-border mx-2" />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => syncOrders()}
-                disabled={isSyncingOrders}
-                className="hidden sm:flex"
-              >
-                <RefreshCw className={`mr-2 h-3 w-3 ${isSyncingOrders ? 'animate-spin' : ''}`} />
-                シフト同期
-              </Button>
-              <div className="w-px h-6 bg-border mx-2" />
+
               <Switch
                 id="mobile-view"
                 checked={forceMobileView}
@@ -401,10 +390,7 @@ export default function DashboardPage() {
                     <ShareOrderFormModal />
                   </div>
                 </div>
-                <DropdownMenuItem onClick={() => syncOrders()} className="cursor-pointer">
-                  <RefreshCw className={`mr-2 h-4 w-4 ${isSyncingOrders ? 'animate-spin' : ''}`} />
-                  シフト同期
-                </DropdownMenuItem>
+
                 <DropdownMenuItem className="p-2">
                   <div className="flex items-center justify-between w-full">
                     <Label htmlFor="mobile-view-m" className="cursor-pointer flex items-center gap-2">
