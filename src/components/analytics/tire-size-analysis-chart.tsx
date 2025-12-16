@@ -90,8 +90,21 @@ export function TireSizeAnalysisChart({ orders }: TireSizeAnalysisChartProps) {
 
     }, [orders]);
 
+    // If no data, show empty state in card
     if (data.length === 0) {
-        return null; // Don't show if no data
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>タイヤサイズ別 平均作業時間</CardTitle>
+                    <CardDescription>インチ数ごとの平均実作業時間（分）</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground border border-dashed rounded-md bg-slate-50">
+                        データがありません
+                    </div>
+                </CardContent>
+            </Card>
+        );
     }
 
     return (

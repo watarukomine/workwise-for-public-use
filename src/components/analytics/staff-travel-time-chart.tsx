@@ -52,8 +52,21 @@ export function StaffTravelTimeChart({ orders }: StaffTravelTimeChartProps) {
 
     }, [orders]);
 
+    // If no data, show empty state in card
     if (data.length === 0) {
-        return null;
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>スタッフ別 移動時間分析</CardTitle>
+                    <CardDescription>総移動時間（時間）と平均移動時間（分 / 回）</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground border border-dashed rounded-md bg-slate-50">
+                        データがありません
+                    </div>
+                </CardContent>
+            </Card>
+        );
     }
 
     return (
