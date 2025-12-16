@@ -388,6 +388,12 @@ export default function DashboardPage() {
 
           {/* Mobile Actions */}
           <div className="flex md:hidden items-center ml-auto gap-1">
+            <Button variant="ghost" size="icon" asChild className="mr-1">
+              <Link href="/order-form">
+                <ExternalLink className="h-5 w-5" />
+              </Link>
+            </Button>
+            <ShareOrderFormModal variant="icon" />
             <AttendanceControls variant="compact" />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 
-export function ShareOrderFormModal() {
+export function ShareOrderFormModal({ variant = 'default' }: { variant?: 'default' | 'icon' }) {
     const [url, setUrl] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -61,15 +61,23 @@ export function ShareOrderFormModal() {
 
     return (
         <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={openOrderForm} className="hidden sm:flex">
-                <ExternalLink className="mr-2 h-4 w-4" />
-                フォームを開く
-            </Button>
+            {variant === 'default' && (
+                <Button variant="outline" size="sm" onClick={openOrderForm} className="hidden sm:flex">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    フォームを開く
+                </Button>
+            )}
 
-            <Button variant="outline" size="sm" onClick={handleShare}>
-                <Share2 className="mr-2 h-4 w-4" />
-                共有
-            </Button>
+            {variant === 'default' ? (
+                <Button variant="outline" size="sm" onClick={handleShare}>
+                    <Share2 className="mr-2 h-4 w-4" />
+                    共有
+                </Button>
+            ) : (
+                <Button variant="ghost" size="icon" onClick={handleShare}>
+                    <Share2 className="h-4 w-4" />
+                </Button>
+            )}
 
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
                 <DialogContent className="sm:max-w-md">
