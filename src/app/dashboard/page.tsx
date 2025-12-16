@@ -10,6 +10,7 @@ import { useCustomer } from '../../contexts/customer-context';
 import { Button } from '../../components/ui/button';
 import { useOrder } from '../../contexts/order-context';
 import { format, isToday, addDays, subDays, parseISO, isValid, isEqual, startOfDay, startOfToday, isSameDay } from 'date-fns';
+import { ja } from 'date-fns/locale';
 import { useIsMobile } from '../../hooks/use-mobile';
 import { VerticalScheduleView } from '../../components/dashboard/vertical-schedule-view';
 import { Switch } from '../../components/ui/switch';
@@ -334,9 +335,10 @@ export default function DashboardPage() {
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <div className="px-3 py-1 min-w-[120px] text-center font-medium bg-background rounded-md shadow-sm border text-sm">
-                {format(currentDate, 'yyyy年MM月dd日')}
-                {isSyncing && <Loader2 className="inline ml-2 h-3 w-3 animate-spin text-muted-foreground" />}
+              <div className="px-2 sm:px-3 py-1 min-w-[80px] sm:min-w-[120px] text-center font-medium bg-background rounded-md shadow-sm border text-sm">
+                <span className="hidden sm:inline">{format(currentDate, 'yyyy年MM月dd日', { locale: ja })}</span>
+                <span className="sm:hidden">{format(currentDate, 'M/d(EEE)', { locale: ja })}</span>
+                {isSyncing && <Loader2 className="inline ml-1 sm:ml-2 h-3 w-3 animate-spin text-muted-foreground" />}
               </div>
               <Button
                 variant="ghost"
