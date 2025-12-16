@@ -299,7 +299,7 @@ export const saveDailyAttendance = async (date: Date, staffIds: string[]): Promi
 /**
  * Fetches attendance data including checkedOutIds.
  */
-export const getDailyAttendanceDetails = async (date: Date): Promise<{ staffIds: string[], checkedOutIds: string[] }> => {
+export const getDailyAttendanceDetails = async (date: Date): Promise<{ staffIds: string[], checkedOutIds: string[], scheduledStaffIds: string[] }> => {
     const docId = getAttendanceDocId(date);
     try {
         const db = getDb();
@@ -310,15 +310,56 @@ export const getDailyAttendanceDetails = async (date: Date): Promise<{ staffIds:
             const data = docSnap.data();
             return {
                 staffIds: (data.staffIds as string[]) || [],
-                checkedOutIds: (data.checkedOutIds as string[]) || []
+                checkedOutIds: (data.checkedOutIds as string[]) || [],
+                scheduledStaffIds: (data.scheduledStaffIds as string[]) || []
             };
         }
-        return { staffIds: [], checkedOutIds: [] };
+        return { staffIds: [], checkedOutIds: [], scheduledStaffIds: [] };
     } catch (error) {
         console.warn(`[AttendanceService] SDK fetch details failed, returning empty structure...`, error);
         // Fallback to purely 'staffIds' from normal getter if we wanted, but for now just return empty or minimal.
         const simpleIds = await getDailyAttendance(date);
-        return { staffIds: simpleIds || [], checkedOutIds: [] };
+        return { staffIds: simpleIds || [], checkedOutIds: [], scheduledStaffIds: [] };
+    }
+};
+
+/**
+ * Saves monthly scheduled staff (Shift Import) in batch.
+ */
+export const saveDailyScheduledBatch = async (records: { date: Date; staffIds: string[] }[]): Promise<void> => {
+    const db = getDb();
+
+    // Process in chunks of 500
+    const chunkDetails = [];
+    for (let i = 0; i < records.length; i += 500) {
+        chunkDetails.push(records.slice(i, i + 500));
+    }
+
+    for (const chunk of chunkDetails) {
+        const batch = writeBatch(db);
+        chunk.forEach(record => {
+            const docId = getAttendanceDocId(record.date);
+            const docRef = doc(db, COLLECTION_NAME, docId);
+            batch.set(docRef, {
+                id: docId,
+                date: record.date,
+                scheduledStaffIds: record.staffIds, // Write to scheduledStaffIds
+                updatedAt: serverTimestamp(),
+            }, { merge: true });
+        });
+
+        // Add a timeout to batch commit
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Batch Timeout (5s)')), 5000)
+        );
+
+        try {
+            await Promise.race([batch.commit(), timeoutPromise]);
+            console.log(`Scheduled Batch saved ${records.length} records.`);
+        } catch (batchError) {
+            console.error('Scheduled Batch save failed, skipping REST fallback for now (complicated for schedule):', batchError);
+            throw batchError;
+        }
     }
 };
 

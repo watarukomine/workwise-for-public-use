@@ -176,12 +176,12 @@ export default function DashboardPage() {
 
       try {
         // 1. Fetch explicitly attended staff from Firestore with details
-        const { staffIds: attendedStaffIds, checkedOutIds = [] } = await getDailyAttendanceDetails(currentDate);
+        const { staffIds: attendedStaffIds, checkedOutIds = [], scheduledStaffIds = [] } = await getDailyAttendanceDetails(currentDate);
         setCheckedOutStaffIds(new Set(checkedOutIds));
         setPresentStaffIds(new Set(attendedStaffIds));
 
         // 3. Merge lists
-        const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...Array.from(staffWithOrders)]));
+        const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...scheduledStaffIds, ...Array.from(staffWithOrders)]));
 
         if (combinedStaffIds.length > 0) {
           if (isRealDateSwitch) {

@@ -16,7 +16,7 @@ import { Label } from '../ui/label';
 import { useToast } from '../../hooks/use-toast';
 import { read, utils } from 'xlsx';
 import { format, parse, isValid } from 'date-fns';
-import { saveDailyAttendanceBatch, getMonthlyAttendance } from '../../services/attendance-service';
+import { saveDailyAttendanceBatch, saveDailyScheduledBatch, getMonthlyAttendance } from '../../services/attendance-service';
 import { syncOrdersFromGasToFirestore } from '../../services/order-service';
 import { Loader2, Upload } from 'lucide-react';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';

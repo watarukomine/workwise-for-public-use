@@ -100,5 +100,6 @@ export type DailyAttendance = {
   date: string; // YYYY-MM-DD
   staffIds: string[];
   checkedOutIds?: string[]; // New field for managing clock-out status
+  scheduledStaffIds?: string[]; // New field for shift schedule
   updatedAt?: Timestamp;
 };
