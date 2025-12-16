@@ -48,7 +48,7 @@ export default function OrderFormPage() {
         resolver: zodResolver(orderFormSchema),
         defaultValues: {
             status: 'お預かり済',
-            disposal: '有',
+            disposal: '回収有り：廃タイヤラベル在庫有り',
             quantity: '4',
             sensor: '無', // Default to '無' as it's common
             arrangement: '手配済み（自社在庫使用）', // Default pick
@@ -219,8 +219,9 @@ export default function OrderFormPage() {
                                     <div className="space-y-2">
                                         <Label htmlFor="disposal">廃タイヤ処分 <span className="text-red-500">*</span></Label>
                                         <select id="disposal" {...register('disposal')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                                            <option value="有">有</option>
-                                            <option value="無">無</option>
+                                            <option value="回収有り：廃タイヤラベル在庫有り">回収有り：廃タイヤラベル在庫有り</option>
+                                            <option value="回収有り：廃タイヤラベル未手配(TMP手配）">回収有り：廃タイヤラベル未手配(TMP手配）</option>
+                                            <option value="回収なし">回収なし</option>
                                         </select>
                                     </div>
                                     <div className="space-y-2">
