@@ -275,12 +275,12 @@ export default function OrderFormPage() {
                             <div className="space-y-4 pt-4">
                                 <h3 className="text-lg font-medium border-b pb-2">その他</h3>
                                 <div className="space-y-2">
-                                    <Label htmlFor="orderNo">受注No (リカバリー1 / 8桁以内)</Label>
+                                    <Label htmlFor="orderNo">受注No (リマーク1 / 8桁以内)</Label>
                                     <Input id="orderNo" {...register('orderNo')} />
                                     {errors.orderNo && <p className="text-red-500 text-xs">{errors.orderNo.message}</p>}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="comment">任意コメント (リカバリー2 / 10桁以内)</Label>
+                                    <Label htmlFor="comment">任意コメント (リマーク2 / 10桁以内)</Label>
                                     <Input id="comment" {...register('comment')} />
                                     {errors.comment && <p className="text-red-500 text-xs">{errors.comment.message}</p>}
                                 </div>
