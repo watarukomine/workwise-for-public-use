@@ -19,8 +19,8 @@ import { ORDER_GAS_URL } from '@/lib/settings';
 const orderFormSchema = z.object({
     userCode: z.string().min(5, 'ユーザーコードは5桁で入力してください').max(5, 'ユーザーコードは5桁で入力してください').regex(/^\d+$/, '数字のみで入力してください'),
     storeName: z.string().min(1, '店舗名（お取引先様名）は必須です'),
-    workLocation: z.enum(['店舗', '配送のみ', '持ち帰り'], {
-        required_error: '作業場所を選択してください',
+    workType: z.enum(['販売店店舗内作業', 'TCC作業', '持ち帰り作業', '配送のみ'], {
+        required_error: '作業を選択してください',
     }),
     scheduledDate: z.string().min(1, '作業予定日は必須です'),
     scheduledTime: z.string().min(1, '予定時間は必須です'),
@@ -55,7 +55,7 @@ export default function OrderFormPage() {
             quantity: '4',
             sensor: '無', // Default to '無' as it's common
             arrangement: '手配済み（自社在庫使用）', // Default pick
-            workLocation: '店舗', // Default
+            workType: '販売店店舗内作業', // Default
         }
     });
 
@@ -154,13 +154,14 @@ export default function OrderFormPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="workLocation">作業場所 <span className="text-red-500">*</span></Label>
-                                        <select id="workLocation" {...register('workLocation')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                                            <option value="店舗">店舗</option>
+                                        <Label htmlFor="workType">作業 <span className="text-red-500">*</span></Label>
+                                        <select id="workType" {...register('workType')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                                            <option value="販売店店舗内作業">販売店店舗内作業</option>
+                                            <option value="TCC作業">TCC作業</option>
+                                            <option value="持ち帰り作業">持ち帰り作業</option>
                                             <option value="配送のみ">配送のみ</option>
-                                            <option value="持ち帰り">持ち帰り</option>
                                         </select>
-                                        {errors.workLocation && <p className="text-red-500 text-xs">{errors.workLocation.message}</p>}
+                                        {errors.workType && <p className="text-red-500 text-xs">{errors.workType.message}</p>}
                                     </div>
                                 </div>
 
