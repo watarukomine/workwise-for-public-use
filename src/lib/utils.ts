@@ -74,7 +74,7 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
   const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
   const scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定']);
 
-  const customerName = findKey(rawOrder, ['お取引先名', '店舗', '取引先']) || '';
+  const customerName = findKey(rawOrder, ['お取引先名', '店舗名', '店舗', '取引先']) || '';
 
   // Extract tire size - try multiple possible column names
   const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ', 'タイヤ']) || '';
@@ -95,7 +95,7 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     scheduledTime: scheduledTime || '',
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     value: parseFloat(findKey(rawOrder, ['金額']) || 0),
-    staffName: findKey(rawOrder, ['担当']) || '',
+    staffName: findKey(rawOrder, ['担当', 'スタッフ名']) || '',
     customerName: customerName,
     address: findKey(rawOrder, ['住所', 'Address']) || '',
     scheduledEndTime: findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime']) || '',
