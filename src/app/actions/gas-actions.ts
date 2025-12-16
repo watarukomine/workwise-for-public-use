@@ -96,6 +96,7 @@ export async function createOrder(args: {
     gasUrl: string;
     userCode: string;
     storeName: string;
+    workLocation: string;
     scheduledDate: string;
     scheduledTime: string;
     picName: string;

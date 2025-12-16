@@ -117,7 +117,7 @@ function createOrder(data) {
             "'" + data.scheduledDate, // E: 作業予定日
             "'" + data.scheduledTime, // F: 予定時間
             data.picName,         // G: ご担当者様
-            '店舗',                // H: 作業場所 (デフォルト「店舗」)
+            data.workLocation || '店舗', // H: 作業場所 (デフォルト「店舗」)
             data.orderNo,         // I: 受注No(リマーク1)
             data.comment,         // J: 任意コメント(リマーク2)
             data.carName,         // K: 車名
