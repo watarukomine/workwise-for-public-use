@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useOrder } from '@/contexts/order-context';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
+import { useUserProfile } from '@/hooks/use-user-profile';
 import { StaffWorkloadChart } from './staff-workload-chart';
 import { TireSizeAnalysisChart } from './tire-size-analysis-chart';
 import { StaffTravelTimeChart } from './staff-travel-time-chart';
@@ -21,6 +22,7 @@ import { Staff, Order } from '@/lib/types';
 export function AnalyticsDashboard() {
     const { orders: allOrders = [], isLoading: isOrdersLoading } = useOrder();
     const { allStaff = [], isLoading: isStaffLoading } = useSelectedStaff();
+    const { profile, isLoading: isProfileLoading } = useUserProfile();
     const [dateRange, setDateRange] = useState('this-month');
 
     // Filter Logic
@@ -166,8 +168,17 @@ export function AnalyticsDashboard() {
         await exportToPDF(title, headers, data, title);
     };
 
-    if (isOrdersLoading || isStaffLoading) {
+    if (isOrdersLoading || isStaffLoading || isProfileLoading) {
         return <div className="p-8 text-center">データを読み込んでいます...</div>;
+    }
+
+    if (!profile || profile.role !== 'admin') {
+        return (
+            <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                <p className="text-lg font-semibold mb-2">アクセス権限がありません</p>
+                <p>このページを表示するには管理者権限が必要です。</p>
+            </div>
+        );
     }
 
     return (
