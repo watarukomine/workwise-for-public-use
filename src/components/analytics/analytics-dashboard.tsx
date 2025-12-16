@@ -4,8 +4,16 @@ import { useState, useMemo } from 'react';
 import { useOrder } from '@/contexts/order-context';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { StaffWorkloadChart } from './staff-workload-chart';
-import { ShopDistributionChart } from './shop-distribution-chart';
-import { Button } from '@/components/ui/button';
+import { TireSizeAnalysisChart } from './tire-size-analysis-chart';
+import { StaffTravelTimeChart } from './staff-travel-time-chart';
+
+// ... (in AnalyticsDashboard component)
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <StaffWorkloadChart data={staffWorkloadData} />
+    <ShopDistributionChart data={shopDistributionData} />
+    <TireSizeAnalysisChart orders={filteredData.orders} />
+</div>
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { exportToExcel, exportToPDF } from '@/lib/export-utils';
@@ -194,6 +202,8 @@ export function AnalyticsDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <StaffWorkloadChart data={staffWorkloadData} />
                 <ShopDistributionChart data={shopDistributionData} />
+                <TireSizeAnalysisChart orders={filteredData.orders} />
+                <StaffTravelTimeChart orders={filteredData.orders} />
             </div>
 
             <Card>

@@ -60,6 +60,8 @@ export type Order = {
   staffId?: string; // Added field
   actualStartTime?: Date; // Added for analytics
   actualEndTime?: Date; // Added for analytics
+  startTravelTime?: Date; // Added for travel analysis
+  arrivalTimestamp?: Date; // Added for travel analysis
   equipmentStatus?: string;
   tireSize?: string;
   taskCalendarEventId?: string;

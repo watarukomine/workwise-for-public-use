@@ -107,6 +107,14 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
       const val = findKey(rawOrder, ['作業完了時間', '作業終了時間', '終了時間', 'completionTime', 'completedAt', 'actualEndTime', 'finishedAt']);
       return val ? new Date(val) : undefined;
     })(),
+    startTravelTime: (() => {
+      const val = findKey(rawOrder, ['移動開始', 'startTravel']);
+      return val ? new Date(val) : undefined;
+    })(),
+    arrivalTimestamp: (() => {
+      const val = findKey(rawOrder, ['現場到着', 'arrive']);
+      return val ? new Date(val) : undefined;
+    })(),
     equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
     tireSize: tireSize,
     '本数': findKey(rawOrder, ['本数', 'honsu']) || '',
