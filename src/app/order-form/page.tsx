@@ -47,9 +47,11 @@ export default function OrderFormPage() {
     const form = useForm<OrderFormValues>({
         resolver: zodResolver(orderFormSchema),
         defaultValues: {
-            status: 'お預かり済', // Default as per example list hint? Or empty? User said "入庫状況（お預かり済・お客待ち）". Let's assume select.
+            status: 'お預かり済',
             disposal: '有',
             quantity: '4',
+            sensor: '無', // Default to '無' as it's common
+            arrangement: '手配済み（自社在庫使用）', // Default pick
         }
     });
 
@@ -129,7 +131,7 @@ export default function OrderFormPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="storeName">店舗名（お取引先様名） <span className="text-red-500">*</span></Label>
+                                        <Label htmlFor="storeName">店舗名 <span className="text-red-500">*</span></Label>
                                         <Input id="storeName" {...register('storeName')} className={errors.storeName ? "border-red-500" : ""} />
                                         {errors.storeName && <p className="text-red-500 text-xs">{errors.storeName.message}</p>}
                                     </div>
@@ -223,13 +225,20 @@ export default function OrderFormPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="sensor">空気圧センサー/パッキン交換</Label>
-                                        <Input id="sensor" {...register('sensor')} />
+                                        <select id="sensor" {...register('sensor')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                                            <option value="有">有</option>
+                                            <option value="無">無</option>
+                                        </select>
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="arrangement">タイヤ手配状況</Label>
-                                    <Input id="arrangement" {...register('arrangement')} />
+                                    <select id="arrangement" {...register('arrangement')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                                        <option value="手配済み（自社在庫使用）">手配済み（自社在庫使用）</option>
+                                        <option value="TMP手配">TMP手配</option>
+                                        <option value="委託在庫使用">委託在庫使用</option>
+                                    </select>
                                 </div>
                             </div>
 
