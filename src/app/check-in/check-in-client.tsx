@@ -11,7 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
+import { updateStaffStatus } from '@/services/attendance-service';
 import type { StaffStatus } from '@/lib/types';
+
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 
@@ -50,17 +52,34 @@ export function CheckInClient() {
     const now = new Date();
 
     // Actions that don't require location or sheet updates
+    // Actions that don't require location or sheet updates (Clock In/Out now uses Firestore)
     if (action === 'Clock In' || action === 'Clock Out') {
       console.log(`Action: ${action}`);
-      setTimeout(() => {
+
+      try {
+        if (!profile?.id) {
+          throw new Error("ユーザー情報を取得できませんでした。再ログインしてください。");
+        }
+
+        const status = action === 'Clock In' ? 'present' : 'checked_out';
+        await updateStaffStatus(now, profile.id, status);
+
         const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
         setLastAction({ action, time: currentTime });
         toast({
           title: 'アクションを記録しました',
           description: `${getJapaneseActionName(action)} at ${currentTime}`,
         });
+      } catch (e: any) {
+        console.error("Clock In/Out failed:", e);
+        toast({
+          variant: 'destructive',
+          title: 'エラー',
+          description: `記録に失敗しました: ${e.message}`
+        });
+      } finally {
         setIsLoading(null);
-      }, 1000);
+      }
       return;
     }
 
