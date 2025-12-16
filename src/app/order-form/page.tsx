@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { createOrder } from '@/app/actions/gas-actions';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
 // Schema definition
@@ -113,6 +113,19 @@ export default function OrderFormPage() {
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-extrabold text-gray-900">タイヤ作業 ご注文フォーム</h1>
                     <p className="mt-2 text-gray-600">以下の項目にご入力の上、送信ボタンを押してください。</p>
+                </div>
+
+                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 shadow-sm rounded-r-md">
+                    <div className="flex items-start">
+                        <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 mr-3 shrink-0" />
+                        <div>
+                            <h3 className="text-sm font-bold text-amber-800 mb-1">作業要請に関するお願い</h3>
+                            <p className="text-sm text-amber-700 leading-relaxed">
+                                タイヤサイズ19インチ以上の作業につきましては弊社店舗持ち帰り作業をお願いしております。<br />
+                                安全作業を進めていくため、持ち帰り作業にご協力くださいますよう宜しくお願い致します。
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 <Card>
