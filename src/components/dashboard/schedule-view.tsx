@@ -152,14 +152,22 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
   );
 
   const content = (
-    <div style={style} className={cn("h-10 rounded-md px-2 flex flex-col justify-center cursor-move bg-primary text-primary-foreground", className)}>
-      <p className="text-xs font-semibold truncate pointer-events-none">
-        {order.customerName || line1}
-      </p>
-      {scheduledTime && (
-        <p className="text-xs opacity-80 truncate pointer-events-none">
-          {scheduledTime}
-        </p>
+    <div style={style} className={cn("h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight", className)}>
+      {/* Row 1: StoreName(Equip) Time */}
+      <div className="flex justify-between items-center w-full overflow-hidden">
+        <span className="font-bold truncate mr-1 flex-1">
+          {order.customerName || line1}
+          {!['移動', '業務', '休憩'].some(t => (line1 || '').includes(t)) && `(${equipmentSymbol})`}
+        </span>
+        <span className="shrink-0 font-medium">{scheduledTime}</span>
+      </div>
+
+      {/* Row 2: TireSize Quantity (Only for non-generic tasks) */}
+      {!['移動', '業務', '休憩'].some(t => (line1 || '').includes(t)) && (
+        <div className="flex justify-start items-center gap-2 w-full overflow-hidden opacity-90 mt-0.5">
+          <span className="truncate">{order.tireSize}</span>
+          <span className="shrink-0">{formatHonsu(order['本数'])}</span>
+        </div>
       )}
     </div>
   );
