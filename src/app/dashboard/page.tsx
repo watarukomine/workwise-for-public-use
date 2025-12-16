@@ -54,6 +54,7 @@ export default function DashboardPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, setSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const [checkedOutStaffIds, setCheckedOutStaffIds] = useState<Set<string>>(new Set());
+  const [presentStaffIds, setPresentStaffIds] = useState<Set<string>>(new Set());
   const isDateLoading = useRef(false);
   const [isSyncing, setIsSyncing] = useState(true); // Add syncing state, default true for initial load
   const { toast } = useToast();
@@ -177,6 +178,7 @@ export default function DashboardPage() {
         // 1. Fetch explicitly attended staff from Firestore with details
         const { staffIds: attendedStaffIds, checkedOutIds = [] } = await getDailyAttendanceDetails(currentDate);
         setCheckedOutStaffIds(new Set(checkedOutIds));
+        setPresentStaffIds(new Set(attendedStaffIds));
 
         // 3. Merge lists
         const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...Array.from(staffWithOrders)]));
@@ -260,7 +262,9 @@ export default function DashboardPage() {
       if (displayStatus === '待機中' || displayStatus === '未割当') {
         // If "Clocked In" (in selectedStaffIds) AND no specific last action implying work completion?
         // User said: "Clock In -> 出勤済". "Work Complete -> 待機中".
-        if (appliedSelectedStaffIds.includes(staff.id)) {
+        // If "Clocked In" (in presentStaffIds) AND no specific last action implying work completion?
+        // User said: "Clock In -> 出勤済". "Work Complete -> 待機中".
+        if (presentStaffIds.has(staff.id)) {
           if (lastAction === '情報なし' || displayStatus === '未割当') {
             displayStatus = '出勤済';
           } else {
@@ -306,7 +310,7 @@ export default function DashboardPage() {
         status: displayStatus,
       } as StaffStatus;
     });
-  }, [filteredStaff, statuses, scheduleEvents, checkedOutStaffIds, appliedSelectedStaffIds, profile]);
+  }, [filteredStaff, statuses, scheduleEvents, checkedOutStaffIds, presentStaffIds, profile]);
 
 
   const showVerticalView = forceMobileView || (isMobile && profile?.role !== 'admin');
