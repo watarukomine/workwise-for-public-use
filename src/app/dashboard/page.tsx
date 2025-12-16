@@ -208,26 +208,10 @@ export default function DashboardPage() {
     syncAttendance();
   }, [currentDate, setSelectedStaffIds, scheduleEvents]);
 
-  // Save attendance when selection changes
-  useEffect(() => {
-    // Skip saving if we are currently loading data for a new date
-    if (isDateLoading.current) return;
-
-    // Only save if we are logged in and have a selection.
-    if (profile && appliedSelectedStaffIds.length > 0) {
-      // Debounce or just save? Firestore is fast. Let's just save.
-      saveDailyAttendance(currentDate, appliedSelectedStaffIds)
-        .then(() => {
-          // Optional: toast({ title: "表示設定を保存しました", duration: 1000 }) 
-          // might be too noisy if it happens on every click. 
-          // But useful for debugging.
-        })
-        .catch(e => {
-          console.error("Failed to save daily attendance:", e);
-          toast({ variant: 'destructive', title: "表示設定の保存に失敗しました", description: "再読み込み時に設定がリセットされる可能性があります。" });
-        });
-    }
-  }, [appliedSelectedStaffIds, currentDate, profile]);
+  // Selection state is persisted in localStorage via SelectedStaffContext.
+  // We NO LONGER auto-save selection to "saveDailyAttendance" (Database) 
+  // because that field (staffIds) represents "Clocked In", not "Viewed".
+  // Visibility is purely local + Shift Schedule + Clocked In status.
 
   // Calculate Derived Statuses
   const derivedStatuses = React.useMemo(() => {
