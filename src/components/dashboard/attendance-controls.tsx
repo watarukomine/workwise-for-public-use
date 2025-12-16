@@ -12,7 +12,12 @@ import { useToast } from '../../hooks/use-toast';
 import { Card, CardContent } from '../../components/ui/card';
 import { format } from 'date-fns';
 
-export function AttendanceControls({ onStatusChange }: { onStatusChange?: () => void }) {
+interface AttendanceControlsProps {
+    onStatusChange?: () => void;
+    variant?: 'default' | 'compact';
+}
+
+export function AttendanceControls({ onStatusChange, variant = 'default' }: AttendanceControlsProps) {
     const { profile } = useUserProfile();
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(true);
@@ -82,7 +87,39 @@ export function AttendanceControls({ onStatusChange }: { onStatusChange?: () => 
     if (!profile) return null;
 
     if (isLoading) {
-        return <div className="flex items-center gap-2 p-2"><Loader2 className="h-4 w-4 animate-spin" /> 読み込み中...</div>;
+        return <div className="flex items-center gap-2 p-2"><Loader2 className="h-4 w-4 animate-spin" /> </div>;
+    }
+
+    if (variant === 'compact') {
+        // Compact mode: Just status text and button, no card
+        return (
+            <div className="flex items-center gap-2">
+                <span className={`text-sm font-bold whitespace-nowrap ${status === 'present' ? 'text-green-600' :
+                    status === 'checked_out' ? 'text-gray-500' : 'text-orange-500'
+                    }`}>
+                    {status === 'present' ? '出勤中' :
+                        status === 'checked_out' ? '退勤済' : '未出勤'}
+                </span>
+
+                {status !== 'present' && status !== 'checked_out' && (
+                    <Button onClick={handleClockIn} disabled={isUpdating} size="sm" className="bg-green-600 hover:bg-green-700 h-8 text-xs px-2">
+                        <LogIn className="mr-1 h-3 w-3" />
+                        出勤
+                    </Button>
+                )}
+                {status === 'present' && (
+                    <Button onClick={handleClockOut} disabled={isUpdating} variant="secondary" size="sm" className="h-8 text-xs px-2">
+                        <LogOut className="mr-1 h-3 w-3" />
+                        退勤
+                    </Button>
+                )}
+                {status === 'checked_out' && (
+                    <Button onClick={handleClockIn} disabled={isUpdating} variant="outline" size="sm" className="h-8 text-xs px-2">
+                        再出勤
+                    </Button>
+                )}
+            </div>
+        );
     }
 
     return (

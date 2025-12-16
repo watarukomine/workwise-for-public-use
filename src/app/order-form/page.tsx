@@ -17,7 +17,7 @@ import { ORDER_GAS_URL } from '@/lib/settings';
 
 // Schema definition
 const orderFormSchema = z.object({
-    userCode: z.string().min(6, 'ユーザーコードは6桁で入力してください').max(6, 'ユーザーコードは6桁で入力してください').regex(/^\d+$/, '数字のみで入力してください'),
+    userCode: z.string().min(5, 'ユーザーコードは5桁で入力してください').max(5, 'ユーザーコードは5桁で入力してください').regex(/^\d+$/, '数字のみで入力してください'),
     storeName: z.string().min(1, '店舗名（お取引先様名）は必須です'),
     scheduledDate: z.string().min(1, '作業予定日は必須です'),
     scheduledTime: z.string().min(1, '予定時間は必須です'),
@@ -125,8 +125,8 @@ export default function OrderFormPage() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="userCode">ユーザーコード (6桁) <span className="text-red-500">*</span></Label>
-                                        <Input id="userCode" type="text" placeholder="123456" {...register('userCode')} className={errors.userCode ? "border-red-500" : ""} />
+                                        <Label htmlFor="userCode">ユーザーコード (5桁) <span className="text-red-500">*</span></Label>
+                                        <Input id="userCode" type="text" placeholder="12345" {...register('userCode')} className={errors.userCode ? "border-red-500" : ""} />
                                         {errors.userCode && <p className="text-red-500 text-xs">{errors.userCode.message}</p>}
                                     </div>
 

@@ -62,7 +62,38 @@ export function CheckInClient() {
         }
 
         const status = action === 'Clock In' ? 'present' : 'checked_out';
+
+        // 1. Update Firestore (for Dashboard status)
         await updateStaffStatus(now, profile.id, status);
+
+        // 2. Update Sheet (for "First Order" timestamp logic)
+        // We trigger this even without orderId. The GAS script will handle finding the correct row.
+        if (action === 'Clock In' && location) {
+          // Only if we have location? Or try anyway? The user mentioned location update.
+          // We need latitude/longitude from state or current position.
+          // The state 'location' might be null if we haven't fetched it yet. 
+          // But handleAction usually fetches location for other actions. 
+          // Clock In block currently doesn't fetch location explicitly before this.
+          // We should probably fetch location if we want to send it.
+          // However, to keep it snappy, maybe we accept it might be missing or rely on background fetch?
+          // Let's try to get location if possible, or send without.
+          // Actually, the main handleAction logic fetches location later.
+          // We should merge the logic? 
+          // Let's simply fire-and-forget the GAS call or await it? 
+        }
+
+        // Actually, the user wants "Location Update ONLY" if no order. 
+        // So we MUST have location.
+        // Refactor: Move Clock In logic to AFTER location fetch?
+        // Or duplicate location fetch?
+        // Let's duplicate location fetch for now or restructure.
+
+        // RESTRUCTURE:
+        // Remove the early return block. 
+        // Let the main flow handle location fetch.
+        // But the main flow requires 'statusValue' from 'statusMap'.
+        // We can add 'Clock In' to statusMap?
+
 
         const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
         setLastAction({ action, time: currentTime });

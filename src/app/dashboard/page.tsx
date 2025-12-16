@@ -16,6 +16,14 @@ import { Switch } from '../../components/ui/switch';
 import { Label } from '../../components/ui/label';
 import { useAppShell } from '../../components/app-shell';
 import { ShareOrderFormModal } from '../../components/dashboard/share-order-form-modal';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import Link from 'next/link';
+import { Menu, ExternalLink } from 'lucide-react';
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -367,6 +375,47 @@ export default function DashboardPage() {
               </Label>
             </div>
             <AttendanceControls />
+          </div>
+
+
+          {/* Mobile Actions */}
+          <div className="flex md:hidden items-center ml-auto gap-1">
+            <AttendanceControls variant="compact" />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8"><Menu className="h-4 w-4" /></Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href="/order-form" className="flex items-center w-full cursor-pointer">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    注文フォームを開く
+                  </Link>
+                </DropdownMenuItem>
+                <div className="p-2 border-b">
+                  <div className="flex justify-center w-full">
+                    <ShareOrderFormModal />
+                  </div>
+                </div>
+                <DropdownMenuItem onClick={() => syncOrders()} className="cursor-pointer">
+                  <RefreshCw className={`mr-2 h-4 w-4 ${isSyncingOrders ? 'animate-spin' : ''}`} />
+                  シフト同期
+                </DropdownMenuItem>
+                <DropdownMenuItem className="p-2">
+                  <div className="flex items-center justify-between w-full">
+                    <Label htmlFor="mobile-view-m" className="cursor-pointer flex items-center gap-2">
+                      <Smartphone className="h-4 w-4" />
+                      <span className="text-sm">モバイル</span>
+                    </Label>
+                    <Switch
+                      id="mobile-view-m"
+                      checked={forceMobileView}
+                      onCheckedChange={setForceMobileView}
+                    />
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
