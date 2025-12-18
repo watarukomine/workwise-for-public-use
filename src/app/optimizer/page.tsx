@@ -14,7 +14,6 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
-import { findKey } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -22,7 +21,7 @@ import { useEffect } from 'react';
 function OptimizerPageContent() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
-  const { rawOrdersData: rawOrders, isLoading: isLoadingOrders } = useOrder();
+  const { rawOrdersData: _rawOrders, isLoading: isLoadingOrders } = useOrder();
   const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   const router = useRouter();
 
@@ -45,56 +44,26 @@ function OptimizerPageContent() {
     return allStaff.filter(s => selectedIds.has(s.id));
   }, [appliedSelectedStaffIds, allStaff, isStaffLoading]);
 
+  const { statuses: contextStatuses } = useOrder();
+
   const statuses: StaffStatus[] = React.useMemo(() => {
-    const orders = rawOrders || [];
-    if (!filteredStaffFromSelection.length || !orders.length) {
-      return filteredStaffFromSelection.map(sf => ({
-        staffId: sf.id,
-        status: '待機中',
-        lastAction: '現在地情報なし',
-      }));
-    }
+    // Filter context statuses to only include selected staff
+    if (!contextStatuses) return [];
 
-    const staffStatusMap = new Map<string, StaffStatus>();
+    // Create a map for quick lookup
+    const statusMap = new Map(contextStatuses.map(s => [s.staffId, s]));
 
-    // Initialize with default status
-    for (const staff of filteredStaffFromSelection) {
-      staffStatusMap.set(staff.id, {
+    return filteredStaffFromSelection.map(staff => {
+      const existingStatus = statusMap.get(staff.id);
+      if (existingStatus) return existingStatus;
+
+      return {
         staffId: staff.id,
         status: '待機中',
         lastAction: '現在地情報なし',
-      });
-    }
-
-    // Process orders to find the latest status for each staff member
-    for (const order of orders) {
-      const staffName = findKey(order, ['担当']);
-      const staffMember = allStaff.find(s => s.name === staffName);
-      if (!staffMember || !staffStatusMap.has(staffMember.id)) continue;
-
-      const lastUpdateStr = findKey(order, ['最終更新日時']);
-      const lastUpdate = lastUpdateStr ? new Date(lastUpdateStr) : new Date(0);
-
-      const currentStatus = staffStatusMap.get(staffMember.id)!;
-      const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
-
-      if (lastUpdate.getTime() >= currentUpdate.getTime()) {
-        const locationStr: string = findKey(order, ['最終位置情報（緯度,経度）']) || '';
-        const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
-
-        staffStatusMap.set(staffMember.id, {
-          staffId: staffMember.id,
-          status: findKey(order, ['受注ステータス']) || '待機中',
-          lastAction: findKey(order, ['受注 ID', 'id']) ? `[${findKey(order, ['受注 ID', 'id'])}] ${findKey(order, ['受注ステータス'])}` : findKey(order, ['受注ステータス']),
-          latitude: !isNaN(lat) ? lat : undefined,
-          longitude: !isNaN(lon) ? lon : undefined,
-          lastUpdate: lastUpdate.toISOString(),
-        });
-      }
-    }
-
-    return Array.from(staffStatusMap.values());
-  }, [filteredStaffFromSelection, rawOrders, allStaff]);
+      };
+    });
+  }, [filteredStaffFromSelection, contextStatuses]);
 
   const staffWithLocation = React.useMemo(() => {
     return filteredStaffFromSelection.filter(staffMember => {

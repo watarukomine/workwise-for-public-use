@@ -17,6 +17,8 @@ import { Switch } from '../../components/ui/switch';
 import { Label } from '../../components/ui/label';
 import { useAppShell } from '../../components/app-shell';
 import { ShareOrderFormModal } from '../../components/dashboard/share-order-form-modal';
+import Link from 'next/link';
+import { ExternalLink } from 'lucide-react';
 
 
 import { useRouter } from 'next/navigation';
@@ -305,9 +307,15 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-none px-4 py-2 space-y-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-y-2">
+          {/* Title Area */}
+          <div className="flex items-center justify-between w-full md:w-auto">
             <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">ダッシュボード</h1>
+          </div>
+
+          {/* Controls Row (Date + Mobile Buttons) */}
+          <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-start">
+            {/* Date Controls */}
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
               <Button
                 variant="ghost"
@@ -340,7 +348,19 @@ export default function DashboardPage() {
                 今日
               </Button>
             </div>
+
+            {/* Mobile Actions: Form Link & Attendance */}
+            <div className="flex md:hidden items-center gap-1 ml-auto md:ml-0">
+              <Button variant="ghost" size="icon" asChild className="mr-1">
+                <Link href="/order-form">
+                  <ExternalLink className="h-5 w-5" />
+                </Link>
+              </Button>
+              <AttendanceControls variant="compact" />
+            </div>
           </div>
+
+          {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-2">
             <div className="flex items-center space-x-2 mr-4">
               <ShareOrderFormModal />
@@ -356,13 +376,6 @@ export default function DashboardPage() {
               </Label>
             </div>
             <AttendanceControls />
-          </div>
-
-
-          {/* Mobile Actions */}
-          <div className="flex md:hidden items-center ml-auto gap-1">
-            <ShareOrderFormModal variant="icon" />
-            <AttendanceControls variant="compact" />
           </div>
         </div>
 

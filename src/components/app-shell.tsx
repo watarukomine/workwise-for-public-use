@@ -29,6 +29,7 @@ import {
     SidebarTrigger,
     SidebarContent,
     SidebarFooter,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -166,6 +167,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const NavMenu = () => {
         const { profile, isLoading } = useUserProfile();
         const userRole = profile?.role;
+        const { isMobile, setOpenMobile } = useSidebar();
 
         const navItems = React.useMemo(() => {
             if (isLoading || !profile) return [];
@@ -191,6 +193,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             isActive={pathname === item.href}
                             tooltip={item.label}
                             className="font-medium"
+                            onClick={() => {
+                                if (isMobile) {
+                                    setOpenMobile(false);
+                                }
+                            }}
                         >
                             <Link href={item.href} target={item.target ? item.target : undefined}>
                                 <item.icon />
