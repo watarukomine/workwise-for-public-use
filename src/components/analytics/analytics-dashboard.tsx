@@ -9,6 +9,9 @@ import { TireSizeAnalysisChart } from './tire-size-analysis-chart';
 import { StaffTravelTimeChart } from './staff-travel-time-chart';
 import { ShopDistributionChart } from './shop-distribution-chart';
 import { MainStoreShareChart } from './main-store-share-chart';
+import { DayOfWeekChart } from './day-of-week-chart';
+import { TimeOfDayChart } from './time-of-day-chart';
+import { DailyTrendChart } from './daily-trend-chart';
 import { Button } from '@/components/ui/button';
 
 
@@ -16,7 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { exportToExcel, exportToPDF } from '@/lib/export-utils';
-import { startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, format } from 'date-fns';
+import { startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, format, getDay, getDate, getHours } from 'date-fns';
 import { Download } from 'lucide-react';
 import { Staff, Order } from '@/lib/types';
 
@@ -61,6 +64,23 @@ export function AnalyticsDashboard() {
 
         return { orders: relevantOrders, start, end };
     }, [allOrders, dateRange, selectedStaffId, allStaff]);
+
+    // Helper to calculate duration
+    const getOrderDuration = (order: Order) => {
+        // Prefer actual time difference if available
+        if (order.actualStartTime && order.actualEndTime) {
+            const start = new Date(order.actualStartTime);
+            const end = new Date(order.actualEndTime);
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                const diffMs = end.getTime() - start.getTime();
+                if (diffMs > 0) {
+                    return diffMs / (1000 * 60 * 60); // Hours
+                }
+            }
+        }
+        // Fallback to estimated duration
+        return (order.estimatedDuration || 60) / 60; // Hours
+    };
 
     // Aggregation Logic (Staff Workload)
     const staffWorkloadData = useMemo(() => {
@@ -124,12 +144,6 @@ export function AnalyticsDashboard() {
         const shopMap = new Map<string, number>();
 
         filteredData.orders.forEach((order: Order) => {
-            // Logical "Shop" determination. 
-            // 1. Check order.customerName if it implies a shop?
-            // 2. Or, check the *Staff's* mother store for who handled it? 
-            // User asked for "Shop Distribution" (likely which shop received the order OR which shop's staff handled it).
-            // Let's assume grouping by "Staff's Mother Store" (who did the work) is the most available metric since Order doesn't always have "Shop" field clearly defined except in details.
-
             let staffShop = '不明';
             const staff = allStaff.find((s: Staff) => s.name === order.staffName || s.id === order.staffId);
             if (staff && staff['母店']) {
@@ -165,6 +179,105 @@ export function AnalyticsDashboard() {
             color: colors[index % colors.length]
         }));
     }, [filteredData.orders]);
+
+    // Aggregation: Day of Week
+    const dayOfWeekData = useMemo(() => {
+        const days = ['日', '月', '火', '水', '木', '金', '土'];
+        const map = new Map<number, { count: number; hours: number }>();
+        // Initialize
+        for (let i = 0; i < 7; i++) map.set(i, { count: 0, hours: 0 });
+
+        filteredData.orders.forEach(order => {
+            if (order.scheduledDate) {
+                const date = new Date(order.scheduledDate);
+                const day = getDay(date); // 0 = Sun, 6 = Sat
+                const current = map.get(day)!;
+                map.set(day, {
+                    count: current.count + 1,
+                    hours: current.hours + getOrderDuration(order)
+                });
+            }
+        });
+
+        // Rotate to start from Monday as per business usual? Or Sunday?
+        // Chart typically shows Mon-Sun or Sun-Sat. Let's do Mon-Sun (1-6, 0).
+        // Let's stick to standard Sunday first or whatever makes sense.
+        // Array order: Sun, Mon, Tue ...
+        return Array.from(map.entries())
+            .sort((a, b) => a[0] - b[0])
+            .map(([key, val]) => ({
+                day: days[key],
+                count: val.count,
+                hours: parseFloat(val.hours.toFixed(1))
+            }));
+    }, [filteredData.orders]);
+
+    // Aggregation: Time of Day
+    const timeOfDayData = useMemo(() => {
+        const map = new Map<number, { count: number; hours: number }>();
+        for (let i = 0; i < 24; i++) map.set(i, { count: 0, hours: 0 });
+
+        filteredData.orders.forEach(order => {
+            // Use actualStartTime if available, else scheduledTime
+            let hour = -1;
+            if (order.actualStartTime) {
+                hour = getHours(new Date(order.actualStartTime));
+            } else if (order.scheduledTime) {
+                // scheduledTime "HH:mm"
+                const parts = order.scheduledTime.split(':');
+                if (parts.length >= 1) hour = parseInt(parts[0]);
+            }
+
+            if (hour >= 0 && hour < 24) {
+                const current = map.get(hour)!;
+                map.set(hour, {
+                    count: current.count + 1,
+                    hours: current.hours + getOrderDuration(order)
+                });
+            }
+        });
+
+        return Array.from(map.entries())
+            .sort((a, b) => a[0] - b[0])
+            .map(([hour, val]) => ({
+                hour: `${hour}:00`,
+                count: val.count,
+                hours: parseFloat(val.hours.toFixed(1))
+            }));
+    }, [filteredData.orders]);
+
+    // Aggregation: Daily Trend
+    const dailyTrendData = useMemo(() => {
+        // Initialize all days in month
+        const daysInMonth = new Date(filteredData.end).getDate(); // Last day number
+        const map = new Map<number, { count: number; hours: number; dateStr: string }>();
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            map.set(i, { count: 0, hours: 0, dateStr: `${i}` });
+        }
+
+        filteredData.orders.forEach(order => {
+            if (order.scheduledDate) {
+                const date = new Date(order.scheduledDate);
+                const day = getDate(date);
+                if (map.has(day)) {
+                    const current = map.get(day)!;
+                    map.set(day, {
+                        ...current,
+                        count: current.count + 1,
+                        hours: current.hours + getOrderDuration(order)
+                    });
+                }
+            }
+        });
+
+        return Array.from(map.values()).map(d => ({
+            date: d.dateStr,
+            day: parseInt(d.dateStr), // For sorting/brush
+            count: d.count,
+            hours: parseFloat(d.hours.toFixed(1))
+        }));
+    }, [filteredData]);
 
 
     const handleExportExcel = () => {
@@ -258,8 +371,14 @@ export function AnalyticsDashboard() {
                 <StaffWorkloadChart data={staffWorkloadData} />
                 <ShopDistributionChart data={shopDistributionData} />
                 <MainStoreShareChart data={mainStoreShareData} />
-                <TireSizeAnalysisChart orders={filteredData.orders} />
                 <StaffTravelTimeChart orders={filteredData.orders} allStaff={allStaff} />
+
+                {/* New Charts */}
+                <DayOfWeekChart data={dayOfWeekData} />
+                <TimeOfDayChart data={timeOfDayData} />
+                <DailyTrendChart data={dailyTrendData} />
+
+                <TireSizeAnalysisChart orders={filteredData.orders} />
             </div>
 
             <Card>
