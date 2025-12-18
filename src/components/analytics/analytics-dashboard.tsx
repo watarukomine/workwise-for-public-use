@@ -8,6 +8,7 @@ import { StaffWorkloadChart } from './staff-workload-chart';
 import { TireSizeAnalysisChart } from './tire-size-analysis-chart';
 import { StaffTravelTimeChart } from './staff-travel-time-chart';
 import { ShopDistributionChart } from './shop-distribution-chart';
+import { MainStoreShareChart } from './main-store-share-chart';
 import { Button } from '@/components/ui/button';
 
 
@@ -147,6 +148,24 @@ export function AnalyticsDashboard() {
         }));
     }, [allStaff, filteredData.orders]);
 
+    // Aggregation Logic (Main Store Share)
+    const mainStoreShareData = useMemo(() => {
+        const storeMap = new Map<string, number>();
+
+        filteredData.orders.forEach((order: Order) => {
+            const storeName = order.mainStore || '主管店舗不明';
+            storeMap.set(storeName, (storeMap.get(storeName) || 0) + 1);
+        });
+
+        const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7f50', '#8dd1e1', '#a4de6c'];
+
+        return Array.from(storeMap.entries()).map(([name, value], index) => ({
+            name,
+            value,
+            color: colors[index % colors.length]
+        }));
+    }, [filteredData.orders]);
+
 
     const handleExportExcel = () => {
         const title = `${format(filteredData.start, 'yyyy年MM月')}活動レポート`;
@@ -238,8 +257,9 @@ export function AnalyticsDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <StaffWorkloadChart data={staffWorkloadData} />
                 <ShopDistributionChart data={shopDistributionData} />
+                <MainStoreShareChart data={mainStoreShareData} />
                 <TireSizeAnalysisChart orders={filteredData.orders} />
-                <StaffTravelTimeChart orders={filteredData.orders} />
+                <StaffTravelTimeChart orders={filteredData.orders} allStaff={allStaff} />
             </div>
 
             <Card>

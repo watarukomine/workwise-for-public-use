@@ -27,7 +27,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const [customerGasUrl, setCustomerGasUrlState] = useState(CUSTOMER_GAS_URL);
 
   const [error, setErrorState] = useState<string | null>(null);
-  const URL_STORAGE_KEY = 'custom_customer_gas_url';
+  const URL_STORAGE_KEY = 'custom_customer_gas_url_v2';
 
   const setCustomerGasUrl = (url: string) => {
     setCustomerGasUrlState(url);

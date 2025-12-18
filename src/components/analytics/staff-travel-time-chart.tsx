@@ -1,18 +1,22 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Order } from '@/lib/types';
+import { Order, Staff } from '@/lib/types';
 import { differenceInMinutes, parseISO } from 'date-fns';
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface StaffTravelTimeChartProps {
     orders: Order[];
+    allStaff?: Staff[];
 }
 
-export function StaffTravelTimeChart({ orders }: StaffTravelTimeChartProps) {
+export function StaffTravelTimeChart({ orders, allStaff = [] }: StaffTravelTimeChartProps) {
+    const [viewMode, setViewMode] = useState<'staff' | 'mother-store'>('staff');
+
     const data = useMemo(() => {
-        const staffMap = new Map<string, { totalMinutes: number; count: number }>();
+        const aggregatorMap = new Map<string, { totalMinutes: number; count: number }>();
 
         orders.forEach(order => {
             // Check for valid timestamps
@@ -30,18 +34,37 @@ export function StaffTravelTimeChart({ orders }: StaffTravelTimeChartProps) {
             // Filter invalid or outlier data (negative or > 5 hours for one trip?)
             if (duration <= 0 || duration > 300) return;
 
-            // Use Order Staff Name
-            const staffName = order.staffName || '未割当';
+            let key = '不明';
 
-            const current = staffMap.get(staffName) || { totalMinutes: 0, count: 0 };
-            staffMap.set(staffName, {
+            if (viewMode === 'staff') {
+                key = order.staffName || '未割当';
+            } else {
+                // Determine Mother Store
+                // Try to find staff by ID first, then Name
+                let staff: Staff | undefined;
+                if (order.staffId) {
+                    staff = allStaff.find(s => s.id === order.staffId);
+                }
+                if (!staff && order.staffName) {
+                    staff = allStaff.find(s => s.name === order.staffName);
+                }
+
+                if (staff && staff['母店']) {
+                    key = staff['母店'];
+                } else {
+                    key = '母店不明';
+                }
+            }
+
+            const current = aggregatorMap.get(key) || { totalMinutes: 0, count: 0 };
+            aggregatorMap.set(key, {
                 totalMinutes: current.totalMinutes + duration,
                 count: current.count + 1
             });
         });
 
         // Convert to array and sort by Total Time (descending)
-        return Array.from(staffMap.entries())
+        return Array.from(aggregatorMap.entries())
             .map(([name, { totalMinutes, count }]) => ({
                 name,
                 totalHours: parseFloat((totalMinutes / 60).toFixed(1)),
@@ -50,15 +73,25 @@ export function StaffTravelTimeChart({ orders }: StaffTravelTimeChartProps) {
             }))
             .sort((a, b) => b.totalHours - a.totalHours);
 
-    }, [orders]);
+    }, [orders, allStaff, viewMode]);
 
     // If no data, show empty state in card
     if (data.length === 0) {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>スタッフ別 移動時間分析</CardTitle>
-                    <CardDescription>総移動時間（時間）と平均移動時間（分 / 回）</CardDescription>
+                    <div className="flex flex-row items-center justify-between">
+                        <div>
+                            <CardTitle>移動時間分析</CardTitle>
+                            <CardDescription>総移動時間（時間）と平均移動時間（分 / 回）</CardDescription>
+                        </div>
+                        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'staff' | 'mother-store')}>
+                            <TabsList>
+                                <TabsTrigger value="staff">スタッフ別</TabsTrigger>
+                                <TabsTrigger value="mother-store">母店別</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="h-[300px] flex items-center justify-center text-muted-foreground border border-dashed rounded-md bg-slate-50">
@@ -72,8 +105,18 @@ export function StaffTravelTimeChart({ orders }: StaffTravelTimeChartProps) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>スタッフ別 移動時間分析</CardTitle>
-                <CardDescription>総移動時間（時間）と平均移動時間（分 / 回）</CardDescription>
+                <div className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle>移動時間分析</CardTitle>
+                        <CardDescription>総移動時間（時間）と平均移動時間（分 / 回）</CardDescription>
+                    </div>
+                    <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'staff' | 'mother-store')}>
+                        <TabsList>
+                            <TabsTrigger value="staff">スタッフ別</TabsTrigger>
+                            <TabsTrigger value="mother-store">母店別</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </div>
             </CardHeader>
             <CardContent>
                 <div className="h-[300px]">
