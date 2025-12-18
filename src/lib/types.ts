@@ -40,6 +40,8 @@ export type Customer = {
   longitude?: number;
   storeName?: string;
   userCode?: string;
+  mainStoreCode?: string;
+  mainStore?: string;
 };
 
 export type Order = {
@@ -58,6 +60,7 @@ export type Order = {
   value: number;
   staffName?: string;
   staffId?: string; // Added field
+  mainStore?: string; // Added field for D column
   actualStartTime?: Date; // Added for analytics
   actualEndTime?: Date; // Added for analytics
   startTravelTime?: Date; // Added for travel analysis

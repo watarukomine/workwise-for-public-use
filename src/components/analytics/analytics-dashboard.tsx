@@ -24,6 +24,7 @@ export function AnalyticsDashboard() {
     const { allStaff = [], isLoading: isStaffLoading } = useSelectedStaff();
     const { profile, isLoading: isProfileLoading } = useUserProfile();
     const [dateRange, setDateRange] = useState('this-month');
+    const [selectedStaffId, setSelectedStaffId] = useState<string>('all');
 
     // Filter Logic
     const filteredData = useMemo(() => {
@@ -36,15 +37,29 @@ export function AnalyticsDashboard() {
             end = endOfMonth(subMonths(now, 1));
         }
 
-        const relevantOrders = allOrders.filter((order: Order) => {
+        let relevantOrders = allOrders.filter((order: Order) => {
             if (!order.scheduledDate) return false;
             // scheduledDate is YYYY-MM-DD string
             const orderDate = new Date(order.scheduledDate);
             return isWithinInterval(orderDate, { start, end });
         });
 
+        // Staff Filter
+        if (selectedStaffId && selectedStaffId !== 'all') {
+            relevantOrders = relevantOrders.filter(order => {
+                // Check ID match
+                if (order.staffId === selectedStaffId) return true;
+                // Check Name match if ID missing (fallback)
+                if (!order.staffId && order.staffName) {
+                    const staff = allStaff.find(s => s.id === selectedStaffId);
+                    return staff && staff.name === order.staffName;
+                }
+                return false;
+            });
+        }
+
         return { orders: relevantOrders, start, end };
-    }, [allOrders, dateRange]);
+    }, [allOrders, dateRange, selectedStaffId, allStaff]);
 
     // Aggregation Logic (Staff Workload)
     const staffWorkloadData = useMemo(() => {
@@ -189,6 +204,19 @@ export function AnalyticsDashboard() {
                     <p className="text-muted-foreground">{format(filteredData.start, 'yyyy年MM月dd日')} - {format(filteredData.end, 'yyyy年MM月dd日')} の活動状況</p>
                 </div>
                 <div className="flex items-center gap-2">
+                    <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
+                        <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="スタッフを選択" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">全スタッフ</SelectItem>
+                            {allStaff.map(staff => (
+                                <SelectItem key={staff.id} value={staff.id}>
+                                    {staff.name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Select value={dateRange} onValueChange={setDateRange}>
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="期間を選択" />

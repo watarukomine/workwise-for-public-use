@@ -96,6 +96,7 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     value: parseFloat(findKey(rawOrder, ['金額']) || 0),
     staffName: findKey(rawOrder, ['担当', 'スタッフ名']) || '',
+    mainStore: findKey(rawOrder, ['主管店舗', 'mainStore']) || '',
     customerName: customerName,
     address: findKey(rawOrder, ['住所', 'Address']) || '',
     scheduledEndTime: findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime']) || '',

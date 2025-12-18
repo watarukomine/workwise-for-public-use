@@ -37,16 +37,16 @@ const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
     let longitude: number | undefined = Number(findKey(item, ['経度']));
 
     if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
-        const coordsValue = findKey(item, ['緯度・経度', '座標', '緯度経度']);
-        if (typeof coordsValue === 'string' && coordsValue.includes(',')) {
-            const parts = coordsValue.split(',').map(part => part.trim());
-            const lat = parseFloat(parts[0]);
-            const lon = parseFloat(parts[1]);
-            if (!isNaN(lat) && !isNaN(lon)) {
-                latitude = lat;
-                longitude = lon;
-            }
+      const coordsValue = findKey(item, ['緯度・経度', '座標', '緯度経度']);
+      if (typeof coordsValue === 'string' && coordsValue.includes(',')) {
+        const parts = coordsValue.split(',').map(part => part.trim());
+        const lat = parseFloat(parts[0]);
+        const lon = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lon)) {
+          latitude = lat;
+          longitude = lon;
         }
+      }
     }
 
     return {
@@ -55,6 +55,8 @@ const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
       userCode: item['ユーザーコード'],
       '旧 チャネル SEQ': item['旧 チャネル SEQ'],
       storeName: item['店舗'],
+      mainStoreCode: item['主管店舗コード'],
+      mainStore: item['主管店舗'],
       '管理C': item['管理C'],
       '機材有無': item['機材有無'],
       address: item['住所'],
@@ -85,7 +87,8 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
     }
     return mappedCustomers.filter(customer =>
       (customer.storeName && String(customer.storeName).toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (customer.userCode && String(customer.userCode).toLowerCase().includes(searchTerm.toLowerCase()))
+      (customer.userCode && String(customer.userCode).toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (customer.mainStore && String(customer.mainStore).toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [mappedCustomers, searchTerm]);
 
@@ -97,7 +100,7 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
   }, [filteredCustomers, page, rowsPerPage]);
 
   const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
-  
+
   const handleRowDoubleClick = () => {
     if (isAdmin && CUSTOMER_SHEET_URL) {
       window.open(CUSTOMER_SHEET_URL, '_blank', 'noopener,noreferrer');
@@ -108,6 +111,7 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
   const headers = [
     { key: 'userCode', label: 'ユーザーコード' },
     { key: 'storeName', label: '店舗名' },
+    { key: 'mainStore', label: '主管店舗' },
     { key: 'address', label: '住所' },
     { key: '電話番号', label: '電話番号' },
     { key: '機材有無', label: '機材有無' },
@@ -143,7 +147,7 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
                 </TableRow>
               ) : paginatedCustomers.length > 0 ? (
                 paginatedCustomers.map((customer, index) => (
-                  <TableRow 
+                  <TableRow
                     key={customer.id || index}
                     onDoubleClick={handleRowDoubleClick}
                     className={cn(isAdmin && CUSTOMER_SHEET_URL && "cursor-pointer")}

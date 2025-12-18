@@ -108,33 +108,34 @@ function createOrder(data) {
 
         // カラム構成（A列=0番目スタート）に合わせてデータを配置
         // ※シートの列順序が変更された場合は、この配列の順序も修正する必要があります。
-        // 今回の変更: C列を「店舗名」として扱います。
+        // 今回の変更: C列を「店舗名」、D列を「主管店舗」として扱います。
         var rowData = [
             '',                   // A: 受注ID (自動採番または空欄)
             data.userCode,        // B: ユーザーコード
             data.storeName,       // C: 店舗名 (旧: お取引先名)
-            '',                   // D: 機材有無 (フォーム入力なし、空欄)
-            "'" + data.scheduledDate, // E: 作業予定日
-            "'" + data.scheduledTime, // F: 予定時間
-            data.picName,         // G: ご担当者様
-            data.workType || '販売店店舗内作業', // H: 作業 (デフォルト「販売店店舗内作業」)
-            data.orderNo,         // I: 受注No(リマーク1)
-            data.comment,         // J: 任意コメント(リマーク2)
-            data.carName,         // K: 車名
-            data.regNo,           // L: 登録ナンバー
-            data.status,          // M: 入庫状況
-            data.tireNumber,      // N: タイヤ品番
-            data.tireSize,        // O: タイヤサイズ
-            data.productName,     // P: 品名
-            '',                   // Q: 作業内容
-            data.quantity,        // R: 本数
-            data.sensor,          // S: 空気圧センサー/パッキン交換 (選択式：有/無)
-            data.arrangement,     // T: タイヤ手配状況 (選択式)
-            data.disposal,        // U: 廃タイヤ処分
-            data.contact,         // V: 連絡先
-            '未着手',             // W: 受注ステータス (デフォルト)
-            '',                   // X: 担当
-            timestamp             // Y: 最終更新日時
+            data.mainStore || '', // D: 主管店舗 (新規追加)
+            '',                   // E: 機材有無 (フォーム入力なし、空欄)
+            "'" + data.scheduledDate, // F: 作業予定日
+            "'" + data.scheduledTime, // G: 予定時間
+            data.picName,         // H: ご担当者様
+            data.workType || '販売店店舗内作業', // I: 作業 (デフォルト「販売店店舗内作業」)
+            data.orderNo,         // J: 受注No(リマーク1)
+            data.comment,         // K: 任意コメント(リマーク2)
+            data.carName,         // L: 車名
+            data.regNo,           // M: 登録ナンバー
+            data.status,          // N: 入庫状況
+            data.tireNumber,      // O: タイヤ品番
+            data.tireSize,        // P: タイヤサイズ
+            data.productName,     // Q: 品名
+            '',                   // R: 作業内容
+            data.quantity,        // S: 本数
+            data.sensor,          // T: タイヤ手配状況 (注意: カラムズレの可能性あり、元のコードの順序に従う)
+            data.arrangement,     // U: タイヤ手配状況 (選択式)
+            data.disposal,        // V: 廃タイヤ処分
+            data.contact,         // W: 連絡先
+            '未着手',             // X: 受注ステータス (デフォルト)
+            '',                   // Y: 担当
+            timestamp             // Z: 最終更新日時
         ];
 
         sheet.appendRow(rowData);

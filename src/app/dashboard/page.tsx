@@ -72,15 +72,11 @@ export default function DashboardPage() {
 
     let selectedStaff: WithId<Staff>[];
 
-    if (profile.role !== 'admin') {
-      selectedStaff = staffToUse.filter(staff => staff.id === profile.id || staff.name === profile.name);
+    if (appliedSelectedStaffIds.length === 0) {
+      selectedStaff = staffToUse;
     } else {
-      if (appliedSelectedStaffIds.length === 0) {
-        selectedStaff = staffToUse;
-      } else {
-        const selectedIds = new Set(appliedSelectedStaffIds);
-        selectedStaff = staffToUse.filter(staff => selectedIds.has(staff.id));
-      }
+      const selectedIds = new Set(appliedSelectedStaffIds);
+      selectedStaff = staffToUse.filter(staff => selectedIds.has(staff.id));
     }
 
     return selectedStaff; // Return in original order (Sheet order)
@@ -88,7 +84,7 @@ export default function DashboardPage() {
   }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
 
   const selectedStaffNames = React.useMemo(() => {
-    if (profile?.role !== 'admin' || appliedSelectedStaffIds.length === 0) {
+    if (appliedSelectedStaffIds.length === 0) {
       return null;
     }
     const staffToUse = allStaff;
