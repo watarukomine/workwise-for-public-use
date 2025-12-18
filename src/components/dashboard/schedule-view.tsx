@@ -47,6 +47,7 @@ import {
 } from "../ui/dialog";
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { Checkbox } from '../ui/checkbox';
 import { useCustomer } from '../../contexts/customer-context';
 import { useToast } from '../../hooks/use-toast';
 import { Textarea } from '../ui/textarea';
@@ -727,7 +728,7 @@ export function ScheduleView({
     setDialogState({ mode: 'new', staffId, start: newStart });
   };
 
-  const handleSaveEvent = async () => {
+  const handleSaveEvent = async (shouldSendEmail: boolean = false) => {
     if (dialogState.mode === 'closed') return;
 
     const newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
@@ -785,6 +786,54 @@ export function ScheduleView({
         }
       }
       toast({ title: '予定を保存しました' });
+
+      if (shouldSendEmail) {
+        let staffName = "";
+        let staffEmail = "";
+        let eventStart = "";
+        let eventEnd = "";
+        let location = "";
+
+        if (dialogState.mode === 'new') {
+          const staff = getStaffById(dialogState.staffId);
+          staffName = staff?.name || "";
+          staffEmail = staff?.email || "";
+          eventStart = newStart.toISOString();
+          eventEnd = newEnd.toISOString();
+          location = ""; // New generic event no location
+        } else if (dialogState.mode === 'edit') {
+          const event = dialogState.event;
+          const staff = getStaffById(event.staffId);
+          staffName = staff?.name || "";
+          staffEmail = staff?.email || "";
+          eventStart = newStart.toISOString();
+          eventEnd = newEnd.toISOString();
+          location = getCustomerByCode(event.locationId)?.address || "";
+        }
+
+        if (staffName) {
+          sendIcsEmail({
+            gasUrl: ORDER_GAS_URL,
+            staffName: staffName,
+            staffEmail: staffEmail,
+            title: editedEventDetails.title,
+            description: editedEventDetails.description,
+            startTime: eventStart,
+            endTime: eventEnd,
+            location: location,
+            isUpdate: dialogState.mode === 'edit'
+          }).then(result => {
+            if (result.status === 'success') {
+              toast({ title: 'メール送信成功', description: 'スタッフにメールを送信しました。' });
+            } else {
+              toast({ variant: 'destructive', title: 'メール送信エラー', description: result.message });
+            }
+          }).catch(e => {
+            toast({ variant: 'destructive', title: 'メール送信エラー', description: e.message });
+          });
+        }
+      }
+
       setDialogState({ mode: 'closed' });
     } catch (e: any) {
       toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });
@@ -1011,17 +1060,18 @@ export function ScheduleView({
                       </div>
                     </div>
                   </div>
+
                   <DialogFooter className="sm:justify-between pt-4 border-t">
                     <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" onClick={() => handleSendIcs(event)}>
+                      <Button variant="outline" onClick={() => handleSaveEvent(true)}>
                         <Mail className="mr-2 h-4 w-4" />
-                        iCalメール送信
+                        保存して送信
                       </Button>
                       <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
                     </div>
                     <div className='flex gap-2 mt-4 sm:mt-0'>
                       <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
-                      <Button onClick={handleSaveEvent}>保存</Button>
+                      <Button onClick={() => handleSaveEvent(false)}>保存</Button>
                     </div>
                   </DialogFooter>
                 </>
@@ -1049,10 +1099,15 @@ export function ScheduleView({
                     </div>
                   </div>
                   <DialogFooter className="sm:justify-between">
-                    <div className="flex gap-2"></div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => handleSaveEvent(true)}>
+                        <Mail className="mr-2 h-4 w-4" />
+                        保存して送信
+                      </Button>
+                    </div>
                     <div className="flex gap-2 mt-4 sm:mt-0">
                       <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
-                      <Button onClick={handleSaveEvent}>保存</Button>
+                      <Button onClick={() => handleSaveEvent(false)}>保存</Button>
                     </div>
                   </DialogFooter>
                 </>
@@ -1088,7 +1143,7 @@ export function ScheduleView({
           <RenderDragOverlay />
         </TooltipProvider>
       </DndContext>
-    </ScheduleViewContext.Provider>
+    </ScheduleViewContext.Provider >
   );
 }
 

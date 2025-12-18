@@ -55,6 +55,7 @@ export default function DashboardPage() {
   const { allStaff, appliedSelectedStaffIds, setSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
   const [checkedOutStaffIds, setCheckedOutStaffIds] = useState<Set<string>>(new Set());
   const [presentStaffIds, setPresentStaffIds] = useState<Set<string>>(new Set());
+  const [scheduledStaffIds, setScheduledStaffIds] = useState<Set<string>>(new Set());
   const isDateLoading = useRef(false);
   const [isSyncing, setIsSyncing] = useState(true); // Add syncing state, default true for initial load
   const { toast } = useToast();
@@ -172,9 +173,10 @@ export default function DashboardPage() {
 
       try {
         // 1. Fetch explicitly attended staff from Firestore with details
-        const { staffIds: attendedStaffIds, checkedOutIds = [], scheduledStaffIds = [] } = await getDailyAttendanceDetails(currentDate);
+        const { staffIds: attendedStaffIds, checkedOutIds = [], scheduledStaffIds: scheduledIds = [] } = await getDailyAttendanceDetails(currentDate);
         setCheckedOutStaffIds(new Set(checkedOutIds));
         setPresentStaffIds(new Set(attendedStaffIds));
+        setScheduledStaffIds(new Set(scheduledIds));
 
         // 3. Merge lists
         const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...scheduledStaffIds, ...Array.from(staffWithOrders)]));
@@ -251,6 +253,9 @@ export default function DashboardPage() {
             // If we have history today, it's '待機中' (Waiting for next order)
             displayStatus = '待機中';
           }
+        } else if (scheduledStaffIds.has(staff.id)) {
+          // Not clocked in, but scheduled
+          displayStatus = '出勤予定';
         }
       }
 
@@ -290,7 +295,7 @@ export default function DashboardPage() {
         status: displayStatus,
       } as StaffStatus;
     });
-  }, [filteredStaff, statuses, scheduleEvents, checkedOutStaffIds, presentStaffIds, profile]);
+  }, [filteredStaff, statuses, scheduleEvents, checkedOutStaffIds, presentStaffIds, scheduledStaffIds, profile]);
 
 
   const showVerticalView = forceMobileView || (isMobile && profile?.role !== 'admin');
