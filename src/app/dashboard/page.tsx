@@ -17,14 +17,7 @@ import { Switch } from '../../components/ui/switch';
 import { Label } from '../../components/ui/label';
 import { useAppShell } from '../../components/app-shell';
 import { ShareOrderFormModal } from '../../components/dashboard/share-order-form-modal';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import Link from 'next/link';
-import { Menu, ExternalLink } from 'lucide-react';
+
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -314,7 +307,7 @@ export default function DashboardPage() {
       <div className="flex-none px-4 py-2 space-y-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-xl font-bold tracking-tight">ダッシュボード</h1>
+            <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">ダッシュボード</h1>
             <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
               <Button
                 variant="ghost"
@@ -368,45 +361,8 @@ export default function DashboardPage() {
 
           {/* Mobile Actions */}
           <div className="flex md:hidden items-center ml-auto gap-1">
-            <Button variant="ghost" size="icon" asChild className="mr-1">
-              <Link href="/order-form">
-                <ExternalLink className="h-5 w-5" />
-              </Link>
-            </Button>
             <ShareOrderFormModal variant="icon" />
             <AttendanceControls variant="compact" />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8"><Menu className="h-4 w-4" /></Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem asChild>
-                  <Link href="/order-form" className="flex items-center w-full cursor-pointer">
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    注文フォームを開く
-                  </Link>
-                </DropdownMenuItem>
-                <div className="p-2 border-b">
-                  <div className="flex justify-center w-full">
-                    <ShareOrderFormModal />
-                  </div>
-                </div>
-
-                <DropdownMenuItem className="p-2">
-                  <div className="flex items-center justify-between w-full">
-                    <Label htmlFor="mobile-view-m" className="cursor-pointer flex items-center gap-2">
-                      <Smartphone className="h-4 w-4" />
-                      <span className="text-sm">モバイル</span>
-                    </Label>
-                    <Switch
-                      id="mobile-view-m"
-                      checked={forceMobileView}
-                      onCheckedChange={setForceMobileView}
-                    />
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
