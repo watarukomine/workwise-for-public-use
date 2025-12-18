@@ -54,10 +54,10 @@ const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
       No: item['No'],
       userCode: item['ユーザーコード'],
       '旧 チャネル SEQ': item['旧 チャネル SEQ'],
-      storeName: item['店舗'],
-      mainStoreCode: item['主管店舗コード'],
-      mainStore: item['主管店舗'],
-      '管理C': item['管理C'],
+      storeName: findKey(item, ['店舗', '店舗名', 'storeName']),
+      mainStoreCode: findKey(item, ['主管店舗コード', 'Main Store Code', 'mainStoreCode']),
+      mainStore: findKey(item, ['主管店舗', 'Main Store', 'mainStore']),
+      '管理C': findKey(item, ['管理C']),
       '機材有無': item['機材有無'],
       address: item['住所'],
       latitude: latitude,
@@ -73,8 +73,6 @@ const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
 
 export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
-  const [page, setPage] = React.useState(1);
-  const rowsPerPage = 10;
   const { profile } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
 
@@ -92,14 +90,6 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
     );
   }, [mappedCustomers, searchTerm]);
 
-  const paginatedCustomers = React.useMemo(() => {
-    return filteredCustomers.slice(
-      (page - 1) * rowsPerPage,
-      page * rowsPerPage
-    );
-  }, [filteredCustomers, page, rowsPerPage]);
-
-  const totalPages = Math.ceil(filteredCustomers.length / rowsPerPage);
 
   const handleRowDoubleClick = () => {
     if (isAdmin && CUSTOMER_SHEET_URL) {
@@ -131,9 +121,9 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
             />
           </div>
         </div>
-        <div className="rounded-md border">
+        <div className="rounded-md border h-[calc(100vh-250px)] overflow-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 {headers.map(header => <TableHead key={header.key}>{header.label}</TableHead>)}
               </TableRow>
@@ -145,8 +135,8 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
                     データを読み込んでいます...
                   </TableCell>
                 </TableRow>
-              ) : paginatedCustomers.length > 0 ? (
-                paginatedCustomers.map((customer, index) => (
+              ) : filteredCustomers.length > 0 ? (
+                filteredCustomers.map((customer, index) => (
                   <TableRow
                     key={customer.id || index}
                     onDoubleClick={handleRowDoubleClick}
@@ -169,26 +159,10 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
             </TableBody>
           </Table>
         </div>
-        <div className="flex items-center justify-end space-x-2 py-4">
+        <div className="flex items-center justify-between space-x-2 py-4">
           <span className="text-sm text-muted-foreground">
-            {totalPages > 0 ? totalPages : 1}ページ中の{page}ページ
+            全 {filteredCustomers.length} 件
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            前へ
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || totalPages === 0}
-          >
-            次へ
-          </Button>
         </div>
       </CardContent>
     </Card>
