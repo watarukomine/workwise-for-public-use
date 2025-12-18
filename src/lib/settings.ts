@@ -17,7 +17,7 @@ export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxGeXICGCJ
  * 顧客情報（販売店情報）を取得・更新するためのGoogle Apps ScriptのURL。
  * 主に customer-context.tsx で使用されます。
  */
-export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b1tD4Y489xg0Fz09e84DtDAy_35KhJ_VD4RyJ3J1DavI0B_aZP5ck8hssWPCi/exec';
+export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyLicNq9Lnedl15wcyc5bQymxMoc4G-3ObC6zrXu7NbY-ZK_GFyMYU_m-HQ_q8ZMgMKuQ/exec';
 
 /**
  * 受注情報を取得・更新し、カレンダー連携も行うGoogle Apps ScriptのURL。
@@ -38,7 +38,7 @@ export const STAFF_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18vztZhnA
  * 販売店情報が記載されているスプレッドシートのURL。
  * customers/page.tsx のヘッダークリックで開かれます。
  */
-export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ojkHXVYFyomm-2RMbWq6QrG4NPCit2y6lxXQFsK_J60/edit?usp=sharing';
+export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1jZdToM75DunESxVU07QjSCbYEsqd_nSwxzjr09a52CA/edit?usp=sharing';
 
 /**
  * 受注情報が記載されているスプレッドシートのURL。
