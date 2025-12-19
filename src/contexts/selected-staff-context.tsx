@@ -196,10 +196,9 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
                 const parsedIds = JSON.parse(savedIds);
                 setAppliedSelectedStaffIds(parsedIds);
                 setPendingSelectedStaffIds(parsedIds);
-              } else {
-                const allStaffIds = cachedStaff.map((s: WithId<Staff>) => s.id);
-                setAppliedSelectedStaffIds(allStaffIds);
-                setPendingSelectedStaffIds(allStaffIds);
+                // Default to empty if no saved selection
+                setAppliedSelectedStaffIds([]);
+                setPendingSelectedStaffIds([]);
               }
               // Show UI immediately with cached data
               setIsLoading(false);
@@ -246,9 +245,9 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
               setAppliedSelectedStaffIds(parsedIds);
               setPendingSelectedStaffIds(parsedIds);
             } else {
-              const allStaffIds = staffList.map(s => s.id);
-              setAppliedSelectedStaffIds(allStaffIds);
-              setPendingSelectedStaffIds(allStaffIds);
+              // Default to empty if no saved selection
+              setAppliedSelectedStaffIds([]);
+              setPendingSelectedStaffIds([]);
             }
           }
         }
