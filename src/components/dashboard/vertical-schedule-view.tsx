@@ -108,6 +108,11 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
                 <MapPin className="h-4 w-4 mt-0.5" />
                 <span>{customer.address}</span>
               </div>}
+              {staffMember && (
+                <div className="flex items-center gap-2 mt-2 text-xs font-medium text-slate-600 dark:text-slate-400 bg-white/50 dark:bg-black/20 p-1 rounded inline-block">
+                  <span>担当: {staffMember.name}</span>
+                </div>
+              )}
             </CardContent>
           </Card>
         );

@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait';
+type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Emergency';
 type StatusValue = StaffStatus['status'];
 
 function CheckInClient() {
@@ -38,45 +38,45 @@ function CheckInClient() {
 
   const currentStatus = currentOrder?.status || '未着手';
 
-  const getJapaneseActionName = (action: ActionType) => {
-    const map: Record<ActionType, string> = {
-      'Clock In': '出勤',
-      'Clock Out': '退勤',
+  const [emergencyMessage, setEmergencyMessage] = React.useState('');
+
+  const getJapaneseActionName = (action: ActionType | 'Emergency') => {
+    const map: Record<string, string> = {
       'Start Travel': '移動開始',
       'Arrive': '現場到着',
       'Begin Task': '作業開始',
       'Finish Task': '作業完了',
       'Wait': '位置情報更新',
+      'Emergency': '緊急連絡',
     };
-    return map[action];
+    return map[action] || action;
   };
 
-  const handleAction = async (action: ActionType) => {
+  const handleEmergency = async () => {
+    if (!emergencyMessage.trim()) {
+      setError('緊急連絡の内容を入力してください。');
+      return;
+    }
+
+    // Use 'Wait' action type as base, but carry the message? 
+    // Or we define a new action 'Emergency'
+    await handleAction('Emergency');
+  };
+
+  const handleAction = async (action: ActionType | 'Emergency') => {
     setIsLoading(action);
     setError(null);
     const now = new Date();
 
-    if (action === 'Clock In' || action === 'Clock Out') {
-      // ... (existing clock logic)
-      console.log(`Action: ${action}`);
-      setTimeout(() => {
-        const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-        setLastAction({ action, time: currentTime });
-        toast({
-          title: 'アクションを記録しました',
-          description: `${getJapaneseActionName(action)} at ${currentTime}`,
-        });
-        setIsLoading(null);
-      }, 1000);
-      return;
-    }
+    // Removed Clock In/Out logical block here
 
-    const statusMap: Partial<Record<ActionType, StatusValue>> = {
+    const statusMap: Partial<Record<string, string>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
       'Finish Task': '作業完了',
       'Wait': '待機中',
       'Arrive': '作業待ち',
+      'Emergency': '緊急', // New Status?
     };
 
     const statusValue = statusMap[action];
@@ -108,6 +108,10 @@ function CheckInClient() {
 
         try {
           const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
+
+          // Pass emergency message if action is Emergency
+          const extraParams = action === 'Emergency' ? { comment: `【緊急】${emergencyMessage}` } : {};
+
           const result = await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: eventTitleForUpdate,
@@ -116,8 +120,9 @@ function CheckInClient() {
             timestamp: now.toISOString(),
             latitude: latitude,
             longitude: longitude,
-            actionType: action,
-            actionTimestamp: now.toISOString()
+            actionType: action as any,
+            actionTimestamp: now.toISOString(),
+            ...extraParams
           });
 
           if (result.status === 'error') {
@@ -127,17 +132,21 @@ function CheckInClient() {
           await refetchOrders();
 
           toast({
-            title: 'ステータスを更新しました',
+            title: action === 'Emergency' ? '緊急連絡を送信しました' : 'ステータスを更新しました',
             description: result.message,
+            variant: action === 'Emergency' ? 'destructive' : 'default',
           });
 
           const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action, time: currentTime });
+          setLastAction({ action: action, time: currentTime });
+
+          if (action === 'Emergency') setEmergencyMessage('');
 
           // Turn off correction mode after successful action
           if (isCorrectionMode) setIsCorrectionMode(false);
 
         } catch (e: any) {
+          // ... existing error catch
           setError(e.message || 'スプレッドシートの更新に失敗しました。');
           toast({
             variant: 'destructive',
@@ -167,16 +176,13 @@ function CheckInClient() {
         setError(message);
         setIsLoading(null);
       },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
-  const isButtonDisabled = (action: ActionType) => {
-    if (['Clock In', 'Clock Out', 'Wait'].includes(action)) return false;
+  const isButtonDisabled = (action: ActionType | 'Emergency') => {
+    if ((action as string) === 'Emergency') return !!isLoading; // Always allow if not already loading
+    if (['Wait'].includes(action)) return false;
     if (!orderId) return true;
     if (isCorrectionMode) return false;
 
@@ -196,8 +202,6 @@ function CheckInClient() {
   };
 
   const actionButtons: { action: ActionType; label: string; icon: React.ElementType }[] = [
-    { action: 'Clock In', label: '出勤', icon: LogIn },
-    { action: 'Clock Out', label: '退勤', icon: LogOut },
     { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },
@@ -211,7 +215,7 @@ function CheckInClient() {
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle>勤怠・作業記録</CardTitle>
+              <CardTitle>作業記録</CardTitle>
               <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
               {orderId && <div className="text-sm font-medium mt-1 text-slate-600">現在のステータス: <span className="text-blue-600">{currentStatus}</span></div>}
             </div>
@@ -224,7 +228,7 @@ function CheckInClient() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             {actionButtons.map(({ action, label, icon: Icon }) => (
               <Button
@@ -233,7 +237,7 @@ function CheckInClient() {
                 className={cn(
                   "h-20 text-base flex-col",
                   action === 'Wait' && "col-span-2",
-                  isCorrectionMode && !['Clock In', 'Clock Out'].includes(action) && "ring-2 ring-red-400 border-red-400 bg-red-50 text-red-900 hover:bg-red-100"
+                  isCorrectionMode && "ring-2 ring-red-400 border-red-400 bg-red-50 text-red-900 hover:bg-red-100"
                 )}
                 onClick={() => handleAction(action)}
                 disabled={!!isLoading || isButtonDisabled(action)}
@@ -250,7 +254,33 @@ function CheckInClient() {
             ))}
           </div>
 
-          {/* ... Alerts ... */}
+          {/* Emergency Contact Section */}
+          {orderId && (
+            <div className="pt-4 border-t">
+              <h3 className="text-sm font-semibold mb-2 text-red-600 flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                緊急連絡
+              </h3>
+              <Textarea
+                placeholder="事故・遅延・トラブルなど、緊急時の連絡事項を入力してください。"
+                className="mb-2"
+                value={emergencyMessage}
+                onChange={(e) => setEmergencyMessage(e.target.value)}
+              />
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={handleEmergency}
+                disabled={isButtonDisabled('Emergency') || !emergencyMessage.trim()}
+              >
+                {isLoading === 'Emergency' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                緊急連絡を送信
+              </Button>
+            </div>
+          )}
+
+          {/* ... existing alerts ... */}
+
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />

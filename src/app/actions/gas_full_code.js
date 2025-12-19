@@ -157,7 +157,7 @@ function createOrder(data) {
 function updateSheetWithOrderInfo(params) {
     const {
         eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType,
-        actionTimestamp, scheduledTime, scheduledEndTime
+        actionTimestamp, scheduledTime, scheduledEndTime, comment
     } = params;
 
     try {
@@ -297,6 +297,10 @@ function updateSheetWithOrderInfo(params) {
                 }
                 updateColumn("チップ配置作業予定", scheduledTime ? new Date(scheduledTime) : (scheduledTime === "" ? "" : undefined));
                 updateColumn("チップ配置作業完了予定", scheduledEndTime ? new Date(scheduledEndTime) : (scheduledEndTime === "" ? "" : undefined));
+
+                if (comment) {
+                    updateColumn("任意コメント", comment);
+                }
 
                 if (actionType && actionTimestamp) {
                     const dateValue = new Date(actionTimestamp);

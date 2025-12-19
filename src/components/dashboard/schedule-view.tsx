@@ -1162,8 +1162,17 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
   const { setNodeRef } = useDroppable({ id: staff.id });
   const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
 
+  const emergencyEvent = events.find(e => e.raw && e.raw['任意コメント'] && e.raw['任意コメント'].includes('【緊急】'));
+
   return (
     <div className={cn("flex relative h-14 border-b", areaBgClass)}>
+      {emergencyEvent && (
+        <div className="absolute inset-0 z-50 bg-red-600/90 flex items-center justify-center px-4 animate-pulse pointer-events-none">
+          <span className="text-white font-bold text-lg flex items-center gap-2 drop-shadow-md">
+            ⚠️ {emergencyEvent.raw?.['任意コメント']} (担当: {staff.name})
+          </span>
+        </div>
+      )}
       <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit w-[144px]")}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
           <div className='w-2 h-8 rounded-full' style={{ backgroundColor: staff.color }}></div>
