@@ -62,7 +62,7 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
 
   const startLocation = parseLocation(startLocationString);
   const endLocation = parseLocation(endLocationString);
-  const waypoints = waypointStrings.map(parseLocation).filter((loc): loc is Location => !!loc);
+  const waypoints = waypointStrings.map(parseLocation).filter((loc: Location | null): loc is Location => !!loc);
 
   if (!startLocation || !endLocation) {
     return { data: null, error: '出発地と目的地を選択または入力してください。', options: { avoidHighways: avoidsHighways } };
@@ -381,7 +381,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
           <CardContent className="space-y-6">
             <input type="hidden" name="startLocation" value={startLocation ? JSON.stringify(startLocation) : ''} />
             <input type="hidden" name="endLocation" value={endLocation ? JSON.stringify(endLocation) : ''} />
-            {waypoints.filter(loc => loc).map((loc, index) => <input key={index} type="hidden" name="waypoints" value={JSON.stringify(loc)} />)}
+            {waypoints.filter(loc => loc).map((loc: Location | null, index: number) => <input key={index} type="hidden" name="waypoints" value={JSON.stringify(loc)} />)}
 
             <div className="space-y-2">
               <Label>出発地</Label>
@@ -510,7 +510,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
               <div>
                 <h3 className="font-semibold mb-2">巡回順</h3>
                 <ol className="relative border-l border-border space-y-4">
-                  {state.data.optimizedRoute.map((location, index) => {
+                  {state.data.optimizedRoute.map((location: any, index: number) => {
                     return (
                       <li key={location.id} className="ml-6">
                         <span className={cn(

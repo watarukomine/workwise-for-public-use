@@ -139,7 +139,8 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                         <div className="flex items-center gap-3">
                           <div
                             className="h-6 w-6 rounded-full border"
-                            style={{ backgroundColor: member.color }}
+                            // eslint-disable-next-line react-dom/no-unsafe-inline-style
+                            style={{ backgroundColor: member.color } as React.CSSProperties}
                           />
                           <span className="font-medium">{member.name}</span>
                         </div>

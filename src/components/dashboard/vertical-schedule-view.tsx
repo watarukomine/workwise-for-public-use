@@ -11,6 +11,7 @@ import { useCustomer } from '../../contexts/customer-context';
 import Link from 'next/link';
 import { useOrder } from '../../contexts/order-context';
 import { STORE_COLORS } from '../../lib/constants';
+import { useUserProfile } from '../../hooks/use-user-profile';
 
 interface VerticalScheduleViewProps {
   staffData: WithId<Staff>[];
@@ -28,6 +29,7 @@ const formatTime = (date: Date | string | undefined) => {
 export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffIds }: VerticalScheduleViewProps) {
   const { customers } = useCustomer();
   const { scheduleEvents } = useOrder();
+  const { profile } = useUserProfile();
 
   const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => {
     if (!id) return undefined;
@@ -43,7 +45,8 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
       return event.staffId &&
         staffIds.has(event.staffId) &&
         isValid(eventDate) &&
-        isEqual(startOfDay(eventDate), startOfDay(currentDate));
+        isEqual(startOfDay(eventDate), startOfDay(currentDate)) &&
+        !event.title.includes('移動'); // Hide travel events
     })
     .sort((a, b) => {
       const startA = typeof a.start === 'string' ? parseISO(a.start) : a.start;
@@ -82,7 +85,9 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
             "cursor-pointer hover:bg-muted/50",
             areaBgClass, // Apply store background color
             isTravel && "bg-secondary/50 border-dashed",
-            checkedOutStaffIds?.has(event.staffId || '') && "opacity-50 grayscale bg-gray-100 dark:bg-gray-800"
+            checkedOutStaffIds?.has(event.staffId || '') && "opacity-50 grayscale bg-gray-100 dark:bg-gray-800",
+            // Dim tasks assigned to other staff members
+            profile && event.staffId !== profile.id && "opacity-40 grayscale-[0.8]"
           )}>
             <CardHeader className="p-4">
               <div className="flex items-center justify-between">
@@ -107,9 +112,10 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
           </Card>
         );
 
+        const isOwnTask = profile?.id === event.staffId;
         return (
           <React.Fragment key={event.id}>
-            {event.rawOrderId && !isTravel ? (
+            {event.rawOrderId && !isTravel && isOwnTask ? (
               <Link href={`/check-in?orderId=${event.rawOrderId}`}>
                 {eventCard}
               </Link>
