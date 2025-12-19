@@ -28,18 +28,25 @@ function CheckInClient() {
   const { profile } = useUserProfile();
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
-  const { refetchOrders } = useOrder();
+  const { refetchOrders, orders } = useOrder();
+  const [isCorrectionMode, setIsCorrectionMode] = React.useState(false);
 
+  const currentOrder = React.useMemo(() => {
+    if (!orderId) return null;
+    return orders.find(o => o.rawOrderId === orderId || o.id === orderId);
+  }, [orders, orderId]);
+
+  const currentStatus = currentOrder?.status || '未着手';
 
   const getJapaneseActionName = (action: ActionType) => {
     const map: Record<ActionType, string> = {
-        'Clock In': '出勤',
-        'Clock Out': '退勤',
-        'Start Travel': '移動開始',
-        'Arrive': '現場到着',
-        'Begin Task': '作業開始',
-        'Finish Task': '作業完了',
-        'Wait': '位置情報更新',
+      'Clock In': '出勤',
+      'Clock Out': '退勤',
+      'Start Travel': '移動開始',
+      'Arrive': '現場到着',
+      'Begin Task': '作業開始',
+      'Finish Task': '作業完了',
+      'Wait': '位置情報更新',
     };
     return map[action];
   };
@@ -48,19 +55,20 @@ function CheckInClient() {
     setIsLoading(action);
     setError(null);
     const now = new Date();
-    
+
     if (action === 'Clock In' || action === 'Clock Out') {
-        console.log(`Action: ${action}`);
-        setTimeout(() => {
-          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-          setLastAction({ action, time: currentTime });
-          toast({
-            title: 'アクションを記録しました',
-            description: `${getJapaneseActionName(action)} at ${currentTime}`,
-          });
-          setIsLoading(null);
-        }, 1000);
-        return;
+      // ... (existing clock logic)
+      console.log(`Action: ${action}`);
+      setTimeout(() => {
+        const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        setLastAction({ action, time: currentTime });
+        toast({
+          title: 'アクションを記録しました',
+          description: `${getJapaneseActionName(action)} at ${currentTime}`,
+        });
+        setIsLoading(null);
+      }, 1000);
+      return;
     }
 
     const statusMap: Partial<Record<ActionType, StatusValue>> = {
@@ -72,11 +80,11 @@ function CheckInClient() {
     };
 
     const statusValue = statusMap[action];
-    
+
     if (!statusValue) {
-        console.error("No status defined for this action:", action);
-        setIsLoading(null);
-        return;
+      console.error("No status defined for this action:", action);
+      setIsLoading(null);
+      return;
     }
 
     if (!navigator.geolocation) {
@@ -89,52 +97,55 @@ function CheckInClient() {
       async (position) => {
         const { latitude, longitude } = position.coords;
         setLocation({ latitude, longitude });
-        
+
         console.log(`Action: ${action}`, { latitude, longitude });
-        
+
         if (!profile?.name) {
-            setError('ユーザー情報が取得できません。ログインしているか確認してください。');
-            setIsLoading(null);
-            return;
+          setError('ユーザー情報が取得できません。ログインしているか確認してください。');
+          setIsLoading(null);
+          return;
         }
 
         try {
-            const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
-            const result = await updateSheetStatus({
-                gasUrl: ORDER_GAS_URL,
-                eventTitle: eventTitleForUpdate,
-                staffName: profile.name,
-                statusValue: statusValue,
-                timestamp: now.toISOString(),
-                latitude: latitude,
-                longitude: longitude,
-                actionType: action,
-                actionTimestamp: now.toISOString()
-            });
+          const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
+          const result = await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: eventTitleForUpdate,
+            staffName: profile.name,
+            statusValue: statusValue,
+            timestamp: now.toISOString(),
+            latitude: latitude,
+            longitude: longitude,
+            actionType: action,
+            actionTimestamp: now.toISOString()
+          });
 
-            if (result.status === 'error') {
-                throw new Error(result.message);
-            }
-            
-            await refetchOrders();
+          if (result.status === 'error') {
+            throw new Error(result.message);
+          }
 
-            toast({
-                title: 'ステータスを更新しました',
-                description: result.message,
-            });
+          await refetchOrders();
 
-            const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-            setLastAction({ action, time: currentTime });
+          toast({
+            title: 'ステータスを更新しました',
+            description: result.message,
+          });
+
+          const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          setLastAction({ action, time: currentTime });
+
+          // Turn off correction mode after successful action
+          if (isCorrectionMode) setIsCorrectionMode(false);
 
         } catch (e: any) {
-            setError(e.message || 'スプレッドシートの更新に失敗しました。');
-            toast({
-                variant: 'destructive',
-                title: '更新エラー',
-                description: e.message || 'スプレッドシートの更新に失敗しました。'
-            });
+          setError(e.message || 'スプレッドシートの更新に失敗しました。');
+          toast({
+            variant: 'destructive',
+            title: '更新エラー',
+            description: e.message || 'スプレッドシートの更新に失敗しました。'
+          });
         }
-        
+
         setIsLoading(null);
       },
       (err) => {
@@ -164,6 +175,26 @@ function CheckInClient() {
     );
   };
 
+  const isButtonDisabled = (action: ActionType) => {
+    if (['Clock In', 'Clock Out', 'Wait'].includes(action)) return false;
+    if (!orderId) return true;
+    if (isCorrectionMode) return false;
+
+    // Sequential logic
+    switch (action) {
+      case 'Start Travel':
+        return !['未着手', '待機中', ''].includes(currentStatus);
+      case 'Arrive':
+        return currentStatus !== '移動中';
+      case 'Begin Task':
+        return currentStatus !== '作業待ち';
+      case 'Finish Task':
+        return currentStatus !== '作業中';
+      default:
+        return false;
+    }
+  };
+
   const actionButtons: { action: ActionType; label: string; icon: React.ElementType }[] = [
     { action: 'Clock In', label: '出勤', icon: LogIn },
     { action: 'Clock Out', label: '退勤', icon: LogOut },
@@ -178,8 +209,20 @@ function CheckInClient() {
     <div className="max-w-md mx-auto space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>勤怠・作業記録</CardTitle>
-          <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle>勤怠・作業記録</CardTitle>
+              <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
+              {orderId && <div className="text-sm font-medium mt-1 text-slate-600">現在のステータス: <span className="text-blue-600">{currentStatus}</span></div>}
+            </div>
+            <Button
+              variant={isCorrectionMode ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => setIsCorrectionMode(!isCorrectionMode)}
+            >
+              {isCorrectionMode ? "修正モードON" : "修正"}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -189,10 +232,11 @@ function CheckInClient() {
                 size="lg"
                 className={cn(
                   "h-20 text-base flex-col",
-                  action === 'Wait' && "col-span-2"
+                  action === 'Wait' && "col-span-2",
+                  isCorrectionMode && !['Clock In', 'Clock Out'].includes(action) && "ring-2 ring-red-400 border-red-400 bg-red-50 text-red-900 hover:bg-red-100"
                 )}
                 onClick={() => handleAction(action)}
-                disabled={!!isLoading || (!orderId && !['Clock In', 'Clock Out', 'Wait'].includes(action))}
+                disabled={!!isLoading || isButtonDisabled(action)}
               >
                 {isLoading === action ? (
                   <Loader2 className="h-6 w-6 animate-spin" />
@@ -206,6 +250,7 @@ function CheckInClient() {
             ))}
           </div>
 
+          {/* ... Alerts ... */}
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
@@ -213,7 +258,7 @@ function CheckInClient() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          
+
           {!orderId && (
             <Alert>
               <AlertCircle className="h-4 w-4" />
@@ -225,7 +270,7 @@ function CheckInClient() {
           )}
 
           {lastAction && (
-             <Alert>
+            <Alert>
               <MapPin className="h-4 w-4" />
               <AlertTitle>最後の記録</AlertTitle>
               <AlertDescription>
@@ -241,9 +286,9 @@ function CheckInClient() {
 }
 
 export default function CheckInPage() {
-    return (
-        <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
-            <CheckInClient />
-        </Suspense>
-    )
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+      <CheckInClient />
+    </Suspense>
+  )
 }
