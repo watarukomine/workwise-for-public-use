@@ -232,6 +232,7 @@ export default function DashboardPage() {
       else if (displayStatus === '現場到着') displayStatus = '作業待ち';
       else if (displayStatus === '作業開始' || displayStatus === '作業中') displayStatus = '作業中';
       else if (displayStatus === '作業完了') displayStatus = '待機中';
+      else if (displayStatus === '作業待ち') displayStatus = '待機中'; // Treat assigned-only (before arrival) as Idle/Waiting so it can be overridden by Attendance
       else if (displayStatus === '待機中') displayStatus = '待機中';
 
       // 3. Handle "Clock In" -> "出勤済" vs "Idle"

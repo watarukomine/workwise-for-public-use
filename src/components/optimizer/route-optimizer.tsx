@@ -8,7 +8,7 @@ import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon, ExternalLink, Flag } from 'lucide-react';
+import { ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon, ExternalLink, Flag, Navigation } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -119,6 +119,37 @@ const PlacesAutocompleteSelector: React.FC<{
   });
 
   const [open, setOpen] = React.useState(false);
+  const [isLocating, setIsLocating] = React.useState(false);
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("このブラウザは位置情報をサポートしていません。");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        onSelect({
+          id: 'current-location',
+          name: '現在地',
+          address: '現在地',
+          latitude,
+          longitude,
+          type: 'custom',
+        });
+        setValue('現在地', false);
+        setOpen(false);
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error("Error getting location", error);
+        alert("位置情報の取得に失敗しました。");
+        setIsLocating(false);
+      }
+    );
+  };
 
   const handleSelect = async (address: string) => {
     setValue(address, false);
@@ -180,6 +211,21 @@ const PlacesAutocompleteSelector: React.FC<{
           />
           <CommandList>
             <CommandEmpty>該当する場所が見つかりません。</CommandEmpty>
+
+            <CommandGroup>
+              <CommandItem
+                value="current-location"
+                onSelect={handleUseCurrentLocation}
+                className="flex items-center text-blue-600 font-medium cursor-pointer"
+              >
+                {isLocating ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Navigation className="mr-2 h-4 w-4 fill-current" />
+                )}
+                現在地を使用
+              </CommandItem>
+            </CommandGroup>
 
             {filteredStaff.length > 0 && (
               <CommandGroup heading="スタッフ">
