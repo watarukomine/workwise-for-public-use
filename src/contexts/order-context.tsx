@@ -56,13 +56,6 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
       id: mappedOrder.id || `order-${index}`, // Ensure ID
       raw: rawOrder
     };
-    // Deduplicate based on rawOrderId
-    if (order.rawOrderId) {
-      if (scheduledRawOrderIds.has(order.rawOrderId)) {
-        return; // Skip duplicate order
-      }
-      scheduledRawOrderIds.add(order.rawOrderId);
-    }
 
     orders.push(order);
 
