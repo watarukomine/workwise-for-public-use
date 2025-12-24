@@ -15,44 +15,57 @@ export function TireSizeAnalysisChart({ orders }: TireSizeAnalysisChartProps) {
         const inchMap = new Map<string, { totalMinutes: number; count: number }>();
 
         orders.forEach(order => {
-            // Filter for completed tasks with valid timestamps
-            if (!order.actualStartTime || !order.actualEndTime) return;
+            // 1. Calculate Duration
+            let duration = 0;
 
-            // Simple status check - if it has start/end time, it's considered done or actionable for this stat.
-            // Some might use order.status === '完了' but timestamps are the source of truth for duration.
+            // Priority 1: Actual Timestamps
+            if (order.actualStartTime && order.actualEndTime) {
+                const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
+                const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
 
-            // Parsing Dates
-            const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
-            const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
-            // Handle Firestore timestamps if they slip through as objects? 
-            // In types.ts they are Date objects usually after service conversion. 
-            // Let's assume they are Dates or ISO strings.
+                if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
+                    const diff = differenceInMinutes(end, start);
+                    if (diff > 0 && diff <= 600) {
+                        duration = diff;
+                    }
+                }
+            }
 
-            // Safe check for Date validity
-            if (!(start instanceof Date) || isNaN(start.getTime())) return;
-            if (!(end instanceof Date) || isNaN(end.getTime())) return;
+            // Priority 2: Manual Entry (estimatedDuration)
+            // Only use if timestamps failed AND we have a valid manual entry.
+            // In utils.ts, estimatedDuration defaults to 60. We need to check if it's a REAL value.
+            // We check order.raw to see if '作業時間' was provided.
+            if (duration === 0) {
+                // Check if we have a valid estimatedDuration (that isn't just the default 60 fallback)
+                // If the raw data has '作業時間' (or similar), we trust the estimatedDuration value.
+                const rawDuration = order.raw ? (
+                    order.raw['作業時間（分）'] ||
+                    order.raw['作業時間(分)'] ||
+                    order.raw['作業時間']
+                ) : undefined;
 
-            const duration = differenceInMinutes(end, start);
-            if (duration <= 0 || duration > 600) return; // Filter reasonable outliers (0 or >10 hrs)
+                if (rawDuration) {
+                    const parsed = parseInt(rawDuration, 10);
+                    if (!isNaN(parsed) && parsed > 0) {
+                        duration = parsed;
+                    }
+                }
+            }
+
+            // If still 0, we skip this order for the average calculation
+            if (duration === 0) return;
+
 
             // Extract Inch
             const tireSize = order.tireSize || '';
-            // Regex to find "R" followed by digits, or just take last 2 digits if they are numbers?
-            // User heuristic: "tire size lower 2 digits is inch".
-            // Implementation: Find the last 2 digits in the string.
-            // Example: "195/65R15" -> "15"
-            // Example: "205/60R16 92H" -> "16" (if strict last 2 digits of string might capture load index "92"?)
-
-            // Refined Heuristic: "R" followed by 2 digits is standard.
-            // Let's try matching "R" + digits.
+            // Match "R" + digits or "inch" or simple 2 digits
             let inch = '';
-            // 1. Look for R/ZR followed by digits (standard format: 195/65R15)
+
             const rMatch = tireSize.toUpperCase().match(/[Z]?R(\d{2})/);
             if (rMatch) {
                 inch = rMatch[1];
             }
 
-            // 2. Look for "inch" or "インチ" (e.g. 14インチ)
             if (!inch) {
                 const inchMatch = tireSize.match(/(\d{2})\s*(inch|インチ|in)/i);
                 if (inchMatch) {
@@ -60,7 +73,6 @@ export function TireSizeAnalysisChart({ orders }: TireSizeAnalysisChartProps) {
                 }
             }
 
-            // 3. Fallback: If the string is just 2 digits (e.g. "14")
             if (!inch) {
                 const simpleMatch = tireSize.trim().match(/^(\d{2})$/);
                 if (simpleMatch) {
@@ -68,7 +80,7 @@ export function TireSizeAnalysisChart({ orders }: TireSizeAnalysisChartProps) {
                 }
             }
 
-            if (!inch) return; // Could not determine inch
+            if (!inch) return;
 
             const current = inchMap.get(inch) || { totalMinutes: 0, count: 0 };
             inchMap.set(inch, {
