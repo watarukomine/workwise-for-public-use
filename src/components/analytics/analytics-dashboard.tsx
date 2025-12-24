@@ -215,7 +215,8 @@ export function AnalyticsDashboard() {
     // Aggregation: Time of Day
     const timeOfDayData = useMemo(() => {
         const map = new Map<number, { count: number; hours: number }>();
-        for (let i = 0; i < 24; i++) map.set(i, { count: 0, hours: 0 });
+        // Only 8:00 to 19:00 (include 19:00? usually "8-19" means up to 19:xx, so index 19 is included)
+        for (let i = 8; i <= 19; i++) map.set(i, { count: 0, hours: 0 });
 
         filteredData.orders.forEach(order => {
             // Use actualStartTime if available, else scheduledTime
@@ -228,7 +229,7 @@ export function AnalyticsDashboard() {
                 if (parts.length >= 1) hour = parseInt(parts[0]);
             }
 
-            if (hour >= 0 && hour < 24) {
+            if (hour >= 8 && hour <= 19) {
                 const current = map.get(hour)!;
                 map.set(hour, {
                     count: current.count + 1,
@@ -301,13 +302,13 @@ export function AnalyticsDashboard() {
     const handleExportPDF = async () => {
         const title = `${format(filteredData.start, 'yyyy年MM月')} 活動レポート`;
         const chartIds = [
-            'chart-workload',
             'chart-daily-trend',
+            'chart-workload',
             'chart-shop-dist',
             'chart-main-store',
-            'chart-travel',
             'chart-day-week',
             'chart-time-day',
+            'chart-travel',
             'chart-tire-size'
         ];
 
@@ -368,21 +369,22 @@ export function AnalyticsDashboard() {
 
             <div className="space-y-6">
                 {/* Full Width Charts */}
-                <div id="chart-workload">
-                    <StaffWorkloadChart data={staffWorkloadData} />
-                </div>
                 <div id="chart-daily-trend">
                     <DailyTrendChart data={dailyTrendData} />
+                </div>
+                <div id="chart-workload">
+                    <StaffWorkloadChart data={staffWorkloadData} />
                 </div>
 
                 {/* 2-Column Grid Charts */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div id="chart-shop-dist"><ShopDistributionChart data={shopDistributionData} /></div>
                     <div id="chart-main-store"><MainStoreShareChart data={mainStoreShareData} /></div>
-                    <div id="chart-travel"><StaffTravelTimeChart orders={filteredData.orders} allStaff={allStaff} /></div>
 
                     <div id="chart-day-week"><DayOfWeekChart data={dayOfWeekData} /></div>
                     <div id="chart-time-day"><TimeOfDayChart data={timeOfDayData} /></div>
+
+                    <div id="chart-travel"><StaffTravelTimeChart orders={filteredData.orders} allStaff={allStaff} /></div>
                     <div id="chart-tire-size"><TireSizeAnalysisChart orders={filteredData.orders} /></div>
                 </div>
             </div>
