@@ -293,7 +293,7 @@ function CheckInClient() {
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: eventTitleForUpdate,
                         staffName: profile.name,
-                        statusValue: currentStatus?.status || '待機中',
+                        statusValue: currentStatus || '待機中',
                         timestamp: now.toISOString(),
                         actionType: null, // No status update action
                         comment: '' // Clear comment
