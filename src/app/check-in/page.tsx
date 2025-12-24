@@ -179,7 +179,7 @@ function CheckInClient() {
 
   const isButtonDisabled = (action: ActionType | 'Emergency') => {
     if ((action as string) === 'Emergency') return !!isLoading; // Always allow if not already loading
-    if (['Wait'].includes(action)) return false;
+    if (['Clock In', 'Clock Out', 'Wait'].includes(action)) return false;
     if (!orderId) return true;
     if (isCorrectionMode) return false;
 
@@ -199,10 +199,12 @@ function CheckInClient() {
   };
 
   const actionButtons: { action: ActionType; label: string; icon: React.ElementType }[] = [
+    { action: 'Clock In', label: '出勤', icon: LogIn },
     { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },
     { action: 'Finish Task', label: '作業完了', icon: CheckCircle },
+    { action: 'Clock Out', label: '退勤', icon: LogOut },
     { action: 'Wait', label: '位置情報更新', icon: RefreshCw },
   ];
 
