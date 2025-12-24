@@ -109,9 +109,6 @@ function CheckInClient() {
         try {
           const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
 
-          // Pass emergency message if action is Emergency
-          const extraParams = action === 'Emergency' ? { comment: `【緊急】${emergencyMessage}` } : {};
-
           const result = await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: eventTitleForUpdate,
@@ -122,7 +119,7 @@ function CheckInClient() {
             longitude: longitude,
             actionType: action as any,
             actionTimestamp: now.toISOString(),
-            ...extraParams
+            comment: action === 'Emergency' ? `【緊急】${emergencyMessage}` : ''
           });
 
           if (result.status === 'error') {
