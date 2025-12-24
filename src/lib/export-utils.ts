@@ -5,14 +5,17 @@ import { format } from 'date-fns';
 
 /**
  * データをExcelファイルとしてエクスポートします
- * @param data エクスポートするデータ配列（オブジェクトの配列）
+ * @param sheets エクスポートするデータ配列とシート名のセット
  * @param fileName 保存するファイル名
- * @param sheetName シート名
  */
-export const exportToExcel = <T extends object>(data: T[], fileName: string, sheetName: string = 'Sheet1') => {
-    const worksheet = XLSX.utils.json_to_sheet(data);
+export const exportToExcel = (sheets: { name: string, data: any[] }[], fileName: string) => {
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+    sheets.forEach(sheet => {
+        const worksheet = XLSX.utils.json_to_sheet(sheet.data);
+        XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
+    });
+
     XLSX.writeFile(workbook, `${fileName}.xlsx`);
 };
 

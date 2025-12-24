@@ -284,19 +284,148 @@ export function AnalyticsDashboard() {
     const handleExportExcel = () => {
         const title = `${format(filteredData.start, 'yyyy年MM月')}活動レポート`;
 
-        // Calculate total tasks for percentage
-        const totalTasks = staffWorkloadData.reduce((sum, d) => sum + d.tasks, 0);
-
-        // Flatten data for export
-        // Export 1: Staff Summary
-        const staffSheet = staffWorkloadData.map(d => ({
+        // 1. Staff Workload
+        const workloadSheet = staffWorkloadData.map(d => ({
             'スタッフ名': d.name,
             '担当件数': d.tasks,
-            '構成比': totalTasks > 0 ? `${(d.tasks / totalTasks * 100).toFixed(1)}%` : '0.0%',
             '推定稼働時間(h)': d.hours.toFixed(1),
             '実稼働時間(h)': d.actualHours.toFixed(1)
         }));
-        exportToExcel(staffSheet, title, 'スタッフ稼働状況');
+
+        // 2. Daily Trend
+        const trendSheet = dailyTrendData.map(d => ({
+            '日付': `${format(filteredData.start, 'yyyy/MM')}/${d.date}`,
+            '受注件数': d.count,
+            '稼働時間(h)': d.hours
+        }));
+
+        // 3. Shop Distribution
+        const shopSheet = shopDistributionData.map(d => ({
+            '店舗名': d.name,
+            '受注件数': d.value
+        }));
+
+        // 4. Main Store Share
+        const mainStoreSheet = mainStoreShareData.map(d => ({
+            '主管店舗名': d.name,
+            '受注件数': d.value
+        }));
+
+        // 5. Day of Week
+        const daySheet = dayOfWeekData.map(d => ({
+            '曜日': d.day,
+            '受注件数': d.count,
+            '稼働時間(h)': d.hours
+        }));
+
+        // 6. Time of Day
+        const timeSheet = timeOfDayData.map(d => ({
+            '時間帯': d.hour,
+            '受注件数': d.count,
+            '稼働時間(h)': d.hours
+        }));
+
+        // 7. Travel Time (Logic replicated from StaffTravelTimeChart)
+        const travelMap = new Map<string, { totalMinutes: number; count: number }>();
+        filteredData.orders.forEach(order => {
+            if (!order.startTravelTime || !order.arrivalTimestamp) return;
+            const start = typeof order.startTravelTime === 'string' ? parseISO(order.startTravelTime) : order.startTravelTime;
+            const end = typeof order.arrivalTimestamp === 'string' ? parseISO(order.arrivalTimestamp) : order.arrivalTimestamp;
+            if (!(start instanceof Date) || isNaN(start.getTime())) return;
+            if (!(end instanceof Date) || isNaN(end.getTime())) return;
+            let duration = (end.getTime() - start.getTime()) / (1000 * 60);
+            if (duration <= 0 || duration > 300) return;
+            // Staff name key
+            const key = order.staffName || '未割当';
+            const current = travelMap.get(key) || { totalMinutes: 0, count: 0 };
+            travelMap.set(key, { totalMinutes: current.totalMinutes + duration, count: current.count + 1 });
+        });
+        const travelSheet = Array.from(travelMap.entries()).map(([name, val]) => ({
+            'スタッフ名': name,
+            '総移動時間(h)': (val.totalMinutes / 60).toFixed(1),
+            '平均移動時間(分)': Math.round(val.totalMinutes / val.count),
+            '回数': val.count
+        })).sort((a, b) => parseFloat(b['総移動時間(h)']) - parseFloat(a['総移動時間(h)']));
+
+
+        // 8. Tire Size (Logic replicated from TireSizeAnalysisChart)
+        const tireMap = new Map<string, { totalMinutes: number; count: number }>();
+        filteredData.orders.forEach(order => {
+            let duration = 0;
+            // Priority 1
+            if (order.actualStartTime && order.actualEndTime) {
+                const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
+                const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
+                if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
+                    const diff = (end.getTime() - start.getTime()) / (1000 * 60);
+                    if (diff > 0 && diff <= 600) duration = diff;
+                }
+            }
+            // Priority 2
+            if (duration === 0 && order.raw) {
+                // Simplified check as per chart
+                const keys = ['作業時間（分）', '作業時間(分)', '作業時間', 'workTime', '作業所要時間'];
+                let val: any;
+                for (const k of keys) { if (order.raw[k]) { val = order.raw[k]; break; } } // Simple search
+
+                // Better: use findKey utility if exported, or just manual check
+                // We don't have findKey imported, let's just do manual logic for consistency with chart
+                const rawDuration = (() => {
+                    for (const k of keys) {
+                        // case insensitive check? logic from utils is safer but we are inside component.
+                        // let's assume raw keys match what we saw.
+                        if (order.raw[k]) return order.raw[k];
+                    }
+                })();
+
+                if (rawDuration) {
+                    if (typeof rawDuration === 'string' && (rawDuration.includes('T') || rawDuration.includes('1899-'))) {
+                        const d = parseISO(rawDuration);
+                        if (!isNaN(d.getTime())) duration = d.getHours() * 60 + d.getMinutes();
+                    } else {
+                        const p = parseInt(String(rawDuration), 10);
+                        if (!isNaN(p) && p > 0 && p !== 1899) duration = p;
+                    }
+                }
+            }
+
+            if (duration === 0) return;
+
+            // Extract Inch
+            const tireSize = order.tireSize || '';
+            let inch = '';
+            const rMatch = tireSize.toUpperCase().match(/[Z]?R(\d{2})/);
+            if (rMatch) inch = rMatch[1];
+            if (!inch) {
+                const inchMatch = tireSize.match(/(\d{2})\s*(inch|インチ|in)/i);
+                if (inchMatch) inch = inchMatch[1];
+            }
+            if (!inch) {
+                const simpleMatch = tireSize.trim().match(/^(\d{2})$/);
+                if (simpleMatch) inch = simpleMatch[1];
+            }
+            if (!inch) return;
+
+            const current = tireMap.get(inch) || { totalMinutes: 0, count: 0 };
+            tireMap.set(inch, { totalMinutes: current.totalMinutes + duration, count: current.count + 1 });
+        });
+        const tireSheet = Array.from(tireMap.entries()).map(([inch, val]) => ({
+            'インチ': inch,
+            '平均作業時間(分)': Math.round(val.totalMinutes / val.count),
+            'サンプル数': val.count
+        })).sort((a, b) => parseInt(a['インチ']) - parseInt(b['インチ']));
+
+
+        exportToExcel([
+            { name: '日別推移', data: trendSheet },
+            { name: 'スタッフ稼働', data: workloadSheet },
+            { name: '母店別シェア', data: shopSheet },
+            { name: '主管店舗別シェア', data: mainStoreSheet },
+            { name: '曜日別', data: daySheet },
+            { name: '時間帯別', data: timeSheet },
+            { name: '移動時間', data: travelSheet },
+            { name: 'タイヤサイズ別', data: tireSheet }
+        ], title);
     };
 
     const handleExportPDF = async () => {
