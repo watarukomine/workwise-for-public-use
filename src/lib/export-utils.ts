@@ -70,32 +70,23 @@ import html2canvas from 'html2canvas';
 
 /**
  * ダッシュボードの指定された要素を画像化してPDFエクスポートします
+ * レイアウト配置と1ページへの収まりを考慮して縮小します
  * @param title PDFタイトル
- * @param elementIds 画像化するDOM要素のID配列
+ * @param layoutIds 画像化するDOM要素のID配列（文字列=1行全幅、配列=その行で分割配置）
  * @param fileName ファイル名
  */
-export const exportDashboardToPDF = async (title: string, elementIds: string[], fileName: string) => {
+export const exportDashboardToPDF = async (title: string, layoutIds: (string | string[])[], fileName: string) => {
     const doc = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = doc.internal.pageSize.getWidth();
     const pdfHeight = doc.internal.pageSize.getHeight();
     const margin = 10;
     const contentWidth = pdfWidth - (margin * 2);
 
-    let yOffset = margin + 10; // Title space
+    // Title area
+    const titleHeight = 15;
+    const contentAvailableHeight = pdfHeight - (margin * 2) - titleHeight;
 
-    // Add Title
-    // Note: Standard fonts don't support Japanese. 
-    // Ideally we'd use the VFS font logic from exportToPDF, but for simplicity we'll assume the user
-    // is okay with the charts themselves containing the Japanese text (as images).
-    // To support Japanese title, we need the font loading logic again.
-    // For now, let's try to reuse the logic if possible or just rely on images.
-    // We will skip adding a text title if we can't guarantee font support, 
-    // OR we can rely on the font loading logic if we duplicate it or refactor.
-    // Let's assume we can use the same font loading if we copy it, but to keep it DRY we should separate it.
-    // However, for this specific request, the user sees charts. 
-    // Let's just create the PDF.
-
-    // Load font for title support (copying logic for robustness)
+    // Load font (Same logic as before)
     const fontName = 'IPAexGothic';
     try {
         const fontResponse = await fetch('/fonts/ipaexg.ttf');
@@ -115,40 +106,97 @@ export const exportDashboardToPDF = async (title: string, elementIds: string[], 
         console.warn('Font load failed', e);
     }
 
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.text(title, margin, margin + 5);
 
-    for (const id of elementIds) {
-        const element = document.getElementById(id);
-        if (!element) continue;
+    // 1. Capture All Images & Calculate Dimensions
+    const capturedRows: { items: { imgData: string, ratio: number }[], height: number }[] = [];
+    let totalNeededHeight = 0;
 
-        try {
-            const canvas = await html2canvas(element, {
-                scale: 2, // Higher scale for better quality
-                useCORS: true,
-                logging: false
-            });
+    for (const row of layoutIds) {
+        const itemIds = Array.isArray(row) ? row : [row];
+        const rowItems = [];
+        let maxRowRatio = 0;
 
-            const imgData = canvas.toDataURL('image/png');
-            const imgProps = doc.getImageProperties(imgData);
-            const imgRatio = imgProps.width / imgProps.height;
+        // Determine width per item in this row
+        const itemWidth = typeof row === 'string' ? contentWidth : (contentWidth - ((itemIds.length - 1) * 5)) / itemIds.length;
 
-            // Calculate dimensions to fit width
-            const printWidth = contentWidth;
-            const printHeight = printWidth / imgRatio;
+        for (const id of itemIds) {
+            const element = document.getElementById(id);
+            if (!element) continue;
 
-            // Check if we need a new page
-            if (yOffset + printHeight > pdfHeight - margin) {
-                doc.addPage();
-                yOffset = margin;
+            try {
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                });
+                const imgData = canvas.toDataURL('image/png');
+                const ratio = canvas.width / canvas.height;
+                rowItems.push({ imgData, ratio });
+            } catch (error) {
+                console.error(`Error capturing ${id}`, error);
             }
-
-            doc.addImage(imgData, 'PNG', margin, yOffset, printWidth, printHeight);
-            yOffset += printHeight + 10; // Add padding between charts
-
-        } catch (error) {
-            console.error(`Error capturing element ${id}:`, error);
         }
+
+        if (rowItems.length > 0) {
+            // Calculate row height based on the first item's ratio (assuming uniform height in grid)
+            // or taking the "tallest" requirement?
+            // Usually grid items should align. Let's take the first item's height as reference or average.
+            // Height = Width / Ratio
+            const rowHeight = itemWidth / rowItems[0].ratio;
+            capturedRows.push({ items: rowItems, height: rowHeight });
+            totalNeededHeight += rowHeight + 5; // +5 padding
+        }
+    }
+
+    // 2. Calculate Scale Factor
+    let scale = 1;
+    if (totalNeededHeight > contentAvailableHeight) {
+        scale = contentAvailableHeight / totalNeededHeight;
+    }
+
+    // 3. Render
+    let currentY = margin + titleHeight;
+
+    for (const row of capturedRows) {
+        const itemCount = row.items.length;
+        // Recalculate width with scale
+        // Padding between grid items should strictly be handled. 
+        // gap = 5mm
+        const gap = 5;
+        const totalGap = (itemCount - 1) * gap;
+        // Available width for content is also scaled? No, width is fixed to page. 
+        // We only scale HEIGHT usually to fit? 
+        // If we simply reduce vertical size, we squish the image. We must scale PROPORTIONALLY.
+        // So we reduce the rendered WIDTH and HEIGHT by 'scale'.
+        // But wait, if we reduce Width, we leave empty space on the right.
+        // The user wants to FIT everything on one page.
+        // If the content is too tall, we must shrink it.
+        // To shrink it proportionally, we must reduce the Width too.
+        // This results in centering the smaller content ?
+
+        // Actually, 'scale' here is just a multiplier for the dimensions we draw.
+        // If we draw smaller, we use less Y.
+        // We probably want to center the content horizontally if we scale down.
+
+        const rowWidth = contentWidth * scale; // Shrink total width to match height reduction ratio?
+        // No, that keeps aspect ratio.
+
+        const itemWidthUnscaled = (contentWidth - totalGap) / itemCount;
+        const finalItemWidth = itemWidthUnscaled * scale;
+        const finalRowHeight = row.height * scale;
+        const finalGap = gap * scale;
+
+        // Center horizontally
+        let currentX = margin + (contentWidth - ((finalItemWidth * itemCount) + (finalGap * (itemCount - 1)))) / 2;
+
+        for (const item of row.items) {
+            doc.addImage(item.imgData, 'PNG', currentX, currentY, finalItemWidth, finalRowHeight);
+            currentX += finalItemWidth + finalGap;
+        }
+
+        currentY += finalRowHeight + (5 * scale);
     }
 
     doc.save(`${fileName}.pdf`);

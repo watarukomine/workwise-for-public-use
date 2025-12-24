@@ -302,14 +302,11 @@ export function AnalyticsDashboard() {
     const handleExportPDF = async () => {
         const title = `${format(filteredData.start, 'yyyy年MM月')} 活動レポート`;
         const chartIds = [
-            'chart-daily-trend',
-            'chart-workload',
-            'chart-shop-dist',
-            'chart-main-store',
-            'chart-day-week',
-            'chart-time-day',
-            'chart-travel',
-            'chart-tire-size'
+            'chart-daily-trend',         // Row 1: Full
+            'chart-workload',            // Row 2: Full
+            ['chart-shop-dist', 'chart-main-store'], // Row 3: Grid
+            ['chart-day-week', 'chart-time-day'],    // Row 4: Grid
+            ['chart-travel', 'chart-tire-size']      // Row 5: Grid
         ];
 
         await exportDashboardToPDF(title, chartIds, title);
