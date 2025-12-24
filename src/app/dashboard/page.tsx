@@ -207,6 +207,18 @@ export default function DashboardPage() {
   // Visibility is purely local + Shift Schedule + Clocked In status.
 
   // Calculate Derived Statuses
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
+
+  useEffect(() => {
+    const intervalId = setInterval(async () => {
+      setIsAutoRefreshing(true);
+      await syncOrders();
+      setIsAutoRefreshing(false);
+    }, 60000); // 1 minute
+
+    return () => clearInterval(intervalId);
+  }, [syncOrders]);
+
   const derivedStatuses = React.useMemo(() => {
     if (!profile) return [];
     const now = new Date();
@@ -329,7 +341,7 @@ export default function DashboardPage() {
               <div className="px-2 sm:px-3 py-1 min-w-[80px] sm:min-w-[120px] text-center font-medium bg-background rounded-md shadow-sm border text-sm">
                 <span className="hidden sm:inline">{format(currentDate, 'yyyy年MM月dd日', { locale: ja })}</span>
                 <span className="sm:hidden">{format(currentDate, 'M/d(EEE)', { locale: ja })}</span>
-                {isSyncing && <Loader2 className="inline ml-1 sm:ml-2 h-3 w-3 animate-spin text-muted-foreground" />}
+                {(isSyncing || isAutoRefreshing) && <Loader2 className="inline ml-1 sm:ml-2 h-3 w-3 animate-spin text-muted-foreground" />}
               </div>
               <Button
                 variant="ghost"
