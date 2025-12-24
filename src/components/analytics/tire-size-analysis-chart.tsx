@@ -37,7 +37,7 @@ export function TireSizeAnalysisChart({ orders }: TireSizeAnalysisChartProps) {
             // In utils.ts, estimatedDuration defaults to 60. We need to check if it's a REAL value.
             // We use findKey to be robust against column name variations (like spaces).
             if (duration === 0) {
-                const rawDuration = order.raw ? findKey(order.raw, ['作業時間（分）', '作業時間(分)', '作業時間', 'workTime']) : undefined;
+                const rawDuration = order.raw ? findKey(order.raw, ['作業時間（分）', '作業時間(分)', '作業時間', 'workTime', '作業所要時間']) : undefined;
 
                 if (rawDuration) {
                     const parsed = parseInt(rawDuration, 10);

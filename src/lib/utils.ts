@@ -71,7 +71,7 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
   // Ensure unique ID if missing
   // const uniqueId = String(orderId || `ord-rand-${Math.random()}`);
 
-  const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
+  const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間']), 10);
   const scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定']);
 
   const customerName = findKey(rawOrder, ['お取引先名', '店舗名', '店舗', '取引先']) || '';
