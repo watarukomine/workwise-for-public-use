@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { exportToExcel, exportToPDF } from '@/lib/export-utils';
+import { exportToExcel, exportToPDF, exportDashboardToPDF } from '@/lib/export-utils';
 import { startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, format, getDay, getDate, getHours } from 'date-fns';
 import { Download } from 'lucide-react';
 import { Staff, Order } from '@/lib/types';
@@ -300,19 +300,18 @@ export function AnalyticsDashboard() {
 
     const handleExportPDF = async () => {
         const title = `${format(filteredData.start, 'yyyy年MM月')} 活動レポート`;
-        const headers = ['スタッフ名', '担当件数', '構成比', '推定稼働(h)', '実稼働(h)'];
+        const chartIds = [
+            'chart-workload',
+            'chart-shop-dist',
+            'chart-main-store',
+            'chart-travel',
+            'chart-day-week',
+            'chart-time-day',
+            'chart-daily-trend',
+            'chart-tire-size'
+        ];
 
-        // Calculate total tasks for percentage
-        const totalTasks = staffWorkloadData.reduce((sum, d) => sum + d.tasks, 0);
-
-        const data = staffWorkloadData.map(d => [
-            d.name,
-            d.tasks,
-            totalTasks > 0 ? `${(d.tasks / totalTasks * 100).toFixed(1)}%` : '0.0%',
-            d.hours.toFixed(1),
-            d.actualHours.toFixed(1)
-        ]);
-        await exportToPDF(title, headers, data, title);
+        await exportDashboardToPDF(title, chartIds, title);
     };
 
     if (isOrdersLoading || isStaffLoading || isProfileLoading) {
@@ -368,17 +367,17 @@ export function AnalyticsDashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <StaffWorkloadChart data={staffWorkloadData} />
-                <ShopDistributionChart data={shopDistributionData} />
-                <MainStoreShareChart data={mainStoreShareData} />
-                <StaffTravelTimeChart orders={filteredData.orders} allStaff={allStaff} />
+                <div id="chart-workload"><StaffWorkloadChart data={staffWorkloadData} /></div>
+                <div id="chart-shop-dist"><ShopDistributionChart data={shopDistributionData} /></div>
+                <div id="chart-main-store"><MainStoreShareChart data={mainStoreShareData} /></div>
+                <div id="chart-travel"><StaffTravelTimeChart orders={filteredData.orders} allStaff={allStaff} /></div>
 
                 {/* New Charts */}
-                <DayOfWeekChart data={dayOfWeekData} />
-                <TimeOfDayChart data={timeOfDayData} />
-                <DailyTrendChart data={dailyTrendData} />
+                <div id="chart-day-week"><DayOfWeekChart data={dayOfWeekData} /></div>
+                <div id="chart-time-day"><TimeOfDayChart data={timeOfDayData} /></div>
+                <div id="chart-daily-trend"><DailyTrendChart data={dailyTrendData} /></div>
 
-                <TireSizeAnalysisChart orders={filteredData.orders} />
+                <div id="chart-tire-size"><TireSizeAnalysisChart orders={filteredData.orders} /></div>
             </div>
 
             <Card>
