@@ -40,9 +40,36 @@ export function TireSizeAnalysisChart({ orders }: TireSizeAnalysisChartProps) {
                 const rawDuration = order.raw ? findKey(order.raw, ['作業時間（分）', '作業時間(分)', '作業時間', 'workTime', '作業所要時間']) : undefined;
 
                 if (rawDuration) {
-                    const parsed = parseInt(rawDuration, 10);
-                    if (!isNaN(parsed) && parsed > 0) {
-                        duration = parsed;
+                    // Handle ISO Date strings from Sheets (e.g., "1899-12-30T00:45:00.000Z")
+                    if (typeof rawDuration === 'string' && (rawDuration.includes('T') || rawDuration.includes('1899-'))) {
+                        const date = parseISO(rawDuration);
+                        if (!isNaN(date.getTime())) {
+                            // Extract hours and minutes
+                            const hours = date.getHours();
+                            const minutes = date.getMinutes();
+                            const totalMinutes = hours * 60 + minutes;
+                            if (totalMinutes > 0) {
+                                duration = totalMinutes;
+                            }
+                        }
+                    }
+                    // Handle "HH:mm" format if it appears as string
+                    else if (typeof rawDuration === 'string' && rawDuration.includes(':')) {
+                        const [hoursStr, minutesStr] = rawDuration.split(':');
+                        const h = parseInt(hoursStr, 10);
+                        const m = parseInt(minutesStr, 10);
+                        if (!isNaN(h) && !isNaN(m)) {
+                            duration = h * 60 + m;
+                        }
+                    }
+                    // Handle direct number (string or number type)
+                    else {
+                        const parsed = parseInt(String(rawDuration), 10);
+                        // If it parsed as 1899, it might have been a date string that slipped through? 
+                        // But the check above should catch '1899-'.
+                        if (!isNaN(parsed) && parsed > 0 && parsed !== 1899) {
+                            duration = parsed;
+                        }
                     }
                 }
             }
