@@ -74,6 +74,7 @@ export async function updateSheetStatus(args: {
     actionTimestamp?: string | null;
     scheduledTime?: string | null;
     scheduledEndTime?: string | null;
+    comment?: string | null;
 }): Promise<GasResponse> {
     return callGasApi(args);
 }
