@@ -22,7 +22,7 @@ export function ShopDistributionChart({ data }: ShopDistributionChartProps) {
     return (
         <Card className="col-span-1">
             <CardHeader>
-                <CardTitle>店舗別シェア</CardTitle>
+                <CardTitle>母店別シェア</CardTitle>
                 <CardDescription>
                     拠点ごとの受注件数割合
                 </CardDescription>
