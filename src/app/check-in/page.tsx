@@ -264,15 +264,54 @@ function CheckInClient() {
                 value={emergencyMessage}
                 onChange={(e) => setEmergencyMessage(e.target.value)}
               />
-              <Button
-                variant="destructive"
-                className="w-full"
-                onClick={handleEmergency}
-                disabled={isButtonDisabled('Emergency') || !emergencyMessage.trim()}
-              >
-                {isLoading === 'Emergency' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                緊急連絡を送信
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  className="flex-1 bg-red-400 hover:bg-red-500 text-white"
+                  onClick={() => handleAction('Emergency')}
+                  disabled={!!isLoading || !emergencyMessage}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  緊急連絡を送信
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-none px-4 text-muted-foreground border-dashed"
+                  onClick={async () => {
+                    if (!profile) return;
+                    setIsLoading('Emergency');
+                    try {
+                      const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
+                      const now = new Date();
+
+                      // Explicitly cast undefined to any to satisfy strict type if needed, 
+                      // or just ensure gas-actions allows undefined.
+                      // gas-actions type allows optional actionType?: string | null.
+                      // undefined is missing from the type definition of updateSheetStatus if strict?
+                      // Let's pass null for actionType.
+
+                      await updateSheetStatus({
+                        gasUrl: ORDER_GAS_URL,
+                        eventTitle: eventTitleForUpdate,
+                        staffName: profile.name,
+                        statusValue: currentStatus?.status || '待機中',
+                        timestamp: now.toISOString(),
+                        actionType: null, // No status update action
+                        comment: '' // Clear comment
+                      });
+                      toast({ title: '緊急連絡を解除しました' });
+                      setEmergencyMessage(''); // Clear local input too
+                    } catch (error) {
+                      console.error("Failed to clear emergency:", error);
+                      toast({ variant: "destructive", title: "解除に失敗しました" });
+                    } finally {
+                      setIsLoading(null);
+                    }
+                  }}
+                  disabled={!!isLoading}
+                >
+                  解除
+                </Button>
+              </div>
             </div>
           )}
 
