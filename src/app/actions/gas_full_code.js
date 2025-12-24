@@ -299,7 +299,7 @@ function updateSheetWithOrderInfo(params) {
                 updateColumn("チップ配置作業完了予定", scheduledEndTime ? new Date(scheduledEndTime) : (scheduledEndTime === "" ? "" : undefined));
 
                 if (comment) {
-                    updateColumn("任意コメント", comment);
+                    updateColumn("緊急連絡", comment);
                 }
 
                 if (actionType && actionTimestamp) {

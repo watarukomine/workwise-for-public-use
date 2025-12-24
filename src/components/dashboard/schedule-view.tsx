@@ -1163,11 +1163,11 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
   const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
 
   const emergencyEvent = events.find(e => {
-    const comment = findKey(e.raw, ['任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
+    const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
     return comment.includes('【緊急】');
   });
 
-  const emergencyMessage = emergencyEvent ? findKey(emergencyEvent.raw, ['任意コメント', '任意コメント(リマーク2)', 'comment']) : '';
+  const emergencyMessage = emergencyEvent ? findKey(emergencyEvent.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) : '';
 
   return (
     <div className={cn("flex relative h-14 border-b", areaBgClass)}>
