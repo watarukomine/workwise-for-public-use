@@ -24,7 +24,7 @@ export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyLicNq
  * 主に order-context.tsx や schedule-view.tsx で使用されます。
  */
 // Google Apps Script Web App URL - Deployment ID
-export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwqhIbsoC1yCYEgE269nL2PQZleTU6NhPaSoyjjJAcU4auf2rf37i8Wt2EkySALMcW-/exec';
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbwufjLH_WnkXrVR8bztihdmfXhq6w3k3oPj-DF7tfbQlVKhI4Kq8OfuZgcVhsr37FYY/exec';
 
 
 // --- スプレッドシート本体のURL ---
