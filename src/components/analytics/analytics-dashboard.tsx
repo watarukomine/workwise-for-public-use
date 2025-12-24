@@ -302,12 +302,12 @@ export function AnalyticsDashboard() {
         const title = `${format(filteredData.start, 'yyyy年MM月')} 活動レポート`;
         const chartIds = [
             'chart-workload',
+            'chart-daily-trend',
             'chart-shop-dist',
             'chart-main-store',
             'chart-travel',
             'chart-day-week',
             'chart-time-day',
-            'chart-daily-trend',
             'chart-tire-size'
         ];
 
@@ -366,18 +366,25 @@ export function AnalyticsDashboard() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div id="chart-workload"><StaffWorkloadChart data={staffWorkloadData} /></div>
-                <div id="chart-shop-dist"><ShopDistributionChart data={shopDistributionData} /></div>
-                <div id="chart-main-store"><MainStoreShareChart data={mainStoreShareData} /></div>
-                <div id="chart-travel"><StaffTravelTimeChart orders={filteredData.orders} allStaff={allStaff} /></div>
+            <div className="space-y-6">
+                {/* Full Width Charts */}
+                <div id="chart-workload">
+                    <StaffWorkloadChart data={staffWorkloadData} />
+                </div>
+                <div id="chart-daily-trend">
+                    <DailyTrendChart data={dailyTrendData} />
+                </div>
 
-                {/* New Charts */}
-                <div id="chart-day-week"><DayOfWeekChart data={dayOfWeekData} /></div>
-                <div id="chart-time-day"><TimeOfDayChart data={timeOfDayData} /></div>
-                <div id="chart-daily-trend"><DailyTrendChart data={dailyTrendData} /></div>
+                {/* 2-Column Grid Charts */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div id="chart-shop-dist"><ShopDistributionChart data={shopDistributionData} /></div>
+                    <div id="chart-main-store"><MainStoreShareChart data={mainStoreShareData} /></div>
+                    <div id="chart-travel"><StaffTravelTimeChart orders={filteredData.orders} allStaff={allStaff} /></div>
 
-                <div id="chart-tire-size"><TireSizeAnalysisChart orders={filteredData.orders} /></div>
+                    <div id="chart-day-week"><DayOfWeekChart data={dayOfWeekData} /></div>
+                    <div id="chart-time-day"><TimeOfDayChart data={timeOfDayData} /></div>
+                    <div id="chart-tire-size"><TireSizeAnalysisChart orders={filteredData.orders} /></div>
+                </div>
             </div>
 
             <Card>
