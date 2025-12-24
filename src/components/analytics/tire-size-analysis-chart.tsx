@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Order } from '@/lib/types';
 import { differenceInMinutes, parseISO } from 'date-fns';
+import { findKey } from '@/lib/utils';
 
 interface TireSizeAnalysisChartProps {
     orders: Order[];
@@ -34,15 +35,9 @@ export function TireSizeAnalysisChart({ orders }: TireSizeAnalysisChartProps) {
             // Priority 2: Manual Entry (estimatedDuration)
             // Only use if timestamps failed AND we have a valid manual entry.
             // In utils.ts, estimatedDuration defaults to 60. We need to check if it's a REAL value.
-            // We check order.raw to see if '作業時間' was provided.
+            // We use findKey to be robust against column name variations (like spaces).
             if (duration === 0) {
-                // Check if we have a valid estimatedDuration (that isn't just the default 60 fallback)
-                // If the raw data has '作業時間' (or similar), we trust the estimatedDuration value.
-                const rawDuration = order.raw ? (
-                    order.raw['作業時間（分）'] ||
-                    order.raw['作業時間(分)'] ||
-                    order.raw['作業時間']
-                ) : undefined;
+                const rawDuration = order.raw ? findKey(order.raw, ['作業時間（分）', '作業時間(分)', '作業時間', 'workTime']) : undefined;
 
                 if (rawDuration) {
                     const parsed = parseInt(rawDuration, 10);
