@@ -121,15 +121,18 @@ export function StaffTravelTimeChart({ orders, allStaff = [] }: StaffTravelTimeC
             <CardContent>
                 <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={data} layout="vertical" margin={{ left: 20, right: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} />
-                            <XAxis type="number" />
-                            <YAxis
+                        <BarChart data={data} margin={{ left: 20, right: 20, top: 10, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} horizontal={true} />
+                            <XAxis
                                 dataKey="name"
                                 type="category"
-                                width={100}
                                 tick={{ fontSize: 12 }}
+                                interval={0}
+                                angle={-45}
+                                textAnchor="end"
+                                height={60}
                             />
+                            <YAxis type="number" />
                             <Tooltip
                                 formatter={(value: any, name: any, props: any) => {
                                     if (name === '総移動時間') return [`${value}時間`, name];
@@ -173,8 +176,8 @@ export function StaffTravelTimeChart({ orders, allStaff = [] }: StaffTravelTimeC
                                     return null
                                 }}
                             />
-                            <Bar dataKey="totalHours" name="総移動時間" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={20} />
-                            <Bar dataKey="avgMinutes" name="平均移動時間" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20} />
+                            <Bar dataKey="totalHours" name="総移動時間" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={30} />
+                            <Bar dataKey="avgMinutes" name="平均移動時間" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={30} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>

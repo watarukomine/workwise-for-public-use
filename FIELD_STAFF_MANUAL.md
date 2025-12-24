@@ -1,4 +1,13 @@
-# 現場スタッフ様用 WorkWise 操作マニュアル
+<div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; text-align: center;">
+  <img src="file:///Users/tmpmarketingsectionofkanagawa/WorkWise/public/icons/icon-512x512.png" alt="WorkWise Logo" style="width: 200px; height: 200px; margin-bottom: 40px;" />
+  <h1 style="font-size: 48px; margin-bottom: 10px; border-bottom: none;">WorkWise</h1>
+  <p style="font-size: 24px; color: #666;">現場スタッフ操作マニュアル</p>
+  <p style="margin-top: 50px; font-size: 14px; color: #999;">TOYOTA MOBILITY PARTS　KANAGAWA BRANCH</p>
+</div>
+
+<div style="page-break-after: always;"></div>
+
+# WorkWise 現場スタッフ操作マニュアル
 
 WorkWiseへようこそ！
 このマニュアルでは、日々の業務で主に行う操作について、一日の流れに沿って説明します。

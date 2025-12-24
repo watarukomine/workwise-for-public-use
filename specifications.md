@@ -1,0 +1,72 @@
+<div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; text-align: center;">
+  <img src="file:///Users/tmpmarketingsectionofkanagawa/WorkWise/public/icons/icon-512x512.png" alt="WorkWise Logo" style="width: 200px; height: 200px; margin-bottom: 40px;" />
+  <h1 style="font-size: 48px; margin-bottom: 10px; border-bottom: none;">WorkWise</h1>
+  <p style="font-size: 24px; color: #666;">システム仕様書</p>
+  <p style="margin-top: 50px; font-size: 14px; color: #999;">TOYOTA MOBILITY PARTS　KANAGAWA BRANCH</p>
+</div>
+
+<div style="page-break-after: always;"></div>
+
+# WorkWise システム仕様書
+
+## 1. システム概要
+**WorkWise** は、フィールドスタッフのスケジュール管理、オーダー受注、作業報告、および管理者による分析・モニタリングを一元化するWebアプリケーションです。
+Googleスプレッドシートをバックエンドのデータソースとして利用し、リアルタイムな情報共有と柔軟なデータ管理を実現しています。
+
+## 2. システム構成
+### 2.1. アーキテクチャ
+- **フロントエンド**: Next.js (App Router), React, Tailwind CSS
+- **バックエンド/DB**: Google Sheets (データマスター), Firebase (認証・補助DB), Google Apps Script (API)
+- **認証**: Firebase Authentication (Email/Password)
+- **インフラ**: Vercel (フロントエンドホスティング)
+
+### 2.2. 主要ライブラリ
+- **UIコンポーネント**: Shadcn UI, Radix UI
+- **チャート**: Recharts
+- **地図・ルート**: Google Maps JavaScript API
+- **PDF生成**: html2canvas, jsPDF
+- **Excel生成**: xlsx
+- **カレンダー連携**: ics (iCal生成)
+
+## 3. 機能一覧
+
+### 3.1. ダッシュボード (管理者向け)
+- **タイムライン表示**: スタッフごとのスケジュールをガントチャート形式で表示。ドラッグ＆ドロップによるオーダー割り当てが可能。
+- **リアルタイム更新**: 1分ごとの自動データリフレッシュ。
+- **未割当オーダー管理**: 担当者未定の案件をリスト化し、ドラッグ＆ドロップでアサイン可能。
+- **スタッフフィルタリング**: スタッフごとの表示・非表示切り替え。
+
+### 3.2. 分析レポート (管理者向け)
+- **ダッシュボード**:
+    - **日別推移**: 受注件数と稼働時間の推移（全幅表示）。
+    - **スタッフ稼働状況**: 担当件数と実稼働時間の比較（全幅表示）。
+    - **店舗別シェア**: 「母店別」「主管店舗別」の構成比を円グラフ表示。
+    - **曜日別・時間帯別**: 曜日や時間帯（8:00-19:00）による傾向分析。
+    - **移動時間分析**: スタッフごとの移動時間と移動効率を可視化。
+    - **タイヤサイズ別**: 作業時間の平均値をタイヤサイズごとに算出・比較（手入力時間も考慮）。
+- **エクスポート機能**:
+    - **PDF出力**: 全グラフをA4用紙1枚に収まるよう自動レイアウト調整して出力（html2canvas + jsPDF）。
+    - **Excel出力**: ダッシュボードの全データを「日別」「スタッフ別」「移動時間」など8つのシートに分割して出力 (.xlsx)。
+
+### 3.3. モバイル画面 (フィールドスタッフ向け)
+- **業務ステータス管理**: 「出勤」「移動開始」「現場到着」「作業開始」「作業終了」の順次報告フロー。
+- **修正モード**: 誤操作時のステータス修正機能。
+- **緊急連絡**: ワンタップで管理者へアラートを通知。
+
+### 3.4. その他機能
+- **販売店管理**: 顧客情報の閲覧・検索・スプレッドシート連携。
+- **受注管理**: 全オーダーの閲覧・編集・スプレッドシート連携。
+- **ルート最適化**: Google Maps APIを用いた巡回ルートの最適化提案。
+
+## 4. データ連携仕様
+- **Google Sheets**:
+    - `Orders`: オーダー情報（日時、場所、内容、ステータス）
+    - `Staff`: スタッフ情報（ID、名前、母店、色設定）
+    - `Customers`: 販売店マスタ
+- **同期仕様**:
+    - GASを介してJSON形式でデータを取得。
+    - 更新系（ステータス変更、アサイン）はPOSTリクエストでGAS経由でシートに書き込み。
+
+## 5. 動作環境
+- **PC (管理者)**: Google Chrome, Microsoft Edge (最新版)
+- **Mobile (スタッフ)**: iOS Safari, Android Chrome (最新版)
