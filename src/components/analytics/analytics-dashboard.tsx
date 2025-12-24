@@ -224,9 +224,20 @@ export function AnalyticsDashboard() {
             if (order.actualStartTime) {
                 hour = getHours(new Date(order.actualStartTime));
             } else if (order.scheduledTime) {
-                // scheduledTime "HH:mm"
-                const parts = order.scheduledTime.split(':');
-                if (parts.length >= 1) hour = parseInt(parts[0]);
+                // Check if it looks like an ISO string or Date string
+                if (order.scheduledTime.includes('T') || order.scheduledTime.includes('-')) {
+                    const d = parseISO(order.scheduledTime);
+                    if (!isNaN(d.getTime())) {
+                        hour = getHours(d);
+                    }
+                } else {
+                    // Try "HH:mm" format
+                    const parts = order.scheduledTime.split(':');
+                    if (parts.length >= 1) {
+                        const h = parseInt(parts[0], 10);
+                        if (!isNaN(h)) hour = h;
+                    }
+                }
             }
 
             if (hour >= 8 && hour <= 19) {
