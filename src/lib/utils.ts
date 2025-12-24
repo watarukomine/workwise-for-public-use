@@ -117,7 +117,7 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
       return val ? new Date(val) : undefined;
     })(),
     equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
-    tireSize: tireSize,
+    tireSize: String(tireSize || ''),
     '本数': findKey(rawOrder, ['本数', 'honsu']) || '',
     serviceType: findKey(rawOrder, ['サービス種別', 'サービス区分']) || '',
     raw: rawOrder // Preserve raw data for context processing

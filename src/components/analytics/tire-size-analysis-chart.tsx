@@ -45,28 +45,26 @@ export function TireSizeAnalysisChart({ orders }: TireSizeAnalysisChartProps) {
 
             // Refined Heuristic: "R" followed by 2 digits is standard.
             // Let's try matching "R" + digits.
-            const matchIndex = tireSize.toUpperCase().indexOf('R');
             let inch = '';
+            // 1. Look for R/ZR followed by digits (standard format: 195/65R15)
+            const rMatch = tireSize.toUpperCase().match(/[Z]?R(\d{2})/);
+            if (rMatch) {
+                inch = rMatch[1];
+            }
 
-            if (matchIndex !== -1 && matchIndex + 3 <= tireSize.length) {
-                // Take 2 chars after R
-                const potentialInch = tireSize.substring(matchIndex + 1, matchIndex + 3);
-                if (/^\d+$/.test(potentialInch)) {
-                    inch = potentialInch;
+            // 2. Look for "inch" or "インチ" (e.g. 14インチ)
+            if (!inch) {
+                const inchMatch = tireSize.match(/(\d{2})\s*(inch|インチ|in)/i);
+                if (inchMatch) {
+                    inch = inchMatch[1];
                 }
             }
 
-            // Fallback: If no R, look for last 2 digits? User said "lower 2 digits".
-            // Often input suggests "R15". 
-            // Let's stick to "R"+digits first as it's safest for "Tire Size".
-            // If that fails, maybe try to regex the last 2 digits of the whole string if it ends in digits?
+            // 3. Fallback: If the string is just 2 digits (e.g. "14")
             if (!inch) {
-                // Try finding any 2 digits at the end of a segment?
-                // Risk: "195" might be picked up.
-                // Let's assume "R" is present for standard inputs or user puts "15".
-                // If just "15", match whole string if 2 digits.
-                if (/^\d{2}$/.test(tireSize.trim())) {
-                    inch = tireSize.trim();
+                const simpleMatch = tireSize.trim().match(/^(\d{2})$/);
+                if (simpleMatch) {
+                    inch = simpleMatch[1];
                 }
             }
 
