@@ -1162,14 +1162,19 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
   const { setNodeRef } = useDroppable({ id: staff.id });
   const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
 
-  const emergencyEvent = events.find(e => e.raw && e.raw['任意コメント'] && e.raw['任意コメント'].includes('【緊急】'));
+  const emergencyEvent = events.find(e => {
+    const comment = findKey(e.raw, ['任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
+    return comment.includes('【緊急】');
+  });
+
+  const emergencyMessage = emergencyEvent ? findKey(emergencyEvent.raw, ['任意コメント', '任意コメント(リマーク2)', 'comment']) : '';
 
   return (
     <div className={cn("flex relative h-14 border-b", areaBgClass)}>
-      {emergencyEvent && (
+      {emergencyEvent && emergencyMessage && (
         <div className="absolute inset-0 z-50 bg-red-600/90 flex items-center justify-center px-4 animate-pulse pointer-events-none">
           <span className="text-white font-bold text-lg flex items-center gap-2 drop-shadow-md">
-            ⚠️ {emergencyEvent.raw?.['任意コメント']} (担当: {staff.name})
+            ⚠️ {emergencyMessage} (担当: {staff.name})
           </span>
         </div>
       )}
