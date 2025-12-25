@@ -52,13 +52,13 @@ import { cn } from '@/lib/utils';
 
 const allNavItems = [
     { href: '/dashboard', label: 'ダッシュボード', icon: ClipboardList, roles: ['admin', 'staff'] },
+    { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['admin', 'staff'], mobileOnly: true },
     { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'] },
+    { href: '/user_manual.pdf', label: 'マニュアル', icon: BookOpen, roles: ['admin', 'staff'], target: '_blank' },
     { href: '/orders', label: '受注管理', icon: ShoppingBag, roles: ['admin'] },
     { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
-    { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'] },
     { href: '/admin/analytics', label: '分析レポート', icon: BarChart, roles: ['admin'] },
-    { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['admin', 'staff'], mobileOnly: true },
-    { href: '/user_manual.pdf', label: 'マニュアル', icon: BookOpen, roles: ['admin', 'staff'], target: '_blank' },
+    { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'], hideOnMobile: true },
 ];
 
 interface AppShellContextType {
@@ -171,7 +171,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         const navItems = React.useMemo(() => {
             if (isLoading || !profile) return [];
-            return allNavItems.filter(item => item.roles.includes(userRole || 'staff'));
+            return allNavItems.filter(item => item.roles.includes(userRole || 'staff') && !item.hideOnMobile);
         }, [profile, isLoading, userRole]);
 
         if (isLoading) {
@@ -192,15 +192,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             asChild
                             isActive={pathname === item.href}
                             tooltip={item.label}
-                            className="font-medium"
+                            className="font-bold h-16 text-lg"
                             onClick={() => {
                                 if (isMobile) {
                                     setOpenMobile(false);
                                 }
                             }}
                         >
-                            <Link href={item.href} target={item.target ? item.target : undefined}>
-                                <item.icon />
+                            <Link href={item.href} target={item.target ? item.target : undefined} className="gap-4">
+                                <item.icon className="!h-6 !w-6" />
                                 <span>{item.label}</span>
                             </Link>
                         </SidebarMenuButton>

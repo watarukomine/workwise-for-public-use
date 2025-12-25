@@ -1172,7 +1172,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
   return (
     <div className={cn("flex relative h-14 border-b", areaBgClass)}>
       {emergencyEvent && emergencyMessage && (
-        <div className="absolute inset-0 z-50 bg-red-600/90 flex items-center justify-center px-4 animate-pulse pointer-events-none">
+        <div className="absolute inset-0 z-[60] bg-red-600/90 flex items-center justify-center px-4 animate-pulse pointer-events-none">
           <span className="text-white font-bold text-lg flex items-center gap-2 drop-shadow-md">
             ⚠️ {emergencyMessage} (担当: {staff.name})
           </span>

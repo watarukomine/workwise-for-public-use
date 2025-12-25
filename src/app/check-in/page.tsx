@@ -285,23 +285,30 @@ function CheckInClient() {
                       const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
                       const now = new Date();
 
-                      // Explicitly cast undefined to any to satisfy strict type if needed, 
-                      // or just ensure gas-actions allows undefined.
-                      // gas-actions type allows optional actionType?: string | null.
-                      // undefined is missing from the type definition of updateSheetStatus if strict?
-                      // Let's pass null for actionType.
+                      let recoveryStatus = '未着手';
+                      if (currentOrder) {
+                        if (currentOrder.actualEndTime) {
+                          recoveryStatus = '待機中'; // Finished -> Waiting
+                        } else if (currentOrder.actualStartTime) {
+                          recoveryStatus = '作業中'; // Started -> Working
+                        } else if (currentOrder.arrivalTimestamp) {
+                          recoveryStatus = '作業待ち'; // Arrived -> Waiting for Work
+                        } else if (currentOrder.startTravelTime) {
+                          recoveryStatus = '移動中'; // Started Travel -> Moving
+                        }
+                      }
 
                       await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: eventTitleForUpdate,
                         staffName: profile.name,
-                        statusValue: currentStatus || '待機中',
+                        statusValue: recoveryStatus,
                         timestamp: now.toISOString(),
-                        actionType: null, // No status update action
+                        actionType: null,
                         comment: '' // Clear comment
                       });
-                      toast({ title: '緊急連絡を解除しました' });
-                      setEmergencyMessage(''); // Clear local input too
+                      toast({ title: '緊急連絡を解除しました', description: `ステータスを「${recoveryStatus}」に戻しました。` });
+                      setEmergencyMessage('');
                     } catch (error) {
                       console.error("Failed to clear emergency:", error);
                       toast({ variant: "destructive", title: "解除に失敗しました" });
