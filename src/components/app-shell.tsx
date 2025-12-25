@@ -54,11 +54,11 @@ const allNavItems = [
     { href: '/dashboard', label: 'ダッシュボード', icon: ClipboardList, roles: ['admin', 'staff'] },
     { href: '/check-in', label: 'チェックイン', icon: MapPin, roles: ['admin', 'staff'], mobileOnly: true },
     { href: '/optimizer', label: 'ルート最適化', icon: Map, roles: ['admin', 'staff'] },
-    { href: '/user_manual.pdf', label: 'マニュアル', icon: BookOpen, roles: ['admin', 'staff'], target: '_blank' },
     { href: '/orders', label: '受注管理', icon: ShoppingBag, roles: ['admin'] },
     { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
     { href: '/admin/analytics', label: '分析レポート', icon: BarChart, roles: ['admin'] },
     { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'], hideOnMobile: true },
+    { href: '/manuals', label: 'マニュアル', icon: BookOpen, roles: ['admin', 'staff'] },
 ];
 
 interface AppShellContextType {
@@ -116,7 +116,7 @@ const DesktopNav = () => {
                 <Link
                     key={item.href}
                     href={item.href}
-                    target={item.target ? item.target : undefined}
+                    target={undefined}
                     className={cn(
                         buttonVariants({ variant: pathname === item.href ? 'secondary' : 'ghost', size: 'sm' }),
                         'font-medium px-2'
@@ -199,7 +199,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                 }
                             }}
                         >
-                            <Link href={item.href} target={item.target ? item.target : undefined} className="gap-4">
+                            <Link href={item.href} target={undefined} className="gap-4">
                                 <item.icon className="!h-6 !w-6" />
                                 <span>{item.label}</span>
                             </Link>
