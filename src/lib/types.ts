@@ -19,6 +19,8 @@ export type Staff = {
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   calendarId?: string;
+  'コントローラー'?: string;
+  controller?: string;
 };
 
 export type Customer = {

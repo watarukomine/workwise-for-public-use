@@ -61,6 +61,8 @@ export default function DashboardPage() {
     }
   }, [isProfileLoading, profile, router]);
 
+  const [showManagement, setShowManagement] = React.useState(true); // Default to showing all
+
   const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || isStaffLoading || !profile) return [];
 
@@ -75,9 +77,18 @@ export default function DashboardPage() {
       selectedStaff = staffToUse.filter(staff => selectedIds.has(staff.id));
     }
 
+    // Filter by Management/Controller visibility
+    if (!showManagement) {
+      selectedStaff = selectedStaff.filter(staff => {
+        const isController = staff['コントローラー'] === '⚪︎' || staff.controller === '⚪︎';
+        const isAdmin = staff.role === 'admin';
+        return !isController && !isAdmin;
+      });
+    }
+
     return selectedStaff; // Return in original order (Sheet order)
 
-  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
+  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading, showManagement]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (appliedSelectedStaffIds.length === 0) {
@@ -377,6 +388,15 @@ export default function DashboardPage() {
           <div className="hidden md:flex items-center space-x-2">
             <div className="flex items-center space-x-2 mr-4">
               <ShareOrderFormModal />
+
+              <Switch
+                id="show-management"
+                checked={showManagement}
+                onCheckedChange={setShowManagement}
+              />
+              <Label htmlFor="show-management" className="cursor-pointer flex items-center gap-2 mr-4">
+                <span className="text-sm font-medium">管理・コントローラーを表示</span>
+              </Label>
 
               <Switch
                 id="mobile-view"
