@@ -12,6 +12,7 @@ import { useUserProfile } from '@/hooks/use-user-profile';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus } from '@/lib/types';
+import { updateStaffStatus } from '@/services/attendance-service';
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
@@ -68,7 +69,37 @@ function CheckInClient() {
     setError(null);
     const now = new Date();
 
-    // Removed Clock In/Out logical block here
+    // Removed Clock In/Out logical block here -> Restoring it
+    if (action === 'Clock In' || action === 'Clock Out') {
+      try {
+        if (!profile?.id) {
+          throw new Error("ユーザー情報を取得できませんでした。");
+        }
+        const status = action === 'Clock In' ? 'present' : 'checked_out'; // Using 'checked_out' (退勤) and 'present' (出勤) logic for Firestore
+        // Note: Dashboard uses 'present' / 'checked_out' / 'break' ?
+        // Referencing check-in-client.tsx (previous view):
+        // const status = action === 'Clock In' ? 'present' : 'checked_out';
+
+        await updateStaffStatus(now, profile.id, status);
+
+        const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        setLastAction({ action, time: currentTime });
+        toast({
+          title: action === 'Clock In' ? '出勤しました' : '退勤しました',
+          description: `${currentTime}に記録しました。`,
+        });
+      } catch (e: any) {
+        console.error("Clock In/Out failed:", e);
+        toast({
+          variant: 'destructive',
+          title: 'エラー',
+          description: `記録に失敗しました: ${e.message}`
+        });
+      } finally {
+        setIsLoading(null);
+      }
+      return;
+    }
 
     const statusMap: Partial<Record<string, string>> = {
       'Start Travel': '移動中',
