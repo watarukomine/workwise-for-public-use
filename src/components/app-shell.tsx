@@ -192,7 +192,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             asChild
                             isActive={pathname === item.href}
                             tooltip={item.label}
-                            className="font-bold h-16 text-lg"
+                            className="!font-bold h-16 text-lg"
                             onClick={() => {
                                 if (isMobile) {
                                     setOpenMobile(false);
