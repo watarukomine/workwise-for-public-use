@@ -16,6 +16,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { isToday } from 'date-fns';
 
 
 function OptimizerPageContent() {
@@ -68,6 +69,15 @@ function OptimizerPageContent() {
   const staffWithLocation = React.useMemo(() => {
     return filteredStaffFromSelection.filter(staffMember => {
       const status = statuses.find(s => s.staffId === staffMember.id);
+
+      // Filter out stale location data (not from today)
+      if (status?.lastUpdate) {
+        const lastUpdateDate = new Date(status.lastUpdate);
+        if (!isToday(lastUpdateDate)) {
+          return false;
+        }
+      }
+
       return status && status.latitude && status.longitude;
     });
   }, [filteredStaffFromSelection, statuses]);
