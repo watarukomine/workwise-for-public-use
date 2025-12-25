@@ -680,7 +680,7 @@ export function ScheduleView({
             if (newEvent) saveLocalEvent(newEvent);
             toast({ title: "汎用タスクを追加しました" });
           } else {
-            await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '作業待ち', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
+            await updateSheetStatus({ gasUrl: ORDER_GAS_URL, eventTitle: `(ID: ${order.rawOrderId})`, staffName: staff.name, statusValue: '未着手', scheduledTime: taskStart.toISOString(), timestamp: new Date().toISOString() });
             await refetchOrders();
 
             const taskEvent = scheduleEvents.find(e => e.start === taskStart.toISOString() && e.staffId === newStaffId);

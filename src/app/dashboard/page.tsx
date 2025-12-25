@@ -249,7 +249,7 @@ export default function DashboardPage() {
 
       // 3. Handle "Clock In" -> "出勤済" vs "Idle"
       // If status is "待機中" (Idle) or "未割当" (Unassigned)
-      if (displayStatus === '待機中' || displayStatus === '未割当') {
+      if (displayStatus === '待機中' || displayStatus === '未割当' || displayStatus === '未着手') {
         // If "Clocked In" (in selectedStaffIds) AND no specific last action implying work completion?
         // User said: "Clock In -> 出勤済". "Work Complete -> 待機中".
         // If "Clocked In" (in presentStaffIds) AND no specific last action implying work completion?

@@ -1,0 +1,38 @@
+
+.cover-page {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    text-align: center;
+    page-break-after: always;
+}
+
+.cover-logo {
+    width: 200px;
+    height: 200px; 
+    margin-bottom: 40px;
+}
+
+.cover-title {
+    font-size: 48px;
+    margin-bottom: 10px;
+    border-bottom: none;
+}
+
+.cover-subtitle {
+    font-size: 24px;
+    color: #666;
+}
+
+.cover-footer {
+    margin-top: 50px;
+    font-size: 14px;
+    color: #999;
+}
+
+/* Ensure page break works */
+@media print {
+    .page-break { page-break-after: always; }
+}
