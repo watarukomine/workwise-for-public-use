@@ -50,7 +50,7 @@ export default function OrderFormPage() {
     const form = useForm<OrderFormValues>({
         resolver: zodResolver(orderFormSchema),
         defaultValues: {
-            status: 'お預かり済',
+            status: '点検',
             disposal: '回収有り：廃タイヤラベル在庫有り',
             quantity: '4',
             sensor: '無', // Default to '無' as it's common
@@ -211,6 +211,7 @@ export default function OrderFormPage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="status">入庫状況</Label>
                                     <select id="status" {...register('status')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                                        <option value="点検">点検</option>
                                         <option value="お預かり済">お預かり済</option>
                                         <option value="お客待ち">お客待ち</option>
                                     </select>
