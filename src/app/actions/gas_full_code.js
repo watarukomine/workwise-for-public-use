@@ -325,8 +325,8 @@ function updateSheetWithOrderInfo(params) {
             // If Clock In, we want to update LOCATION regardless?
             // "出勤ボタン" logic: "もし...出動予定のない場合はタイムスタンプの入力はせず、位置情報の更新だけを行う"
 
-            if (actionType === 'Clock In') {
-                console.log("Clock In: No order found. Attempting location update only.");
+            if (actionType === 'Clock In' || actionType === 'Wait') {
+                console.log(`${actionType}: No order found. Attempting location update only.`);
                 // Where do we stick the location?
                 // If no order row, we can't stick it in an order row.
                 // Maybe update "Staff Master"?

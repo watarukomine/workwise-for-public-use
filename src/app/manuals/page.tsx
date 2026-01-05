@@ -58,6 +58,26 @@ export default function ManualsPage() {
                         </CardContent>
                     </Card>
                 ))}
+
+                {/* Troubleshooting Guide Link */}
+                <Card className="flex flex-col hover:shadow-lg transition-shadow duration-200">
+                    <CardHeader className="pb-4">
+                        <div className="mb-2 p-3 rounded-full w-fit bg-slate-100 text-red-500">
+                            <FileText className="h-6 w-6" />
+                        </div>
+                        <CardTitle className="text-xl">エラー・トラブルシューティング</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col">
+                        <CardDescription className="flex-1 mb-6">
+                            エラーメッセージの意味や、問題発生時の対処方法についてまとめています。
+                        </CardDescription>
+                        <Button asChild className="w-full mt-auto" variant={'outline'}>
+                            <Link href="/manuals/troubleshooting">
+                                開く (Web)
+                            </Link>
+                        </Button>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );

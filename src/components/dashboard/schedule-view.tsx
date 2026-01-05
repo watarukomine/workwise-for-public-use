@@ -153,6 +153,7 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
   );
 
   const content = (
+    // eslint-disable-next-line react-dom/no-unsafe-inline-style
     <div style={style} className={cn("h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight", className)}>
       {/* Row 1: StoreName(Equip) Time */}
       <div className="flex justify-between items-center w-full overflow-hidden">
@@ -213,6 +214,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   };
 
   return (
+    // eslint-disable-next-line react-dom/no-unsafe-inline-style
     <div ref={setNodeRef} style={style} {...listeners} {...attributes} onDoubleClick={handleDoubleClick}>
       <OrderChip order={order} className={className} />
     </div>
@@ -352,6 +354,7 @@ const TimeIndicator = () => {
   const leftPosition = minutesToPixels(minutesFromStart);
 
   return (
+    // eslint-disable-next-line react-dom/no-unsafe-inline-style
     <div
       className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
       style={{ left: `${leftPosition}px`, zIndex: 101 }}
@@ -440,6 +443,27 @@ export function ScheduleView({
       return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
     });
   }, [scheduleEvents, currentDate]);
+
+  const emergencyNotifications = React.useMemo(() => {
+    if (!scheduleEvents) return [];
+
+    // Find all events with emergency comments
+    const emergencyEvents = scheduleEvents.filter(e => {
+      const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
+      return comment.includes('【緊急】');
+    });
+
+    // Map to staff names and deduplicate
+    const staffNames = new Set<string>();
+    emergencyEvents.forEach(e => {
+      const staff = getStaffById(e.staffId);
+      if (staff) {
+        staffNames.add(staff.name);
+      }
+    });
+
+    return Array.from(staffNames);
+  }, [scheduleEvents, staffData]);
 
   React.useEffect(() => {
     setIsClient(true);
@@ -941,7 +965,16 @@ export function ScheduleView({
       >
 
         <TooltipProvider>
+          {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
           <div className="space-y-1" style={{ maxWidth: `${TOTAL_TIMELINE_WIDTH + 2}px` }}>
+            {emergencyNotifications.length > 0 && (
+              <div className="w-full bg-red-600/90 text-white px-4 py-2 mb-2 rounded-md shadow-md flex items-center gap-2 animate-pulse">
+                <span className="text-xl">⚠️</span>
+                <span className="font-bold">
+                  {emergencyNotifications.join('、')}より緊急連絡あり
+                </span>
+              </div>
+            )}
             <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-20 py-1">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                 <div className="md:col-span-3">
@@ -956,6 +989,7 @@ export function ScheduleView({
             <div>
               <div>
                 <ScrollArea className="w-full border rounded-md h-[calc(100vh-200px)]">
+                  {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
                   <div className="relative" style={{ width: `${TOTAL_TIMELINE_WIDTH}px` }}>
 
                     {/* Header Row - Now inside ScrollArea for perfect alignment */}
@@ -963,6 +997,7 @@ export function ScheduleView({
                       <div className="sticky left-0 z-50 flex-shrink-0 font-semibold p-2 border-r bg-background w-[144px]">スタッフ</div>
                       <div className="relative flex-1 h-full">
                         {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                          // eslint-disable-next-line react-dom/no-unsafe-inline-style
                           <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
                             <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
                           </div>
@@ -973,6 +1008,7 @@ export function ScheduleView({
 
                     <div className="relative space-y-2 pb-2">
                       {isToday(currentDate) && (
+                        // eslint-disable-next-line react-dom/no-unsafe-inline-style
                         <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
                           <TimeIndicator />
                         </div>
@@ -1180,6 +1216,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
       )}
       <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit w-[144px]")}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
+          {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
           <div className='w-2 h-8 rounded-full' style={{ backgroundColor: staff.color }}></div>
           <span className='truncate flex-1'>{staff.name}</span>
         </div>
@@ -1274,6 +1311,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const eventContent = (
     <div
       className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && !isOverlay && "opacity-50")}
+      // eslint-disable-next-line react-dom/no-unsafe-inline-style
       style={{ ...divStyle, width: isOverlay ? `${width}px` : '100%' }}
     >
       <p className="text-xs font-semibold truncate pointer-events-none">{customerName || line1}</p>
@@ -1301,6 +1339,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   return (
     <div
       ref={setNodeRef}
+      // eslint-disable-next-line react-dom/no-unsafe-inline-style
       style={style}
       {...listeners}
       {...attributes}

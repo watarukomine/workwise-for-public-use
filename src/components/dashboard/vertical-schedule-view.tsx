@@ -94,6 +94,7 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
                 <CardTitle className="text-lg leading-tight">{event.title}</CardTitle>
                 <div
                   className="w-3 h-10 rounded-full"
+                  // eslint-disable-next-line react-dom/no-unsafe-inline-style
                   style={{ backgroundColor: staffMember?.color || 'gray' }}
                 />
               </div>

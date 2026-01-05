@@ -137,6 +137,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                       )}
                       <TableCell>
                         <div className="flex items-center gap-3">
+                          {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
                           <div
                             className="h-6 w-6 rounded-full border"
                             // eslint-disable-next-line react-dom/no-unsafe-inline-style
