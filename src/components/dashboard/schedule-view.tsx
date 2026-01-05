@@ -725,12 +725,19 @@ export function ScheduleView({
               gasUrl: ORDER_GAS_URL,
               eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
               staffName: newStaff.name,
-              scheduledDate: format(taskStart, 'yyyy-MM-dd'),
-              scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
+              scheduledDate: format(taskStart, 'yyyy/MM/dd'),
+              scheduledTime: format(taskStart, 'HH:mm'),
+              scheduledEndTime: format(taskEnd, 'HH:mm'),
               estimatedDuration: taskDuration,
+              // Fallback for Japanese column matching
+              "予定時間": format(taskStart, 'HH:mm'),
+              "終了時間": format(taskEnd, 'HH:mm'),
+              "作業予定日": format(taskStart, 'yyyy/MM/dd'),
+              "作業時間（分）": taskDuration,
             });
             toast({ title: "スケジュールを更新しました" });
+            // Add slight delay to allow GAS propagation
+            await new Promise(resolve => setTimeout(resolve, 1000));
             await refetchOrders();
           }
         } catch (e: any) {
@@ -908,12 +915,19 @@ export function ScheduleView({
           await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId})`,
-            scheduledDate: format(newStart, 'yyyy-MM-dd'),
-            scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
-            scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
+            scheduledDate: format(newStart, 'yyyy/MM/dd'),
+            scheduledTime: format(newStart, 'HH:mm'),
+            scheduledEndTime: format(finalEnd, 'HH:mm'),
             estimatedDuration: durationMinutes,
             timestamp: new Date().toISOString(),
+            // Fallback for Japanese column matching
+            "予定時間": format(newStart, 'HH:mm'),
+            "終了時間": format(finalEnd, 'HH:mm'),
+            "作業予定日": format(newStart, 'yyyy/MM/dd'),
+            "作業時間（分）": durationMinutes,
           });
+          // Add slight delay to allow GAS propagation
+          await new Promise(resolve => setTimeout(resolve, 1000));
           await refetchOrders();
         } else { // Generic event (not from sheet)
           const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: finalEnd.toISOString() };
