@@ -105,12 +105,19 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
         if (/^\d{1,2}:\d{2}$/.test(order.scheduledTime)) {
           scheduledTime = parseISO(`${dateStr}T${order.scheduledTime}`);
         } else {
-          // If existing ISO string (likely 1899 date from GAS), extract time and apply to dateStr
-          const timeComponent = parseISO(order.scheduledTime);
+          // Try standard Date parsing for "yyyy/MM/dd HH:mm:ss" which parseISO dislikes
+          const timeComponent = new Date(order.scheduledTime);
           if (isValid(timeComponent)) {
-            const timeStr = format(timeComponent, 'HH:mm:ss');
-            scheduledTime = parseISO(`${dateStr}T${timeStr}`);
+            // If it has full date info, use it directly (prioritize the "Shotgun" payload we sent)
+            if (order.scheduledTime.includes('/') || order.scheduledTime.includes('-')) {
+              scheduledTime = timeComponent;
+            } else {
+              // Time only (1899 base)
+              const timeStr = format(timeComponent, 'HH:mm:ss');
+              scheduledTime = parseISO(`${dateStr}T${timeStr}`);
+            }
           } else {
+            // Fallback to ISO
             scheduledTime = parseISO(order.scheduledTime);
           }
         }
@@ -126,7 +133,11 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
           if (/^\d{1,2}:\d{2}$/.test(order.scheduledEndTime)) {
             taskEndTime = parseISO(`${dateStr}T${order.scheduledEndTime}`);
           } else {
-            taskEndTime = parseISO(order.scheduledEndTime);
+            // Use new Date() for flexible parsing
+            taskEndTime = new Date(order.scheduledEndTime);
+            if (!isValid(taskEndTime)) {
+              taskEndTime = parseISO(order.scheduledEndTime);
+            }
           }
         } else {
           taskEndTime = addMinutes(scheduledTime, order.estimatedDuration);
