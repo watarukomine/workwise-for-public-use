@@ -1,8 +1,8 @@
 <div class="cover-page">
-<img src="file:///Users/tmpmarketingsectionofkanagawa/WorkWise/public/icons/icon-512x512.png" alt="WorkWise Logo" class="cover-logo" />
-<h1 class="cover-title">WorkWise</h1>
-<p class="cover-subtitle">ユーザー操作マニュアル</p>
-<p class="cover-footer">TOYOTA MOBILITY PARTS　KANAGAWA BRANCH</p>
+  <img src="file:///Users/tmpmarketingsectionofkanagawa/WorkWise/public/icons/icon-512x512.png" alt="WorkWise Logo" class="cover-logo" />
+  <h1 class="cover-title">WorkWise</h1>
+  <p class="cover-subtitle">ユーザー操作マニュアル</p>
+  <p class="cover-footer">TOYOTA MOBILITY PARTS　KANAGAWA BRANCH</p>
 </div>
 
 <div style="page-break-after: always;"></div>
