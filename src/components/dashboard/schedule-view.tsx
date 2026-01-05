@@ -444,26 +444,102 @@ export function ScheduleView({
     });
   }, [scheduleEvents, currentDate]);
 
+  const [replyDialogOpen, setReplyDialogOpen] = React.useState(false);
+  const [targetEmergencyEvent, setTargetEmergencyEvent] = React.useState<{ rawOrderId: string, currentComment: string, staffName: string } | null>(null);
+  const [replyMessage, setReplyMessage] = React.useState('');
+
   const emergencyNotifications = React.useMemo(() => {
     if (!scheduleEvents) return [];
 
-    // Find all events with emergency comments
     const emergencyEvents = scheduleEvents.filter(e => {
       const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
       return comment.includes('【緊急】');
     });
 
-    // Map to staff names and deduplicate
-    const staffNames = new Set<string>();
+    // return generic structure
+    const notifications: { staffId: string, staffName: string, message: string, rawOrderId: string }[] = [];
+
+    const seenStaff = new Set<string>();
+
     emergencyEvents.forEach(e => {
+      if (seenStaff.has(e.staffId)) return;
+
       const staff = getStaffById(e.staffId);
       if (staff) {
-        staffNames.add(staff.name);
+        seenStaff.add(e.staffId);
+        const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
+        notifications.push({
+          staffId: e.staffId,
+          staffName: staff.name,
+          message: comment,
+          rawOrderId: e.rawOrderId || ''
+        });
       }
     });
 
-    return Array.from(staffNames);
+    return notifications;
   }, [scheduleEvents, staffData]);
+
+  const handleClearEmergency = async (event: { rawOrderId: string, message: string, staffName: string }) => {
+    try {
+      if (!event.rawOrderId) {
+        toast({ variant: 'destructive', title: "エラー", description: "イベントIDが見つかりません" });
+        return;
+      }
+
+      // Remove "【緊急】" from the comment
+      const newComment = event.message.replace(/【緊急】/g, '').trim();
+
+      await updateSheetStatus({
+        gasUrl: ORDER_GAS_URL,
+        eventTitle: `(ID: ${event.rawOrderId})`,
+        staffName: event.staffName,
+        comment: newComment,
+      });
+
+      toast({ title: "緊急ステータスを解除しました" });
+      await refetchOrders();
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: 'destructive', title: "エラー", description: "解除に失敗しました" });
+    }
+  };
+
+  const openReplyDialog = (event: { rawOrderId: string, message: string, staffName: string }) => {
+    setTargetEmergencyEvent({
+      rawOrderId: event.rawOrderId,
+      currentComment: event.message,
+      staffName: event.staffName
+    });
+    setReplyMessage('');
+    setReplyDialogOpen(true);
+  };
+
+  const handleSendReply = async () => {
+    if (!targetEmergencyEvent || !replyMessage.trim()) return;
+
+    try {
+      const { rawOrderId, currentComment, staffName } = targetEmergencyEvent;
+      const timestamp = format(new Date(), 'HH:mm');
+      const newComment = `${currentComment}\n[管理者返信 ${timestamp}]: ${replyMessage}`;
+
+      await updateSheetStatus({
+        gasUrl: ORDER_GAS_URL,
+        eventTitle: `(ID: ${rawOrderId})`,
+        staffName: staffName,
+        comment: newComment,
+      });
+
+      toast({ title: "返信を送信しました" });
+      setReplyDialogOpen(false);
+      setTargetEmergencyEvent(null);
+      await refetchOrders();
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: 'destructive', title: "エラー", description: "返信の送信に失敗しました" });
+    }
+  };
+
 
   React.useEffect(() => {
     setIsClient(true);
@@ -967,14 +1043,67 @@ export function ScheduleView({
         <TooltipProvider>
           {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
           <div className="space-y-1" style={{ maxWidth: `${TOTAL_TIMELINE_WIDTH + 2}px` }}>
+            {/* Emergency Notification Banner */}
             {emergencyNotifications.length > 0 && (
-              <div className="w-full bg-red-600/90 text-white px-4 py-2 mb-2 rounded-md shadow-md flex items-center gap-2 animate-pulse">
-                <span className="text-xl">⚠️</span>
-                <span className="font-bold">
-                  {emergencyNotifications.join('、')}より緊急連絡あり
-                </span>
+              <div className="w-full bg-red-600/90 text-white px-4 py-2 mb-2 rounded-md shadow-md animate-pulse relative z-50">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 font-bold text-lg">
+                    <span>⚠️ 緊急連絡あり</span>
+                  </div>
+                  <div className="flex flex-col gap-2 pl-4">
+                    {emergencyNotifications.map((notification, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-white/10 p-2 rounded">
+                        <span className="font-bold flex-1">{notification.staffName}: {notification.message}</span>
+                        <div className="flex gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="bg-white text-red-600 hover:bg-gray-100 border-none"
+                            onClick={() => openReplyDialog(notification)}
+                          >
+                            返信
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-white text-blue-600 bg-white hover:bg-gray-100 border-none"
+                            onClick={() => handleClearEmergency(notification)}
+                          >
+                            解除
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
+
+            {/* Reply Dialog */}
+            <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>緊急連絡への返信</DialogTitle>
+                  <DialogDescription>
+                    スタッフ {targetEmergencyEvent?.staffName} のスケジュールコメントに返信を追記します。
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                  <Label htmlFor="reply-message">メッセージ</Label>
+                  <Textarea
+                    id="reply-message"
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder="了解しました。すぐに向かいます。"
+                    className="mt-2"
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setReplyDialogOpen(false)}>キャンセル</Button>
+                  <Button onClick={handleSendReply}>送信</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-20 py-1">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                 <div className="md:col-span-3">
