@@ -726,8 +726,8 @@ export function ScheduleView({
               eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
               staffName: newStaff.name,
               scheduledDate: format(taskStart, 'yyyy-MM-dd'),
-              scheduledTime: format(taskStart, 'HH:mm'),
-              scheduledEndTime: format(taskEnd, 'HH:mm'),
+              scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
+              scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
               estimatedDuration: taskDuration,
             });
             toast({ title: "スケジュールを更新しました" });
@@ -909,8 +909,8 @@ export function ScheduleView({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId})`,
             scheduledDate: format(newStart, 'yyyy-MM-dd'),
-            scheduledTime: format(newStart, 'HH:mm'),
-            scheduledEndTime: format(finalEnd, 'HH:mm'),
+            scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
+            scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
             estimatedDuration: durationMinutes,
             timestamp: new Date().toISOString(),
           });
