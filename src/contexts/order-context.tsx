@@ -24,6 +24,7 @@ interface OrderContextType {
   isSyncingOrders: boolean;
   error: string | null;
   saveLocalEvent: (event: WithId<ScheduleEvent>) => void;
+  deleteLocalEvent: (eventId: string) => void;
   refetchOrders: () => Promise<void>;
   rawOrdersData: WithId<Order>[];
   orderGasUrl: string;
@@ -244,6 +245,18 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const deleteLocalEvent = useCallback((eventId: string) => {
+    setLocalScheduleEvents(prev => {
+      const newEvents = prev.filter(e => e.id !== eventId);
+      try {
+        localStorage.setItem('local_schedule_events', JSON.stringify(newEvents));
+      } catch (e) {
+        console.error('Failed to save local event:', e);
+      }
+      return newEvents;
+    });
+  }, []);
+
   /* Removed loadOrders and syncOrders/date params */
   const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
 
@@ -311,9 +324,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     isSyncingOrders: isLoading, // map to loading
     error,
     saveLocalEvent,
-    refetchOrders: async () => { await fetchAndProcessData(false); },
-    rawOrdersData: orders, // mapped orders
-    orderGasUrl,
+    deleteLocalEvent,
+    refetchOrders: async () => { await fetchAndProcessData(false); }, // force refetch
+    rawOrdersData,
+    orderGasUrl: orderGasUrl || ORDER_GAS_URL,
     setOrderGasUrl
   };
 

@@ -54,7 +54,7 @@ import { Textarea } from '../ui/textarea';
 import { useOrder } from '../../contexts/order-context';
 import { updateSheetStatus, sendIcsEmail } from '../../app/actions/gas-actions';
 import { ORDER_GAS_URL } from '../../lib/settings';
-import { Mail, Pencil } from 'lucide-react';
+import { Mail, Pencil, Loader2 } from 'lucide-react';
 import { createContext, useContext } from 'react';
 import { STORE_COLORS } from '../../lib/constants';
 
@@ -426,12 +426,14 @@ export function ScheduleView({
 
   const { customers: allCustomers } = useCustomer();
   const { toast } = useToast();
-  const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent } = useOrder();
+  const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent } = useOrder();
 
   const [isClient, setIsClient] = React.useState(false);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
+
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   const [active, setActive] = React.useState<Active | null>(null);
+  const [isSaving, setIsSaving] = React.useState(false);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
@@ -723,8 +725,10 @@ export function ScheduleView({
               gasUrl: ORDER_GAS_URL,
               eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
               staffName: newStaff.name,
-              scheduledTime: taskStart.toISOString(),
-              scheduledEndTime: taskEnd.toISOString(),
+              scheduledDate: format(taskStart, 'yyyy-MM-dd'),
+              scheduledTime: format(taskStart, 'HH:mm'),
+              scheduledEndTime: format(taskEnd, 'HH:mm'),
+              estimatedDuration: taskDuration,
             });
             toast({ title: "スケジュールを更新しました" });
             await refetchOrders();
@@ -850,6 +854,7 @@ export function ScheduleView({
 
   const handleSaveEvent = async (shouldSendEmail: boolean = false) => {
     if (dialogState.mode === 'closed') return;
+    setIsSaving(true);
 
     const newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
     const newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
@@ -858,6 +863,15 @@ export function ScheduleView({
       toast({ variant: 'destructive', title: 'エラー', description: '無効な時間形式です。' });
       return;
     }
+
+    // Handle overnight shifts (if End is before Start, assume next day)
+    let finalEnd = newEnd;
+    if (finalEnd < newStart) {
+      finalEnd = addMinutes(finalEnd, 24 * 60);
+    }
+
+    // Calculate duration in minutes
+    const durationMinutes = Math.round((finalEnd.getTime() - newStart.getTime()) / (1000 * 60));
 
     try {
       if (dialogState.mode === 'new') {
@@ -870,9 +884,8 @@ export function ScheduleView({
           title, description,
           staffId: dialogState.staffId, locationId: '',
           start: newStart.toISOString(),
-          end: newEnd.toISOString(),
+          end: finalEnd.toISOString(),
           raw: {},
-          // Add missing Order fields
           customerCode: '',
           customerName: '',
           address: '',
@@ -880,12 +893,13 @@ export function ScheduleView({
           serviceType: '',
           status: '未割当',
           scheduledDate: '',
-          estimatedDuration: (newEnd.getTime() - newStart.getTime()) / (1000 * 60),
+          estimatedDuration: durationMinutes,
           value: 0,
           staffName: staff.name,
           equipmentStatus: '',
         };
         setScheduleEvents(prev => [...prev, newEvent]);
+        saveLocalEvent(newEvent);
       } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
         const eventToUpdate = dialogState.event;
         const { title, description } = editedEventDetails;
@@ -894,15 +908,17 @@ export function ScheduleView({
           await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId})`,
-            scheduledTime: newStart.toISOString(),
-            scheduledEndTime: newEnd.toISOString(),
+            scheduledDate: format(newStart, 'yyyy-MM-dd'),
+            scheduledTime: format(newStart, 'HH:mm'),
+            scheduledEndTime: format(finalEnd, 'HH:mm'),
+            estimatedDuration: durationMinutes,
             timestamp: new Date().toISOString(),
           });
           await refetchOrders();
-
         } else { // Generic event (not from sheet)
-          const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: newEnd.toISOString() };
+          const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: finalEnd.toISOString() };
           setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+          saveLocalEvent(updatedEvent);
         }
       }
       toast({ title: '予定を保存しました' });
@@ -955,24 +971,36 @@ export function ScheduleView({
       }
 
       setDialogState({ mode: 'closed' });
+      setDialogState({ mode: 'closed' });
     } catch (e: any) {
       toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });
+    } finally {
+      setIsSaving(false);
     }
   };
 
 
   const handleDeleteEvent = async () => {
     if (dialogState.mode !== 'details' && dialogState.mode !== 'edit') return;
-    const eventToDelete = dialogState.event;
 
-    if (eventToDelete.rawOrderId) {
-      await unassignTask(eventToDelete);
-    } else {
-      setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
-      toast({ title: '予定を削除しました' });
+    setIsSaving(true);
+    try {
+      const eventToDelete = dialogState.event;
+
+      if (eventToDelete.rawOrderId) {
+        await unassignTask(eventToDelete);
+      } else {
+        setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+        deleteLocalEvent(eventToDelete.id);
+        toast({ title: '予定を削除しました' });
+      }
+
+      setDialogState({ mode: 'closed' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '削除エラー', description: `削除に失敗しました: ${e.message}` });
+    } finally {
+      setIsSaving(false);
     }
-
-    setDialogState({ mode: 'closed' });
   };
 
   const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
@@ -1248,15 +1276,24 @@ export function ScheduleView({
 
                   <DialogFooter className="sm:justify-between pt-4 border-t">
                     <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" onClick={() => handleSaveEvent(true)}>
-                        <Mail className="mr-2 h-4 w-4" />
-                        保存して送信
+                      <Button variant="outline" onClick={() => handleSaveEvent(true)} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                        {isSaving ? '送信中...' : '保存して送信'}
                       </Button>
-                      <Button variant="destructive" onClick={handleDeleteEvent}>未割当に戻す</Button>
+                      <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
+                        {isSaving ? '処理中...' : '未割当に戻す'}
+                      </Button>
                     </div>
                     <div className='flex gap-2 mt-4 sm:mt-0'>
-                      <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
-                      <Button onClick={() => handleSaveEvent(false)}>保存</Button>
+                      <DialogClose asChild><Button variant="ghost" disabled={isSaving}>キャンセル</Button></DialogClose>
+                      <Button onClick={() => handleSaveEvent(false)} disabled={isSaving}>
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            保存中...
+                          </>
+                        ) : '保存'}
+                      </Button>
                     </div>
                   </DialogFooter>
                 </>
@@ -1285,14 +1322,21 @@ export function ScheduleView({
                   </div>
                   <DialogFooter className="sm:justify-between">
                     <div className="flex gap-2">
-                      <Button variant="outline" onClick={() => handleSaveEvent(true)}>
-                        <Mail className="mr-2 h-4 w-4" />
-                        保存して送信
+                      <Button variant="outline" onClick={() => handleSaveEvent(true)} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                        {isSaving ? '送信中...' : '保存して送信'}
                       </Button>
                     </div>
                     <div className="flex gap-2 mt-4 sm:mt-0">
-                      <DialogClose asChild><Button variant="ghost">キャンセル</Button></DialogClose>
-                      <Button onClick={() => handleSaveEvent(false)}>保存</Button>
+                      <DialogClose asChild><Button variant="ghost" disabled={isSaving}>キャンセル</Button></DialogClose>
+                      <Button onClick={() => handleSaveEvent(false)} disabled={isSaving}>
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            保存中...
+                          </>
+                        ) : '保存'}
+                      </Button>
                     </div>
                   </DialogFooter>
                 </>
