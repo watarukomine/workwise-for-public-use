@@ -730,7 +730,7 @@ export function ScheduleView({
               scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
               estimatedDuration: taskDuration,
               // Exact Column Matching based on screenshot
-              "予定時間": format(taskStart, 'HH:mm'), // Col F
+              // User confirmed "Scheduled Chip Time" is the real schedule, so ONLY update chip cols
               "チップ配置作業予定": format(taskStart, 'yyyy/MM/dd HH:mm:ss'), // Col AB
               "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'), // Col AC
               "作業予定日": format(taskStart, 'yyyy/MM/dd'),
@@ -922,7 +922,7 @@ export function ScheduleView({
             estimatedDuration: durationMinutes,
             timestamp: new Date().toISOString(),
             // Exact Column Matching based on screenshot
-            "予定時間": format(newStart, 'HH:mm'), // Col F
+            // User confirmed "Scheduled Chip Time" is the real schedule, so ONLY update chip cols
             "チップ配置作業予定": format(newStart, 'yyyy/MM/dd HH:mm:ss'), // Col AB
             "チップ配置作業完了予定": format(finalEnd, 'yyyy/MM/dd HH:mm:ss'), // Col AC
             "作業予定日": format(newStart, 'yyyy/MM/dd'),
