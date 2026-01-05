@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD033 MD041 -->
 <div class="cover-page">
   <img src="file:///Users/tmpmarketingsectionofkanagawa/WorkWise/public/icons/icon-512x512.png" alt="WorkWise Logo" class="cover-logo" />
   <h1 class="cover-title">WorkWise</h1>
