@@ -729,16 +729,12 @@ export function ScheduleView({
               scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
               scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
               estimatedDuration: taskDuration,
-              // Send all possible aliases to ensure GAS picks it up
-              "startTime": format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              "endTime": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
-              "予定時間": format(taskStart, 'HH:mm'),
-              "終了時間": format(taskEnd, 'HH:mm'),
-              "チップ配置作業予定": format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
+              // Exact Column Matching based on screenshot
+              "予定時間": format(taskStart, 'HH:mm'), // Col F
+              "チップ配置作業予定": format(taskStart, 'yyyy/MM/dd HH:mm:ss'), // Col AB
+              "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'), // Col AC
               "作業予定日": format(taskStart, 'yyyy/MM/dd'),
               "作業時間（分）": taskDuration,
-              "作業時間": taskDuration,
             });
             toast({ title: "スケジュールを更新しました" });
             // Add slight delay to allow GAS propagation
@@ -925,16 +921,12 @@ export function ScheduleView({
             scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
             estimatedDuration: durationMinutes,
             timestamp: new Date().toISOString(),
-            // Send all possible aliases to ensure GAS picks it up
-            "startTime": format(newStart, 'yyyy/MM/dd HH:mm:ss'),
-            "endTime": format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
-            "予定時間": format(newStart, 'HH:mm'),
-            "終了時間": format(finalEnd, 'HH:mm'),
-            "チップ配置作業予定": format(newStart, 'yyyy/MM/dd HH:mm:ss'),
-            "チップ配置作業完了予定": format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
+            // Exact Column Matching based on screenshot
+            "予定時間": format(newStart, 'HH:mm'), // Col F
+            "チップ配置作業予定": format(newStart, 'yyyy/MM/dd HH:mm:ss'), // Col AB
+            "チップ配置作業完了予定": format(finalEnd, 'yyyy/MM/dd HH:mm:ss'), // Col AC
             "作業予定日": format(newStart, 'yyyy/MM/dd'),
             "作業時間（分）": durationMinutes,
-            "作業時間": durationMinutes,
           });
           // Add slight delay to allow GAS propagation
           await new Promise(resolve => setTimeout(resolve, 2000));
