@@ -153,7 +153,7 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
   );
 
   const content = (
-    // eslint-disable-next-line react-dom/no-unsafe-inline-style
+    // eslint-disable-next-line
     <div style={style} className={cn("h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight", className)}>
       {/* Row 1: StoreName(Equip) Time */}
       <div className="flex justify-between items-center w-full overflow-hidden">
@@ -214,7 +214,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   };
 
   return (
-    // eslint-disable-next-line react-dom/no-unsafe-inline-style
+    // eslint-disable-next-line
     <div ref={setNodeRef} style={style} {...listeners} {...attributes} onDoubleClick={handleDoubleClick}>
       <OrderChip order={order} className={className} />
     </div>
@@ -354,7 +354,7 @@ const TimeIndicator = () => {
   const leftPosition = minutesToPixels(minutesFromStart);
 
   return (
-    // eslint-disable-next-line react-dom/no-unsafe-inline-style
+    // eslint-disable-next-line
     <div
       className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
       style={{ left: `${leftPosition}px`, zIndex: 101 }}
@@ -696,15 +696,35 @@ export function ScheduleView({
             toast({ title: "スケジュールを更新しました" });
           } else if (draggedEvent.rawOrderId) {
             let taskStart = newStart;
+            // Calculate task duration to determine end time
+            let taskDuration = 60; // Default
+            if (draggedEvent.tripId) {
+              const tripEvents = previousSchedule.filter(e => e.tripId === draggedEvent.tripId);
+              const taskEvent = tripEvents.find(e => e.id.endsWith('-task'));
+              if (taskEvent) {
+                taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
+              } else if (!draggedEvent.id.endsWith('-travel')) {
+                // If dragging the task itself and no other events found (unlikely but safe)
+                taskDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+              }
+            } else {
+              // No tripId? likely task only
+              taskDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+            }
+
             if (draggedEvent.id.endsWith('-travel')) {
               const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
               taskStart = addMinutes(newStart, travelDuration);
             }
+
+            const taskEnd = addMinutes(taskStart, taskDuration);
+
             await updateSheetStatus({
               gasUrl: ORDER_GAS_URL,
               eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
               staffName: newStaff.name,
               scheduledTime: taskStart.toISOString(),
+              scheduledEndTime: taskEnd.toISOString(),
             });
             toast({ title: "スケジュールを更新しました" });
             await refetchOrders();
@@ -1126,7 +1146,7 @@ export function ScheduleView({
                       <div className="sticky left-0 z-50 flex-shrink-0 font-semibold p-2 border-r bg-background w-[144px]">スタッフ</div>
                       <div className="relative flex-1 h-full">
                         {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                          // eslint-disable-next-line react-dom/no-unsafe-inline-style
+                          // eslint-disable-next-line
                           <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
                             <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
                           </div>
@@ -1137,7 +1157,7 @@ export function ScheduleView({
 
                     <div className="relative space-y-2 pb-2">
                       {isToday(currentDate) && (
-                        // eslint-disable-next-line react-dom/no-unsafe-inline-style
+                        // eslint-disable-next-line
                         <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
                           <TimeIndicator />
                         </div>
@@ -1438,9 +1458,9 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const customerName = event.raw ? findKey(event.raw, ['お取引先名', '店舗', '取引先']) : (customer?.storeName || line1);
 
   const eventContent = (
+    // eslint-disable-next-line
     <div
       className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && !isOverlay && "opacity-50")}
-      // eslint-disable-next-line react-dom/no-unsafe-inline-style
       style={{ ...divStyle, width: isOverlay ? `${width}px` : '100%' }}
     >
       <p className="text-xs font-semibold truncate pointer-events-none">{customerName || line1}</p>
@@ -1466,9 +1486,9 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   );
 
   return (
+    // eslint-disable-next-line
     <div
       ref={setNodeRef}
-      // eslint-disable-next-line react-dom/no-unsafe-inline-style
       style={style}
       {...listeners}
       {...attributes}
