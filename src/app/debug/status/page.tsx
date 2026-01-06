@@ -84,7 +84,17 @@ export default function DebugStatusPage() {
                                             <td className="border p-2 font-bold">{staff?.name || 'Unknown'}</td>
                                             <td className="border p-2 text-blue-600">{s.status}</td>
                                             <td className="border p-2">{s.lastAction}</td>
-                                            <td className="border p-2">{s.lastUpdate ? format(new Date(s.lastUpdate), 'yyyy-MM-dd HH:mm:ss') : 'N/A'}</td>
+                                            <td className="border p-2">
+                                                {s.lastUpdate ? (
+                                                    <div>
+                                                        <div>{format(new Date(s.lastUpdate), 'yyyy-MM-dd HH:mm:ss')}</div>
+                                                        <div className="text-xs text-gray-400">{s.lastUpdate}</div>
+                                                        <div className={new Date(s.lastUpdate).toDateString() === new Date().toDateString() ? "text-green-500 font-bold" : "text-red-500 font-bold"}>
+                                                            isToday: {new Date(s.lastUpdate).toDateString() === new Date().toDateString() ? 'YES' : 'NO'}
+                                                        </div>
+                                                    </div>
+                                                ) : 'N/A'}
+                                            </td>
                                             <td className="border p-2">{s.latitude && s.longitude ? `${s.latitude}, ${s.longitude}` : 'None'}</td>
                                         </tr>
                                     );
