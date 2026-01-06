@@ -419,6 +419,10 @@ const useScheduleView = () => {
 }
 
 
+import { useSelectedStaff } from '@/contexts/selected-staff-context';
+
+// ... (existing imports)
+
 export function ScheduleView({
   staffData,
   currentDate,
@@ -426,6 +430,7 @@ export function ScheduleView({
 }: ScheduleViewProps) {
 
   const { customers: allCustomers } = useCustomer();
+  const { allStaff } = useSelectedStaff(); // Get full list
   const { toast } = useToast();
   const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent } = useOrder();
 
@@ -435,9 +440,9 @@ export function ScheduleView({
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '' });
   const [active, setActive] = React.useState<Active | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
-
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
-  const getStaffById = (id: string | undefined): WithId<Staff> | undefined => staffData?.find(s => s.id === id);
+  // Use allStaff instead of filtered staffData for lookup
+  const getStaffById = (id: string | undefined): WithId<Staff> | undefined => allStaff?.find(s => s.id === id);
 
   const dailySchedule = React.useMemo(() => {
     if (!scheduleEvents) return [];
