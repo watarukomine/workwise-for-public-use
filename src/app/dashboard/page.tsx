@@ -254,7 +254,8 @@ export default function DashboardPage() {
       if (displayStatus === '移動開始' || displayStatus === '移動中') displayStatus = '移動中';
       else if (displayStatus === '現場到着') displayStatus = '作業待ち';
       else if (displayStatus === '作業開始' || displayStatus === '作業中') displayStatus = '作業中';
-      else if (displayStatus === '作業完了') displayStatus = '待機中';
+      // Allow '作業完了' to be displayed as is, or map to a distinct status if needed.
+      // else if (displayStatus === '作業完了') displayStatus = '待機中'; 
       else if (displayStatus === '作業待ち') displayStatus = '待機中'; // Treat assigned-only (before arrival) as Idle/Waiting so it can be overridden by Attendance
       else if (displayStatus === '待機中') displayStatus = '待機中';
 
