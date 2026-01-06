@@ -963,30 +963,33 @@ export function ScheduleView({
           location = getCustomerByCode(event.locationId)?.address || "";
         }
 
-        if (staffName) {
-          sendIcsEmail({
-            gasUrl: ORDER_GAS_URL,
-            staffName: staffName,
-            staffEmail: staffEmail,
-            title: editedEventDetails.title,
-            description: editedEventDetails.description,
-            startTime: eventStart,
-            endTime: eventEnd,
-            location: location,
-            isUpdate: dialogState.mode === 'edit'
-          }).then(result => {
+        if (!staffEmail) {
+          toast({ variant: 'destructive', title: '送信エラー', description: '担当者のメールアドレスが登録されていません。' });
+        } else {
+          try {
+            const result = await sendIcsEmail({
+              gasUrl: ORDER_GAS_URL,
+              staffName: staffName,
+              staffEmail: staffEmail,
+              title: editedEventDetails.title,
+              description: editedEventDetails.description,
+              startTime: eventStart,
+              endTime: eventEnd,
+              location: location,
+              isUpdate: dialogState.mode === 'edit'
+            });
+
             if (result.status === 'success') {
               toast({ title: 'メール送信成功', description: 'スタッフにメールを送信しました。' });
             } else {
               toast({ variant: 'destructive', title: 'メール送信エラー', description: result.message });
             }
-          }).catch(e => {
+          } catch (e: any) {
             toast({ variant: 'destructive', title: 'メール送信エラー', description: e.message });
-          });
+          }
         }
       }
 
-      setDialogState({ mode: 'closed' });
       setDialogState({ mode: 'closed' });
     } catch (e: any) {
       toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });

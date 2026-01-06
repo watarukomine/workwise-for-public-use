@@ -61,7 +61,24 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
     orders.push(order);
 
     // 1. Process Staff Status
-    const staffMember = order.staffName ? allStaff.find(s => s.name === order.staffName) : undefined;
+    // Improve matching: Normalize by removing spaces and lowercasing
+    const normalizeName = (n: string) => n.replace(/\s+/g, '').toLowerCase();
+    const staffMember = order.staffName
+      ? allStaff.find(s => normalizeName(s.name) === normalizeName(order.staffName || ''))
+      : undefined;
+
+    // Debug Log
+    if (order.status === '移動中' || order.status === '移動開始') {
+      console.log('DEBUG: Found Moving Order', {
+        orderId: order.id,
+        staffName: order.staffName,
+        matchedStaff: !!staffMember,
+        allStaffCount: allStaff.length,
+        rawLastUpdate: findKey(rawOrder, ['最終更新日時']),
+        rawLocation: findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']),
+        rawStatus: findKey(rawOrder, ['受注ステータス']),
+      });
+    }
 
     if (staffMember) {
       const lastUpdateStr = findKey(rawOrder, ['最終更新日時']);
@@ -71,7 +88,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
         const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
 
         if (!isNaN(lastUpdate.getTime()) && lastUpdate.getTime() >= currentUpdate.getTime()) {
-          const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）']) || '';
+          const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';
           const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
           const status = findKey(rawOrder, ['受注ステータス']) || '待機中';
           const actionText = order.rawOrderId ? `[${order.rawOrderId}]` : '[汎用タスク]';
