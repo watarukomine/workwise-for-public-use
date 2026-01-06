@@ -106,6 +106,33 @@ export default function DebugStatusPage() {
             </Card>
 
             <Card>
+                <CardHeader><CardTitle>Staff Data Debug (Raw Keys check)</CardTitle></CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {allStaff.filter(s => !filterStaff || s.name.includes(filterStaff)).map(staff => (
+                            <div key={staff.id} className="border p-4 rounded text-xs font-mono">
+                                <div className="font-bold text-lg">{staff.name}</div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <div className="font-bold border-b mb-2">Mapped Object</div>
+                                        <div>Email: <span className={staff.email ? "text-green-600 font-bold" : "text-red-600 font-bold"}>{staff.email || "(Empty)"}</span></div>
+                                        <div>Role: {staff.role}</div>
+                                        <div>Color: <span style={{ backgroundColor: staff.color }} className="px-2">{staff.color}</span></div>
+                                    </div>
+                                    <div>
+                                        <div className="font-bold border-b mb-2">Raw Object Keys & Values</div>
+                                        <pre className="whitespace-pre-wrap break-all">
+                                            {JSON.stringify(staff, null, 2)}
+                                        </pre>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
                 <CardHeader><CardTitle>Raw Orders Data (GAS)</CardTitle></CardHeader>
                 <CardContent>
                     <p className="text-sm text-gray-500 mb-2">Showing {filteredRawOrders.length} records</p>
