@@ -1017,15 +1017,17 @@ export function ScheduleView({
           eventStart = newStart.toISOString();
           eventEnd = newEnd.toISOString();
           location = getCustomerByCode(event.locationId)?.address || "";
+        } else if (dialogState.mode === 'details') {
+          const event = dialogState.event;
+          const staff = getStaffById(event.staffId);
+          staffName = staff?.name || "";
+          staffEmail = staff?.email || "";
+          // For details mode, use original event times or current newStart/newEnd if they happen to be set (though usually they aren't edited in details)
+          // Actually in details mode newStart/newEnd are initialized from event.start/end
+          eventStart = newStart.toISOString();
+          eventEnd = newEnd.toISOString();
+          location = getCustomerByCode(event.locationId)?.address || "";
         }
-
-
-        console.log('Debug Email Check:', {
-          mode: dialogState.mode,
-          staffId: dialogState.mode === 'new' ? dialogState.staffId : (dialogState.mode === 'edit' ? dialogState.event.staffId : 'unknown'),
-          foundStaff: dialogState.mode === 'new' ? getStaffById(dialogState.staffId) : (dialogState.mode === 'edit' ? getStaffById(dialogState.event.staffId) : undefined),
-          email: staffEmail
-        });
 
         if (!staffEmail) {
           toast({ variant: 'destructive', title: '送信エラー', description: '担当者のメールアドレスが登録されていません。' });
@@ -1035,8 +1037,8 @@ export function ScheduleView({
               gasUrl: ORDER_GAS_URL,
               staffName: staffName,
               staffEmail: staffEmail,
-              title: editedEventDetails.title,
-              description: editedEventDetails.description,
+              title: dialogState.mode === 'details' ? (dialogState.event.title || '作業予定') : editedEventDetails.title,
+              description: dialogState.mode === 'details' ? (dialogState.event.description || '') : editedEventDetails.description,
               startTime: eventStart,
               endTime: eventEnd,
               location: location,
