@@ -72,14 +72,14 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
   // const uniqueId = String(orderId || `ord-rand-${Math.random()}`);
 
   const duration = parseInt(findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間']), 10);
-  const scheduledTime = findKey(rawOrder, ['チップ配置作業予定', '予定時間', 'チップ配置作業予定']);
+  const scheduledTime = findKey(rawOrder, ['チップ配置作業予定', '予定時間', 'チップ配置作業予定', 'scheduledTime', '開始日時']);
 
   const customerName = findKey(rawOrder, ['お取引先名', '店舗名', '店舗', '取引先']) || '';
 
   // Extract tire size - try multiple possible column names
   const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ', 'タイヤ']) || '';
 
-  let taskDetails = customerName;
+  let taskDetails = findKey(rawOrder, ['業務内容', 'taskDetails']) || customerName;
   if (scheduledTime) {
     // Optionally format time if needed, but raw string might be enough for detail view
     // taskDetails += `\n予定: ${scheduledTime}`; 
@@ -90,16 +90,16 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     rawOrderId: orderId ? String(orderId) : undefined,
     customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
     taskDetails: taskDetails, // Simplified for initial view, detailed view can show more
-    status: findKey(rawOrder, ['受注ステータス']) || '未割当',
+    status: findKey(rawOrder, ['受注ステータス', 'status']) || '未割当',
     scheduledDate: formatDate(String(findKey(rawOrder, ['作業予定日']) || ''), 'yyyy-MM-dd'),
     scheduledTime: scheduledTime || '',
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     value: parseFloat(findKey(rawOrder, ['金額']) || 0),
-    staffName: findKey(rawOrder, ['担当', 'スタッフ名']) || '',
+    staffName: findKey(rawOrder, ['担当', 'スタッフ名', 'staffName']) || '',
     mainStore: findKey(rawOrder, ['主管店舗', 'mainStore']) || '',
     customerName: customerName,
     address: findKey(rawOrder, ['住所', 'Address']) || '',
-    scheduledEndTime: findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime']) || '',
+    scheduledEndTime: findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime', 'scheduledEndTime', '終了日時']) || '',
     actualStartTime: (() => {
       const val = findKey(rawOrder, ['作業開始時間', '開始時間', 'startTime', 'startedAt', 'actualStartTime']);
       return val ? new Date(val) : undefined;
