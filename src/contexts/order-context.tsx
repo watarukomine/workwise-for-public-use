@@ -102,14 +102,28 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
           const status = findKey(rawOrder, ['受注ステータス']) || '待機中';
           const actionText = order.rawOrderId ? `[${order.rawOrderId}]` : '[汎用タスク]';
 
-          staffStatusMap.set(staffMember.id, {
-            staffId: staffMember.id,
-            status: status,
-            lastAction: `${actionText} ${status}`,
-            latitude: !isNaN(lat) ? lat : undefined,
-            longitude: !isNaN(lon) ? lon : undefined,
-            lastUpdate: lastUpdate.toISOString(),
-          });
+          // Priority Logic: Prevent "Not Started" from overwriting active statuses
+          // If current status is Active (Moving, Working, Arrived) and new status is Passive (Not Started, Unassigned),
+          // Ignore the update unless it's significantly newer (which shouldn't happen for Not Started)
+          const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着'];
+          const passiveStatuses = ['未着手', '未割当', '待機中'];
+
+          const isCurrentActive = activeStatuses.includes(currentStatus.status || '');
+          const isNewPassive = passiveStatuses.includes(status);
+
+          if (isCurrentActive && isNewPassive) {
+            // Do not overwrite active status with passive status from another (future) order
+            console.log(`DEBUG: Ignoring passive status update '${status}' for active staff ${staffMember.name} (Current: ${currentStatus.status})`);
+          } else {
+            staffStatusMap.set(staffMember.id, {
+              staffId: staffMember.id,
+              status: status,
+              lastAction: `${actionText} ${status}`,
+              latitude: !isNaN(lat) ? lat : undefined,
+              longitude: !isNaN(lon) ? lon : undefined,
+              lastUpdate: lastUpdate.toISOString(),
+            });
+          }
         }
       }
     }
