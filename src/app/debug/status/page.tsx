@@ -13,6 +13,7 @@ export default function DebugStatusPage() {
     const [filterStaff, setFilterStaff] = useState<string>('');
 
     const filteredRawOrders = React.useMemo(() => {
+        if (!rawOrdersData || !Array.isArray(rawOrdersData)) return [];
         if (!filterStaff) return rawOrdersData;
         return rawOrdersData.filter(o =>
             (o.staffName && o.staffName.includes(filterStaff)) ||
@@ -21,9 +22,10 @@ export default function DebugStatusPage() {
     }, [rawOrdersData, filterStaff]);
 
     const filteredStatuses = React.useMemo(() => {
+        if (!statuses || !Array.isArray(statuses)) return [];
         if (!filterStaff) return statuses;
         // Find staff ID by name if possible
-        const staff = allStaff.find(s => s.name.includes(filterStaff));
+        const staff = allStaff?.find(s => s.name?.includes(filterStaff));
         if (staff) {
             return statuses.filter(s => s.staffId === staff.id);
         }
