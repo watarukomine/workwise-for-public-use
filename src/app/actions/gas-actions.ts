@@ -96,27 +96,14 @@ export async function sendIcsEmail(args: {
     return callGasApi({ ...args, operation: 'sendEmail' });
 }
 
-export async function createOrder(args: {
+export async function createTask(args: {
     gasUrl: string;
-    userCode: string;
-    storeName: string;
-    workType: string;
-    scheduledDate: string;
-    scheduledTime: string;
-    picName: string;
-    orderNo?: string;
-    comment?: string;
-    carName?: string;
-    regNo: string;
-    status?: string;
-    tireNumber: string;
-    tireSize: string;
-    productName?: string;
-    quantity: string;
-    sensor?: string;
-    arrangement?: string;
-    disposal: string;
-    contact: string;
+    staffName: string;
+    taskName: string;
+    description?: string;
+    startTime: string;
+    endTime: string;
+    estimatedDuration: number;
 }): Promise<GasResponse> {
-    return callGasApi({ ...args, action: 'createOrder' });
+    return callGasApi({ ...args, action: 'createTask' });
 }
