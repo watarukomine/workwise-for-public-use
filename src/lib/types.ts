@@ -71,6 +71,8 @@ export type Order = {
   tireSize?: string;
   taskCalendarEventId?: string;
   travelCalendarEventId?: string;
+  cancelDate?: string;
+  cancelContact?: string;
   '本数'?: string;
   raw?: Record<string, any>;
 };

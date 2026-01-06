@@ -263,6 +263,12 @@ function updateSheetWithOrderInfo(params) {
       }
     }
 
+    // キャンセル情報更新
+    if (params.cancelDate) {
+      updateColumn("キャンセル日時", new Date(params.cancelDate));
+      updateColumn("キャンセル連絡者", params.cancelContact);
+    }
+
     return successResponse(`受注ID: ${orderId} を更新しました。`);
 
   } catch (error) {

@@ -116,6 +116,8 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
       const val = findKey(rawOrder, ['現場到着', 'arrive']);
       return val ? new Date(val) : undefined;
     })(),
+    cancelDate: findKey(rawOrder, ['キャンセル日時', 'cancelDate']),
+    cancelContact: findKey(rawOrder, ['キャンセル連絡者', 'cancelContact']),
     equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
     tireSize: String(tireSize || ''),
     '本数': findKey(rawOrder, ['本数', 'honsu']) || '',

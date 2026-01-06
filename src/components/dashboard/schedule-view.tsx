@@ -55,7 +55,7 @@ import { useOrder } from '../../contexts/order-context';
 import { updateSheetStatus, sendIcsEmail, createTask } from '../../app/actions/gas-actions';
 import { ORDER_GAS_URL } from '../../lib/settings';
 import { Mail, Pencil, Loader2 } from 'lucide-react';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { STORE_COLORS } from '../../lib/constants';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -319,6 +319,7 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
                   order={order}
                   customer={getCustomerByCode(order.customerCode)}
                   onDoubleClick={() => onDoubleClickOrder(order)}
+                  className={order.status === 'キャンセル' ? 'bg-red-100 dark:bg-red-900/30 border-red-500/50' : ''}
                 />
               ))}
               {dailyOrders.length === 0 && (
@@ -871,6 +872,47 @@ export function ScheduleView({
     setDialogState({ mode: 'new', staffId, start: newStart });
   };
 
+  const [cancelContact, setCancelContact] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const handleWorkCancel = async () => {
+    if (!cancelContact.trim()) {
+      toast({ variant: 'destructive', title: 'エラー', description: 'キャンセル連絡者名を入力してください。' });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const staff = dialogState.mode === 'new' ? getStaffById(dialogState.staffId) : undefined;
+      // For work cancel, we primarily need the order ID.
+      let orderId: string | undefined;
+      if (dialogState.mode === 'details' || dialogState.mode === 'edit') {
+        orderId = dialogState.event?.rawOrderId;
+      }
+
+      if (orderId) {
+        await updateSheetStatus({
+          gasUrl: ORDER_GAS_URL,
+          eventTitle: `(ID: ${orderId})`,
+          staffName: '', // Unassign
+          statusValue: 'キャンセル',
+          cancelDate: new Date().toISOString(),
+          cancelContact: cancelContact,
+          timestamp: new Date().toISOString()
+        });
+        toast({ title: "作業キャンセルを記録しました" });
+        setIsCancelling(false);
+        setCancelContact('');
+        await refetchOrders();
+      }
+      setDialogState({ mode: 'closed' });
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: 'destructive', title: 'エラー', description: 'キャンセル処理に失敗しました。' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleSaveEvent = async (shouldSendEmail: boolean = false) => {
     if (dialogState.mode === 'closed') return;
     setIsSaving(true);
@@ -1304,25 +1346,49 @@ export function ScheduleView({
 
                   <DialogFooter className="sm:justify-between pt-4 border-t">
                     <div className="flex flex-wrap gap-2">
-                      <Button variant="outline" onClick={() => handleSaveEvent(true)} disabled={isSaving}>
-                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                        {isSaving ? '送信中...' : '保存して送信'}
-                      </Button>
-                      <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
-                        {isSaving ? '処理中...' : '未割当に戻す'}
-                      </Button>
+                      {!isCancelling ? (
+                        <>
+                          <Button variant="outline" onClick={() => handleSaveEvent(true)} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                            {isSaving ? '送信中...' : '保存して送信'}
+                          </Button>
+                          <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
+                            {isSaving ? '処理中...' : '未割当に戻す'}
+                          </Button>
+                          <Button variant="destructive" onClick={() => setIsCancelling(true)} disabled={isSaving} className="bg-red-700 hover:bg-red-800">
+                            作業キャンセル
+                          </Button>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2 w-full">
+                          <Input
+                            placeholder="キャンセル連絡者名"
+                            value={cancelContact}
+                            onChange={(e) => setCancelContact(e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button variant="destructive" onClick={handleWorkCancel} disabled={isSaving}>
+                            確定
+                          </Button>
+                          <Button variant="ghost" onClick={() => setIsCancelling(false)} disabled={isSaving}>
+                            戻る
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    <div className='flex gap-2 mt-4 sm:mt-0'>
-                      <DialogClose asChild><Button variant="ghost" disabled={isSaving}>キャンセル</Button></DialogClose>
-                      <Button onClick={() => handleSaveEvent(false)} disabled={isSaving}>
-                        {isSaving ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            保存中...
-                          </>
-                        ) : '保存'}
-                      </Button>
-                    </div>
+                    {!isCancelling && (
+                      <div className='flex gap-2 mt-4 sm:mt-0'>
+                        <DialogClose asChild><Button variant="ghost" disabled={isSaving}>閉じる</Button></DialogClose>
+                        <Button onClick={() => handleSaveEvent(false)} disabled={isSaving}>
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              保存中...
+                            </>
+                          ) : '保存'}
+                        </Button>
+                      </div>
+                    )}
                   </DialogFooter>
                 </>
               ) : (dialogState.mode === 'new') ? (
