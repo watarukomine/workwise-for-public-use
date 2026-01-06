@@ -96,25 +96,51 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
         const currentStatus = staffStatusMap.get(staffMember.id)!;
         const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
 
-        if (!isNaN(lastUpdate.getTime()) && lastUpdate.getTime() >= currentUpdate.getTime()) {
-          const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';
-          const [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
-          const status = findKey(rawOrder, ['受注ステータス']) || '待機中';
-          const actionText = order.rawOrderId ? `[${order.rawOrderId}]` : '[汎用タスク]';
-
-          // Priority Logic: Prevent "Not Started" from overwriting active statuses
-          // If current status is Active (Moving, Working, Arrived) and new status is Passive (Not Started, Unassigned),
-          // Ignore the update unless it's significantly newer (which shouldn't happen for Not Started)
+        if (!isNaN(lastUpdate.getTime())) {
+          // Priority Logic: Active statuses should persist over newer Passive statuses
+          // And older Active statuses should restore over current Passive statuses
           const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着'];
           const passiveStatuses = ['未着手', '未割当', '待機中'];
 
+          const isNewer = lastUpdate.getTime() >= currentUpdate.getTime();
+          const isCandidateActive = activeStatuses.includes(status);
           const isCurrentActive = activeStatuses.includes(currentStatus.status || '');
-          const isNewPassive = passiveStatuses.includes(status);
+          const isCandidatePassive = passiveStatuses.includes(status);
+          const isCurrentPassive = passiveStatuses.includes(currentStatus.status || '');
 
-          if (isCurrentActive && isNewPassive) {
-            // Do not overwrite active status with passive status from another (future) order
-            console.log(`DEBUG: Ignoring passive status update '${status}' for active staff ${staffMember.name} (Current: ${currentStatus.status})`);
+          let shouldUpdate = false;
+
+          if (isNewer) {
+            // New data is newer
+            if (isCandidatePassive && isCurrentActive) {
+              // Ignore newer passive if we have active
+              console.log(`DEBUG: Ignoring newer passive status '${status}' (${lastUpdateStr}) for active staff ${staffMember.name} (Current: ${currentStatus.status})`);
+              shouldUpdate = false;
+            } else {
+              shouldUpdate = true; // Normal case: newer wins
+            }
           } else {
+            // New data is OLDER (or same)
+            if (isCandidateActive && isCurrentPassive) {
+              // Restore older active if current is merely passive
+              console.log(`DEBUG: Restoring older active status '${status}' (${lastUpdateStr}) over passive staff ${staffMember.name} (Current: ${currentStatus.status})`);
+              shouldUpdate = true;
+            } else {
+              shouldUpdate = false; // Normal case: older loses
+            }
+          }
+
+          if (shouldUpdate) {
+            const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';
+            let [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
+
+            // Location Persistence: If new location is invalid, keep existing valid location
+            // (Only if existing location is valid number)
+            if ((isNaN(lat) || isNaN(lon)) && currentStatus.latitude && currentStatus.longitude) {
+              lat = currentStatus.latitude;
+              lon = currentStatus.longitude;
+            }
+
             staffStatusMap.set(staffMember.id, {
               staffId: staffMember.id,
               status: status,
