@@ -893,451 +893,402 @@ export function ScheduleView({
     const durationMinutes = Math.round((finalEnd.getTime() - newStart.getTime()) / (1000 * 60));
 
     try {
-      try {
-        if (dialogState.mode === 'new') {
-          const staff = getStaffById(dialogState.staffId);
-          if (!staff) throw new Error("担当スタッフが見つかりません。");
-
-          const { title, description } = editedEventDetails;
-
-          // Call createTask for new double-click events
-          await createTask({
-            gasUrl: ORDER_GAS_URL,
-            staffName: staff.name,
-            taskName: title,
-            description: description,
-            startTime: newStart.toISOString(),
-            endTime: finalEnd.toISOString(),
-            estimatedDuration: durationMinutes
-          });
-
-          toast({ title: '予定を保存しました' });
-          // Optimistic update omitted as refetch will handle it, or we could add manually but IDs are server-generated
-          await new Promise(r => setTimeout(r, 1500));
-          await refetchOrders();
-
-        } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
-          const eventToUpdate = dialogState.event;
-          const { title, description } = editedEventDetails;
-
-          if (eventToUpdate.rawOrderId || (eventToUpdate.id && eventToUpdate.id.startsWith('task-'))) {
-            // Sheet-based event (Order OR Generic Task)
-            // The updated GAS `updateSheetWithOrderInfo` handles `task-` IDs by updating the Action Log sheet.
-            await updateSheetStatus({
-              gasUrl: ORDER_GAS_URL,
-              eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`, // Use ID for tasks
-              scheduledDate: format(newStart, 'yyyy/MM/dd'),
-              scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
-              scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
-              estimatedDuration: durationMinutes,
-              timestamp: new Date().toISOString(),
-              // Exact Column Matching
-              "チップ配置作業予定": format(newStart, 'yyyy/MM/dd HH:mm:ss'),
-              "チップ配置作業完了予定": format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
-              "作業予定日": format(newStart, 'yyyy/MM/dd'),
-              "作業時間（分）": durationMinutes,
-              // For Generic Tasks (Action Log) fields if needed explicitly, but GAS mapping takes care of it
-              staffName: getStaffById(eventToUpdate.staffId)?.name,
-            });
-            // Add slight delay to allow GAS propagation
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await refetchOrders();
-          } else { // Legacy Local event
-            const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: finalEnd.toISOString() };
-            setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
-            saveLocalEvent(updatedEvent);
-          }
-        }
-
-        if (shouldSendEmail) {
-          let staffName = "";
-          let staffEmail = "";
-          let eventStart = "";
-          let eventEnd = "";
-          let location = "";
-
-          if (dialogState.mode === 'new') {
-            const staff = getStaffById(dialogState.staffId);
-            staffName = staff?.name || "";
-            staffEmail = staff?.email || "";
-            eventStart = newStart.toISOString();
-            eventEnd = newEnd.toISOString();
-            location = ""; // New generic event no location
-          } else if (dialogState.mode === 'edit') {
-            const event = dialogState.event;
-            const staff = getStaffById(event.staffId);
-            staffName = staff?.name || "";
-            staffEmail = staff?.email || "";
-            eventStart = newStart.toISOString();
-            eventEnd = newEnd.toISOString();
-            location = getCustomerByCode(event.locationId)?.address || "";
-          }
-
-          if (!staffEmail) {
-            toast({ variant: 'destructive', title: '送信エラー', description: '担当者のメールアドレスが登録されていません。' });
-          } else {
-            try {
-              const result = await sendIcsEmail({
-                gasUrl: ORDER_GAS_URL,
-                staffName: staffName,
-                staffEmail: staffEmail,
-                title: editedEventDetails.title,
-                description: editedEventDetails.description,
-                startTime: eventStart,
-                endTime: eventEnd,
-                location: location,
-                isUpdate: dialogState.mode === 'edit'
-              });
-
-              if (result.status === 'success') {
-                toast({ title: 'メール送信成功', description: 'スタッフにメールを送信しました。' });
-              } else {
-                toast({ variant: 'destructive', title: 'メール送信エラー', description: result.message });
-              }
-            } catch (e: any) {
-              toast({ variant: 'destructive', title: 'メール送信エラー', description: e.message });
-            }
-          }
-        }
-
-        setDialogState({ mode: 'closed' });
-      } catch (e: any) {
-        toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });
-      } finally {
-        setIsSaving(false);
-      }
-    };
-
-
-    const handleDeleteEvent = async () => {
-      if (dialogState.mode !== 'details' && dialogState.mode !== 'edit') return;
-
-      setIsSaving(true);
-      try {
-        const eventToDelete = dialogState.event;
-
-        if (eventToDelete.rawOrderId) {
-          await unassignTask(eventToDelete);
-        } else {
-          setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
-          deleteLocalEvent(eventToDelete.id);
-          toast({ title: '予定を削除しました' });
-        }
-
-        setDialogState({ mode: 'closed' });
-      } catch (e: any) {
-        toast({ variant: 'destructive', title: '削除エラー', description: `削除に失敗しました: ${e.message}` });
-      } finally {
-        setIsSaving(false);
-      }
-    };
-
-    const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
-      const staff = getStaffById(event.staffId);
-      if (!staff) {
-        toast({ variant: 'destructive', title: 'エラー', description: '担当者が見つかりません。' });
-        return;
-      }
-      try {
-        const result = await sendIcsEmail({
-          gasUrl: ORDER_GAS_URL,
-          staffName: staff.name,
-          staffEmail: staff.email || '',
-          title: event.title,
-          description: `顧客: ${findKey(event.raw, ['お取引先名', '店舗']) || 'N/A'}\n住所: ${findKey(event.raw, ['住所']) || 'N/A'}`,
-          startTime: event.start as string,
-          endTime: event.end as string,
-          location: findKey(event.raw, ['住所']) || '',
-          isUpdate: false,
-        });
-        if (result.status === 'error') throw new Error(result.message);
-
-        toast({ title: 'メール送信成功', description: `${staff.name}にiCalメールを送信しました。` });
-        setDialogState({ mode: 'closed' });
-      } catch (e: any) {
-        toast({ variant: 'destructive', title: 'メール送信エラー', description: e.message });
-      }
-    };
-
-    const getDialogDetails = () => {
-      if (dialogState.mode === 'details') {
-        const { event } = dialogState;
-        const staff = getStaffById(event.staffId);
-        const customer = getCustomerByCode(event.locationId);
-        return { event, staff, customer, title: '受注詳細' };
-      }
-      if (dialogState.mode === 'edit') {
-        const { event } = dialogState;
-        const staff = getStaffById(event.staffId);
-        const customer = getCustomerByCode(event.locationId);
-        return { event, staff, customer, title: '予定の編集' };
-      }
       if (dialogState.mode === 'new') {
         const staff = getStaffById(dialogState.staffId);
-        return { staff, start: dialogState.start, title: '新規予定の作成' };
+        if (!staff) throw new Error("担当スタッフが見つかりません。");
+
+        const { title, description } = editedEventDetails;
+
+        // Call createTask for new double-click events
+        await createTask({
+          gasUrl: ORDER_GAS_URL,
+          staffName: staff.name,
+          taskName: title,
+          description: description,
+          startTime: newStart.toISOString(),
+          endTime: finalEnd.toISOString(),
+          estimatedDuration: durationMinutes
+        });
+
+        toast({ title: '予定を保存しました' });
+        // Optimistic update omitted as refetch will handle it, or we could add manually but IDs are server-generated
+        await new Promise(r => setTimeout(r, 1500));
+        await refetchOrders();
+
+      } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
+        const eventToUpdate = dialogState.event;
+        const { title, description } = editedEventDetails;
+
+        if (eventToUpdate.rawOrderId || (eventToUpdate.id && eventToUpdate.id.startsWith('task-'))) {
+          // Sheet-based event (Order OR Generic Task)
+          // The updated GAS `updateSheetWithOrderInfo` handles `task-` IDs by updating the Action Log sheet.
+          await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`, // Use ID for tasks
+            scheduledDate: format(newStart, 'yyyy/MM/dd'),
+            scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
+            scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
+            estimatedDuration: durationMinutes,
+            timestamp: new Date().toISOString(),
+            // Exact Column Matching
+            "チップ配置作業予定": format(newStart, 'yyyy/MM/dd HH:mm:ss'),
+            "チップ配置作業完了予定": format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
+            "作業予定日": format(newStart, 'yyyy/MM/dd'),
+            "作業時間（分）": durationMinutes,
+            // For Generic Tasks (Action Log) fields if needed explicitly, but GAS mapping takes care of it
+            staffName: getStaffById(eventToUpdate.staffId)?.name,
+          });
+          // Add slight delay to allow GAS propagation
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          await refetchOrders();
+        } else { // Legacy Local event
+          const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: finalEnd.toISOString() };
+          setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+          saveLocalEvent(updatedEvent);
+        }
       }
-      return { event: undefined, staff: undefined, customer: undefined, start: undefined, title: '' };
-    };
 
-    const { event, staff, customer, title } = getDialogDetails();
+      if (shouldSendEmail) {
+        let staffName = "";
+        let staffEmail = "";
+        let eventStart = "";
+        let eventEnd = "";
+        let location = "";
 
-    const renderDetailItem = (label: string, value: any) => (
-      value ? <div className="text-sm"><span className="font-semibold text-muted-foreground">{label}:</span> {String(value)}</div> : null
-    );
+        if (dialogState.mode === 'new') {
+          const staff = getStaffById(dialogState.staffId);
+          staffName = staff?.name || "";
+          staffEmail = staff?.email || "";
+          eventStart = newStart.toISOString();
+          eventEnd = newEnd.toISOString();
+          location = ""; // New generic event no location
+        } else if (dialogState.mode === 'edit') {
+          const event = dialogState.event;
+          const staff = getStaffById(event.staffId);
+          staffName = staff?.name || "";
+          staffEmail = staff?.email || "";
+          eventStart = newStart.toISOString();
+          eventEnd = newEnd.toISOString();
+          location = getCustomerByCode(event.locationId)?.address || "";
+        }
 
-    const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
-    const sensors = useSensors(
-      useSensor(PointerSensor, {
-        activationConstraint: {
-          distance: 5,
-        },
-      })
-    );
+        if (!staffEmail) {
+          toast({ variant: 'destructive', title: '送信エラー', description: '担当者のメールアドレスが登録されていません。' });
+        } else {
+          try {
+            const result = await sendIcsEmail({
+              gasUrl: ORDER_GAS_URL,
+              staffName: staffName,
+              staffEmail: staffEmail,
+              title: editedEventDetails.title,
+              description: editedEventDetails.description,
+              startTime: eventStart,
+              endTime: eventEnd,
+              location: location,
+              isUpdate: dialogState.mode === 'edit'
+            });
 
-    if (!isClient) {
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>スケジュール</CardTitle>
-            <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-center h-64"><p>Loading schedule...</p></div>
-          </CardContent>
-        </Card>
-      );
+            if (result.status === 'success') {
+              toast({ title: 'メール送信成功', description: 'スタッフにメールを送信しました。' });
+            } else {
+              toast({ variant: 'destructive', title: 'メール送信エラー', description: result.message });
+            }
+          } catch (e: any) {
+            toast({ variant: 'destructive', title: 'メール送信エラー', description: e.message });
+          }
+        }
+      }
+
+      setDialogState({ mode: 'closed' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });
+    } finally {
+      setIsSaving(false);
     }
+  };
 
+
+  const handleDeleteEvent = async () => {
+    if (dialogState.mode !== 'details' && dialogState.mode !== 'edit') return;
+
+    setIsSaving(true);
+    try {
+      const eventToDelete = dialogState.event;
+
+      if (eventToDelete.rawOrderId) {
+        await unassignTask(eventToDelete);
+      } else {
+        setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+        deleteLocalEvent(eventToDelete.id);
+        toast({ title: '予定を削除しました' });
+      }
+
+      setDialogState({ mode: 'closed' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '削除エラー', description: `削除に失敗しました: ${e.message}` });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSendIcs = async (event: WithId<ScheduleEvent>) => {
+    const staff = getStaffById(event.staffId);
+    if (!staff) {
+      toast({ variant: 'destructive', title: 'エラー', description: '担当者が見つかりません。' });
+      return;
+    }
+    try {
+      const result = await sendIcsEmail({
+        gasUrl: ORDER_GAS_URL,
+        staffName: staff.name,
+        staffEmail: staff.email || '',
+        title: event.title,
+        description: `顧客: ${findKey(event.raw, ['お取引先名', '店舗']) || 'N/A'}\n住所: ${findKey(event.raw, ['住所']) || 'N/A'}`,
+        startTime: event.start as string,
+        endTime: event.end as string,
+        location: findKey(event.raw, ['住所']) || '',
+        isUpdate: false,
+      });
+      if (result.status === 'error') throw new Error(result.message);
+
+      toast({ title: 'メール送信成功', description: `${staff.name}にiCalメールを送信しました。` });
+      setDialogState({ mode: 'closed' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'メール送信エラー', description: e.message });
+    }
+  };
+
+  const getDialogDetails = () => {
+    if (dialogState.mode === 'details') {
+      const { event } = dialogState;
+      const staff = getStaffById(event.staffId);
+      const customer = getCustomerByCode(event.locationId);
+      return { event, staff, customer, title: '受注詳細' };
+    }
+    if (dialogState.mode === 'edit') {
+      const { event } = dialogState;
+      const staff = getStaffById(event.staffId);
+      const customer = getCustomerByCode(event.locationId);
+      return { event, staff, customer, title: '予定の編集' };
+    }
+    if (dialogState.mode === 'new') {
+      const staff = getStaffById(dialogState.staffId);
+      return { staff, start: dialogState.start, title: '新規予定の作成' };
+    }
+    return { event: undefined, staff: undefined, customer: undefined, start: undefined, title: '' };
+  };
+
+  const { event, staff, customer, title } = getDialogDetails();
+
+  const renderDetailItem = (label: string, value: any) => (
+    value ? <div className="text-sm"><span className="font-semibold text-muted-foreground">{label}:</span> {String(value)}</div> : null
+  );
+
+  const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
+  if (!isClient) {
     return (
-      <ScheduleViewContext.Provider value={contextValue}>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={pointerWithin}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
+      <Card>
+        <CardHeader>
+          <CardTitle>スケジュール</CardTitle>
+          <CardDescription>各スタッフのタイムライン形式のスケジュールです。</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center h-64"><p>Loading schedule...</p></div>
+        </CardContent>
+      </Card>
+    );
+  }
 
-          <TooltipProvider>
-            {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
-            <div className="space-y-1" style={{ maxWidth: `${TOTAL_TIMELINE_WIDTH + 2}px` }}>
-              {/* Emergency Notification Banner */}
-              {emergencyNotifications.length > 0 && (
-                <div className="w-full bg-red-600/90 text-white px-4 py-2 mb-2 rounded-md shadow-md animate-pulse relative z-50">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2 font-bold text-lg">
-                      <span>⚠️ 緊急連絡あり</span>
-                    </div>
-                    <div className="flex flex-col gap-2 pl-4">
-                      {emergencyNotifications.map((notification, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-white/10 p-2 rounded">
-                          <span className="font-bold flex-1">{notification.staffName}: {notification.message}</span>
-                          <div className="flex gap-2 shrink-0">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="bg-white text-red-600 hover:bg-gray-100 border-none"
-                              onClick={() => openReplyDialog(notification)}
-                            >
-                              返信
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-white text-blue-600 bg-white hover:bg-gray-100 border-none"
-                              onClick={() => handleClearEmergency(notification)}
-                            >
-                              解除
-                            </Button>
-                          </div>
+  return (
+    <ScheduleViewContext.Provider value={contextValue}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+
+        <TooltipProvider>
+          {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
+          <div className="space-y-1" style={{ maxWidth: `${TOTAL_TIMELINE_WIDTH + 2}px` }}>
+            {/* Emergency Notification Banner */}
+            {emergencyNotifications.length > 0 && (
+              <div className="w-full bg-red-600/90 text-white px-4 py-2 mb-2 rounded-md shadow-md animate-pulse relative z-50">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 font-bold text-lg">
+                    <span>⚠️ 緊急連絡あり</span>
+                  </div>
+                  <div className="flex flex-col gap-2 pl-4">
+                    {emergencyNotifications.map((notification, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-white/10 p-2 rounded">
+                        <span className="font-bold flex-1">{notification.staffName}: {notification.message}</span>
+                        <div className="flex gap-2 shrink-0">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="bg-white text-red-600 hover:bg-gray-100 border-none"
+                            onClick={() => openReplyDialog(notification)}
+                          >
+                            返信
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-white text-blue-600 bg-white hover:bg-gray-100 border-none"
+                            onClick={() => handleClearEmergency(notification)}
+                          >
+                            解除
+                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Reply Dialog */}
-              <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>緊急連絡への返信</DialogTitle>
-                    <DialogDescription>
-                      スタッフ {targetEmergencyEvent?.staffName} のスケジュールコメントに返信を追記します。
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="py-4">
-                    <Label htmlFor="reply-message">メッセージ</Label>
-                    <Textarea
-                      id="reply-message"
-                      value={replyMessage}
-                      onChange={(e) => setReplyMessage(e.target.value)}
-                      placeholder="了解しました。すぐに向かいます。"
-                      className="mt-2"
-                    />
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setReplyDialogOpen(false)}>キャンセル</Button>
-                    <Button onClick={handleSendReply}>送信</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-              <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-20 py-1">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-                  <div className="md:col-span-3">
-                    <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} onDoubleClickOrder={(order) => setDialogState({ mode: 'order-details', order })} />
-                  </div>
-                  <div className="md:col-span-2">
-                    <GenericTasks />
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
+            )}
 
-              <div>
-                <div>
-                  <ScrollArea className="w-full border rounded-md h-[calc(100vh-200px)]">
-                    {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
-                    <div className="relative" style={{ width: `${TOTAL_TIMELINE_WIDTH}px` }}>
-
-                      {/* Header Row - Now inside ScrollArea for perfect alignment */}
-                      <div className="sticky top-0 z-40 flex h-[34px] border-b bg-background/95 backdrop-blur-sm">
-                        <div className="sticky left-0 z-50 flex-shrink-0 font-semibold p-2 border-r bg-background w-[144px]">スタッフ</div>
-                        <div className="relative flex-1 h-full">
-                          {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                            // eslint-disable-next-line
-                            <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
-                              <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="sticky right-0 z-50 flex-shrink-0 font-semibold p-2 border-l bg-background w-[120px]">ステータス</div>
-                      </div>
-
-                      <div className="relative space-y-2 pb-2">
-                        {isToday(currentDate) && (
-                          // eslint-disable-next-line
-                          <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
-                            <TimeIndicator />
-                          </div>
-                        )}
-                        {staffData?.map((staff) => {
-                          const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                          const status = statuses.find(s => s.staffId === staff.id);
-                          return (
-                            <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} isToday={isToday(currentDate)} />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </ScrollArea>
+            {/* Reply Dialog */}
+            <Dialog open={replyDialogOpen} onOpenChange={setReplyDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>緊急連絡への返信</DialogTitle>
+                  <DialogDescription>
+                    スタッフ {targetEmergencyEvent?.staffName} のスケジュールコメントに返信を追記します。
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                  <Label htmlFor="reply-message">メッセージ</Label>
+                  <Textarea
+                    id="reply-message"
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder="了解しました。すぐに向かいます。"
+                    className="mt-2"
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setReplyDialogOpen(false)}>キャンセル</Button>
+                  <Button onClick={handleSendReply}>送信</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-20 py-1">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+                <div className="md:col-span-3">
+                  <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} onDoubleClickOrder={(order) => setDialogState({ mode: 'order-details', order })} />
+                </div>
+                <div className="md:col-span-2">
+                  <GenericTasks />
                 </div>
               </div>
             </div>
 
-            <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
-              <DialogContent className={cn(dialogState.mode === 'details' && "max-w-xl")}>
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    {dialogState.mode === 'details' ? '受注詳細' : dialogState.mode === 'edit' ? '予定の編集' : dialogState.mode === 'order-details' ? '未割当オーダー詳細' : '新規予定の作成'}
-                    {(dialogState.mode === 'details') && (
-                      <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
-                        if (dialogState.mode === 'details') {
-                          setDialogState({ mode: 'edit', event: dialogState.event })
-                        }
-                      }
-                      }>
-                        <Pencil className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                    )}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {dialogState.mode === 'details' ? 'スプレッドシートから取得した受注の詳細情報です。' :
-                      dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' :
-                        dialogState.mode === 'order-details' ? '未割当オーダーの詳細情報です。' : '新しい予定の詳細を入力してください。'
-                    }
-                  </DialogDescription>
-                </DialogHeader>
-                {(dialogState.mode === 'details' || dialogState.mode === 'edit') && event ? (
-                  <>
-                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                      {/* Details section */}
-                      {dialogState.mode === 'details' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
-                          {renderDetailItem('担当者', staff?.name)}
-                          {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
-                          {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
-                          {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
-                          {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
-                          {renderDetailItem('車名', findKey(event.raw, ['車名']))}
-                          {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
-                          {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
-                          {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
-                          {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
-                          {renderDetailItem('品名', findKey(event.raw, ['品名']))}
-                          {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
-                          {renderDetailItem('本数', findKey(event.raw, ['本数']))}
-                          {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
-                          {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
-                          {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
-                        </div>
-                      )}
+            <div>
+              <div>
+                <ScrollArea className="w-full border rounded-md h-[calc(100vh-200px)]">
+                  {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
+                  <div className="relative" style={{ width: `${TOTAL_TIMELINE_WIDTH}px` }}>
 
-                      {/* Edit form */}
-                      <div className="grid gap-4 pt-4 border-t">
-                        <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
-                        {!event.rawOrderId && (
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="title" className="text-right">タスク名</Label>
-                            <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, title: e.target.value }))} className="col-span-3" placeholder="例：定期メンテナンス" />
+                    {/* Header Row - Now inside ScrollArea for perfect alignment */}
+                    <div className="sticky top-0 z-40 flex h-[34px] border-b bg-background/95 backdrop-blur-sm">
+                      <div className="sticky left-0 z-50 flex-shrink-0 font-semibold p-2 border-r bg-background w-[144px]">スタッフ</div>
+                      <div className="relative flex-1 h-full">
+                        {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
+                          // eslint-disable-next-line
+                          <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
+                            <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
                           </div>
-                        )}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label htmlFor="start-time">開始時間</Label>
-                            <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, startTime: e.target.value }))} />
-                          </div>
-                          <div>
-                            <Label htmlFor="end-time">終了時間</Label>
-                            <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, endTime: e.target.value }))} />
-                          </div>
-                        </div>
+                        ))}
                       </div>
+                      <div className="sticky right-0 z-50 flex-shrink-0 font-semibold p-2 border-l bg-background w-[120px]">ステータス</div>
                     </div>
 
-                    <DialogFooter className="sm:justify-between pt-4 border-t">
-                      <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" onClick={() => handleSaveEvent(true)} disabled={isSaving}>
-                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                          {isSaving ? '送信中...' : '保存して送信'}
-                        </Button>
-                        <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
-                          {isSaving ? '処理中...' : '未割当に戻す'}
-                        </Button>
+                    <div className="relative space-y-2 pb-2">
+                      {isToday(currentDate) && (
+                        // eslint-disable-next-line
+                        <div className="absolute top-0 h-full pointer-events-none z-10" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
+                          <TimeIndicator />
+                        </div>
+                      )}
+                      {staffData?.map((staff) => {
+                        const events = dailySchedule.filter((e) => e.staffId === staff.id);
+                        const status = statuses.find(s => s.staffId === staff.id);
+                        return (
+                          <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} isToday={isToday(currentDate)} />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+          </div>
+
+          <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
+            <DialogContent className={cn(dialogState.mode === 'details' && "max-w-xl")}>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {dialogState.mode === 'details' ? '受注詳細' : dialogState.mode === 'edit' ? '予定の編集' : dialogState.mode === 'order-details' ? '未割当オーダー詳細' : '新規予定の作成'}
+                  {(dialogState.mode === 'details') && (
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
+                      if (dialogState.mode === 'details') {
+                        setDialogState({ mode: 'edit', event: dialogState.event })
+                      }
+                    }
+                    }>
+                      <Pencil className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  )}
+                </DialogTitle>
+                <DialogDescription>
+                  {dialogState.mode === 'details' ? 'スプレッドシートから取得した受注の詳細情報です。' :
+                    dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' :
+                      dialogState.mode === 'order-details' ? '未割当オーダーの詳細情報です。' : '新しい予定の詳細を入力してください。'
+                  }
+                </DialogDescription>
+              </DialogHeader>
+              {(dialogState.mode === 'details' || dialogState.mode === 'edit') && event ? (
+                <>
+                  <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                    {/* Details section */}
+                    {dialogState.mode === 'details' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
+                        {renderDetailItem('担当者', staff?.name)}
+                        {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
+                        {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
+                        {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
+                        {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
+                        {renderDetailItem('車名', findKey(event.raw, ['車名']))}
+                        {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
+                        {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
+                        {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
+                        {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
+                        {renderDetailItem('品名', findKey(event.raw, ['品名']))}
+                        {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
+                        {renderDetailItem('本数', findKey(event.raw, ['本数']))}
+                        {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
+                        {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
+                        {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
                       </div>
-                      <div className='flex gap-2 mt-4 sm:mt-0'>
-                        <DialogClose asChild><Button variant="ghost" disabled={isSaving}>キャンセル</Button></DialogClose>
-                        <Button onClick={() => handleSaveEvent(false)} disabled={isSaving}>
-                          {isSaving ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              保存中...
-                            </>
-                          ) : '保存'}
-                        </Button>
-                      </div>
-                    </DialogFooter>
-                  </>
-                ) : (dialogState.mode === 'new') ? (
-                  <>
-                    <div className="grid gap-4 py-4">
+                    )}
+
+                    {/* Edit form */}
+                    <div className="grid gap-4 pt-4 border-t">
                       <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="title" className="text-right">タスク名</Label>
-                        <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, title: e.target.value }))} className="col-span-3" placeholder="例：定期メンテナンス" />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="description" className="text-right">詳細</Label>
-                        <Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, description: e.target.value }))} className="col-span-3" placeholder="予定の詳細やメモ" />
-                      </div>
+                      {!event.rawOrderId && (
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="title" className="text-right">タスク名</Label>
+                          <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, title: e.target.value }))} className="col-span-3" placeholder="例：定期メンテナンス" />
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <Label htmlFor="start-time">開始時間</Label>
@@ -1349,232 +1300,280 @@ export function ScheduleView({
                         </div>
                       </div>
                     </div>
-                    <DialogFooter className="sm:justify-between">
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => handleSaveEvent(true)} disabled={isSaving}>
-                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                          {isSaving ? '送信中...' : '保存して送信'}
-                        </Button>
+                  </div>
+
+                  <DialogFooter className="sm:justify-between pt-4 border-t">
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" onClick={() => handleSaveEvent(true)} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                        {isSaving ? '送信中...' : '保存して送信'}
+                      </Button>
+                      <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
+                        {isSaving ? '処理中...' : '未割当に戻す'}
+                      </Button>
+                    </div>
+                    <div className='flex gap-2 mt-4 sm:mt-0'>
+                      <DialogClose asChild><Button variant="ghost" disabled={isSaving}>キャンセル</Button></DialogClose>
+                      <Button onClick={() => handleSaveEvent(false)} disabled={isSaving}>
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            保存中...
+                          </>
+                        ) : '保存'}
+                      </Button>
+                    </div>
+                  </DialogFooter>
+                </>
+              ) : (dialogState.mode === 'new') ? (
+                <>
+                  <div className="grid gap-4 py-4">
+                    <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="title" className="text-right">タスク名</Label>
+                      <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, title: e.target.value }))} className="col-span-3" placeholder="例：定期メンテナンス" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                      <Label htmlFor="description" className="text-right">詳細</Label>
+                      <Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, description: e.target.value }))} className="col-span-3" placeholder="予定の詳細やメモ" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="start-time">開始時間</Label>
+                        <Input id="start-time" type="time" value={editedEventDetails.startTime} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, startTime: e.target.value }))} />
                       </div>
-                      <div className="flex gap-2 mt-4 sm:mt-0">
-                        <DialogClose asChild><Button variant="ghost" disabled={isSaving}>キャンセル</Button></DialogClose>
-                        <Button onClick={() => handleSaveEvent(false)} disabled={isSaving}>
-                          {isSaving ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              保存中...
-                            </>
-                          ) : '保存'}
-                        </Button>
-                      </div>
-                    </DialogFooter>
-                  </>
-                ) : (dialogState.mode === 'order-details') ? (
-                  <>
-                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
-                        {renderDetailItem('受注ID', dialogState.order.id)}
-                        {renderDetailItem('お取引先名', findKey(dialogState.order.raw, ['お取引先名', '店舗']))}
-                        {renderDetailItem('機材有無', findKey(dialogState.order.raw, ['機材有無']))}
-                        {renderDetailItem('作業予定日', findKey(dialogState.order.raw, ['作業予定日']))}
-                        {renderDetailItem('予定時間', formatTime(findKey(dialogState.order.raw, ['予定時間', 'チップ配置作業予定'])))}
-                        {renderDetailItem('車名', findKey(dialogState.order.raw, ['車名']))}
-                        {renderDetailItem('登録ナンバー', findKey(dialogState.order.raw, ['登録ナンバー(下４桁)']))}
-                        {renderDetailItem('入庫状況', findKey(dialogState.order.raw, ['入庫状況']))}
-                        {renderDetailItem('タイヤ品番', findKey(dialogState.order.raw, ['タイヤ品番']))}
-                        {renderDetailItem('タイヤサイズ', findKey(dialogState.order.raw, ['タイヤサイズ']))}
-                        {renderDetailItem('品名', findKey(dialogState.order.raw, ['品名']))}
-                        {renderDetailItem('作業内容', findKey(dialogState.order.raw, ['作業内容']))}
-                        {renderDetailItem('本数', findKey(dialogState.order.raw, ['本数']))}
-                        {renderDetailItem('タイヤ手配状況', findKey(dialogState.order.raw, ['タイヤ手配状況']))}
-                        {renderDetailItem('廃タイヤ処分', findKey(dialogState.order.raw, ['廃タイヤ処分']))}
+                      <div>
+                        <Label htmlFor="end-time">終了時間</Label>
+                        <Input id="end-time" type="time" value={editedEventDetails.endTime} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, endTime: e.target.value }))} />
                       </div>
                     </div>
-                    <DialogFooter className="sm:justify-between">
-                      <div className="flex gap-2"></div>
-                      <DialogClose asChild><Button variant="ghost">閉じる</Button></DialogClose>
-                    </DialogFooter>
-                  </>
-                ) : null}
-              </DialogContent>
-            </Dialog>
-            <RenderDragOverlay />
-          </TooltipProvider>
-        </DndContext>
-      </ScheduleViewContext.Provider >
-    );
-  }
+                  </div>
+                  <DialogFooter className="sm:justify-between">
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => handleSaveEvent(true)} disabled={isSaving}>
+                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                        {isSaving ? '送信中...' : '保存して送信'}
+                      </Button>
+                    </div>
+                    <div className="flex gap-2 mt-4 sm:mt-0">
+                      <DialogClose asChild><Button variant="ghost" disabled={isSaving}>キャンセル</Button></DialogClose>
+                      <Button onClick={() => handleSaveEvent(false)} disabled={isSaving}>
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            保存中...
+                          </>
+                        ) : '保存'}
+                      </Button>
+                    </div>
+                  </DialogFooter>
+                </>
+              ) : (dialogState.mode === 'order-details') ? (
+                <>
+                  <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
+                      {renderDetailItem('受注ID', dialogState.order.id)}
+                      {renderDetailItem('お取引先名', findKey(dialogState.order.raw, ['お取引先名', '店舗']))}
+                      {renderDetailItem('機材有無', findKey(dialogState.order.raw, ['機材有無']))}
+                      {renderDetailItem('作業予定日', findKey(dialogState.order.raw, ['作業予定日']))}
+                      {renderDetailItem('予定時間', formatTime(findKey(dialogState.order.raw, ['予定時間', 'チップ配置作業予定'])))}
+                      {renderDetailItem('車名', findKey(dialogState.order.raw, ['車名']))}
+                      {renderDetailItem('登録ナンバー', findKey(dialogState.order.raw, ['登録ナンバー(下４桁)']))}
+                      {renderDetailItem('入庫状況', findKey(dialogState.order.raw, ['入庫状況']))}
+                      {renderDetailItem('タイヤ品番', findKey(dialogState.order.raw, ['タイヤ品番']))}
+                      {renderDetailItem('タイヤサイズ', findKey(dialogState.order.raw, ['タイヤサイズ']))}
+                      {renderDetailItem('品名', findKey(dialogState.order.raw, ['品名']))}
+                      {renderDetailItem('作業内容', findKey(dialogState.order.raw, ['作業内容']))}
+                      {renderDetailItem('本数', findKey(dialogState.order.raw, ['本数']))}
+                      {renderDetailItem('タイヤ手配状況', findKey(dialogState.order.raw, ['タイヤ手配状況']))}
+                      {renderDetailItem('廃タイヤ処分', findKey(dialogState.order.raw, ['廃タイヤ処分']))}
+                    </div>
+                  </div>
+                  <DialogFooter className="sm:justify-between">
+                    <div className="flex gap-2"></div>
+                    <DialogClose asChild><Button variant="ghost">閉じる</Button></DialogClose>
+                  </DialogFooter>
+                </>
+              ) : null}
+            </DialogContent>
+          </Dialog>
+          <RenderDragOverlay />
+        </TooltipProvider>
+      </DndContext>
+    </ScheduleViewContext.Provider >
+  );
+}
 
-  interface StaffRowProps {
-    staff: WithId<Staff>;
-    events: WithId<ScheduleEvent>[];
-    status?: StaffStatus;
-    getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
-    isOver: boolean;
-    onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
-    onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
-    isToday: boolean;
-  }
+interface StaffRowProps {
+  staff: WithId<Staff>;
+  events: WithId<ScheduleEvent>[];
+  status?: StaffStatus;
+  getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
+  isOver: boolean;
+  onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
+  onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
+  isToday: boolean;
+}
 
-  const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, isToday }) => {
-    const { setNodeRef } = useDroppable({ id: staff.id });
-    const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, isToday }) => {
+  const { setNodeRef } = useDroppable({ id: staff.id });
+  const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
 
-    const emergencyEvent = events.find(e => {
-      const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
-      return comment.includes('【緊急】');
-    });
+  const emergencyEvent = events.find(e => {
+    const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
+    return comment.includes('【緊急】');
+  });
 
-    const emergencyMessage = emergencyEvent ? findKey(emergencyEvent.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) : '';
+  const emergencyMessage = emergencyEvent ? findKey(emergencyEvent.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) : '';
 
-    return (
-      <div className={cn("flex relative h-14 border-b", areaBgClass)}>
-        {emergencyEvent && emergencyMessage && (
-          <div className="absolute inset-0 z-[60] bg-red-600/90 flex items-center justify-center px-4 animate-pulse pointer-events-none">
-            <span className="text-white font-bold text-lg flex items-center gap-2 drop-shadow-md">
-              ⚠️ {emergencyMessage} (担当: {staff.name})
-            </span>
-          </div>
-        )}
-        <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit w-[144px]")}>
-          <div className="font-semibold flex items-center gap-2 w-full truncate">
-            {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
-            <div className='w-2 h-8 rounded-full' style={{ backgroundColor: staff.color }}></div>
-            <span className='truncate flex-1'>{staff.name}</span>
-          </div>
+  return (
+    <div className={cn("flex relative h-14 border-b", areaBgClass)}>
+      {emergencyEvent && emergencyMessage && (
+        <div className="absolute inset-0 z-[60] bg-red-600/90 flex items-center justify-center px-4 animate-pulse pointer-events-none">
+          <span className="text-white font-bold text-lg flex items-center gap-2 drop-shadow-md">
+            ⚠️ {emergencyMessage} (担当: {staff.name})
+          </span>
         </div>
-        <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
-          <div className="absolute top-0 left-0 h-full w-full">
-            {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)} />))}
-          </div>
-        </div>
-        <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[120px]")}>
-          {status && isToday && (<div className="text-xs text-center font-medium">{status.status}</div>)}
+      )}
+      <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit w-[144px]")}>
+        <div className="font-semibold flex items-center gap-2 w-full truncate">
+          {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
+          <div className='w-2 h-8 rounded-full' style={{ backgroundColor: staff.color }}></div>
+          <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
-    )
+      <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
+        <div className="absolute top-0 left-0 h-full w-full">
+          {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)} />))}
+        </div>
+      </div>
+      <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[120px]")}>
+        {status && isToday && (<div className="text-xs text-center font-medium">{status.status}</div>)}
+      </div>
+    </div>
+  )
+};
+
+interface DraggableEventProps {
+  event: WithId<ScheduleEvent>;
+  staff: WithId<Staff>;
+  getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
+  onDoubleClick: () => void;
+  isOverlay?: boolean;
+}
+
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, isOverlay }) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: event.id, data: event });
+  const { left, width } = getEventDimensions(event.start, event.end);
+
+  const style: React.CSSProperties = isOverlay ?
+    {} :
+    {
+      left: `${left}px`,
+      width: `${width}px`,
+      opacity: isDragging ? 0 : 1,
+      position: 'absolute',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      zIndex: 50,
+    };
+
+  const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
+
+  const isTravelEvent = event.title?.startsWith('移動');
+
+  const divStyle: React.CSSProperties = { backgroundColor: staff.color || 'hsl(var(--primary))' };
+
+  let textColorClass = getContrastingTextColor(staff.color || 'hsl(var(--primary))') === '#FFFFFF' ? 'text-white' : 'text-black';
+
+  if (isTravelEvent) {
+    // Lighten the staff color to make it look "thinner" or "mixed with white"
+    const lightenedColor = lightenColor(staff.color || 'hsl(var(--primary))', 0.6);
+    divStyle.backgroundColor = lightenedColor;
+    // Recalculate contrast for the new light background (likely needs black text)
+    textColorClass = getContrastingTextColor(lightenedColor) === '#FFFFFF' ? 'text-white' : 'text-black';
+  }
+
+  if (event.title === '業務') {
+    divStyle.backgroundColor = 'rgb(156 163 175)';
+    textColorClass = 'text-white';
+  } else if (event.title === '休憩') {
+    divStyle.backgroundColor = 'rgb(34 197 94)';
+    textColorClass = 'text-white';
+  }
+
+  const [line1, ...rest] = (event.title || '').split('\n');
+  const line2 = rest.join('\n');
+  const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
+
+  // Get equipment status and other details from raw order data
+  const getEquipmentSymbol = (status: string | undefined): string => {
+    if (!status || status.trim() === '') return '×';
+    if (status === '有' || status.includes('有')) return '○';
+    if (status === '無' || status.includes('無')) return '×';
+    if (status === '△' || status.includes('△')) return '△';
+    return '×';
   };
 
-  interface DraggableEventProps {
-    event: WithId<ScheduleEvent>;
-    staff: WithId<Staff>;
-    getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
-    onDoubleClick: () => void;
-    isOverlay?: boolean;
-  }
+  const formatHonsu = (honsu: string | number | undefined): string => {
+    if (honsu === undefined || honsu === null || honsu === '') return '';
+    const str = String(honsu).trim();
+    if (str === '') return '';
+    if (str.endsWith('本')) return str;
+    return `${str}本`;
+  };
 
-  const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, isOverlay }) => {
-    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: event.id, data: event });
-    const { left, width } = getEventDimensions(event.start, event.end);
+  const equipmentStatus = event.raw ? findKey(event.raw, ['機材有無']) : undefined;
+  const equipmentSymbol = getEquipmentSymbol(equipmentStatus);
+  const tireSize = event.raw ? findKey(event.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
+  const honsu = event.raw ? findKey(event.raw, ['本数', 'honsu']) : undefined;
+  const customerName = event.raw ? findKey(event.raw, ['お取引先名', '店舗', '取引先']) : (customer?.storeName || line1);
 
-    const style: React.CSSProperties = isOverlay ?
-      {} :
-      {
-        left: `${left}px`,
-        width: `${width}px`,
-        opacity: isDragging ? 0 : 1,
-        position: 'absolute',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        zIndex: 50,
-      };
+  const eventContent = (
+    // eslint-disable-next-line
+    <div
+      className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && !isOverlay && "opacity-50")}
+      style={{ ...divStyle, width: isOverlay ? `${width}px` : '100%' }}
+    >
+      <p className="text-xs font-semibold truncate pointer-events-none">{customerName || line1}</p>
+      <p className="text-xs opacity-80 truncate pointer-events-none">{formatTime(event.start)}</p>
+    </div>
+  );
 
-    const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
-
-    const isTravelEvent = event.title?.startsWith('移動');
-
-    const divStyle: React.CSSProperties = { backgroundColor: staff.color || 'hsl(var(--primary))' };
-
-    let textColorClass = getContrastingTextColor(staff.color || 'hsl(var(--primary))') === '#FFFFFF' ? 'text-white' : 'text-black';
-
-    if (isTravelEvent) {
-      // Lighten the staff color to make it look "thinner" or "mixed with white"
-      const lightenedColor = lightenColor(staff.color || 'hsl(var(--primary))', 0.6);
-      divStyle.backgroundColor = lightenedColor;
-      // Recalculate contrast for the new light background (likely needs black text)
-      textColorClass = getContrastingTextColor(lightenedColor) === '#FFFFFF' ? 'text-white' : 'text-black';
-    }
-
-    if (event.title === '業務') {
-      divStyle.backgroundColor = 'rgb(156 163 175)';
-      textColorClass = 'text-white';
-    } else if (event.title === '休憩') {
-      divStyle.backgroundColor = 'rgb(34 197 94)';
-      textColorClass = 'text-white';
-    }
-
-    const [line1, ...rest] = (event.title || '').split('\n');
-    const line2 = rest.join('\n');
-    const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
-
-    // Get equipment status and other details from raw order data
-    const getEquipmentSymbol = (status: string | undefined): string => {
-      if (!status || status.trim() === '') return '×';
-      if (status === '有' || status.includes('有')) return '○';
-      if (status === '無' || status.includes('無')) return '×';
-      if (status === '△' || status.includes('△')) return '△';
-      return '×';
-    };
-
-    const formatHonsu = (honsu: string | number | undefined): string => {
-      if (honsu === undefined || honsu === null || honsu === '') return '';
-      const str = String(honsu).trim();
-      if (str === '') return '';
-      if (str.endsWith('本')) return str;
-      return `${str}本`;
-    };
-
-    const equipmentStatus = event.raw ? findKey(event.raw, ['機材有無']) : undefined;
-    const equipmentSymbol = getEquipmentSymbol(equipmentStatus);
-    const tireSize = event.raw ? findKey(event.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
-    const honsu = event.raw ? findKey(event.raw, ['本数', 'honsu']) : undefined;
-    const customerName = event.raw ? findKey(event.raw, ['お取引先名', '店舗', '取引先']) : (customer?.storeName || line1);
-
-    const eventContent = (
-      // eslint-disable-next-line
-      <div
-        className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && !isOverlay && "opacity-50")}
-        style={{ ...divStyle, width: isOverlay ? `${width}px` : '100%' }}
-      >
-        <p className="text-xs font-semibold truncate pointer-events-none">{customerName || line1}</p>
-        <p className="text-xs opacity-80 truncate pointer-events-none">{formatTime(event.start)}</p>
-      </div>
-    );
-
-    const tooltipContent = (
-      <div className="space-y-1">
-        <p className="font-bold">
-          {customerName || line1}
-          {(!isTravelEvent && !['移動', '業務', '休憩'].some(t => (event.title || '').includes(t))) && <span className="ml-1">({equipmentSymbol})</span>}
-          <span className="ml-2">{formatTime(event.start)}</span>
+  const tooltipContent = (
+    <div className="space-y-1">
+      <p className="font-bold">
+        {customerName || line1}
+        {(!isTravelEvent && !['移動', '業務', '休憩'].some(t => (event.title || '').includes(t))) && <span className="ml-1">({equipmentSymbol})</span>}
+        <span className="ml-2">{formatTime(event.start)}</span>
+      </p>
+      {!isTravelEvent && (tireSize || honsu) && (
+        <p className="text-sm">
+          {tireSize && <span>{tireSize}</span>}
+          {tireSize && honsu && <span className="mx-1"></span>}
+          {honsu && <span>{formatHonsu(honsu)}</span>}
         </p>
-        {!isTravelEvent && (tireSize || honsu) && (
-          <p className="text-sm">
-            {tireSize && <span>{tireSize}</span>}
-            {tireSize && honsu && <span className="mx-1"></span>}
-            {honsu && <span>{formatHonsu(honsu)}</span>}
-          </p>
-        )}
-      </div>
-    );
+      )}
+    </div>
+  );
 
-    return (
-      // eslint-disable-next-line
-      <div
-        ref={setNodeRef}
-        style={style}
-        {...listeners}
-        {...attributes}
-        onDoubleClick={handleDoubleClick}
-        className={cn("rounded-md flex flex-col justify-center cursor-move h-12", isOverlay ? 'shadow-lg' : '')}
-        data-event-chip="true"
-      >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            {eventContent}
-          </TooltipTrigger>
-          <TooltipContent side="bottom">{tooltipContent}</TooltipContent>
-        </Tooltip>
-      </div>
-    );
-  };
+  return (
+    // eslint-disable-next-line
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      onDoubleClick={handleDoubleClick}
+      className={cn("rounded-md flex flex-col justify-center cursor-move h-12", isOverlay ? 'shadow-lg' : '')}
+      data-event-chip="true"
+    >
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {eventContent}
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{tooltipContent}</TooltipContent>
+      </Tooltip>
+    </div>
+  );
+};
