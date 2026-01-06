@@ -1014,6 +1014,14 @@ export function ScheduleView({
           location = getCustomerByCode(event.locationId)?.address || "";
         }
 
+
+        console.log('Debug Email Check:', {
+          mode: dialogState.mode,
+          staffId: dialogState.mode === 'new' ? dialogState.staffId : (dialogState.mode === 'edit' ? dialogState.event.staffId : 'unknown'),
+          foundStaff: dialogState.mode === 'new' ? getStaffById(dialogState.staffId) : (dialogState.mode === 'edit' ? getStaffById(dialogState.event.staffId) : undefined),
+          email: staffEmail
+        });
+
         if (!staffEmail) {
           toast({ variant: 'destructive', title: '送信エラー', description: '担当者のメールアドレスが登録されていません。' });
         } else {
