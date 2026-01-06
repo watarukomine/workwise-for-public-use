@@ -226,19 +226,24 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
             rawOrderId: order.rawOrderId,
           };
 
-          const travelEvent: WithId<ScheduleEvent> = {
-            ...order,
-            id: `${tripId}-travel`,
-            tripId,
-            title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
-            staffId: staffMember.id,
-            locationId: order.customerCode || '',
-            start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
-            end: scheduledTime.toISOString(),
-            rawOrderId: order.rawOrderId,
-          };
 
-          newScheduleEvents.push(travelEvent, taskEvent);
+          const isGenericTask = order.id.startsWith('task-');
+          if (isGenericTask) {
+            newScheduleEvents.push(taskEvent);
+          } else {
+            const travelEvent: WithId<ScheduleEvent> = {
+              ...order,
+              id: `${tripId}-travel`,
+              tripId,
+              title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
+              staffId: staffMember.id,
+              locationId: order.customerCode || '',
+              start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
+              end: scheduledTime.toISOString(),
+              rawOrderId: order.rawOrderId,
+            };
+            newScheduleEvents.push(travelEvent, taskEvent);
+          }
         }
       }
     }
