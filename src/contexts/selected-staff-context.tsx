@@ -56,7 +56,7 @@ export const fetchStaffDataFromGAS = async (url: string = STAFF_GAS_URL): Promis
       return {
         id: staffId,
         name: findKey(item, ['スタッフ名', 'name']) || 'No Name',
-        email: findKey(item, ['メールアドレス', 'email']) || '',
+        email: findKey(item, ['メールアドレス', 'email', 'e-mail', 'mail', 'Email Address', 'email address']) || '',
         password: findKey(item, ['パスワード', 'password', 'Password']) || '',
         role: getRole(),
         color: assignedColor || fallbackColor,
