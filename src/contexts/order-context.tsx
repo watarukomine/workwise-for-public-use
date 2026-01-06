@@ -62,9 +62,18 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
 
     // 1. Process Staff Status
     // Improve matching: Normalize by removing spaces and lowercasing
-    const normalizeName = (n: string) => n.replace(/\s+/g, '').toLowerCase();
+    const normalizeName = (n: any) => {
+      if (typeof n !== 'string') return '';
+      return n.replace(/\s+/g, '').toLowerCase();
+    };
+
     const staffMember = order.staffName
-      ? allStaff.find(s => normalizeName(s.name) === normalizeName(order.staffName || ''))
+      ? allStaff.find(s => {
+        // Try exact match first for performance/safety
+        if (s.name === order.staffName) return true;
+        // Try normalized match
+        return normalizeName(s.name) === normalizeName(order.staffName);
+      })
       : undefined;
 
     // Debug Log
