@@ -97,6 +97,10 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
         const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
 
         if (!isNaN(lastUpdate.getTime())) {
+          // Define variables needed for logic
+          const status = findKey(rawOrder, ['受注ステータス']) || '待機中';
+          const actionText = order.rawOrderId ? `[${order.rawOrderId}]` : '[汎用タスク]';
+
           // Priority Logic: Active statuses should persist over newer Passive statuses
           // And older Active statuses should restore over current Passive statuses
           const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着'];
