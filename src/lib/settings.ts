@@ -11,19 +11,20 @@
 // Note: These URLs point to the deployed Web App URL of your GAS project.
 // Ensure your GAS project is deployed with "Execute as: Me" and "Who has access: Anyone".
 
-// Unified GAS URL (Assuming all functionalities are now merged into one script)
-const UNIFIED_GAS_URL = 'https://script.google.com/macros/s/AKfycbyuHsz4qyIV44XqD0PqS5gtA4ZLVx46DBJKvs3sMd6b4pIXCwcMiEb0YWUghm7UfoLo/exec';
+// -----------------------------------------------------------------------------
+// GAS (Google Apps Script) API Configuration
+// -----------------------------------------------------------------------------
+// Note: These URLs point to the deployed Web App URL of your GAS project.
+// Ensure your GAS project is deployed with "Execute as: Me" and "Who has access: Anyone".
 
-export const STAFF_GAS_URL = UNIFIED_GAS_URL;
+// Staff Data Script
+export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxGeXICGCJIbu-EuaRINfiVp1UTEz3IO9A2bGP-monXgwIHIv7PRomaFaM-s10KppDWzA/exec';
 
-// Optional: If you have separate scripts for customers, update this accordingly.
-// For now, mapping to the same script if it handles customer logic or if not used differently.
-export const CUSTOMER_GAS_URL = UNIFIED_GAS_URL;
+// Customer Data Script
+export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b1tD4Y489xg0Fz09e84DtDAy_35KhJ_VD4RyJ3J1DavI0B_aZP5ck8hssWPCi/exec';
 
-/**
- * Endpoint for Order-related operations (Get Orders, Update Status, Create Order)
- */
-export const ORDER_GAS_URL = UNIFIED_GAS_URL;
+// Order & Task Management Script (Unified)
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyuHsz4qyIV44XqD0PqS5gtA4ZLVx46DBJKvs3sMd6b4pIXCwcMiEb0YWUghm7UfoLo/exec';
 
 
 // --- スプレッドシート本体のURL ---
