@@ -246,7 +246,40 @@ function createOrder(params) {
       }
     });
 
-    sheet.appendRow(newRow);
+    // Instead of appendRow, find the first available row in Column A (受注ID)
+    // This prevents adding data at the very bottom if there are empty formatted rows.
+    
+    // 1. Get all data in the first column to find the last row with an ID
+    // Assuming "受注ID" is in Column A (Index 0). If headers are dynamic, we find the ID column index first.
+    let idColIndex = -1;
+    headers.forEach((h, i) => {
+      if (String(h).trim() === "受注ID") idColIndex = i;
+    });
+
+    if (idColIndex === -1) {
+       // Fallback if ID column not found in headers (unlikely given previous logic)
+       sheet.appendRow(newRow);
+       return successResponse("注文を登録しました(末尾)。", { orderId: orderId });
+    }
+
+    const colLetter = String.fromCharCode(65 + idColIndex); // 0->A, 1->B... (Works for A-Z)
+    const idColumnValues = sheet.getRange(`${colLetter}2:${colLetter}`).getValues(); // Start from row 2 (skip header)
+    
+    let targetRow = -1;
+    for (let i = 0; i < idColumnValues.length; i++) {
+      if (!idColumnValues[i][0]) {
+        targetRow = i + 2; // +2 because index 0 is valid data from Row 2
+        break;
+      }
+    }
+    
+    if (targetRow === -1) {
+      targetRow = sheet.getLastRow() + 1; // If no empty slot found, append
+    }
+
+    // Write the new row data
+    sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
+    
     return successResponse("注文を登録しました。", { orderId: orderId });
   } catch (error) {
     console.error("createOrder Error:", error);
