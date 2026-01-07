@@ -54,9 +54,9 @@ export function StaffWorkloadChart({ data }: StaffWorkloadChartProps) {
                             contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 'var(--radius)' }}
                         />
                         <Legend />
-                        <Bar dataKey="tasks" name="タスク数" fill="#adfa1d" radius={[4, 4, 0, 0]} barSize={20} />
-                        <Bar dataKey="hours" name="推定稼働(h)" fill="#2563eb" radius={[4, 4, 0, 0]} barSize={20} />
-                        <Bar dataKey="actualHours" name="実稼働(h)" fill="#f97316" radius={[4, 4, 0, 0]} barSize={20} />
+                        <Bar dataKey="tasks" name="タスク数" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={20} />
+                        <Bar dataKey="hours" name="推定稼働(h)" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={20} />
+                        <Bar dataKey="actualHours" name="実稼働(h)" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
                     </BarChart>
                 </ResponsiveContainer>
             </CardContent>
