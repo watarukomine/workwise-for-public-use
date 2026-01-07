@@ -196,29 +196,53 @@ function createOrder(params) {
     const orderId = "ord-" + new Date().getTime(); // Generate unique ID
 
     headers.forEach(header => {
-      switch (header) {
-        case "受注ID": newRow.push(orderId); break;
-        case "顧客コード": newRow.push(params.userCode || ""); break;
-        case "お取引先名": case "店舗": newRow.push(params.storeName || ""); break;
-        case "作業内容": newRow.push(params.workType || ""); break;
-        case "作業予定日": newRow.push(params.scheduledDate || ""); break;
-        case "予定時間": newRow.push(params.scheduledTime || ""); break;
-        case "担当者名": case "担当": newRow.push(params.picName || ""); break;
-        case "注文番号": newRow.push(params.orderNo || ""); break;
-        case "緊急連絡": case "任意コメント": newRow.push(params.comment || ""); break;
-        case "車名": newRow.push(params.carName || ""); break;
-        case "登録ナンバー(下４桁)": newRow.push(params.regNo || ""); break;
-        case "受注ステータス": case "入庫状況": newRow.push(params.status || "入庫待ち"); break;
-        case "タイヤ品番": newRow.push(params.tireNumber || ""); break;
-        case "タイヤサイズ": newRow.push(params.tireSize || ""); break;
-        case "品名": newRow.push(params.productName || ""); break;
-        case "本数": newRow.push(params.quantity || ""); break;
-        case "空気圧センサーパッキン交換": newRow.push(params.sensor || ""); break;
-        case "タイヤ手配状況": newRow.push(params.arrangement || ""); break;
-        case "廃タイヤ処分": newRow.push(params.disposal || ""); break;
-        case "連絡者名": newRow.push(params.contact || ""); break; 
-        case "受信日時": newRow.push(new Date()); break;
-        default: newRow.push("");
+      const h = String(header).trim();
+      
+      // Header Matching Logic
+      if (h === "受注ID") {
+        newRow.push(orderId);
+      } else if (h === "顧客コード" || h === "ユーザーコード") {
+        newRow.push(params.userCode || "");
+      } else if (h === "お取引先名" || h === "店舗" || h === "店舗名") {
+        newRow.push(params.storeName || "");
+      } else if (h === "作業内容" || h === "作業") {
+        newRow.push(params.workType || "");
+      } else if (h === "作業予定日") {
+        newRow.push(params.scheduledDate || "");
+      } else if (h === "予定時間") {
+        newRow.push(params.scheduledTime || "");
+      } else if (h === "担当" || h === "担当者名" || h === "ご担当者様") {
+        newRow.push(params.picName || "");
+      } else if (h === "注文番号" || h.includes("受注No")) {
+        newRow.push(params.orderNo || "");
+      } else if (h === "緊急連絡" || h.includes("任意コメント")) {
+        newRow.push(params.comment || "");
+      } else if (h === "車名") {
+        newRow.push(params.carName || "");
+      } else if (h.includes("登録ナンバー")) {
+        newRow.push(params.regNo || "");
+      } else if (h === "受注ステータス" || h === "入庫状況") {
+        newRow.push(params.status || "入庫待ち");
+      } else if (h === "タイヤ品番") {
+        newRow.push(params.tireNumber || "");
+      } else if (h === "タイヤサイズ") {
+        newRow.push(params.tireSize || "");
+      } else if (h === "品名") {
+        newRow.push(params.productName || "");
+      } else if (h === "本数") {
+        newRow.push(params.quantity || "");
+      } else if (h.includes("センサー")) {
+        newRow.push(params.sensor || "");
+      } else if (h === "タイヤ手配状況" || h === "手配") {
+        newRow.push(params.arrangement || "");
+      } else if (h === "廃タイヤ処分" || h === "廃タイヤ") {
+        newRow.push(params.disposal || "");
+      } else if (h === "連絡者名" || h === "連絡者") {
+        newRow.push(params.contact || "");
+      } else if (h === "受信日時") {
+        newRow.push(new Date());
+      } else {
+        newRow.push(""); // No match
       }
     });
 
