@@ -5,26 +5,25 @@
 
 // 注: これらのURLはサンプルです。実際のGASのデプロイURLやシートのURLに置き換えてください。
 
-// --- データソース (Google Apps Script) ---
+// -----------------------------------------------------------------------------
+// GAS (Google Apps Script) API Configuration
+// -----------------------------------------------------------------------------
+// Note: These URLs point to the deployed Web App URL of your GAS project.
+// Ensure your GAS project is deployed with "Execute as: Me" and "Who has access: Anyone".
+
+// Unified GAS URL (Assuming all functionalities are now merged into one script)
+const UNIFIED_GAS_URL = 'https://script.google.com/macros/s/AKfycbyuHsz4qyIV44XqD0PqS5gtA4ZLVx46DBJKvs3sMd6b4pIXCwcMiEb0YWUghm7UfoLo/exec';
+
+export const STAFF_GAS_URL = UNIFIED_GAS_URL;
+
+// Optional: If you have separate scripts for customers, update this accordingly.
+// For now, mapping to the same script if it handles customer logic or if not used differently.
+export const CUSTOMER_GAS_URL = UNIFIED_GAS_URL;
 
 /**
- * スタッフマスターのデータを取得・更新するためのGoogle Apps ScriptのURL。
- * 主に staff-context.tsx や auth.ts で使用されます。
+ * Endpoint for Order-related operations (Get Orders, Update Status, Create Order)
  */
-export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxGeXICGCJIbu-EuaRINfiVp1UTEz3IO9A2bGP-monXgwIHIv7PRomaFaM-s10KppDWzA/exec';
-
-/**
- * 顧客情報（販売店情報）を取得・更新するためのGoogle Apps ScriptのURL。
- * 主に customer-context.tsx で使用されます。
- */
-export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyLicNq9Lnedl15wcyc5bQymxMoc4G-3ObC6zrXu7NbY-ZK_GFyMYU_m-HQ_q8ZMgMKuQ/exec';
-
-/**
- * 受注情報を取得・更新し、カレンダー連携も行うGoogle Apps ScriptのURL。
- * 主に order-context.tsx や schedule-view.tsx で使用されます。
- */
-// Google Apps Script Web App URL - Deployment ID
-export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbySl2vW3gqVs_ZpURvRpPa7V35OEnZTCRekSVLRCA8v-Qy-0L9uAA5s4bJiXZbtTaRr/exec';
+export const ORDER_GAS_URL = UNIFIED_GAS_URL;
 
 
 // --- スプレッドシート本体のURL ---
