@@ -192,15 +192,51 @@ function createOrder(params) {
     if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
 
     const headers = sheet.getDataRange().getValues()[0];
+    
+    // ---------------------------------------------------------
+    // 1. Determine Target Row First
+    // ---------------------------------------------------------
+    // We need the target row number to calculate the returned ID (row - 1)
+    // and to decide where to write.
+    
+    let idColIndex = -1;
+    headers.forEach((h, i) => {
+      if (String(h).trim() === "受注ID") idColIndex = i;
+    });
+
+    let targetRow = -1;
+    if (idColIndex !== -1) {
+      const colLetter = String.fromCharCode(65 + idColIndex);
+      const idColumnValues = sheet.getRange(`${colLetter}2:${colLetter}`).getValues();
+      
+      for (let i = 0; i < idColumnValues.length; i++) {
+        // Build logic: exact match empty string to find strict empty cell
+        if (idColumnValues[i][0] === "" || idColumnValues[i][0] === null) {
+          targetRow = i + 2; 
+          break;
+        }
+      }
+    }
+    
+    if (targetRow === -1) {
+      targetRow = sheet.getLastRow() + 1;
+    }
+
+    // ---------------------------------------------------------
+    // 2. Prepare Data
+    // ---------------------------------------------------------
     const newRow = [];
-    const orderId = "ord-" + new Date().getTime(); // Generate unique ID
+    // User wants ID to be determined by formula =ROW()-1
+    // So for the backend response, we estimate it as targetRow - 1
+    // (Actual cell will contain the formula)
+    const numericId = targetRow - 1; 
 
     headers.forEach(header => {
       const h = String(header).trim();
       
       // Header Matching Logic
       if (h === "受注ID") {
-        newRow.push(orderId);
+        newRow.push("=ROW()-1"); // User request: Use formula
       } else if (h === "顧客コード" || h === "ユーザーコード") {
         newRow.push(params.userCode || "");
       } else if (h === "お取引先名" || h === "店舗" || h === "店舗名") {
@@ -242,45 +278,14 @@ function createOrder(params) {
       } else if (h === "受信日時") {
         newRow.push(new Date());
       } else {
-        newRow.push(""); // No match
+        newRow.push(""); 
       }
     });
-
-    // Instead of appendRow, find the first available row in Column A (受注ID)
-    // This prevents adding data at the very bottom if there are empty formatted rows.
-    
-    // 1. Get all data in the first column to find the last row with an ID
-    // Assuming "受注ID" is in Column A (Index 0). If headers are dynamic, we find the ID column index first.
-    let idColIndex = -1;
-    headers.forEach((h, i) => {
-      if (String(h).trim() === "受注ID") idColIndex = i;
-    });
-
-    if (idColIndex === -1) {
-       // Fallback if ID column not found in headers (unlikely given previous logic)
-       sheet.appendRow(newRow);
-       return successResponse("注文を登録しました(末尾)。", { orderId: orderId });
-    }
-
-    const colLetter = String.fromCharCode(65 + idColIndex); // 0->A, 1->B... (Works for A-Z)
-    const idColumnValues = sheet.getRange(`${colLetter}2:${colLetter}`).getValues(); // Start from row 2 (skip header)
-    
-    let targetRow = -1;
-    for (let i = 0; i < idColumnValues.length; i++) {
-      if (!idColumnValues[i][0]) {
-        targetRow = i + 2; // +2 because index 0 is valid data from Row 2
-        break;
-      }
-    }
-    
-    if (targetRow === -1) {
-      targetRow = sheet.getLastRow() + 1; // If no empty slot found, append
-    }
 
     // Write the new row data
     sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
     
-    return successResponse("注文を登録しました。", { orderId: orderId });
+    return successResponse("注文を登録しました。", { orderId: numericId });
   } catch (error) {
     console.error("createOrder Error:", error);
     return errorResponse("注文登録エラー: " + error.message);
