@@ -98,7 +98,7 @@ service cloud.firestore {
      * @allow (read, write) - Authenticated users can read/write.
      */
     match /daily_attendance/{date} {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
 
     /**

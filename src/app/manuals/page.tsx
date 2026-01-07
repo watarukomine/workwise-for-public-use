@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, FileText, Settings } from 'lucide-react';
+import { BookOpen, FileText, Settings, Shield } from 'lucide-react';
 import Link from 'next/link';
 
 export default function ManualsPage() {
@@ -27,6 +27,13 @@ export default function ManualsPage() {
             href: '/specifications.pdf',
             icon: Settings,
             color: 'text-gray-500',
+        },
+        {
+            title: 'セキュリティルール仕様書',
+            description: 'データベースのアクセス権限や情報セキュリティの設定に関する詳細ドキュメントです。',
+            href: '/security_rules.pdf',
+            icon: Shield,
+            color: 'text-purple-500',
         },
     ];
 

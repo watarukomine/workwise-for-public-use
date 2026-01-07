@@ -24,6 +24,13 @@ const MANUALS = [
         output: 'FIELD_STAFF_MANUAL.pdf',
         title: 'WorkWise',
         subtitle: '現場スタッフ操作マニュアル'
+    },
+    {
+        id: 'security_rules',
+        input: 'security_rules.md',
+        output: 'security_rules.pdf',
+        title: 'WorkWise',
+        subtitle: 'セキュリティルール仕様書'
     }
 ];
 
