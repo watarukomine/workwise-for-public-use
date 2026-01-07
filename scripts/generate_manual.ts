@@ -3,22 +3,44 @@ import { jsPDF } from 'jspdf';
 import fs from 'fs';
 import path from 'path';
 
-// Define the content from user_manual.md directly or read it
-// Here we read it assuming it's in the root
-const MANUAL_PATH = path.join(process.cwd(), 'user_manual.md');
-const OUTPUT_PATH = path.join(process.cwd(), 'public', 'user_manual.pdf');
+const MANUALS = [
+    {
+        id: 'user_manual',
+        input: 'user_manual.md',
+        output: 'user_manual.pdf',
+        title: 'WorkWise',
+        subtitle: 'ユーザー操作マニュアル'
+    },
+    {
+        id: 'specifications',
+        input: 'specifications.md',
+        output: 'specifications.pdf',
+        title: 'WorkWise',
+        subtitle: 'システム仕様書'
+    },
+    {
+        id: 'field_staff_manual',
+        input: 'FIELD_STAFF_MANUAL.md',
+        output: 'FIELD_STAFF_MANUAL.pdf',
+        title: 'WorkWise',
+        subtitle: '現場スタッフ操作マニュアル'
+    }
+];
+
 const FONT_PATH = path.join(process.cwd(), 'public', 'fonts', 'ipaexg.ttf');
 const LOGO_PATH = path.join(process.cwd(), 'public', 'icons', 'icon-192x192.png');
 
-async function generatePDF() {
-    console.log('Generating PDF...');
+async function generatePDFForManual(config: typeof MANUALS[0]) {
+    console.log(`Generating PDF for ${config.input}...`);
+    const manualPath = path.join(process.cwd(), config.input);
+    const outputPath = path.join(process.cwd(), 'public', config.output);
 
-    if (!fs.existsSync(MANUAL_PATH)) {
-        console.error('user_manual.md not found!');
-        process.exit(1);
+    if (!fs.existsSync(manualPath)) {
+        console.warn(`${config.input} not found! Skipping.`);
+        return;
     }
 
-    const content = fs.readFileSync(MANUAL_PATH, 'utf-8');
+    const content = fs.readFileSync(manualPath, 'utf-8');
     const doc = new jsPDF();
 
     // Add Japanese Font
@@ -28,7 +50,6 @@ async function generatePDF() {
         doc.addFileToVFS('ipaexg.ttf', fontBase64);
         doc.addFont('ipaexg.ttf', 'IPAexGothic', 'normal');
         doc.setFont('IPAexGothic');
-        console.log('Font loaded.');
     } else {
         console.warn('Font file not found at:', FONT_PATH);
     }
@@ -50,18 +71,19 @@ async function generatePDF() {
     // Logo
     if (fs.existsSync(LOGO_PATH)) {
         const logoData = fs.readFileSync(LOGO_PATH);
+        // doc.addImage supports Buffer in Node environment usually, but to be safe with all jspdf versions/types:
         const logoBase64 = logoData.toString('base64');
         const imgWidth = 50;
         const imgHeight = 50;
         const x = (pageWidth - imgWidth) / 2;
-        doc.addImage(logoData, 'PNG', x, 60, imgWidth, imgHeight); // Use Buffer directly if supported or base64
+        doc.addImage(logoData, 'PNG', x, 60, imgWidth, imgHeight);
     }
 
     doc.setFontSize(24);
-    doc.text('WorkWise', pageWidth / 2, 130, { align: 'center' });
+    doc.text(config.title, pageWidth / 2, 130, { align: 'center' });
 
     doc.setFontSize(16);
-    doc.text('ユーザー操作マニュアル', pageWidth / 2, 150, { align: 'center' });
+    doc.text(config.subtitle, pageWidth / 2, 150, { align: 'center' });
 
     doc.setFontSize(10);
     doc.setTextColor(100);
@@ -80,13 +102,20 @@ async function generatePDF() {
         if (line.trim().startsWith('<div') || line.trim().startsWith('</div>') || line.trim().startsWith('<img') || line.trim().startsWith('<h1') || line.trim().startsWith('<p')) {
             continue;
         }
-        if (line.includes('# WorkWise ユーザー操作マニュアル')) {
+
+        // Skip title lines if they match the manual title to avoid duplication
+        // (Simple heuristic: check if line contains the subtitle or main title in H1 format)
+        if (line.includes(`# ${config.title}`) || line.includes(`# ${config.subtitle}`)) {
             inCover = false;
-            // Don't print main title again as we have cover
             continue;
         }
 
-        if (inCover) continue;
+        if (inCover && (line.trim() === '' || line.trim().startsWith('<!--'))) continue;
+
+        // Once we hit non-empty, non-cover content, we are out of cover
+        if (inCover && line.trim() !== '') {
+            inCover = false;
+        }
 
         if (line.trim() === '') {
             y += lineHeight / 2;
@@ -98,7 +127,7 @@ async function generatePDF() {
             checkPageBreak(15);
             y += 5;
             doc.setFontSize(14);
-            doc.setFont('IPAexGothic', 'normal'); // Use normal as we don't have bold font file
+            doc.setFont('IPAexGothic', 'normal');
             doc.text(line.replace('## ', ''), margin, y);
             y += 10;
             doc.setFontSize(10);
@@ -112,14 +141,14 @@ async function generatePDF() {
             doc.setFontSize(10);
         }
         // Lists
-        else if (line.trim().startsWith('- ')) {
+        else if (line.trim().startsWith('- ') || line.trim().startsWith('* ')) {
             checkPageBreak(7);
-            const text = '• ' + line.trim().replace('- ', '').replace(/\*\*/g, '');
+            const text = '• ' + line.trim().replace(/^[-*] /, '').replace(/\*\*/g, '');
             const splitText = doc.splitTextToSize(text, pageWidth - margin * 2 - 5);
             doc.text(splitText, margin + 5, y);
             y += splitText.length * lineHeight;
         }
-        else if (line.trim().startsWith('1. ') || line.trim().startsWith('2. ') || line.trim().startsWith('3. ') || line.trim().startsWith('4. ')) {
+        else if (line.trim().match(/^\d+\. /)) {
             checkPageBreak(7);
             const text = line.trim().replace(/\*\*/g, '');
             const splitText = doc.splitTextToSize(text, pageWidth - margin * 2 - 5);
@@ -136,6 +165,13 @@ async function generatePDF() {
             y += splitText.length * lineHeight;
             doc.setTextColor(0);
         }
+        // Horizontal Rule
+        else if (line.trim() === '---') {
+            checkPageBreak(10);
+            doc.setDrawColor(200);
+            doc.line(margin, y + 2, pageWidth - margin, y + 2);
+            y += 10;
+        }
         // Normal Text
         else {
             checkPageBreak(7);
@@ -147,8 +183,14 @@ async function generatePDF() {
     }
 
     const pdfBytes = doc.output('arraybuffer');
-    fs.writeFileSync(OUTPUT_PATH, Buffer.from(pdfBytes));
-    console.log(`PDF saved to ${OUTPUT_PATH}`);
+    fs.writeFileSync(outputPath, Buffer.from(pdfBytes));
+    console.log(`PDF saved to ${outputPath}`);
 }
 
-generatePDF().catch(console.error);
+async function main() {
+    for (const manual of MANUALS) {
+        await generatePDFForManual(manual);
+    }
+}
+
+main().catch(console.error);

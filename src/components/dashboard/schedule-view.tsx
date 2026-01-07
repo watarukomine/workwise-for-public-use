@@ -622,9 +622,31 @@ export function ScheduleView({
 
     // --- Dropping back to unassigned area ---
     if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
-      if (item.rawOrderId) {
-        await unassignTask(item as WithId<ScheduleEvent>);
+      const scheduleItem = item as WithId<ScheduleEvent>;
+      // Check if it's a real order (has customer code) or a generic task
+      // Real orders should be unassigned (moved to list), Generic tasks should be deleted/cancelled
+      const isRealOrder = !!scheduleItem.customerCode;
+
+      if (scheduleItem.rawOrderId && isRealOrder) {
+        await unassignTask(scheduleItem);
       } else {
+        // Delete generic task (local or synced)
+        // If it sends a rawOrderId, it means it's synced, so we should update status to Cancelled/Deleted in backend too
+        if (scheduleItem.rawOrderId) {
+          try {
+            await updateSheetStatus({
+              gasUrl: ORDER_GAS_URL,
+              eventTitle: `(ID: ${scheduleItem.rawOrderId})`,
+              staffName: "",
+              statusValue: "キャンセル", // Treat as cancelled/deleted
+              timestamp: new Date().toISOString(),
+            });
+            await refetchOrders();
+          } catch (e) {
+            console.error("Failed to cancel generic task:", e);
+          }
+        }
+
         setScheduleEvents(prev => prev.filter(e => e.id !== item.id));
         toast({ title: '汎用タスクを削除しました' });
       }
