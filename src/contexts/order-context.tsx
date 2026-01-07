@@ -253,7 +253,14 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
   const unassignedOrders = orders.filter(order => {
     const hasRawOrderId = !!order.rawOrderId;
     const isAlreadyScheduled = order.rawOrderId ? scheduledRawOrderIds.has(order.rawOrderId) : false;
-    if (!hasRawOrderId || isAlreadyScheduled) return false;
+
+    // Filter out Generic Tasks from Unassigned List
+    // Generic tasks (Work, Break, etc.) usually don't have a customerCode.
+    // If it's a "Real Order", it should generally have a customerCode or at least a customerName that isn't just the task name.
+    const isGenericTask = !order.customerCode && ['業務', '休憩', '移動', '研修', '同行', '商談'].some(t => order.taskDetails.includes(t));
+
+    if (!hasRawOrderId || isAlreadyScheduled || isGenericTask) return false;
+
     if (order.staffName && order.scheduledTime) return false;
     // Show undated or dated-but-unassigned
     return true;
