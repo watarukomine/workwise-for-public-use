@@ -189,7 +189,7 @@ function CheckInClient() {
         let message = '';
         switch (err.code) {
           case err.PERMISSION_DENIED:
-            message = '位置情報の利用が許可されていません。ブラウザの設定を確認してください。';
+            message = '位置情報の利用がブロックされています。iPhoneの設定 > プライバシーとセキュリティ > 位置情報サービス > SafariのWebサイト から、このサイトの権限を「使用中のみ許可」に変更してください。';
             break;
           case err.POSITION_UNAVAILABLE:
             message = '現在地の取得に失敗しました。';
