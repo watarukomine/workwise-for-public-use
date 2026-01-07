@@ -262,10 +262,10 @@ export function AnalyticsDashboard() {
     const dailyTrendData = useMemo(() => {
         // Initialize all days in month
         const daysInMonth = new Date(filteredData.end).getDate(); // Last day number
-        const map = new Map<number, { count: number; hours: number; dateStr: string }>();
+        const map = new Map<number, { count: number; hours: number; actualHours: number; dateStr: string }>();
 
         for (let i = 1; i <= daysInMonth; i++) {
-            map.set(i, { count: 0, hours: 0, dateStr: `${i}` });
+            map.set(i, { count: 0, hours: 0, actualHours: 0, dateStr: `${i}` });
         }
 
         filteredData.orders.forEach(order => {
@@ -274,10 +274,28 @@ export function AnalyticsDashboard() {
                 const day = getDate(date);
                 if (map.has(day)) {
                     const current = map.get(day)!;
+
+                    // Scheduled/Estimated Hours
+                    const estimated = (order.estimatedDuration || 60) / 60;
+
+                    // Actual Hours
+                    let actual = 0;
+                    if (order.actualStartTime && order.actualEndTime) {
+                        const start = new Date(order.actualStartTime);
+                        const end = new Date(order.actualEndTime);
+                        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                            const diffMs = end.getTime() - start.getTime();
+                            if (diffMs > 0) {
+                                actual = diffMs / (1000 * 60 * 60);
+                            }
+                        }
+                    }
+
                     map.set(day, {
                         ...current,
                         count: current.count + 1,
-                        hours: current.hours + getOrderDuration(order)
+                        hours: current.hours + estimated,
+                        actualHours: current.actualHours + actual
                     });
                 }
             }
@@ -287,7 +305,8 @@ export function AnalyticsDashboard() {
             date: d.dateStr,
             day: parseInt(d.dateStr), // For sorting/brush
             count: d.count,
-            hours: parseFloat(d.hours.toFixed(1))
+            hours: parseFloat(d.hours.toFixed(1)),
+            actualHours: parseFloat(d.actualHours.toFixed(1))
         }));
     }, [filteredData]);
 
@@ -307,7 +326,8 @@ export function AnalyticsDashboard() {
         const trendSheet = dailyTrendData.map(d => ({
             '日付': `${format(filteredData.start, 'yyyy/MM')}/${d.date}`,
             '受注件数': d.count,
-            '稼働時間(h)': d.hours
+            '予定稼働時間(h)': d.hours,
+            '実作業時間(h)': d.actualHours
         }));
 
         // 3. Shop Distribution

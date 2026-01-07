@@ -20,6 +20,7 @@ interface DailyTrendChartProps {
         day: number;
         count: number;
         hours: number;
+        actualHours: number;
     }[];
 }
 
@@ -54,7 +55,8 @@ export function DailyTrendChart({ data }: DailyTrendChartProps) {
                             />
                             <Legend verticalAlign="top" />
                             <Bar yAxisId="left" dataKey="count" name="受注件数" barSize={12} fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                            <Line yAxisId="right" type="monotone" dataKey="hours" name="作業時間(h)" stroke="#f43f5e" strokeWidth={2} dot={{ r: 3 }} />
+                            <Line yAxisId="right" type="monotone" dataKey="hours" name="予定稼働(h)" stroke="#f43f5e" strokeWidth={2} dot={{ r: 3 }} />
+                            <Line yAxisId="right" type="monotone" dataKey="actualHours" name="実稼働(h)" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
                             {/* Brush adds a zoom/slider control below the chart */}
                             <Brush dataKey="day" height={30} stroke="#8884d8" />
                         </ComposedChart>
