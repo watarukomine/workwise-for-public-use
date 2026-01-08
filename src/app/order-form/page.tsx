@@ -125,9 +125,9 @@ export default function OrderFormPage() {
                 const code = rawMatched['ユーザーコード'] || matchedCustomer.userCode || findKey(matchedCustomer, ['ユーザーコード', 'userCode']);
                 if (code) {
                     const currentCode = form.getValues('userCode');
-                    // Only auto-fill if we have a code and the field is currently empty
-                    if (!currentCode) {
-                        setValue('userCode', String(code));
+                    // Update if empty OR if it doesn't match the found code (to allow correction)
+                    if (!currentCode || currentCode !== String(code)) {
+                        setValue('userCode', String(code), { shouldValidate: true });
                     }
                 }
             }
