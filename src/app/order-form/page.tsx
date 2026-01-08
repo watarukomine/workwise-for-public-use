@@ -70,13 +70,15 @@ export default function OrderFormPage() {
 
     const { register, handleSubmit, formState: { errors }, reset, watch, setValue } = form;
 
-    // Watch storeName for changes to trigger lookup logic
+    // Watch storeName and userCode for changes
     const storeNameWatched = watch('storeName');
+    const userCodeWatched = watch('userCode');
 
+    // 1. Store Name -> User Code (and Abbreviations)
     React.useEffect(() => {
         if (!storeNameWatched) return;
 
-        // 1. Expand Abbreviations
+        // A. Abbreviation Expansion
         let expandedName = storeNameWatched;
         let isModified = false;
 
@@ -90,26 +92,18 @@ export default function OrderFormPage() {
             }
         }
 
-        // If expanded, update the field (careful with cursor position if typing, but acceptable for prefix expansion)
         if (isModified) {
-            // Using a small delay or check to prevent fighting the user? 
-            // For simple prefix replacement, immediate update on matching the pattern is okay-ish, 
-            // but might be better to do this only if the user pauses?
-            // For now, let's just use the expanded value for SEARCH, 
-            // and only update strict matches if needed. 
-            // User requirement: "入力されたら...のことだと認識して" -> "Recognize as".
-            // So we update the form value to the formal name.
+            // Update the store name field first
+            // This will trigger this effect again with the new name, so we return early to let the next cycle handle lookup
             setValue('storeName', expandedName);
+            return;
         }
 
-        // 2. Lookup User Code
+        // B. Lookup User Code
         if (expandedName.length > 2 && customers.length > 0) {
-            const normalizedInput = expandedName.replace(/\s|[　]/g, ''); // Remove spaces for comparison
+            const normalizedInput = expandedName.replace(/\s|[　]/g, '');
 
             const matchedCustomer = customers.find(c => {
-                // Check various name fields using findKey util or specific known keys
-                // We cast to any to access raw Japanese keys if strict type doesn't support them, 
-                // but findKey handles generic search nicely.
                 const rawC = c as any;
                 const cNameCandidates = [
                     rawC['店舗'],
@@ -119,30 +113,59 @@ export default function OrderFormPage() {
                     findKey(c, ['店舗', '店舗名', 'storeName'])
                 ];
 
-                const cName = cNameCandidates
-                    .map(n => String(n || ''))
-                    .filter(n => n.length > 0)
-                    .find(n => n.replace(/\s|[　]/g, '').includes(normalizedInput));
-
-                return !!cName;
+                // Check if any candidate name contains the input (or implies it)
+                return cNameCandidates.some(n => {
+                    const str = String(n || '');
+                    return str.replace(/\s|[　]/g, '').includes(normalizedInput);
+                });
             });
 
             if (matchedCustomer) {
                 const rawMatched = matchedCustomer as any;
                 const code = rawMatched['ユーザーコード'] || matchedCustomer.userCode || findKey(matchedCustomer, ['ユーザーコード', 'userCode']);
-                const currentCode = form.getValues('userCode');
-
-                // Only auto-fill if we have a code and the field is currently empty or it's a very strong match
-                if (code && !currentCode) {
-                    setValue('userCode', String(code));
-
-                    // Optional: Toast or indication found?
-                    // toast({ title: "販売店データが見つかりました", description: `ユーザーコード: ${code}` });
+                if (code) {
+                    const currentCode = form.getValues('userCode');
+                    // Only auto-fill if we have a code and the field is currently empty
+                    if (!currentCode) {
+                        setValue('userCode', String(code));
+                    }
                 }
             }
         }
-
     }, [storeNameWatched, customers, setValue, form]);
+
+    // 2. User Code -> Store Name
+    React.useEffect(() => {
+        if (!userCodeWatched || userCodeWatched.length < 3) return;
+        if (customers.length === 0) return;
+
+        const inputCode = userCodeWatched.replace(/\s|[　]/g, '');
+
+        const matchedCustomer = customers.find(c => {
+            const rawC = c as any;
+            const codeCandidates = [
+                rawC['ユーザーコード'],
+                c.userCode,
+                findKey(c, ['ユーザーコード', 'userCode'])
+            ];
+
+            return codeCandidates.some(code => String(code || '') === inputCode);
+        });
+
+        if (matchedCustomer) {
+            const rawMatched = matchedCustomer as any;
+            const storeName = findKey(matchedCustomer, ['店舗', '店舗名', 'storeName']) || rawMatched['店舗'] || matchedCustomer.storeName || rawMatched.name;
+
+            if (storeName) {
+                const currentStoreName = form.getValues('storeName');
+                // Only update if currently empty
+                // If user typed code, they expect store name.
+                if (!currentStoreName) {
+                    setValue('storeName', String(storeName));
+                }
+            }
+        }
+    }, [userCodeWatched, customers, setValue, form]);
 
     const onSubmit = async (data: OrderFormValues) => {
         setIsSubmitting(true);
