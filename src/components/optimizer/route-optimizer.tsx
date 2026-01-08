@@ -328,8 +328,11 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
 
       if (latitude === undefined || longitude === undefined) return null;
 
+      // Safe ID generation: prefer userCode, then id, then random fallback
+      const safeId = c.userCode || c.id || `customer-${Math.random().toString(36).substr(2, 9)}`;
+
       return {
-        id: String(c.userCode || c.id || `customer-${Math.random()}`),
+        id: String(safeId),
         name: String(findKey(c, ['店舗', 'storeName']) || c.name || '名称未設定'),
         address: String(findKey(c, ['住所', 'address']) || '住所未設定'),
         latitude: latitude,

@@ -49,10 +49,15 @@ const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
       }
     }
 
+    // Fallback for userCode: if undefined or null, use empty string to avoid display issues
+    const userCode = item['ユーザーコード'] !== undefined && item['ユーザーコード'] !== null
+      ? String(item['ユーザーコード'])
+      : '';
+
     return {
-      id: item['ユーザーコード'] || item['id'] || String(item['No'] || Math.random()),
+      id: userCode || item['id'] || String(item['No'] || Math.random()),
       No: item['No'],
-      userCode: item['ユーザーコード'],
+      userCode: userCode,
       '旧 チャネル SEQ': item['旧 チャネル SEQ'],
       storeName: findKey(item, ['店舗', '店舗名', 'storeName']),
       mainStoreCode: findKey(item, ['主管店舗コード', 'Main Store Code', 'mainStoreCode']),

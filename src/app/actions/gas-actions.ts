@@ -112,12 +112,12 @@ export async function createTask(args: {
 
 export async function createOrder(args: {
     gasUrl: string;
-    userCode: string;
+    userCode?: string;
     storeName: string;
     workType: string;
     scheduledDate: string;
     scheduledTime: string;
-    picName: string;
+    picName?: string;
     orderNo?: string;
     comment?: string;
     carName?: string;
@@ -130,7 +130,7 @@ export async function createOrder(args: {
     sensor?: string;
     arrangement?: string;
     disposal: string;
-    contact: string;
+    contact?: string;
 }): Promise<GasResponse> {
     return callGasApi({ ...args, action: 'createOrder' });
 }

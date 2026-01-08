@@ -12,19 +12,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { createOrder } from '@/app/actions/gas-actions';
 import { useToast } from '@/hooks/use-toast';
+import { useCustomer } from '@/contexts/customer-context';
 import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { ORDER_GAS_URL } from '@/lib/settings';
+import { findKey } from '@/lib/utils';
 
 // Schema definition
 const orderFormSchema = z.object({
-    userCode: z.string().min(5, 'ユーザーコードは5桁で入力してください').max(5, 'ユーザーコードは5桁で入力してください').regex(/^\d+$/, '数字のみで入力してください'),
+    userCode: z.string().optional(),
     storeName: z.string().min(1, '店舗名（お取引先様名）は必須です'),
     workType: z.enum(['販売店店舗内作業', 'TCC作業', '持ち帰り作業', '配送のみ'], {
         required_error: '作業を選択してください',
     }),
     scheduledDate: z.string().min(1, '作業予定日は必須です'),
     scheduledTime: z.string().min(1, '予定時間は必須です'),
-    picName: z.string().min(1, '発注担当者様名は必須です'),
+    picName: z.string().optional(),
     orderNo: z.string().max(8, '受注No(リマーク1)は8桁以内で入力してください').optional(),
     comment: z.string().max(10, '任意コメント(リマーク2)は10桁以内で入力してください').optional(),
     carName: z.string().optional(),
@@ -37,7 +39,7 @@ const orderFormSchema = z.object({
     sensor: z.string().optional(),
     arrangement: z.string().optional(),
     disposal: z.string().min(1, '廃タイヤ処分は必須です'),
-    contact: z.string().min(1, '連絡先は必須です'),
+    contact: z.string().optional(),
 });
 
 type OrderFormValues = z.infer<typeof orderFormSchema>;
@@ -46,6 +48,13 @@ export default function OrderFormPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const { toast } = useToast();
+    const { customers } = useCustomer();
+
+    const ABBREVIATIONS = [
+        { key: /^(RY|ＲＹ)/i, value: 'レンタリース横浜' },
+        { key: /^(WTK|WT|ＷＴＫ|ＷＴ)/i, value: 'ウエインズトヨタ神奈川' },
+        { key: /^(VS|ＶＳ)/i, value: 'ビークルステーション' },
+    ];
 
     const form = useForm<OrderFormValues>({
         resolver: zodResolver(orderFormSchema),
@@ -59,7 +68,81 @@ export default function OrderFormPage() {
         }
     });
 
-    const { register, handleSubmit, formState: { errors }, reset } = form;
+    const { register, handleSubmit, formState: { errors }, reset, watch, setValue } = form;
+
+    // Watch storeName for changes to trigger lookup logic
+    const storeNameWatched = watch('storeName');
+
+    React.useEffect(() => {
+        if (!storeNameWatched) return;
+
+        // 1. Expand Abbreviations
+        let expandedName = storeNameWatched;
+        let isModified = false;
+
+        for (const abbr of ABBREVIATIONS) {
+            if (abbr.key.test(expandedName)) {
+                // Ensure we don't double replace if already correct (fuzzy check)
+                if (!expandedName.startsWith(abbr.value)) {
+                    expandedName = expandedName.replace(abbr.key, abbr.value);
+                    isModified = true;
+                }
+            }
+        }
+
+        // If expanded, update the field (careful with cursor position if typing, but acceptable for prefix expansion)
+        if (isModified) {
+            // Using a small delay or check to prevent fighting the user? 
+            // For simple prefix replacement, immediate update on matching the pattern is okay-ish, 
+            // but might be better to do this only if the user pauses?
+            // For now, let's just use the expanded value for SEARCH, 
+            // and only update strict matches if needed. 
+            // User requirement: "入力されたら...のことだと認識して" -> "Recognize as".
+            // So we update the form value to the formal name.
+            setValue('storeName', expandedName);
+        }
+
+        // 2. Lookup User Code
+        if (expandedName.length > 2 && customers.length > 0) {
+            const normalizedInput = expandedName.replace(/\s|[　]/g, ''); // Remove spaces for comparison
+
+            const matchedCustomer = customers.find(c => {
+                // Check various name fields using findKey util or specific known keys
+                // We cast to any to access raw Japanese keys if strict type doesn't support them, 
+                // but findKey handles generic search nicely.
+                const rawC = c as any;
+                const cNameCandidates = [
+                    rawC['店舗'],
+                    rawC['店舗名'],
+                    c.storeName,
+                    rawC.name,
+                    findKey(c, ['店舗', '店舗名', 'storeName'])
+                ];
+
+                const cName = cNameCandidates
+                    .map(n => String(n || ''))
+                    .filter(n => n.length > 0)
+                    .find(n => n.replace(/\s|[　]/g, '').includes(normalizedInput));
+
+                return !!cName;
+            });
+
+            if (matchedCustomer) {
+                const rawMatched = matchedCustomer as any;
+                const code = rawMatched['ユーザーコード'] || matchedCustomer.userCode || findKey(matchedCustomer, ['ユーザーコード', 'userCode']);
+                const currentCode = form.getValues('userCode');
+
+                // Only auto-fill if we have a code and the field is currently empty or it's a very strong match
+                if (code && !currentCode) {
+                    setValue('userCode', String(code));
+
+                    // Optional: Toast or indication found?
+                    // toast({ title: "販売店データが見つかりました", description: `ユーザーコード: ${code}` });
+                }
+            }
+        }
+
+    }, [storeNameWatched, customers, setValue, form]);
 
     const onSubmit = async (data: OrderFormValues) => {
         setIsSubmitting(true);
@@ -142,7 +225,7 @@ export default function OrderFormPage() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="userCode">ユーザーコード (5桁) <span className="text-red-500">*</span></Label>
+                                        <Label htmlFor="userCode">ユーザーコード (5桁)</Label>
                                         <Input id="userCode" type="text" placeholder="12345" {...register('userCode')} className={errors.userCode ? "border-red-500" : ""} />
                                         {errors.userCode && <p className="text-red-500 text-xs">{errors.userCode.message}</p>}
                                     </div>
@@ -180,13 +263,13 @@ export default function OrderFormPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="picName">発注担当者様名 <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="picName">発注担当者様名</Label>
                                     <Input id="picName" {...register('picName')} className={errors.picName ? "border-red-500" : ""} />
                                     {errors.picName && <p className="text-red-500 text-xs">{errors.picName.message}</p>}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="contact">連絡先 <span className="text-red-500">*</span></Label>
+                                    <Label htmlFor="contact">連絡先</Label>
                                     <Input id="contact" placeholder="090-0000-0000" {...register('contact')} className={errors.contact ? "border-red-500" : ""} />
                                     {errors.contact && <p className="text-red-500 text-xs">{errors.contact.message}</p>}
                                 </div>
