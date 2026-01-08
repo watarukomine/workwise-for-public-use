@@ -94,6 +94,15 @@ function OptimizerPageContent() {
     const staffLocs = filteredStaffFromSelection
       .map(staffMember => {
         const status = statuses.find(s => s.staffId === staffMember.id);
+
+        // Filter out stale location data (not from today)
+        if (status?.lastUpdate) {
+          const lastUpdateDate = new Date(status.lastUpdate);
+          if (!isToday(lastUpdateDate)) {
+            return null;
+          }
+        }
+
         return status && status.latitude && status.longitude ? { ...staffMember, ...status, type: 'staff' as const } : null;
       })
       .filter((s): s is Staff & StaffStatus & { type: 'staff' } => s !== null);
