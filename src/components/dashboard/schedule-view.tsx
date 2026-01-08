@@ -139,7 +139,7 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
     <div className="space-y-1">
       <p className="font-bold">
         {order.customerName || line1}
-        {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => (line1 || '').includes(t)) && <span className="ml-1">({equipmentSymbol})</span>}
+        {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) && <span className="ml-1">({equipmentSymbol})</span>}
         {scheduledTime && <span className="ml-2">{scheduledTime}</span>}
       </p>
       {(order.tireSize || order['本数']) && (
@@ -159,13 +159,13 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
       <div className="flex justify-between items-center w-full overflow-hidden">
         <span className="font-bold truncate mr-1 flex-1">
           {order.customerName || line1}
-          {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => (line1 || '').includes(t)) && `(${equipmentSymbol})`}
+          {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) && `(${equipmentSymbol})`}
         </span>
         <span className="shrink-0 font-medium">{scheduledTime}</span>
       </div>
 
       {/* Row 2: TireSize Quantity (Only for non-generic tasks) */}
-      {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => (line1 || '').includes(t)) && (
+      {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) && (
         <div className="flex justify-start items-center gap-2 w-full overflow-hidden opacity-90 mt-0.5">
           <span className="truncate">{order.tireSize}</span>
           <span className="shrink-0">{formatHonsu(order['本数'])}</span>
@@ -468,7 +468,7 @@ export function ScheduleView({
 
     const emergencyEvents = scheduleEvents.filter(e => {
       const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
-      return comment.includes('【緊急】');
+      return String(comment).includes('【緊急】');
     });
 
     // return generic structure
@@ -1566,7 +1566,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
 
   const emergencyEvent = events.find(e => {
     const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
-    return comment.includes('【緊急】');
+    return String(comment).includes('【緊急】');
   });
 
   const emergencyMessage = emergencyEvent ? findKey(emergencyEvent.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) : '';
@@ -1653,12 +1653,13 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
 
   // Get equipment status and other details from raw order data
-  const getEquipmentSymbol = (status: string | undefined): string => {
-    if (!status || status.trim() === '') return '×';
-    if (status === '有' || status.includes('有')) return '○';
-    if (status === '無' || status.includes('無')) return '×';
-    if (status === '△' || status.includes('△')) return '△';
-    return '×';
+  const getStatusSymbol = (status: any) => {
+    if (!status) return '×';
+    const s = String(status);
+    if (s === '有' || s.includes('有')) return '○';
+    if (s === '無' || s.includes('無')) return '×';
+    if (s === '△' || s.includes('△')) return '△';
+    return status;
   };
 
   const formatHonsu = (honsu: string | number | undefined): string => {
@@ -1690,7 +1691,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     <div className="space-y-1">
       <p className="font-bold">
         {customerName || line1}
-        {(!isTravelEvent && !['移動', '業務', '休憩'].some(t => (event.title || '').includes(t))) && <span className="ml-1">({equipmentSymbol})</span>}
+        {(!isTravelEvent && !['移動', '業務', '休憩'].some(t => String(event.title || '').includes(t))) && <span className="ml-1">({equipmentSymbol})</span>}
         <span className="ml-2">{formatTime(event.start)}</span>
       </p>
       {!isTravelEvent && (tireSize || honsu) && (
