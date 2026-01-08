@@ -21,16 +21,16 @@ import { findKey } from '@/lib/utils';
 const orderFormSchema = z.object({
     userCode: z.string().optional(),
     storeName: z.string().min(1, '店舗名（お取引先様名）は必須です'),
-    workType: z.enum(['販売店店舗内作業', 'TCC作業', '持ち帰り作業', '配送のみ'], {
-        required_error: '作業を選択してください',
-    }),
+    workType: z.string().min(1, '作業を選択してください'), // Changed to string to allow 'その他' and custom logic
+    otherWorkType: z.string().optional(), // Added for custom input
     scheduledDate: z.string().min(1, '作業予定日は必須です'),
     scheduledTime: z.string().min(1, '予定時間は必須です'),
     picName: z.string().optional(),
     orderNo: z.string().max(8, '受注No(リマーク1)は8桁以内で入力してください').optional(),
     comment: z.string().max(10, '任意コメント(リマーク2)は10桁以内で入力してください').optional(),
+    specialNotes: z.string().optional(), // Added
     carName: z.string().optional(),
-    regNo: z.string().min(4, '登録ナンバー(下4桁)は必須です'), // Assuming slightly looser validation than exactly 4 chars based on user input, but regex to 4 digits is safer if strictly asked "下4桁". Let's stick to simple required-ness first.
+    regNo: z.string().min(4, '登録ナンバー(下4桁)は必須です'),
     status: z.string().optional(),
     tireNumber: z.string().min(1, 'タイヤ品番は必須です'),
     tireSize: z.string().min(1, 'タイヤサイズは必須です'),
@@ -40,6 +40,14 @@ const orderFormSchema = z.object({
     arrangement: z.string().optional(),
     disposal: z.string().min(1, '廃タイヤ処分は必須です'),
     contact: z.string().optional(),
+}).refine((data) => {
+    if (data.workType === 'その他' && !data.otherWorkType) {
+        return false;
+    }
+    return true;
+}, {
+    message: "作業内容を入力してください",
+    path: ["otherWorkType"],
 });
 
 type OrderFormValues = z.infer<typeof orderFormSchema>;

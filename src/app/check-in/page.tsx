@@ -174,13 +174,24 @@ function CheckInClient() {
           if (isCorrectionMode) setIsCorrectionMode(false);
 
         } catch (e: any) {
-          // ... existing error catch
-          setError(e.message || 'スプレッドシートの更新に失敗しました。');
-          toast({
-            variant: 'destructive',
-            title: '更新エラー',
-            description: e.message || 'スプレッドシートの更新に失敗しました。'
-          });
+          // Check for "Server Action not found" which happens when deployment changes
+          const errorMessage = e.message || 'スプレッドシートの更新に失敗しました。';
+
+          if (errorMessage.includes('not found') || errorMessage.includes('Server Action')) {
+            setError('システムの更新が必要です。ページを再読み込みしてください。');
+            toast({
+              variant: 'destructive',
+              title: '更新エラー',
+              description: 'システムのバージョンが古くなっています。ページを更新して再試行してください。'
+            });
+          } else {
+            setError(errorMessage);
+            toast({
+              variant: 'destructive',
+              title: '更新エラー',
+              description: errorMessage
+            });
+          }
         }
 
         setIsLoading(null);

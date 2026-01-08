@@ -131,6 +131,7 @@ export async function createOrder(args: {
     arrangement?: string;
     disposal: string;
     contact?: string;
+    specialNotes?: string;
 }): Promise<GasResponse> {
     return callGasApi({ ...args, action: 'createOrder' });
 }
