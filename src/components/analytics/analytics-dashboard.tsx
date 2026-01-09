@@ -132,9 +132,17 @@ export function AnalyticsDashboard() {
                 if (actualDurationHours === 0 && order.raw) {
                     const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration']);
                     if (rawDuration) {
-                        const parsed = parseInt(String(rawDuration), 10);
-                        if (!isNaN(parsed) && parsed > 0) {
-                            actualDurationHours = parsed; // Minutes
+                        const valStr = String(rawDuration);
+                        if (valStr.includes('1899-12-30')) {
+                            const date = new Date(valStr);
+                            if (!isNaN(date.getTime())) {
+                                actualDurationHours = (date.getHours() * 60 + date.getMinutes()) / 60; // Minutes to Hours
+                            }
+                        } else {
+                            const parsed = parseInt(valStr, 10);
+                            if (!isNaN(parsed) && parsed > 0) {
+                                actualDurationHours = parsed / 60; // Minutes to Hours
+                            }
                         }
                     }
                 }
@@ -309,9 +317,17 @@ export function AnalyticsDashboard() {
                     if (actual === 0 && order.raw) {
                         const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration']);
                         if (rawDuration) {
-                            const parsed = parseInt(String(rawDuration), 10);
-                            if (!isNaN(parsed) && parsed > 0) {
-                                actual = parsed / 60; // Minutes to Hours
+                            const valStr = String(rawDuration);
+                            if (valStr.includes('1899-12-30')) {
+                                const date = new Date(valStr);
+                                if (!isNaN(date.getTime())) {
+                                    actual = (date.getHours() * 60 + date.getMinutes()) / 60; // Minutes to Hours
+                                }
+                            } else {
+                                const parsed = parseInt(valStr, 10);
+                                if (!isNaN(parsed) && parsed > 0) {
+                                    actual = parsed / 60; // Minutes to Hours
+                                }
                             }
                         }
                     }
