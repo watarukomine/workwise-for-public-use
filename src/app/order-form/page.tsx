@@ -274,9 +274,17 @@ export default function OrderFormPage() {
                                             <option value="TCC作業">TCC作業</option>
                                             <option value="持ち帰り作業">持ち帰り作業</option>
                                             <option value="配送のみ">配送のみ</option>
+                                            <option value="その他">その他</option>
                                         </select>
                                         {errors.workType && <p className="text-red-500 text-xs">{errors.workType.message}</p>}
                                     </div>
+                                    {form.watch('workType') === 'その他' && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="otherWorkType">作業内容 (その他) <span className="text-red-500">*</span></Label>
+                                            <Input id="otherWorkType" {...register('otherWorkType')} className={errors.otherWorkType ? "border-red-500" : ""} />
+                                            {errors.otherWorkType && <p className="text-red-500 text-xs">{errors.otherWorkType.message}</p>}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -398,6 +406,15 @@ export default function OrderFormPage() {
                                     <Label htmlFor="comment">任意コメント (リマーク2 / 10桁以内)</Label>
                                     <Input id="comment" {...register('comment')} />
                                     {errors.comment && <p className="text-red-500 text-xs">{errors.comment.message}</p>}
+                                </div>
+                            </div>
+
+                            {/* 特記事項 */}
+                            <div className="space-y-4 pt-4">
+                                <h3 className="text-lg font-medium border-b pb-2">特記事項</h3>
+                                <div className="space-y-2">
+                                    <Label htmlFor="specialNotes">特記事項</Label>
+                                    <Textarea id="specialNotes" placeholder="特記事項があればご記入ください" {...register('specialNotes')} />
                                 </div>
                             </div>
 
