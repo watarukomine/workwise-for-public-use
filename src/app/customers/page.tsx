@@ -118,25 +118,6 @@ export default function CustomersPage() {
         </CardContent>
       </Card>
 
-      {/* Debug Section - To be removed later */}
-      {customers.length > 0 && isAdmin && (
-        <Card className="border-red-200 bg-red-50">
-          <CardHeader>
-            <CardTitle className="text-red-800 text-sm">デバッグ情報 (開発者用)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-red-700 mb-2">取得したデータの項目名一覧:</p>
-            <pre className="text-xs bg-white p-2 rounded border border-red-100 overflow-auto max-h-40">
-              {JSON.stringify(Object.keys(customers[0]), null, 2)}
-            </pre>
-            <p className="text-xs text-red-700 mt-2 mb-2">先頭データ (Raw):</p>
-            <pre className="text-xs bg-white p-2 rounded border border-red-100 overflow-auto max-h-60">
-              {JSON.stringify(customers[0], null, 2)}
-            </pre>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
           <CardTitle>データソースURL設定</CardTitle>
