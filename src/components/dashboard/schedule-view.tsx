@@ -33,7 +33,7 @@ import {
   TooltipTrigger,
 } from '../ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor } from '../../lib/utils';
+import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate } from '../../lib/utils';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import {
@@ -1376,7 +1376,7 @@ export function ScheduleView({
                         {renderDetailItem('担当者', staff?.name)}
                         {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
                         {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
-                        {renderDetailItem('作業予定日', findKey(event.raw, ['作業予定日']))}
+                        {renderDetailItem('作業予定日', formatDate(findKey(event.raw, ['作業予定日']), 'MM/dd'))}
                         {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
                         {renderDetailItem('車名', findKey(event.raw, ['車名']))}
                         {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
