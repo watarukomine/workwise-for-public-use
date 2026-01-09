@@ -123,7 +123,7 @@ export function AnalyticsDashboard() {
                     if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
                         const diffMs = end.getTime() - start.getTime();
                         if (diffMs > 0) {
-                            actualDurationHours = diffMs / (1000 * 60 * 60);
+                            actualDurationHours = diffMs / (1000 * 60); // Minutes
                         }
                     }
                 }
@@ -134,7 +134,7 @@ export function AnalyticsDashboard() {
                     if (rawDuration) {
                         const parsed = parseInt(String(rawDuration), 10);
                         if (!isNaN(parsed) && parsed > 0) {
-                            actualDurationHours = parsed / 60;
+                            actualDurationHours = parsed; // Minutes
                         }
                     }
                 }
@@ -142,7 +142,7 @@ export function AnalyticsDashboard() {
                 workloadMap.set(staffId, {
                     ...current,
                     tasks: current.tasks + 1,
-                    hours: current.hours + durationHours,
+                    hours: current.hours + (order.estimatedDuration || 60), // Minutes
                     actualHours: (current.actualHours || 0) + actualDurationHours
                 });
             }
@@ -289,18 +289,18 @@ export function AnalyticsDashboard() {
                 if (map.has(day)) {
                     const current = map.get(day)!;
 
-                    // Scheduled/Estimated Hours
-                    const estimated = (order.estimatedDuration || 60) / 60;
+                    // Scheduled/Estimated Minutes
+                    const estimated = order.estimatedDuration || 60;
 
-                    // Actual Hours
+                    // Actual Minutes
                     let actual = 0;
                     if (order.actualStartTime && order.actualEndTime) {
-                        const start = new Date(order.actualStartTime);
-                        const end = new Date(order.actualEndTime);
-                        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                        const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
+                        const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
+                        if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
                             const diffMs = end.getTime() - start.getTime();
                             if (diffMs > 0) {
-                                actual = diffMs / (1000 * 60 * 60);
+                                actual = diffMs / (1000 * 60); // Minutes
                             }
                         }
                     }
@@ -311,7 +311,7 @@ export function AnalyticsDashboard() {
                         if (rawDuration) {
                             const parsed = parseInt(String(rawDuration), 10);
                             if (!isNaN(parsed) && parsed > 0) {
-                                actual = parsed / 60;
+                                actual = parsed; // Assuming raw is minutes
                             }
                         }
                     }
@@ -330,8 +330,8 @@ export function AnalyticsDashboard() {
             date: d.dateStr,
             day: parseInt(d.dateStr), // For sorting/brush
             count: d.count,
-            hours: parseFloat(d.hours.toFixed(1)),
-            actualHours: parseFloat(d.actualHours.toFixed(1))
+            hours: Math.round(d.hours),
+            actualHours: Math.round(d.actualHours)
         }));
     }, [filteredData]);
 
