@@ -289,10 +289,10 @@ export function AnalyticsDashboard() {
                 if (map.has(day)) {
                     const current = map.get(day)!;
 
-                    // Scheduled/Estimated Minutes
-                    const estimated = order.estimatedDuration || 60;
+                    // Scheduled/Estimated Hours
+                    const estimated = (order.estimatedDuration || 60) / 60; // Hours
 
-                    // Actual Minutes
+                    // Actual Hours
                     let actual = 0;
                     if (order.actualStartTime && order.actualEndTime) {
                         const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
@@ -300,7 +300,7 @@ export function AnalyticsDashboard() {
                         if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
                             const diffMs = end.getTime() - start.getTime();
                             if (diffMs > 0) {
-                                actual = diffMs / (1000 * 60); // Minutes
+                                actual = diffMs / (1000 * 60 * 60); // Hours
                             }
                         }
                     }
@@ -311,7 +311,7 @@ export function AnalyticsDashboard() {
                         if (rawDuration) {
                             const parsed = parseInt(String(rawDuration), 10);
                             if (!isNaN(parsed) && parsed > 0) {
-                                actual = parsed; // Assuming raw is minutes
+                                actual = parsed / 60; // Minutes to Hours
                             }
                         }
                     }
@@ -330,8 +330,8 @@ export function AnalyticsDashboard() {
             date: d.dateStr,
             day: parseInt(d.dateStr), // For sorting/brush
             count: d.count,
-            hours: Math.round(d.hours),
-            actualHours: Math.round(d.actualHours)
+            hours: parseFloat(d.hours.toFixed(2)),
+            actualHours: parseFloat(d.actualHours.toFixed(2))
         }));
     }, [filteredData]);
 
