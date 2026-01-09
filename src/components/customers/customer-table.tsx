@@ -66,7 +66,7 @@ const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
       '旧 チャネル SEQ': item['旧 チャネル SEQ'],
       storeName: findKey(item, ['店舗', '店舗名', 'storeName']),
       mainStoreCode: findKey(item, ['主管店舗コード', 'Main Store Code', 'mainStoreCode']),
-      mainStore: findKey(item, ['主管店舗', 'Main Store', 'mainStore']), // Reverted '保管店舗'
+      mainStore: findKey(item, ['主管店舗', '主管店舗名', '母店', '母店名', 'Main Store', 'mainStore']),
       '管理C': findKey(item, ['管理C']),
       '機材有無': item['機材有無'],
       address: item['住所'],
