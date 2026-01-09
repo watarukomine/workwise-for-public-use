@@ -123,7 +123,7 @@ export function AnalyticsDashboard() {
                     if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
                         const diffMs = end.getTime() - start.getTime();
                         if (diffMs > 0) {
-                            actualDurationHours = diffMs / (1000 * 60); // Minutes
+                            actualDurationHours = diffMs / (1000 * 60 * 60); // Hours
                         }
                     }
                 }
@@ -133,14 +133,14 @@ export function AnalyticsDashboard() {
                     const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration']);
                     if (rawDuration) {
                         const valStr = String(rawDuration);
-                        if (valStr.includes('1899-12-30')) {
+                        if (valStr.includes('1899')) {
                             const date = new Date(valStr);
                             if (!isNaN(date.getTime())) {
                                 actualDurationHours = (date.getHours() * 60 + date.getMinutes()) / 60; // Minutes to Hours
                             }
                         } else {
-                            const parsed = parseInt(valStr, 10);
-                            if (!isNaN(parsed) && parsed > 0) {
+                            const parsed = parseFloat(valStr);
+                            if (!isNaN(parsed) && parsed > 0 && parsed !== 1899) {
                                 actualDurationHours = parsed / 60; // Minutes to Hours
                             }
                         }
@@ -150,7 +150,7 @@ export function AnalyticsDashboard() {
                 workloadMap.set(staffId, {
                     ...current,
                     tasks: current.tasks + 1,
-                    hours: current.hours + (order.estimatedDuration || 60), // Minutes
+                    hours: current.hours + ((order.estimatedDuration || 60) / 60), // Convert Minutes to Hours
                     actualHours: (current.actualHours || 0) + actualDurationHours
                 });
             }
