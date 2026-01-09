@@ -76,14 +76,14 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
   if (rawDurationVal) {
     const valStr = String(rawDurationVal);
     // Handle GAS Date object string for Duration (e.g. "1899-12-30T...")
-    if (valStr.includes('1899-12-30')) {
+    if (valStr.includes('1899')) {
       const date = new Date(valStr);
       if (!isNaN(date.getTime())) {
         duration = date.getHours() * 60 + date.getMinutes();
       }
     } else {
       const parsed = parseInt(valStr, 10);
-      if (!isNaN(parsed)) {
+      if (!isNaN(parsed) && parsed !== 1899) {
         duration = parsed;
       }
     }
