@@ -119,9 +119,8 @@ function doPost(e) {
       return createTask(params);
     } else if (params.eventTitle) { // 既存更新
       return updateSheetWithOrderInfo(params);
-    } else if (params.action === 'createOrder') { // 将来用
-      // createOrderの実装を入れるならここ
-      return errorResponse("createOrder is not implemented yet.");
+    } else if (params.action === 'createOrder') { // 新規注文
+      return createOrder(params);
     } else {
       return errorResponse("必要なパラメータ (eventTitle, action, または operation) がありません");
     }
@@ -181,13 +180,133 @@ function createTask(params) {
   }
 }
 
+/**
+ * 注文（受注）を新規作成する機能
+ * 受注管理シートに追記します
+ */
+function createOrder(params) {
+  try {
+    const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
+    if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
+
+    // ヘッダー行を取得して名前に基づいてデータを配置します
+    // これにより、列の挿入や移動があってもヘッダー名さえ合っていれば動作します
+    const headers = sheet.getDataRange().getValues()[0];
+
+    // ---------------------------------------------------------
+    // 1. Determine Target Row First
+    // ---------------------------------------------------------
+    // We need the target row number to calculate the returned ID (row - 1)
+    // and to decide where to write.
+
+    let idColIndex = -1;
+    headers.forEach((h, i) => {
+      if (String(h).trim() === "受注ID") idColIndex = i;
+    });
+
+    let targetRow = -1;
+    if (idColIndex !== -1) {
+      const colLetter = String.fromCharCode(65 + idColIndex);
+      const idColumnValues = sheet.getRange(`${colLetter}2:${colLetter}`).getValues();
+
+      for (let i = 0; i < idColumnValues.length; i++) {
+        // Build logic: exact match empty string to find strict empty cell
+        if (idColumnValues[i][0] === "" || idColumnValues[i][0] === null) {
+          targetRow = i + 2;
+          break;
+        }
+      }
+    }
+
+    if (targetRow === -1) {
+      targetRow = sheet.getLastRow() + 1;
+    }
+
+    // ---------------------------------------------------------
+    // 2. Prepare Data
+    // ---------------------------------------------------------
+    const newRow = [];
+    // User wants ID to be determined by formula =ROW()-1
+    // So for the backend response, we estimate it as targetRow - 1
+    // (Actual cell will contain the formula)
+    const numericId = targetRow - 1;
+
+    headers.forEach(header => {
+      const h = String(header).trim();
+
+      // Header Matching Logic
+      if (h === "受注ID") {
+        newRow.push("=ROW()-1"); // User request: Use formula
+      } else if (h === "顧客コード" || h === "ユーザーコード") {
+        newRow.push(params.userCode || "");
+      } else if (h === "お取引先名" || h === "店舗" || h === "店舗名") {
+        newRow.push(params.storeName || "");
+      } else if (h === "主管店舗") {
+        newRow.push(params.mainStore || "");
+      } else if (h === "作業内容" || h === "作業") {
+        newRow.push(params.workType || "");
+      } else if (h === "作業予定日") {
+        newRow.push(params.scheduledDate || "");
+      } else if (h === "予定時間") {
+        newRow.push(params.scheduledTime || "");
+      } else if (h === "担当" || h === "担当者名" || h === "ご担当者様") {
+        newRow.push(params.picName || "");
+      } else if (h === "注文番号" || h.includes("受注No")) {
+        newRow.push(params.orderNo || "");
+      } else if (h === "緊急連絡" || h.includes("任意コメント")) {
+        newRow.push(params.comment || "");
+      } else if (h === "車名") {
+        newRow.push(params.carName || "");
+      } else if (h.includes("登録ナンバー")) {
+        newRow.push(params.regNo || "");
+      } else if (h === "受注ステータス" || h === "入庫状況") {
+        newRow.push(params.status || "入庫待ち");
+      } else if (h === "タイヤ品番") {
+        newRow.push(params.tireNumber || "");
+      } else if (h === "タイヤサイズ") {
+        newRow.push(params.tireSize || "");
+      } else if (h === "品名") {
+        newRow.push(params.productName || "");
+      } else if (h === "本数") {
+        newRow.push(params.quantity || "");
+      } else if (h.includes("センサー")) {
+        newRow.push(params.sensor || "");
+      } else if (h === "タイヤ手配状況" || h === "手配") {
+        newRow.push(params.arrangement || "");
+      } else if (h === "廃タイヤ処分" || h === "廃タイヤ") {
+        newRow.push(params.disposal || "");
+      } else if (h === "連絡者名" || h === "連絡者") {
+        newRow.push(params.contact || "");
+      } else if (h === "特記事項") {
+        // 【新規追加】特記事項
+        newRow.push(params.specialNotes || "");
+      } else if (h === "最終更新日時" || h === "受信日時") {
+        newRow.push(new Date());
+      } else {
+        // I列(キャンセル日時), J列(キャンセル連絡者) など、
+        // 未知の列やフォームから送られない列には空文字を入れる
+        newRow.push("");
+      }
+    });
+
+    // Write the new row data
+    sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
+
+    return successResponse("注文を登録しました。", { orderId: numericId });
+  } catch (error) {
+    console.error("createOrder Error:", error);
+    return errorResponse("注文登録エラー: " + error.message);
+  }
+}
+
 
 /**
  * 受注IDでシートを検索し、指定された情報で更新する
  * (汎用タスクの場合でIDがtask-から始まるものは行動予定シートを更新するように分岐)
  */
 function updateSheetWithOrderInfo(params) {
-  const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp, scheduledTime, scheduledEndTime, scheduledDate, comment } = params;
+  const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp, scheduledTime, scheduledEndTime, scheduledDate, comment, specialNotes } = params;
 
   try {
     const match = eventTitle.match(/\(ID:\s*([\w-]+)\)/);
@@ -217,7 +336,7 @@ function updateSheetWithOrderInfo(params) {
     if (orderIdCol === -1) throw new Error("「受注ID」列が見つかりません。");
 
     let rowNum = -1;
-    // 後ろから検索（最新のものが下にある場合、パフォーマンス的に有利かも？いやデータ量は少ないか）
+    // 後ろから検索
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][orderIdCol]) === String(orderId)) {
         rowNum = i + 1;
@@ -227,11 +346,15 @@ function updateSheetWithOrderInfo(params) {
     if (rowNum === -1) throw new Error(`受注ID: ${orderId} が見つかりませんでした。`);
 
     const updateColumn = (colName, value) => {
-      if (value !== undefined) {
-        const colIdx = headers.indexOf(colName);
-        if (colIdx !== -1) {
+      const colIdx = headers.indexOf(colName);
+      if (colIdx !== -1) {
+        if (value !== undefined) {
           sheet.getRange(rowNum, colIdx + 1).setValue(value);
         }
+      } else {
+        // カラムが見つからない場合はログなどで警告してもいいが、
+        // ユーザーがカラム名を変更した可能性もあるのでエラーにはしない
+        console.log(`Column not found: ${colName}`);
       }
     };
 
@@ -249,6 +372,9 @@ function updateSheetWithOrderInfo(params) {
     if (scheduledEndTime) updateColumn("チップ配置作業完了予定", new Date(scheduledEndTime));
     if (scheduledDate) updateColumn("作業予定日", new Date(scheduledDate));
     if (comment) updateColumn("任意コメント", comment); // 必要に応じて
+
+    // 【新規追加】特記事項の更新
+    if (specialNotes !== undefined) updateColumn("特記事項", specialNotes);
 
     if (actionType && actionTimestamp) {
       const dateValue = new Date(actionTimestamp);
@@ -317,9 +443,10 @@ function updateTaskSheet(taskId, params) {
 }
 
 /**
- * iCalメール送信 (変更なし、省略可能だが念のため残す)
+ * iCalメール送信 (変更なし)
  */
 function sendIcsEmail(params) {
+  // ... (省略せず全文必要な場合は、既存のsendIcsEmail関数と同様のコードを含めます)
   const { staffName, staffEmail, title, description, startTime, endTime, location, isUpdate } = params;
   try {
     if (!staffEmail) throw new Error("宛先メールアドレスが指定されていません。");
