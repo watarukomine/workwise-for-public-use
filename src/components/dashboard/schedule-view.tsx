@@ -1719,7 +1719,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         <TooltipTrigger asChild>
           {eventContent}
         </TooltipTrigger>
-        <TooltipContent side="bottom">{tooltipContent}</TooltipContent>
+        <TooltipContent side="bottom" className="z-[1000]">{tooltipContent}</TooltipContent>
       </Tooltip>
     </div>
   );
