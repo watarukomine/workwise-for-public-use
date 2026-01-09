@@ -32,24 +32,13 @@ const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
   if (!Array.isArray(rawData)) {
     return [];
   }
+  if (rawData.length > 0) {
+    console.log('First Customer Row Keys:', Object.keys(rawData[0]));
+    console.log('First Customer Row Data:', rawData[0]);
+  }
+
   return rawData.map(item => {
-    let latitude: number | undefined = Number(findKey(item, ['緯度']));
-    let longitude: number | undefined = Number(findKey(item, ['経度']));
-
-    if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
-      const coordsValue = findKey(item, ['緯度・経度', '座標', '緯度経度']);
-      if (typeof coordsValue === 'string' && coordsValue.includes(',')) {
-        const parts = coordsValue.split(',').map(part => part.trim());
-        const lat = parseFloat(parts[0]);
-        const lon = parseFloat(parts[1]);
-        if (!isNaN(lat) && !isNaN(lon)) {
-          latitude = lat;
-          longitude = lon;
-        }
-      }
-    }
-
-    // Fallback for userCode: if undefined or null, use empty string to avoid display issues
+    // ... (rest of the map function)
     const userCode = item['ユーザーコード'] !== undefined && item['ユーザーコード'] !== null
       ? String(item['ユーザーコード'])
       : '';
@@ -61,7 +50,7 @@ const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
       '旧 チャネル SEQ': item['旧 チャネル SEQ'],
       storeName: findKey(item, ['店舗', '店舗名', 'storeName']),
       mainStoreCode: findKey(item, ['主管店舗コード', 'Main Store Code', 'mainStoreCode']),
-      mainStore: findKey(item, ['主管店舗', 'Main Store', 'mainStore', '保管店舗']),
+      mainStore: findKey(item, ['主管店舗', 'Main Store', 'mainStore']), // Reverted '保管店舗'
       '管理C': findKey(item, ['管理C']),
       '機材有無': item['機材有無'],
       address: item['住所'],
