@@ -21,7 +21,7 @@
 export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxGeXICGCJIbu-EuaRINfiVp1UTEz3IO9A2bGP-monXgwIHIv7PRomaFaM-s10KppDWzA/exec';
 
 // Customer Data Script
-export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbygUg4b1tD4Y489xg0Fz09e84DtDAy_35KhJ_VD4RyJ3J1DavI0B_aZP5ck8hssWPCi/exec';
+export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbz9CFA3PdNTi5fQhnxz5Dm6-copXjMPpCKvJtSGB80Na5cVSsdYXfgO-g5EQPK66BrcCA/exec';
 
 // Order & Task Management Script (Unified)
 export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbyGiLDzfR1sHhpHAauzYQ8m8KjpIYN5kvCcvl0-ubuAywUa2LNQ0NTAtmwLO_bLOVkx/exec';
