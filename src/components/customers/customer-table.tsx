@@ -38,7 +38,23 @@ const mapRawDataToCustomers = (rawData: any[]): CustomerWithUrl[] => {
   }
 
   return rawData.map(item => {
-    // ... (rest of the map function)
+    let latitude: number | undefined = Number(findKey(item, ['緯度']));
+    let longitude: number | undefined = Number(findKey(item, ['経度']));
+
+    if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
+      const coordsValue = findKey(item, ['緯度・経度', '座標', '緯度経度']);
+      if (typeof coordsValue === 'string' && coordsValue.includes(',')) {
+        const parts = coordsValue.split(',').map(part => part.trim());
+        const lat = parseFloat(parts[0]);
+        const lon = parseFloat(parts[1]);
+        if (!isNaN(lat) && !isNaN(lon)) {
+          latitude = lat;
+          longitude = lon;
+        }
+      }
+    }
+
+    // Fallback for userCode: if undefined or null, use empty string to avoid display issues
     const userCode = item['ユーザーコード'] !== undefined && item['ユーザーコード'] !== null
       ? String(item['ユーザーコード'])
       : '';
