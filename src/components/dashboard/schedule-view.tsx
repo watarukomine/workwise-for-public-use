@@ -1326,7 +1326,7 @@ export function ScheduleView({
                     <div className="relative space-y-2 pb-2">
                       {isToday(currentDate) && (
                         // eslint-disable-next-line react-dom/no-unsafe-inline-style
-                        <div className="absolute top-0 h-full pointer-events-none z-45" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
+                        <div className="absolute top-0 h-full pointer-events-none z-15" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
                           <TimeIndicator />
                         </div>
                       )}
