@@ -1671,7 +1671,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   };
 
   const equipmentStatus = event.raw ? findKey(event.raw, ['機材有無']) : undefined;
-  const equipmentSymbol = getEquipmentSymbol(equipmentStatus);
+  const equipmentSymbol = getStatusSymbol(equipmentStatus);
   const tireSize = event.raw ? findKey(event.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
   const honsu = event.raw ? findKey(event.raw, ['本数', 'honsu']) : undefined;
   const customerName = event.raw ? findKey(event.raw, ['お取引先名', '店舗', '取引先']) : (customer?.storeName || line1);
