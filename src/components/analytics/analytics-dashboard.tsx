@@ -318,14 +318,14 @@ export function AnalyticsDashboard() {
                         const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration']);
                         if (rawDuration) {
                             const valStr = String(rawDuration);
-                            if (valStr.includes('1899-12-30')) {
+                            if (valStr.includes('1899')) {
                                 const date = new Date(valStr);
                                 if (!isNaN(date.getTime())) {
                                     actual = (date.getHours() * 60 + date.getMinutes()) / 60; // Minutes to Hours
                                 }
                             } else {
-                                const parsed = parseInt(valStr, 10);
-                                if (!isNaN(parsed) && parsed > 0) {
+                                const parsed = parseFloat(valStr);
+                                if (!isNaN(parsed) && parsed > 0 && parsed !== 1899) {
                                     actual = parsed / 60; // Minutes to Hours
                                 }
                             }
