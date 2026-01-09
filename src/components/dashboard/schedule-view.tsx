@@ -365,7 +365,7 @@ const TimeIndicator = () => {
     // eslint-disable-next-line react-dom/no-unsafe-inline-style
     <div
       className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
-      style={{ left: `${leftPosition}px`, zIndex: 101 }}
+      style={{ left: `${leftPosition}px` }}
     >
       <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
     </div>
