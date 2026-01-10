@@ -1398,6 +1398,7 @@ export function ScheduleView({
                         {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
                         {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
                         {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
+                        {renderDetailItem('特記事項', findKey(event.raw, ['特記事項', 'specialNotes']))}
                       </div>
                     )}
 
@@ -1421,10 +1422,14 @@ export function ScheduleView({
                         </div>
                       </div>
 
+
+
+                      {/* 行き先欄は不要とのことで削除
                       <div className="grid grid-cols-4 items-center gap-4 mt-2">
                         <Label htmlFor="edit-destination" className="text-right">行き先</Label>
                         <Input id="edit-destination" value={editedEventDetails.destination} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, destination: e.target.value }))} className="col-span-3" placeholder="行き先を入力" />
                       </div>
+                      */}
                     </div>
                   </div>
 
@@ -1483,10 +1488,12 @@ export function ScheduleView({
                       <Label htmlFor="title" className="text-right">タスク名</Label>
                       <Input id="title" value={editedEventDetails.title} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, title: e.target.value }))} className="col-span-3" placeholder="例：定期メンテナンス" />
                     </div>
+                    {/* 行き先欄は不要とのことで削除
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="destination" className="text-right">行き先</Label>
                       <Input id="destination" value={editedEventDetails.destination} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, destination: e.target.value }))} className="col-span-3" placeholder="行き先を入力" />
                     </div>
+                    */}
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="description" className="text-right">詳細</Label>
                       <Textarea id="description" value={editedEventDetails.description} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, description: e.target.value }))} className="col-span-3" placeholder="予定の詳細やメモ" />
@@ -1541,6 +1548,7 @@ export function ScheduleView({
                       {renderDetailItem('本数', findKey(dialogState.order.raw, ['本数']))}
                       {renderDetailItem('タイヤ手配状況', findKey(dialogState.order.raw, ['タイヤ手配状況']))}
                       {renderDetailItem('廃タイヤ処分', findKey(dialogState.order.raw, ['廃タイヤ処分']))}
+                      {renderDetailItem('特記事項', findKey(dialogState.order.raw, ['特記事項', 'specialNotes']))}
                     </div>
                   </div>
                   <DialogFooter className="sm:justify-between">
