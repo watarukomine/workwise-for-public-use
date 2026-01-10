@@ -26,14 +26,20 @@ export function findKey(item: any, possibleKeys: string[]) {
 export const formatDate = (dateString: string | undefined | null, formatString: string = 'yyyy/MM/dd'): string => {
   if (!dateString) return '';
   try {
-    const date = parseISO(dateString);
+    // Try strict ISO first
+    let date = parseISO(dateString);
+    if (!isValid(date)) {
+      // Fallback: standard JS Date parsing (handles "YYYY/MM/DD" etc.)
+      date = new Date(dateString);
+    }
+
     if (isValid(date)) {
       return format(date, formatString);
     }
   } catch (e) {
     // Fallback for non-ISO strings if necessary
   }
-  return dateString; // Return original string if invalid
+  return dateString || ''; // Return original string if valid
 };
 
 export const formatTime = (date: Date | string) => {
