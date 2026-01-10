@@ -235,83 +235,68 @@ export default function DashboardPage() {
     const now = new Date();
 
     return filteredStaff.map(staff => {
-      // 1. Get Base Status from Order Context
       const orderStatusObj = statuses.find(s => s.staffId === staff.id);
 
-      let displayStatus = '未割当';
-      let lastAction = '情報なし';
+      const getDisplayStatus = () => {
+        // 1. Generic Task Status (Priority 1: Time Window)
+        if (scheduleEvents) {
+          const currentGenericEvent = scheduleEvents.find(event => {
+            if (event.staffId !== staff.id) return false;
+            if (event.rawOrderId) return false;
 
-      // Check if status update is from TODAY. If old, ignore it (reset to daily start).
-      if (orderStatusObj?.lastUpdate) {
-        const lastUpdateDate = new Date(orderStatusObj.lastUpdate);
-        if (isToday(lastUpdateDate)) {
-          displayStatus = orderStatusObj.status || '未割当';
-          lastAction = orderStatusObj.lastAction || '';
-        }
-      }
+            const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+            const end = typeof event.end === 'string' ? parseISO(event.end) : event.end;
+            return isValid(start) && isValid(end) && now >= start && now <= end;
+          });
 
-      // 2. Map Raw Statuses to User Requested Display
-      if (displayStatus === '移動開始' || displayStatus === '移動中') displayStatus = '移動中';
-      else if (displayStatus === '現場到着') displayStatus = '作業待ち';
-      else if (displayStatus === '作業開始' || displayStatus === '作業中') displayStatus = '作業中';
-      else if (displayStatus === '作業完了') displayStatus = '待機中';
-      else if (displayStatus === '作業待ち') displayStatus = '待機中'; // Treat assigned-only (before arrival) as Idle/Waiting so it can be overridden by Attendance
-      else if (displayStatus === '待機中') displayStatus = '待機中';
-
-      // 3. Handle "Clock In" -> "出勤済" vs "Idle"
-      // If status is "待機中" (Idle) or "未割当" (Unassigned)
-      if (displayStatus === '待機中' || displayStatus === '未割当' || displayStatus === '未着手') {
-        // If "Clocked In" (in selectedStaffIds) AND no specific last action implying work completion?
-        // User said: "Clock In -> 出勤済". "Work Complete -> 待機中".
-        // If "Clocked In" (in presentStaffIds) AND no specific last action implying work completion?
-        // User said: "Clock In -> 出勤済". "Work Complete -> 待機中".
-        if (presentStaffIds.has(staff.id)) {
-          if (lastAction === '情報なし' || displayStatus === '未割当') {
-            displayStatus = '出勤済';
-          } else {
-            // If we have history today, it's '待機中' (Waiting for next order)
-            displayStatus = '待機中';
+          if (currentGenericEvent) {
+            const title = currentGenericEvent.title || '作業';
+            return title.endsWith('中') ? title : `${title}中`;
           }
+        }
+
+        // 2. Active Order Status (Priority 2: Button Status)
+        let displayStatus = '未割当';
+        let lastAction = '情報なし';
+
+        if (orderStatusObj?.lastUpdate) {
+          const lastUpdateDate = new Date(orderStatusObj.lastUpdate);
+          if (isToday(lastUpdateDate)) {
+            displayStatus = orderStatusObj.status || '未割当';
+            lastAction = orderStatusObj.lastAction || '';
+          }
+        }
+
+        if (displayStatus === '移動開始' || displayStatus === '移動中') return '移動中';
+        if (displayStatus === '現場到着' || displayStatus === '作業待ち') return '作業待ち';
+        if (displayStatus === '作業開始' || displayStatus === '作業中') return '作業中';
+        // Note: '作業完了' falls through to step 3.
+
+        // 3. Attendance / Shift Status (Priority 3: Fallback)
+        if (presentStaffIds.has(staff.id)) {
+          // Present but not in active button state
+          return '待機中';
+          // Note: Logic simplified to '待機中' if present and not working/moving.
+          // '出勤済' can be used if explicit differentiation needed, but '待機中' is safe.
         } else if (scheduledStaffIds.has(staff.id)) {
-          // Not clocked in, but scheduled
-          displayStatus = '出勤予定';
+          return '出勤予定';
         }
-      }
 
-      // 4. Override with Generic Chips (if current time is within event)
-      // Check for generic chips (events without orderId/rawOrderId or specific flag)
-      // We look at `scheduleEvents`
-      if (scheduleEvents) {
-        const currentGenericEvent = scheduleEvents.find(event => {
-          if (event.staffId !== staff.id) return false;
-          // Check if it's a "Generic" event. 
-          // Definition: No customerCode or customerName? Or explicit ID?
-          // In `order-context`, generic tasks have id `generic-...` but those are draggable sources.
-          // Placed events have IDs like `trip-...`.
-          // If it DOESN'T have a valid `rawOrderId`, it might be generic.
-          // OR if `customerCode` is empty?
-          // Let's assume Order-based events have `rawOrderId`.
-          if (event.rawOrderId) return false; // It's an order
+        return '未割当';
+      };
 
-          const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-          const end = typeof event.end === 'string' ? parseISO(event.end) : event.end;
-          return isValid(start) && isValid(end) && now >= start && now <= end;
-        });
+      let finalStatus = getDisplayStatus();
 
-        if (currentGenericEvent) {
-          displayStatus = currentGenericEvent.title;
-        }
-      }
-
-      // 5. Clock Out Override
+      // 4. Clock Out Override
       if (checkedOutStaffIds.has(staff.id)) {
-        displayStatus = '退勤済';
+        finalStatus = '退勤済';
       }
 
       return {
         ...orderStatusObj,
         staffId: staff.id,
-        status: displayStatus,
+        status: finalStatus,
+        lastAction: orderStatusObj?.lastAction || ''
       } as StaffStatus;
     });
   }, [filteredStaff, statuses, scheduleEvents, checkedOutStaffIds, presentStaffIds, scheduledStaffIds, profile]);
