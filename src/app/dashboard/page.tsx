@@ -253,7 +253,9 @@ export default function DashboardPage() {
 
   const derivedStatuses = React.useMemo(() => {
     if (!profile) return [];
-    const now = new Date();
+
+    // Use currentTime state to ensure reactivity
+    const now = currentTime;
 
     return filteredStaff.map(staff => {
       const orderStatusObj = statuses.find(s => s.staffId === staff.id);
@@ -263,7 +265,15 @@ export default function DashboardPage() {
         if (scheduleEvents) {
           const currentGenericEvent = scheduleEvents.find(event => {
             if (event.staffId !== staff.id) return false;
-            if (event.rawOrderId) return false;
+
+            // Check if it looks like a Generic Task based on title
+            // Note: "移動" is usually a sub-event of an order, but standalone "移動" exists.
+            // If it's a real order travel, it behaves as order.
+            // However, user wants "Break" etc to be automatic.
+
+            const title = event.title || '';
+            const isGeneric = ['休憩', '商談', '研修', '同行', '業務', '会議'].some(k => title.includes(k));
+            if (!isGeneric) return false;
 
             const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
             const end = typeof event.end === 'string' ? parseISO(event.end) : event.end;
@@ -320,7 +330,7 @@ export default function DashboardPage() {
         lastAction: orderStatusObj?.lastAction || ''
       } as StaffStatus;
     });
-  }, [filteredStaff, statuses, scheduleEvents, checkedOutStaffIds, presentStaffIds, scheduledStaffIds, profile]);
+  }, [filteredStaff, statuses, scheduleEvents, checkedOutStaffIds, presentStaffIds, scheduledStaffIds, profile, currentTime]);
 
 
   const showVerticalView = forceMobileView || (isMobile && profile?.role !== 'admin');
