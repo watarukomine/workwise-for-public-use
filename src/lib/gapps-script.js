@@ -219,18 +219,40 @@ function createOrder(params) {
     const newSystemId = `${dateStr}_${userCode}_${randomStr}`;
 
     // ---------------------------------------------------------
-    // 行の決定 (空行を探す)
     // ---------------------------------------------------------
-    let targetRow = sheet.getLastRow() + 1;
-    // 必要なら空行検索ロジックをここに入れる
+    // 2. Prepare Data (Calculate Static Order ID)
+    // ---------------------------------------------------------
+    // Instead of using formula =ROW()-1, calculate Max(CurrentID) + 1
+    // This allows sorting without breaking IDs.
+
+    let maxId = 0;
+    const idColIndex = headers.indexOf("受注ID"); // Find the index of "受注ID"
+    if (idColIndex !== -1) {
+      const colLetter = String.fromCharCode(65 + idColIndex);
+      // Get all values in ID column (exclude header)
+      const existingIds = sheet.getRange(`${colLetter}2:${colLetter}`).getValues();
+      for (let i = 0; i < existingIds.length; i++) {
+        const val = existingIds[i][0];
+        // Check if value is a number (ignore formulas like =ROW()-1 if any left, though unlikely if pasting as values)
+        // Adjust logic: if it's a number, take it.
+        const numVal = Number(val);
+        if (!isNaN(numVal) && numVal > maxId) {
+          maxId = numVal;
+        }
+      }
+    }
+
+    const nextId = maxId + 1;
+    const numericId = nextId; // Return value for frontend response
 
     const newRow = [];
 
     headers.forEach(header => {
       const h = String(header).trim();
 
+      // Header Matching Logic
       if (h === "受注ID") {
-        newRow.push("=ROW()-1"); // 既存の行番号方式（表示用）
+        newRow.push(nextId); // Static Number!
       } else if (h === "SystemID") {
         newRow.push(newSystemId); // 【重要】絶対不変のID
       } else if (h === "顧客コード" || h === "ユーザーコード") {
