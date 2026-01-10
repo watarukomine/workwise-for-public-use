@@ -16,6 +16,16 @@ import { updateStaffStatus } from '@/services/attendance-service';
 import { cn } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Emergency';
 type StatusValue = StaffStatus['status'];
@@ -32,6 +42,8 @@ function CheckInClient() {
   const { refetchOrders, orders } = useOrder();
   const [manualTime, setManualTime] = React.useState('');
   const [isCorrectionMode, setIsCorrectionMode] = React.useState(false);
+  const [pendingAction, setPendingAction] = React.useState<ActionType | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
   const currentOrder = React.useMemo(() => {
     if (!orderId) return null;
@@ -59,32 +71,47 @@ function CheckInClient() {
       setError('緊急連絡の内容を入力してください。');
       return;
     }
-
-    // Use 'Wait' action type as base, but carry the message? 
-    // Or we define a new action 'Emergency'
-    await handleAction('Emergency');
+    await executeCheckIn('Emergency');
   };
 
-  const handleAction = async (action: ActionType | 'Emergency') => {
-    setIsLoading(action);
-    setError(null);
-    let actionDate = new Date();
+  const handleActionClick = (action: ActionType) => {
+    if (isCorrectionMode) {
+      setPendingAction(action);
+      // Default to current time
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      setManualTime(timeStr);
+      setIsDialogOpen(true);
+    } else {
+      executeCheckIn(action);
+    }
+  };
 
-    // In Correction Mode, if manualTime is set, use it
-    if (isCorrectionMode && manualTime) {
-      const [hours, minutes] = manualTime.split(':').map(Number);
-      if (!isNaN(hours) && !isNaN(minutes)) {
-        actionDate.setHours(hours, minutes, 0, 0);
-        // Safety check: if manual time is in future? User might want to correct to future? Allow it.
-      }
+  const handleConfirmCorrection = () => {
+    if (!pendingAction) return;
+
+    let actionDate = new Date();
+    const [hours, minutes] = manualTime.split(':').map(Number);
+    if (!isNaN(hours) && !isNaN(minutes)) {
+      actionDate.setHours(hours, minutes, 0, 0);
+    } else {
+      setError('時刻の形式が正しくありません。');
+      return;
     }
 
-    const now = actionDate;
+    executeCheckIn(pendingAction, actionDate);
+    setIsDialogOpen(false);
+    setPendingAction(null);
+  };
 
-    // Check geolocation ONLY if NOT in correction mode (unless Emergency)
-    // If correction mode is ON, bypass geolocation check if user wants (implicit request for "can't press button")
-    // But let's keep it safe: if Correction Mode, we bypass geolocation check.
-    const bypassGeolocation = isCorrectionMode;
+  const executeCheckIn = async (action: ActionType | 'Emergency', manualDate?: Date) => {
+    setIsLoading(action === 'Emergency' ? 'Emergency' : action as ActionType);
+    setError(null);
+
+    const now = manualDate || new Date();
+    const isManual = !!manualDate;
+    const bypassGeolocation = isManual || action === 'Emergency'; // Always bypass for manual or emergency logic if needed? 
+    // Actually Emergency usually wants location, but let's keep it robust.
 
     if (action === 'Clock In' || action === 'Clock Out') {
       try {
@@ -98,7 +125,7 @@ function CheckInClient() {
         const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
         setLastAction({ action, time: currentTime });
         toast({
-          title: isCorrectionMode ? `${action === 'Clock In' ? '出勤' : '退勤'}時間を修正しました` : (action === 'Clock In' ? '出勤しました' : '退勤しました'),
+          title: isManual ? `${action === 'Clock In' ? '出勤' : '退勤'}時間を修正しました` : (action === 'Clock In' ? '出勤しました' : '退勤しました'),
           description: `${currentTime}に記録しました。`,
         });
       } catch (e: any) {
@@ -149,8 +176,8 @@ function CheckInClient() {
           latitude: latitude,
           longitude: longitude,
           actionType: action as any,
-          actionTimestamp: now.toISOString(), // Action Timestamp is the corrected time
-          comment: action === 'Emergency' ? `【緊急】${emergencyMessage}` : (isCorrectionMode ? '【修正】' : '')
+          actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
+          comment: action === 'Emergency' ? `【緊急】${emergencyMessage}` : (isManual ? '【修正】' : '')
         });
 
         if (result.status === 'error') {
@@ -160,25 +187,24 @@ function CheckInClient() {
         await refetchOrders();
 
         toast({
-          title: action === 'Emergency' ? '緊急連絡を送信しました' : (isCorrectionMode ? 'ステータス時間を修正しました' : 'ステータスを更新しました'),
+          title: action === 'Emergency' ? '緊急連絡を送信しました' : (isManual ? 'ステータス時間を修正しました' : 'ステータスを更新しました'),
           description: result.message,
           variant: action === 'Emergency' ? 'destructive' : 'default',
         });
 
         const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-        setLastAction({ action: action, time: currentTime });
+        setLastAction({ action: action as ActionType, time: currentTime });
 
         if (action === 'Emergency') setEmergencyMessage('');
 
         // Turn off correction mode
-        if (isCorrectionMode) {
+        if (isManual && isCorrectionMode) {
           setIsCorrectionMode(false);
           setManualTime('');
         }
 
       } catch (e: any) {
         const errorMessage = e.message || 'スプレッドシートの更新に失敗しました。';
-        // ... existing error handling ...
         setError(errorMessage);
         toast({
           variant: 'destructive',
@@ -189,31 +215,77 @@ function CheckInClient() {
     };
 
     if (!bypassGeolocation && navigator.geolocation) {
-      // Normal flow
       navigator.geolocation.getCurrentPosition(
         (pos) => executeUpdate(pos.coords.latitude, pos.coords.longitude),
         (err) => {
-          // ... existing error handling ...
-          setError('位置情報の取得に失敗しました。修正モードを試してください。');
-          setIsLoading(null);
+          // Fallback to update without location if error, but warn?
+          // Actually existing logic just errors out.
+          let message = '';
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              message = '位置情報の利用がブロックされています。';
+              break;
+            case err.POSITION_UNAVAILABLE:
+              message = '現在地の取得に失敗しました。';
+              break;
+            case err.TIMEOUT:
+              message = '位置情報の取得がタイムアウトしました。';
+              break;
+            default:
+              message = '不明なエラーが発生しました。';
+              break;
+          }
+          if (isManual) {
+            // Should not happen if bypass is true
+            executeUpdate(null, null);
+          } else {
+            setError(message + ' 修正モードを試してください。');
+            setIsLoading(null);
+          }
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     } else {
-      // Bypass flow (Correction Mode or No Geo)
       await executeUpdate(null, null);
       setIsLoading(null);
     }
   };
 
-  // ... (keep isButtonDisabled)
+  const isButtonDisabled = (action: ActionType | 'Emergency') => {
+    if ((action as string) === 'Emergency') return !!isLoading;
+    if (['Clock In', 'Clock Out', 'Wait'].includes(action)) return false;
+    if (!orderId) return true;
+    if (isCorrectionMode) return false;
+
+    switch (action) {
+      case 'Start Travel':
+        return !['未着手', '待機中', ''].includes(currentStatus);
+      case 'Arrive':
+        return currentStatus !== '移動中';
+      case 'Begin Task':
+        return currentStatus !== '作業待ち';
+      case 'Finish Task':
+        return currentStatus !== '作業中';
+      default:
+        return false;
+    }
+  };
+
+  const actionButtons: { action: ActionType; label: string; icon: React.ElementType }[] = [
+    { action: 'Clock In', label: '出勤', icon: LogIn },
+    { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
+    { action: 'Arrive', label: '現場到着', icon: MapPin },
+    { action: 'Begin Task', label: '作業開始', icon: Clock },
+    { action: 'Finish Task', label: '作業完了', icon: CheckCircle },
+    { action: 'Clock Out', label: '退勤', icon: LogOut },
+    { action: 'Wait', label: '位置情報更新', icon: RefreshCw },
+  ];
 
   return (
     <div className="max-w-md mx-auto space-y-6">
       <Card>
         <CardHeader>
           <div className="flex justify-between items-start">
-            {/* ... existing header ... */}
             <div>
               <CardTitle>作業記録</CardTitle>
               <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
@@ -228,21 +300,9 @@ function CheckInClient() {
             </Button>
           </div>
 
-          {/* Manual Time Input for Correction Mode */}
           {isCorrectionMode && (
-            <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
-              <label className="text-xs font-semibold text-red-700 mb-1 block">指定時間に修正 (未入力なら現在時刻)</label>
-              <input
-                type="time"
-                className="w-full text-lg p-2 border rounded"
-                value={manualTime}
-                onChange={(e) => setManualTime(e.target.value)}
-              />
-              <p className="text-xs text-red-600 mt-2">
-                ※ 位置情報のチェックがスキップされます。
-                <br />
-                ※ ボタンを押すと、この時間で記録されます。
-              </p>
+            <div className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+              修正モード有効中: ボタンを押すと時間指定画面が開きます。
             </div>
           )}
         </CardHeader>
@@ -258,7 +318,7 @@ function CheckInClient() {
                   action === 'Wait' && "col-span-2",
                   isCorrectionMode && "ring-2 ring-red-400 border-red-400 bg-red-50 text-red-900 hover:bg-red-100"
                 )}
-                onClick={() => handleAction(action)}
+                onClick={() => handleActionClick(action)}
                 disabled={!!isLoading || isButtonDisabled(action)}
               >
                 {isLoading === action ? (
@@ -289,7 +349,7 @@ function CheckInClient() {
               <div className="flex gap-2">
                 <Button
                   className="flex-1 bg-red-400 hover:bg-red-500 text-white"
-                  onClick={() => handleAction('Emergency')}
+                  onClick={() => executeCheckIn('Emergency')}
                   disabled={!!isLoading || !emergencyMessage}
                 >
                   <Send className="mr-2 h-4 w-4" />
@@ -308,13 +368,13 @@ function CheckInClient() {
                       let recoveryStatus = '未着手';
                       if (currentOrder) {
                         if (currentOrder.actualEndTime) {
-                          recoveryStatus = '待機中'; // Finished -> Waiting
+                          recoveryStatus = '待機中';
                         } else if (currentOrder.actualStartTime) {
-                          recoveryStatus = '作業中'; // Started -> Working
+                          recoveryStatus = '作業中';
                         } else if (currentOrder.arrivalTimestamp) {
-                          recoveryStatus = '作業待ち'; // Arrived -> Waiting for Work
+                          recoveryStatus = '作業待ち';
                         } else if (currentOrder.startTravelTime) {
-                          recoveryStatus = '移動中'; // Started Travel -> Moving
+                          recoveryStatus = '移動中';
                         }
                       }
 
@@ -325,7 +385,7 @@ function CheckInClient() {
                         statusValue: recoveryStatus,
                         timestamp: now.toISOString(),
                         actionType: null,
-                        comment: '' // Clear comment
+                        comment: ''
                       });
                       toast({ title: '緊急連絡を解除しました', description: `ステータスを「${recoveryStatus}」に戻しました。` });
                       setEmergencyMessage('');
@@ -369,13 +429,53 @@ function CheckInClient() {
               <MapPin className="h-4 w-4" />
               <AlertTitle>最後の記録</AlertTitle>
               <AlertDescription>
-                {getJapaneseActionName(lastAction.action)} @ {lastAction.time}
-                {location && !['Clock In', 'Clock Out'].includes(lastAction.action) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
+                {getJapaneseActionName(lastAction.action as ActionType)} @ {lastAction.time}
+                {location && !['Clock In', 'Clock Out'].includes(lastAction.action as ActionType) && <span className="text-xs block mt-1">({location.latitude.toFixed(4)}, {location.longitude.toFixed(4)})</span>}
               </AlertDescription>
             </Alert>
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>修正時間の入力</DialogTitle>
+            <DialogDescription>
+              「{pendingAction && getJapaneseActionName(pendingAction)}」の実績時間を入力してください。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center space-x-2 py-4">
+            <div className="grid flex-1 gap-2">
+              <Label htmlFor="time" className="sr-only">
+                時間
+              </Label>
+              <Input
+                id="time"
+                type="time"
+                value={manualTime}
+                onChange={(e) => setManualTime(e.target.value)}
+                className="text-center text-lg"
+              />
+            </div>
+          </div>
+          <DialogFooter className="sm:justify-between">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsDialogOpen(false)}
+            >
+              キャンセル
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmCorrection}
+            >
+              決定
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
