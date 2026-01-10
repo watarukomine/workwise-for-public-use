@@ -313,6 +313,24 @@ export default function DashboardPage() {
           return '出勤予定';
         }
 
+        // 3.5. Implied Attendance from Tasks
+        // If staff has tasks assigned TODAY, assume they are at least '待機中' (Idle/Waiting)
+        // rather than '未割当' (Unassigned), even if they forgot to clock in.
+        if (scheduleEvents) {
+          const hasTasksToday = scheduleEvents.some(event => {
+            if (event.staffId !== staff.id) return false;
+            // Ignore Unassigned just in case
+            if (event.staffId === 'unassigned') return false;
+
+            const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+            return isValid(start) && isSameDay(start, now);
+          });
+
+          if (hasTasksToday) {
+            return '待機中';
+          }
+        }
+
         return '未割当';
       };
 
