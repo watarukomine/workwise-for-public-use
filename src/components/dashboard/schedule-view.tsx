@@ -460,7 +460,7 @@ export function ScheduleView({
   }, [scheduleEvents, currentDate]);
 
   const [replyDialogOpen, setReplyDialogOpen] = React.useState(false);
-  const [targetEmergencyEvent, setTargetEmergencyEvent] = React.useState<{ rawOrderId: string, currentComment: string, staffName: string } | null>(null);
+  const [targetEmergencyEvent, setTargetEmergencyEvent] = React.useState<{ rawOrderId: string, systemId?: string, currentComment: string, staffName: string } | null>(null);
   const [replyMessage, setReplyMessage] = React.useState('');
 
   const emergencyNotifications = React.useMemo(() => {
@@ -472,7 +472,7 @@ export function ScheduleView({
     });
 
     // return generic structure
-    const notifications: { staffId: string, staffName: string, message: string, rawOrderId: string }[] = [];
+    const notifications: { staffId: string, staffName: string, message: string, rawOrderId: string, systemId: string }[] = [];
 
     const seenStaff = new Set<string>();
 
@@ -522,7 +522,7 @@ export function ScheduleView({
     }
   };
 
-  const openReplyDialog = (event: { rawOrderId: string, message: string, staffName: string }) => {
+  const openReplyDialog = (event: { rawOrderId: string, message: string, staffName: string, systemId: string }) => {
     setTargetEmergencyEvent({
       rawOrderId: event.rawOrderId,
       systemId: event.systemId,
