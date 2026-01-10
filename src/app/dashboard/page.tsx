@@ -230,6 +230,27 @@ export default function DashboardPage() {
     return () => clearInterval(intervalId);
   }, [syncOrders]);
 
+  // Force re-render every minute to update time-based statuses
+  const [currentTime, setCurrentTime] = useState(new Date());
+  useEffect(() => {
+    // Sync with seconds to update roughly at :00
+    const now = new Date();
+    const delay = (60 - now.getSeconds()) * 1000;
+
+    // Initial timeout to align with minute boundary
+    const timeoutId = setTimeout(() => {
+      setCurrentTime(new Date());
+      // Then interval
+      const intervalId = setInterval(() => {
+        setCurrentTime(new Date());
+      }, 60000);
+
+      return () => clearInterval(intervalId);
+    }, delay);
+
+    return () => clearTimeout(timeoutId);
+  }, []);
+
   const derivedStatuses = React.useMemo(() => {
     if (!profile) return [];
     const now = new Date();
