@@ -172,7 +172,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
       }
 
       try {
-        if (/^\d{1,2}:\d{2}$/.test(order.scheduledTime)) {
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(order.scheduledTime)) {
           scheduledTime = parseISO(`${dateStr}T${order.scheduledTime}`);
         } else {
           // Try standard Date parsing for "yyyy/MM/dd HH:mm:ss" which parseISO dislikes
@@ -200,7 +200,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
         let taskEndTime: Date;
 
         if (order.scheduledEndTime) {
-          if (/^\d{1,2}:\d{2}$/.test(order.scheduledEndTime)) {
+          if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(order.scheduledEndTime)) {
             taskEndTime = parseISO(`${dateStr}T${order.scheduledEndTime}`);
           } else {
             // Use new Date() for flexible parsing
