@@ -182,9 +182,15 @@ export default function OrderFormPage() {
                 throw new Error('システム設定エラー: 連携URLが設定されていません。');
             }
 
+            // Handle 'その他' work type
+            const submissionData = { ...data };
+            if (data.workType === 'その他' && data.otherWorkType) {
+                submissionData.workType = data.otherWorkType;
+            }
+
             const result = await createOrder({
                 gasUrl: ORDER_GAS_URL,
-                ...data,
+                ...submissionData,
             });
 
             if (result.status === 'success') {
