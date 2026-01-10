@@ -313,21 +313,32 @@ export default function DashboardPage() {
           return '出勤予定';
         }
 
-        // 3.5. Implied Attendance from Tasks
-        // If staff has tasks assigned TODAY, assume they are at least '待機中' (Idle/Waiting)
-        // rather than '未割当' (Unassigned), even if they forgot to clock in.
+        // 3.5. Overdue Task Check (Implied Status)
+        // If staff has a task that should have started but no button was pressed,
+        // hint at the likely status with a question mark.
         if (scheduleEvents) {
-          const hasTasksToday = scheduleEvents.some(event => {
+          // Find the active event for THIS moment
+          const activeEvent = scheduleEvents.find(event => {
             if (event.staffId !== staff.id) return false;
-            // Ignore Unassigned just in case
+            // Ignore generic here because they are handled in Step 1 (Time Window)
+            // But wait, step 1 handles "Generic Title" (Break/Meeting). 
+            // Here we care about "Order Trip" (Travel/Task).
             if (event.staffId === 'unassigned') return false;
 
             const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-            return isValid(start) && isSameDay(start, now);
+            const end = typeof event.end === 'string' ? parseISO(event.end) : event.end;
+            return isValid(start) && isValid(end) && now >= start && now <= end;
           });
 
-          if (hasTasksToday) {
-            return '待機中';
+          if (activeEvent) {
+            const title = activeEvent.title || '';
+            // If it's a Travel event
+            if (title.startsWith('移動')) {
+              return '移動中？';
+            }
+            // If it's a Task event (and not generic, since generic is caught in Step 1)
+            // Step 1 only catches specific titles. If this is a real task:
+            return '作業中？';
           }
         }
 
