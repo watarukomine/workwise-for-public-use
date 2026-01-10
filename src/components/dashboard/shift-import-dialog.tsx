@@ -16,7 +16,7 @@ import { Label } from '../ui/label';
 import { useToast } from '../../hooks/use-toast';
 import { read, utils } from 'xlsx';
 import { format, parse, isValid } from 'date-fns';
-import { saveDailyAttendanceBatch, saveDailyScheduledBatch, getMonthlyAttendance } from '../../services/attendance-service';
+import { saveDailyAttendanceBatch, saveDailyScheduledBatch, getMonthlyAttendance, getMonthlySchedule } from '../../services/attendance-service';
 import { syncOrdersFromGasToFirestore } from '../../services/order-service';
 import { Loader2, Upload } from 'lucide-react';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';
@@ -70,8 +70,12 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                 if (match) {
                     const day = parseInt(match[1]);
                     // Create date with selected Year/Month
+                    const [tYearStr, tMonthStr] = month.split('-');
+                    const targetYear = parseInt(tYearStr);
+                    const targetMonthIdx = parseInt(tMonthStr) - 1;
+
                     if (!isNaN(selectedDate.getTime()) && day > 0 && day <= 31) {
-                        return new Date(selectedDate.getFullYear(), selectedDate.getMonth(), day);
+                        return new Date(targetYear, targetMonthIdx, day);
                     }
                 }
                 return null;
@@ -190,32 +194,51 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
 
     const parseCellToDate = (cell: any): Date | null => {
         // Excel serial date?
-        if (typeof cell === 'number' && cell > 40000) {
+        if (typeof cell === 'number' && cell > 30000) {
             // Excel base date roughly 1900-01-01. 
-            // JS = (cell - 25569) * 86400 * 1000
             const jsDate = new Date((cell - 25569) * 86400 * 1000);
-            // Set to current year if ambiguous? Excel serial is absolute.
+
+            // Check if year is suspiciously old or default (e.g. 1900) and user likely meant target year
+            // But Excel serials are usually precise. However, if user typed "1/1" into Excel, 
+            // and opened it, Excel might have saved it as 2026/1/1 or 2025/1/1 depending on WHEN they typed it.
+            // If we want to ENFORCE the target year:
+            const [tYear] = targetMonth.split('-');
+            const targetYear = parseInt(tYear);
+
+            if (jsDate.getFullYear() < 2000) {
+                jsDate.setFullYear(targetYear);
+            }
             return jsDate;
         }
         if (typeof cell === 'string') {
             // Try "MM/DD", "M/D", "YYYY/MM/DD"
-            // If no year, assume current year or next year?
-            // Let's try parsing purely.
-            const currentYear = new Date().getFullYear();
+            const [tYear] = targetMonth.split('-');
+            const targetYear = parseInt(tYear);
+            const currentYear = isNaN(targetYear) ? new Date().getFullYear() : targetYear;
+
             let parsed = new Date(cell);
-            if (isValid(parsed) && parsed.getFullYear() < 1950) {
-                // Likely missing year "12/1" -> 1901 or 2001 depending on browser
-                parsed.setFullYear(currentYear);
+
+            // If "M/D" format, Date() constructor usually picks 2001 or near 1900 or current year depending on browser
+            // We force target year if the parsed year looks "automatic" (e.g. 2001)
+
+            if (isValid(parsed) && (parsed.getFullYear() < 1950 || parsed.getFullYear() === 2001)) {
+                parsed.setFullYear(targetYear);
             }
             if (!isValid(parsed)) {
                 // Try manual parse "12/1"
                 const parts = cell.match(/(\d+)\/(\d+)/);
                 if (parts) {
-                    parsed = new Date(currentYear, parseInt(parts[1]) - 1, parseInt(parts[2]));
+                    parsed = new Date(targetYear, parseInt(parts[1]) - 1, parseInt(parts[2]));
                 }
             }
 
-            if (isValid(parsed)) return parsed;
+            if (isValid(parsed)) {
+                // Final enforcement: If parsed date is valid, but year is 2001, force targetYear
+                if (parsed.getFullYear() === 2001) {
+                    parsed.setFullYear(targetYear);
+                }
+                return parsed;
+            }
         }
         return null;
     };
@@ -296,22 +319,13 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                         const year = parseInt(yStr);
                         const month = parseInt(mStr);
 
-                        // Fetch current attendance
-                        const currentData = await getMonthlyAttendance(year, month);
+                        // Fetch current SCHEDULE (not actual attendance)
+                        const currentData = await getMonthlySchedule(year, month);
 
                         // Set of staff IDs found in the file (to calculate who is NOT in file)
                         const fileStaffIds = new Set<string>();
                         parsedData.forEach(shift => {
-                            shift.staffNames.forEach(name => {
-                                // Re-resolve to ID (inefficient to redo, but safer or we can collect from batchRecords)
-                                // Actually batchRecords is better source, but batchRecords is by DATE.
-                                // We need ALL staff IDs present in the file across ALL dates?
-                                // "Update only staff in file" usually means:
-                                // If Staff A is in the file (even if absent), we update Staff A.
-                                // If Staff B is NOT in the file at all, we keep Staff B's current data.
-                                // So we need a set of "Staff IDs processed in this file".
-                                // Let's collect from nameToId match we did earlier.
-                            });
+                            // We already built participated names earlier
                         });
 
                         // Let's gather all IDs appearing in the import file (based on the names we matched)
@@ -329,7 +343,7 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                         finalBatchRecords = batchRecords.map(record => {
                             const dateKey = format(record.date, 'yyyy-MM-dd');
                             const currentIds = currentData[dateKey] || [];
-                            // IDs to keep: Current IDs that are NOT in the participating set
+                            // IDs to keep: Current SCHEDULED IDs that are NOT in the participating set
                             const idsToKeep = currentIds.filter((id: string) => !participatingStaffIds.has(id));
                             // IDs from file: record.staffIds
                             // New list = Kept + File

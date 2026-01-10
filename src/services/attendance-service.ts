@@ -63,9 +63,10 @@ const getDailyAttendanceViaRest = async (date: Date): Promise<string[] | null> =
     // @ts-ignore
     let dbId = firestore?._databaseId?.database;
 
-    // Ensure we use 'workwise' as the database name
+    // Ensure we use 'workwise' as the database name -> NO
+    // Fixed: Use (default) unless specified, because most projects use default
     if (!dbId || dbId === '(default)' || dbId === pId) {
-        dbId = 'workwise';
+        dbId = '(default)';
     }
 
     const projectId = pId;
@@ -156,7 +157,7 @@ const getMonthlyAttendanceViaRest = async (year: number, month: number): Promise
     let dbId = firestore?._databaseId?.database;
 
     if (!dbId || dbId === '(default)' || dbId === pId) {
-        dbId = 'workwise';
+        dbId = '(default)';
     }
 
     const projectId = pId;
@@ -213,6 +214,119 @@ const getMonthlyAttendanceViaRest = async (year: number, month: number): Promise
     return result;
 };
 
+/**
+ * Fetches scheduled shift data for a whole month.
+ * Returns a map of date string (YYYY-MM-DD) -> scheduled staff IDs array.
+ */
+export const getMonthlySchedule = async (year: number, month: number): Promise<{ [date: string]: string[] }> => {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = endOfMonth(startDate);
+    const startId = getAttendanceDocId(startDate);
+    const endId = getAttendanceDocId(endDate);
+
+    const result: { [date: string]: string[] } = {};
+
+    try {
+        console.log(`[AttendanceService] Fetching monthly schedule for ${year}-${month}...`);
+        const db = getDb();
+        const q = query(
+            collection(db, COLLECTION_NAME),
+            where('__name__', '>=', startId),
+            where('__name__', '<=', endId)
+        );
+
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.scheduledStaffIds && Array.isArray(data.scheduledStaffIds)) {
+                result[doc.id] = data.scheduledStaffIds;
+            }
+        });
+        console.log(`[AttendanceService] Successfully fetched monthly schedule.`);
+        return result;
+
+    } catch (error) {
+        console.warn(`[AttendanceService] SDK monthly schedule fetch failed, trying REST fallback...`, error);
+        try {
+            return await getMonthlyScheduleViaRest(year, month);
+        } catch (restError) {
+            console.error(`[AttendanceService] REST monthly schedule fallback also failed:`, restError);
+            return {};
+        }
+    }
+};
+
+/**
+ * Fetches monthly schedule using REST API (RunQuery).
+ */
+const getMonthlyScheduleViaRest = async (year: number, month: number): Promise<{ [date: string]: string[] }> => {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = endOfMonth(startDate);
+    const startId = getAttendanceDocId(startDate);
+    const endId = getAttendanceDocId(endDate);
+
+    const { firestore } = initializeFirebase();
+    // @ts-ignore
+    const pId = firestore?._databaseId?.projectId || firebaseConfig.projectId;
+    // @ts-ignore
+    let dbId = firestore?._databaseId?.database;
+
+    if (!dbId || dbId === '(default)' || dbId === pId) {
+        dbId = '(default)';
+    }
+
+    const projectId = pId;
+    const databaseId = dbId;
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents:runQuery?key=${firebaseConfig.apiKey}`;
+
+    const queryBody = {
+        structuredQuery: {
+            from: [{ collectionId: COLLECTION_NAME }],
+            where: {
+                compositeFilter: {
+                    op: 'AND',
+                    filters: [
+                        { fieldFilter: { field: { fieldPath: '__name__' }, op: 'GREATER_THAN_OR_EQUAL', value: { referenceValue: `projects/${projectId}/databases/${databaseId}/documents/${COLLECTION_NAME}/${startId}` } } },
+                        { fieldFilter: { field: { fieldPath: '__name__' }, op: 'LESS_THAN_OR_EQUAL', value: { referenceValue: `projects/${projectId}/databases/${databaseId}/documents/${COLLECTION_NAME}/${endId}` } } }
+                    ]
+                }
+            }
+        }
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(queryBody)
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`REST API monthly schedule fetch failed: ${response.status} - ${errorText}`);
+    }
+
+    const json = await response.json();
+    const result: { [date: string]: string[] } = {};
+
+    if (Array.isArray(json)) {
+        json.forEach((item: any) => {
+            if (item.document) {
+                const parts = item.document.name.split('/');
+                const docId = parts[parts.length - 1];
+
+                const scheduleField = item.document.fields?.scheduledStaffIds;
+                if (scheduleField && scheduleField.arrayValue && scheduleField.arrayValue.values) {
+                    result[docId] = scheduleField.arrayValue.values.map((v: any) => v.stringValue);
+                } else if (scheduleField && scheduleField.arrayValue && !scheduleField.arrayValue.values) {
+                    result[docId] = [];
+                }
+            }
+        });
+    }
+
+    return result;
+};
+
 
 /**
  * Saves daily attendance using the Firestore REST API.
@@ -235,7 +349,7 @@ const saveDailyAttendanceViaRest = async (date: Date, staffIds: string[]): Promi
     // Ensure we use 'workwise' unless specifically told otherwise.
     // The previous logic to use projectId as databaseId was incorrect for standard Firestore setups.
     if (!dbId || dbId === '(default)' || dbId === pId) {
-        dbId = 'workwise';
+        dbId = '(default)';
     }
 
     console.log(`[AttendanceService] Debug: Project=${pId}, Database=${dbId} (adjusted)`);
