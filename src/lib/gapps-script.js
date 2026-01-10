@@ -67,7 +67,7 @@ function doGet(e) {
 // シートデータをオブジェクト配列として取得するヘルパー
 function getSheetData(sheet) {
   const dataRange = sheet.getDataRange();
-  const values = dataRange.getValues();
+  const values = dataRange.getDisplayValues(); // 文字列としてそのまま取得（日付自動変換を防ぐ）
   if (values.length < 1) return [];
 
   const headers = values.shift();
@@ -253,6 +253,9 @@ function createOrder(params) {
     const nextId = maxId + 1;
     const numericId = nextId; // Return value for frontend response
 
+    // Determine the row to write to (last row + 1)
+    const targetRow = sheet.getLastRow() + 1;
+
     const newRow = [];
 
     headers.forEach(header => {
@@ -275,12 +278,16 @@ function createOrder(params) {
         newRow.push(params.scheduledDate || "");
       } else if (h === "予定時間") {
         newRow.push(params.scheduledTime || "");
-      } else if (h === "担当" || h === "担当者名" || h === "ご担当者様") {
+      } else if (h === "ご担当者様" || h === "担当者名") {
         newRow.push(params.picName || "");
+      } else if (h === "担当") {
+        newRow.push(""); // 弊社担当者はフォームからは空欄にする
       } else if (h === "注文番号" || h.includes("受注No")) {
         newRow.push(params.orderNo || "");
-      } else if (h === "緊急連絡" || h.includes("任意コメント")) {
+      } else if (h.includes("任意コメント")) {
         newRow.push(params.comment || "");
+      } else if (h === "緊急連絡") {
+        newRow.push(""); // フォームからは緊急連絡は空欄
       } else if (h === "車名") {
         newRow.push(params.carName || "");
       } else if (h.includes("登録ナンバー")) {
