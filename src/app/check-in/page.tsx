@@ -77,10 +77,11 @@ function CheckInClient() {
   const handleActionClick = (action: ActionType) => {
     if (isCorrectionMode) {
       setPendingAction(action);
-      // Default to current time
+      // Default to current time in HH:mm format for input type="time"
       const now = new Date();
-      const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-      setManualTime(timeStr);
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      setManualTime(`${hours}:${minutes}`);
       setIsDialogOpen(true);
     } else {
       executeCheckIn(action);
