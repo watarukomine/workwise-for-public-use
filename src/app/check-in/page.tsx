@@ -179,7 +179,7 @@ function CheckInClient() {
           actionType: action as any,
           actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
           comment: action === 'Emergency' ? `【緊急】${emergencyMessage}` : (isManual ? '【修正】' : ''),
-          systemId: currentOrder?.id || orderId // Pass robust ID
+          systemId: currentOrder?.rawOrderId || (currentOrder?.id && !currentOrder.id.startsWith('trip-') ? currentOrder.id : (orderId?.replace(/^(trip-)/, '').replace(/(-task|-travel)$/, '') || ''))
         });
 
         if (result.status === 'error') {
@@ -388,7 +388,7 @@ function CheckInClient() {
                         timestamp: now.toISOString(),
                         actionType: null,
                         comment: '', // Clear comment
-                        systemId: currentOrder?.id || orderId
+                        systemId: currentOrder?.rawOrderId || (currentOrder?.id && !currentOrder.id.startsWith('trip-') ? currentOrder.id : (orderId?.replace(/^(trip-)/, '').replace(/(-task|-travel)$/, '') || ''))
                       });
                       toast({ title: '緊急連絡を解除しました', description: `ステータスを「${recoveryStatus}」に戻しました。` });
                       setEmergencyMessage('');
