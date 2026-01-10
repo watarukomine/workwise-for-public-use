@@ -47,7 +47,8 @@ export type Customer = {
 };
 
 export type Order = {
-  id: string;
+  id: string; // System ID (Unique: Date_User_UUID)
+  displayId?: string; // Visual ID (Row Number: 1, 2, 3...)
   rawOrderId?: string;
   customerCode: string;
   customerName: string;

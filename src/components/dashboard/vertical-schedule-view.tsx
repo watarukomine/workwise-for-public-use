@@ -122,7 +122,7 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
         return (
           <React.Fragment key={event.id}>
             {event.rawOrderId && !isTravel && isOwnTask ? (
-              <Link href={`/check-in?orderId=${event.rawOrderId}`}>
+              <Link href={`/check-in?orderId=${event.id}`}>
                 {eventCard}
               </Link>
             ) : (

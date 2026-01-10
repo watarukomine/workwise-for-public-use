@@ -486,6 +486,7 @@ export function ScheduleView({
         notifications.push({
           staffId: e.staffId,
           staffName: staff.name,
+          systemId: e.id,
           message: comment,
           rawOrderId: e.rawOrderId || ''
         });
@@ -495,9 +496,9 @@ export function ScheduleView({
     return notifications;
   }, [scheduleEvents, staffData]);
 
-  const handleClearEmergency = async (event: { rawOrderId: string, message: string, staffName: string }) => {
+  const handleClearEmergency = async (event: { rawOrderId: string, message: string, staffName: string, systemId: string }) => {
     try {
-      if (!event.rawOrderId) {
+      if (!event.rawOrderId && !event.systemId) {
         toast({ variant: 'destructive', title: "エラー", description: "イベントIDが見つかりません" });
         return;
       }
@@ -510,6 +511,7 @@ export function ScheduleView({
         eventTitle: `(ID: ${event.rawOrderId})`,
         staffName: event.staffName,
         comment: newComment,
+        systemId: event.systemId
       });
 
       toast({ title: "緊急ステータスを解除しました" });
@@ -523,6 +525,7 @@ export function ScheduleView({
   const openReplyDialog = (event: { rawOrderId: string, message: string, staffName: string }) => {
     setTargetEmergencyEvent({
       rawOrderId: event.rawOrderId,
+      systemId: event.systemId,
       currentComment: event.message,
       staffName: event.staffName
     });
@@ -543,6 +546,7 @@ export function ScheduleView({
         eventTitle: `(ID: ${rawOrderId})`,
         staffName: staffName,
         comment: newComment,
+        systemId: (targetEmergencyEvent as any).systemId
       });
 
       toast({ title: "返信を送信しました" });
@@ -599,6 +603,7 @@ export function ScheduleView({
         statusValue: "未割当",
         scheduledTime: "",
         timestamp: new Date().toISOString(),
+        systemId: eventToUnassign.id
       });
 
       await refetchOrders();
@@ -643,6 +648,7 @@ export function ScheduleView({
               staffName: "",
               statusValue: "キャンセル",
               timestamp: new Date().toISOString(),
+              systemId: scheduleItem.id
             });
             await refetchOrders();
           } catch (e) {
@@ -757,6 +763,7 @@ export function ScheduleView({
               "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
               "作業予定日": format(taskStart, 'yyyy/MM/dd'),
               "作業時間（分）": taskDuration,
+              systemId: draggedEvent.id
             });
             toast({ title: "スケジュールを更新しました" });
             await new Promise(resolve => setTimeout(resolve, 2000));
@@ -1028,6 +1035,7 @@ export function ScheduleView({
           await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`, // Use ID for tasks
+            systemId: eventToUpdate.id,
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
             scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),

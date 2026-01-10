@@ -65,11 +65,13 @@ export const formatTime = (date: Date | string) => {
 };
 
 export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
-  const idKeys = ['受注 ID', '受注id', '受注ID', 'id'];
-  const orderId = findKey(rawOrder, idKeys);
+  // Try to find the robust System ID first
+  const sysId = findKey(rawOrder, ['SystemID', 'systemId', 'sysId']);
+  // Find the visual ID (Row Number)
+  const visualId = findKey(rawOrder, ['受注 ID', '受注id', '受注ID', 'id']);
 
-  // Ensure unique ID if missing
-  // const uniqueId = String(orderId || `ord-rand-${Math.random()}`);
+  // If SystemID exists, use it. Otherwise fallback to visualId (for backward compatibility)
+  const orderId = sysId ? String(sysId) : (visualId ? String(visualId) : `ord-${Math.random()}`);
 
   const rawDurationVal = findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間']);
   let duration = 60; // Default
@@ -102,8 +104,9 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
   }
 
   return {
-    id: String(orderId || `ord-${Math.random()}`),
-    rawOrderId: orderId ? String(orderId) : undefined,
+    id: String(orderId),
+    displayId: visualId ? String(visualId) : undefined,
+    rawOrderId: visualId ? String(visualId) : undefined,
     customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
     taskDetails: taskDetails, // Simplified for initial view, detailed view can show more
     status: findKey(rawOrder, ['受注ステータス', 'status']) || '未割当',
