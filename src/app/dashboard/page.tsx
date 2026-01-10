@@ -287,13 +287,13 @@ export default function DashboardPage() {
         }
 
         // 2. Active Order Status (Priority 2: Button Status)
-        let displayStatus = '未割当';
+        let displayStatus = '';
         let lastAction = '情報なし';
 
         if (orderStatusObj?.lastUpdate) {
           const lastUpdateDate = new Date(orderStatusObj.lastUpdate);
           if (isToday(lastUpdateDate)) {
-            displayStatus = orderStatusObj.status || '未割当';
+            displayStatus = orderStatusObj.status || '';
             lastAction = orderStatusObj.lastAction || '';
           }
         }
@@ -316,7 +316,17 @@ export default function DashboardPage() {
         // 3.5. Overdue Task Check (Implied Status)
         // If staff has a task that should have started but no button was pressed,
         // hint at the likely status with a question mark.
+        let hasTasksToday = false;
+
         if (scheduleEvents) {
+          // Check if staff has any tasks TODAY
+          hasTasksToday = scheduleEvents.some(event => {
+            if (event.staffId !== staff.id) return false;
+            // Filter by date
+            const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+            return isValid(start) && isSameDay(start, currentDate);
+          });
+
           // Find the active event for THIS moment
           const activeEvent = scheduleEvents.find(event => {
             if (event.staffId !== staff.id) return false;
@@ -342,7 +352,10 @@ export default function DashboardPage() {
           }
         }
 
-        return '未割当';
+        // 4. Final Fallback
+        // If they have tasks today -> '待機中' (Waiting for next task)
+        // If they have NO tasks today -> '-' (No status/Off)
+        return hasTasksToday ? '待機中' : '-';
       };
 
       let finalStatus = getDisplayStatus();
