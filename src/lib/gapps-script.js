@@ -206,16 +206,24 @@ function createOrder(params) {
     }
 
     // 新しいSystemIDの生成: YYYYMMDD_UserCode_Random3
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
+    // 新しいSystemIDの生成: ScheduledDate_UserCode_Random3
+    // ユーザー要望により、作成日ではなく「作業予定日」をIDのプレフィックスにする
+
+    let targetDate = new Date();
+    if (params.scheduledDate) {
+      const scheduled = new Date(params.scheduledDate);
+      if (!isNaN(scheduled.getTime())) {
+        targetDate = scheduled;
+      }
+    }
+
+    const yyyy = targetDate.getFullYear();
+    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(targetDate.getDate()).padStart(2, '0');
     const dateStr = `${yyyy}${mm}${dd}`;
+
     const userCode = params.userCode || 'guest';
-
-    // ランダム3文字 (UUIDの一部など)
     const randomStr = Utilities.getUuid().split('-')[0].substring(0, 3);
-
     const newSystemId = `${dateStr}_${userCode}_${randomStr}`;
 
     // ---------------------------------------------------------
