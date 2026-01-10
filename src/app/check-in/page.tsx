@@ -31,6 +31,39 @@ function CheckInClient() {
   const orderId = searchParams.get('orderId');
   const { refetchOrders, orders } = useOrder();
   const [manualTime, setManualTime] = React.useState('');
+  const [isCorrectionMode, setIsCorrectionMode] = React.useState(false);
+
+  const currentOrder = React.useMemo(() => {
+    if (!orderId) return null;
+    return orders.find(o => o.rawOrderId === orderId || o.id === orderId);
+  }, [orders, orderId]);
+
+  const currentStatus = currentOrder?.status || '未着手';
+
+  const [emergencyMessage, setEmergencyMessage] = React.useState('');
+
+  const getJapaneseActionName = (action: ActionType | 'Emergency') => {
+    const map: Record<string, string> = {
+      'Start Travel': '移動開始',
+      'Arrive': '現場到着',
+      'Begin Task': '作業開始',
+      'Finish Task': '作業完了',
+      'Wait': '位置情報更新',
+      'Emergency': '緊急連絡',
+    };
+    return map[action] || action;
+  };
+
+  const handleEmergency = async () => {
+    if (!emergencyMessage.trim()) {
+      setError('緊急連絡の内容を入力してください。');
+      return;
+    }
+
+    // Use 'Wait' action type as base, but carry the message? 
+    // Or we define a new action 'Emergency'
+    await handleAction('Emergency');
+  };
 
   const handleAction = async (action: ActionType | 'Emergency') => {
     setIsLoading(action);
