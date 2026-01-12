@@ -603,7 +603,7 @@ export function ScheduleView({
         statusValue: "未割当",
         scheduledTime: "",
         timestamp: new Date().toISOString(),
-        systemId: eventToUnassign.id
+        systemId: orderToUnassign.id
       });
 
       await refetchOrders();
@@ -1035,7 +1035,7 @@ export function ScheduleView({
           await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`, // Use ID for tasks
-            systemId: eventToUpdate.id,
+            systemId: mapRawToOrder(eventToUpdate.raw).id,
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
             scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
