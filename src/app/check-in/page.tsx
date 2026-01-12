@@ -213,6 +213,8 @@ function CheckInClient() {
           title: '更新エラー',
           description: errorMessage
         });
+      } finally {
+        setIsLoading(null);
       }
     };
 
