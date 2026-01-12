@@ -45,16 +45,33 @@ function CheckInClient() {
   const [pendingAction, setPendingAction] = React.useState<ActionType | null>(null);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
 
+  const [optimisticStatus, setOptimisticStatus] = React.useState<string | null>(null);
+  const [emergencyMessage, setEmergencyMessage] = React.useState('');
+
   const currentOrder = React.useMemo(() => {
     if (!orderId) return null;
     return orders.find(o => o.rawOrderId === orderId || o.id === orderId);
   }, [orders, orderId]);
 
-  const currentStatus = currentOrder?.status || '未着手';
+  // Use optimistic status if available, otherwise fall back to context data
+  const currentStatus = optimisticStatus || currentOrder?.status || '未着手';
 
-  const [emergencyMessage, setEmergencyMessage] = React.useState('');
+  // Reset optimistic status when the underlying order status updates to match it
+  React.useEffect(() => {
+    if (currentOrder?.status && currentOrder.status === optimisticStatus) {
+      setOptimisticStatus(null);
+    }
+    // Also reset if orderId changes
+  }, [currentOrder?.status, optimisticStatus, orderId]);
+
+  // Also reset optimistic status if orderId changes completely
+  React.useEffect(() => {
+    setOptimisticStatus(null);
+  }, [orderId]);
+
 
   const getJapaneseActionName = (action: ActionType | 'Emergency') => {
+    // ... (existing map)
     const map: Record<string, string> = {
       'Start Travel': '移動開始',
       'Arrive': '現場到着',
@@ -65,6 +82,11 @@ function CheckInClient() {
     };
     return map[action] || action;
   };
+
+  // ... (handleEmergency, handleActionClick, handleConfirmCorrection)
+  // Inside executeCheckIn/executeUpdate:
+
+
 
   const handleEmergency = async () => {
     if (!emergencyMessage.trim()) {
@@ -186,6 +208,7 @@ function CheckInClient() {
           throw new Error(result.message);
         }
 
+        setOptimisticStatus(statusValue);
         await refetchOrders();
 
         toast({

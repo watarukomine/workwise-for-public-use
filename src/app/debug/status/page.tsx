@@ -119,7 +119,10 @@ export default function DebugStatusPage() {
                                             <div className="font-bold border-b mb-2">Mapped Object</div>
                                             <div>Email: <span className={staff.email ? "text-green-600 font-bold" : "text-red-600 font-bold"}>{staff.email || "(Empty)"}</span></div>
                                             <div>Role: {staff.role}</div>
-                                            <div>Color: <span style={colorStyle} className="px-2">{staff.color}</span></div>
+                                            <div>
+                                                Color: {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
+                                                <span style={colorStyle} className="px-2">{staff.color}</span>
+                                            </div>
                                         </div>
                                         <div>
                                             <div className="font-bold border-b mb-2">Raw Object Keys & Values</div>

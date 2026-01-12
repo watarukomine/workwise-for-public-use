@@ -116,6 +116,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
               ) : staffList && staffList.length > 0 ? (
                 staffList.map((member) => {
                   const areaBgClass = member['母店'] ? STORE_COLORS[member['母店']] || '' : '';
+                  const staffColorStyle = { backgroundColor: member.color } as React.CSSProperties;
                   return (
                     <TableRow
                       key={member.id}
@@ -137,11 +138,9 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                       )}
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
                           <div
                             className="h-6 w-6 rounded-full border"
-                            // eslint-disable-next-line react-dom/no-unsafe-inline-style
-                            style={{ backgroundColor: member.color } as React.CSSProperties}
+                            style={staffColorStyle}
                           />
                           <span className="font-medium">{member.name}</span>
                         </div>
