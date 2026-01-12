@@ -124,14 +124,28 @@ export function AnalyticsDashboard() {
                     const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration', '実稼働時間']);
                     if (rawDuration) {
                         const valStr = String(rawDuration);
-                        if (valStr.includes('1899')) {
+                        // Handle "1:30" or "1:30:00" format (H:mm)
+                        if (valStr.includes(':') && !valStr.includes('1899')) {
+                            const parts = valStr.split(':');
+                            if (parts.length >= 2) {
+                                const h = parseInt(parts[0], 10);
+                                const m = parseInt(parts[1], 10);
+                                if (!isNaN(h) && !isNaN(m)) {
+                                    actualDurationHours = h + (m / 60); // Hours
+                                }
+                            }
+                        }
+                        // Handle GAS Date object string (1899-12-30...)
+                        else if (valStr.includes('1899')) {
                             const date = new Date(valStr);
                             if (!isNaN(date.getTime())) {
                                 actualDurationHours = (date.getHours() * 60 + date.getMinutes()) / 60; // Minutes to Hours
                             }
-                        } else {
+                        }
+                        // Handle raw minutes (90)
+                        else {
                             const parsed = parseFloat(valStr);
-                            if (!isNaN(parsed) && parsed > 0 && parsed !== 1899) {
+                            if (!isNaN(parsed) && parsed > 0) {
                                 actualDurationHours = parsed / 60; // Minutes to Hours
                             }
                         }
@@ -312,14 +326,28 @@ export function AnalyticsDashboard() {
                         const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration', '実稼働時間']);
                         if (rawDuration) {
                             const valStr = String(rawDuration);
-                            if (valStr.includes('1899')) {
+                            // Handle "1:30" or "1:30:00" format (H:mm)
+                            if (valStr.includes(':') && !valStr.includes('1899')) {
+                                const parts = valStr.split(':');
+                                if (parts.length >= 2) {
+                                    const h = parseInt(parts[0], 10);
+                                    const m = parseInt(parts[1], 10);
+                                    if (!isNaN(h) && !isNaN(m)) {
+                                        actual = h + (m / 60); // Hours
+                                    }
+                                }
+                            }
+                            // Handle GAS Date object string (1899-12-30...)
+                            else if (valStr.includes('1899')) {
                                 const date = new Date(valStr);
                                 if (!isNaN(date.getTime())) {
                                     actual = (date.getHours() * 60 + date.getMinutes()) / 60; // Minutes to Hours
                                 }
-                            } else {
+                            }
+                            // Handle raw minutes (90)
+                            else {
                                 const parsed = parseFloat(valStr);
-                                if (!isNaN(parsed) && parsed > 0 && parsed !== 1899) {
+                                if (!isNaN(parsed) && parsed > 0) {
                                     actual = parsed / 60; // Minutes to Hours
                                 }
                             }
