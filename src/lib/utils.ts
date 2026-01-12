@@ -133,11 +133,11 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     address: findKey(rawOrder, ['住所', 'Address']) || '',
     scheduledEndTime: findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime', 'scheduledEndTime', '終了日時']) || '',
     actualStartTime: (() => {
-      const val = findKey(rawOrder, ['作業開始時間', '開始時間', 'startTime', 'startedAt', 'actualStartTime']);
+      const val = findKey(rawOrder, ['作業開始', '作業開始時間', '開始時間', 'startTime', 'startedAt', 'actualStartTime']);
       return val ? new Date(val) : undefined;
     })(),
     actualEndTime: (() => {
-      const val = findKey(rawOrder, ['作業完了時間', '作業終了時間', '終了時間', 'completionTime', 'completedAt', 'actualEndTime', 'finishedAt']);
+      const val = findKey(rawOrder, ['作業完了', '作業完了時間', '作業終了時間', '終了時間', 'completionTime', 'completedAt', 'actualEndTime', 'finishedAt']);
       return val ? new Date(val) : undefined;
     })(),
     startTravelTime: (() => {

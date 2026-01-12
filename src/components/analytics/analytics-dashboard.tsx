@@ -115,22 +115,13 @@ export function AnalyticsDashboard() {
 
                 // Calculate actual duration if timestamps exist
                 let durationHours = (order.estimatedDuration || 60) / 60;
+                // Calculate actual duration
+                // Priority: Raw "Work Duration" column > Timestamp Diff
                 let actualDurationHours = 0;
 
-                if (order.actualStartTime && order.actualEndTime) {
-                    const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
-                    const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
-                    if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
-                        const diffMs = end.getTime() - start.getTime();
-                        if (diffMs > 0) {
-                            actualDurationHours = diffMs / (1000 * 60 * 60); // Hours
-                        }
-                    }
-                }
-
-                // Fallback: Use "作業所要時間" or "作業時間" from raw data if timestamps are missing
-                if (actualDurationHours === 0 && order.raw) {
-                    const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration']);
+                // 1. Try raw data column first (User Request)
+                if (order.raw) {
+                    const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration', '実稼働時間']);
                     if (rawDuration) {
                         const valStr = String(rawDuration);
                         if (valStr.includes('1899')) {
@@ -143,6 +134,18 @@ export function AnalyticsDashboard() {
                             if (!isNaN(parsed) && parsed > 0 && parsed !== 1899) {
                                 actualDurationHours = parsed / 60; // Minutes to Hours
                             }
+                        }
+                    }
+                }
+
+                // 2. Fallback to timestamps if column is empty
+                if (actualDurationHours === 0 && order.actualStartTime && order.actualEndTime) {
+                    const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
+                    const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
+                    if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
+                        const diffMs = end.getTime() - start.getTime();
+                        if (diffMs > 0) {
+                            actualDurationHours = diffMs / (1000 * 60 * 60); // Hours
                         }
                     }
                 }
@@ -301,21 +304,12 @@ export function AnalyticsDashboard() {
                     const estimated = (order.estimatedDuration || 60) / 60; // Hours
 
                     // Actual Hours
+                    // Actual Hours
                     let actual = 0;
-                    if (order.actualStartTime && order.actualEndTime) {
-                        const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
-                        const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
-                        if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
-                            const diffMs = end.getTime() - start.getTime();
-                            if (diffMs > 0) {
-                                actual = diffMs / (1000 * 60 * 60); // Hours
-                            }
-                        }
-                    }
 
-                    // Fallback: Use "作業所要時間" or "作業時間" from raw data if timestamps are missing
-                    if (actual === 0 && order.raw) {
-                        const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration']);
+                    // 1. Try raw data column first (User Request)
+                    if (order.raw) {
+                        const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration', '実稼働時間']);
                         if (rawDuration) {
                             const valStr = String(rawDuration);
                             if (valStr.includes('1899')) {
@@ -328,6 +322,18 @@ export function AnalyticsDashboard() {
                                 if (!isNaN(parsed) && parsed > 0 && parsed !== 1899) {
                                     actual = parsed / 60; // Minutes to Hours
                                 }
+                            }
+                        }
+                    }
+
+                    // 2. Fallback to timestamps if column is empty
+                    if (actual === 0 && order.actualStartTime && order.actualEndTime) {
+                        const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
+                        const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
+                        if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
+                            const diffMs = end.getTime() - start.getTime();
+                            if (diffMs > 0) {
+                                actual = diffMs / (1000 * 60 * 60); // Hours
                             }
                         }
                     }

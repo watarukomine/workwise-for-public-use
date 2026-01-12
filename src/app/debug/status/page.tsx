@@ -142,6 +142,15 @@ export default function DebugStatusPage() {
                 <CardHeader><CardTitle>Raw Orders Data (GAS)</CardTitle></CardHeader>
                 <CardContent>
                     <p className="text-sm text-gray-500 mb-2">Showing {filteredRawOrders.length} records</p>
+                    <div className="mb-4 p-2 bg-slate-100 rounded border">
+                        <p className="font-bold text-xs">First VALID Order Raw Keys (v2 Debug):</p>
+                        <pre className="text-[10px] overflow-auto max-h-48">
+                            {(() => {
+                                const valid = orders.find(o => o.raw && Object.keys(o.raw).length > 2);
+                                return valid ? JSON.stringify(valid.raw, null, 2) : 'No valid records found';
+                            })()}
+                        </pre>
+                    </div>
                     <div className="space-y-4">
                         {filteredRawOrders.map((order, idx) => (
                             <div key={idx} className="border p-4 rounded bg-gray-50 text-xs font-mono overflow-auto">
