@@ -109,21 +109,40 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     // taskDetails += `\n予定: ${scheduledTime}`; 
   }
 
+  const scheduledDateVal = formatDate(String(findKey(rawOrder, ['作業予定日']) || ''), 'yyyy-MM-dd');
+
+  // Helper to parse date/time values which might be just time strings
+  const parseDateTimeValue = (val: any): Date | undefined => {
+    if (!val) return undefined;
+    const date = new Date(val);
+    if (!isNaN(date.getTime()) && date.getFullYear() > 1970) {
+      return date;
+    }
+    // Try parsing as Time string (HH:mm) combined with scheduled date
+    const valStr = String(val).trim();
+    if (valStr.match(/^\d{1,2}:\d{2}/) && scheduledDateVal) {
+      const [h, m] = valStr.split(':');
+      const d = new Date(scheduledDateVal);
+      d.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+      if (!isNaN(d.getTime())) return d;
+    }
+    return undefined;
+  };
+
   return {
     id: String(orderId),
     displayId: visualId ? String(visualId) : undefined,
     rawOrderId: visualId ? String(visualId) : undefined,
     customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
-    taskDetails: taskDetails, // Simplified for initial view, detailed view can show more
+    taskDetails: taskDetails,
     status: (() => {
       const raw = findKey(rawOrder, ['受注ステータス', 'status']) || '未割当';
-      // Normalize warehousing statuses to "Not Started" state for the app workflow
       if (['お客まち', '点検', 'お預かり済', '点検待ち', '洗車待ち'].some(s => raw.includes(s))) {
         return '未着手';
       }
       return raw;
     })(),
-    scheduledDate: formatDate(String(findKey(rawOrder, ['作業予定日']) || ''), 'yyyy-MM-dd'),
+    scheduledDate: scheduledDateVal,
     scheduledTime: scheduledTime || '',
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     value: parseFloat(findKey(rawOrder, ['金額']) || 0),
@@ -134,19 +153,19 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     scheduledEndTime: findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime', 'scheduledEndTime', '終了日時']) || '',
     actualStartTime: (() => {
       const val = findKey(rawOrder, ['作業開始', '作業開始時間', '開始時間', 'startTime', 'startedAt', 'actualStartTime']);
-      return val ? new Date(val) : undefined;
+      return parseDateTimeValue(val);
     })(),
     actualEndTime: (() => {
       const val = findKey(rawOrder, ['作業完了', '作業完了時間', '作業終了時間', '終了時間', 'completionTime', 'completedAt', 'actualEndTime', 'finishedAt']);
-      return val ? new Date(val) : undefined;
+      return parseDateTimeValue(val);
     })(),
     startTravelTime: (() => {
       const val = findKey(rawOrder, ['移動開始', '移動開始時間', '移動開始日時', 'startTravel', 'startTravelTime']);
-      return val ? new Date(val) : undefined;
+      return parseDateTimeValue(val);
     })(),
     arrivalTimestamp: (() => {
       const val = findKey(rawOrder, ['現場到着', '現場到着時間', '現場到着日時', 'arrive', 'arrivalTimestamp']);
-      return val ? new Date(val) : undefined;
+      return parseDateTimeValue(val);
     })(),
     cancelDate: findKey(rawOrder, ['キャンセル日時', 'cancelDate']),
     cancelContact: findKey(rawOrder, ['キャンセル連絡者', 'cancelContact']),
