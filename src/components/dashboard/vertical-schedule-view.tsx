@@ -80,6 +80,8 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
         const staffMember = staffData.find(s => s.id === event.staffId);
         const areaBgClass = staffMember?.['母店'] ? STORE_COLORS[staffMember['母店']] || '' : '';
 
+        const staffColorStyle = { backgroundColor: staffMember?.color || 'gray' };
+
         const eventCard = (
           <Card className={cn(
             "cursor-pointer hover:bg-muted/50",
@@ -92,10 +94,9 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
             <CardHeader className="p-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg leading-tight">{event.title}</CardTitle>
-                {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
                 <div
                   className="w-3 h-10 rounded-full"
-                  style={{ backgroundColor: staffMember?.color || 'gray' }}
+                  style={staffColorStyle}
                 />
               </div>
               {customer && <CardDescription>{customer.storeName}</CardDescription>}
