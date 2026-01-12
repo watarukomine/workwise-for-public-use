@@ -115,7 +115,14 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     rawOrderId: visualId ? String(visualId) : undefined,
     customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
     taskDetails: taskDetails, // Simplified for initial view, detailed view can show more
-    status: findKey(rawOrder, ['受注ステータス', 'status']) || '未割当',
+    status: (() => {
+      const raw = findKey(rawOrder, ['受注ステータス', 'status']) || '未割当';
+      // Normalize warehousing statuses to "Not Started" state for the app workflow
+      if (['お客まち', '点検', 'お預かり済', '点検待ち', '洗車待ち'].some(s => raw.includes(s))) {
+        return '未着手';
+      }
+      return raw;
+    })(),
     scheduledDate: formatDate(String(findKey(rawOrder, ['作業予定日']) || ''), 'yyyy-MM-dd'),
     scheduledTime: scheduledTime || '',
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
