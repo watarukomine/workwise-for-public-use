@@ -141,11 +141,11 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
       return val ? new Date(val) : undefined;
     })(),
     startTravelTime: (() => {
-      const val = findKey(rawOrder, ['移動開始', 'startTravel']);
+      const val = findKey(rawOrder, ['移動開始', '移動開始時間', '移動開始日時', 'startTravel', 'startTravelTime']);
       return val ? new Date(val) : undefined;
     })(),
     arrivalTimestamp: (() => {
-      const val = findKey(rawOrder, ['現場到着', 'arrive']);
+      const val = findKey(rawOrder, ['現場到着', '現場到着時間', '現場到着日時', 'arrive', 'arrivalTimestamp']);
       return val ? new Date(val) : undefined;
     })(),
     cancelDate: findKey(rawOrder, ['キャンセル日時', 'cancelDate']),

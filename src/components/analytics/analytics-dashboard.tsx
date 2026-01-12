@@ -270,8 +270,10 @@ export function AnalyticsDashboard() {
                         hour = getHours(d);
                     }
                 } else {
-                    // Try "HH:mm" format
-                    const parts = order.scheduledTime.split(':');
+                    // Try "HH:mm" format, handle "9:00", "09:00", "9:00:00"
+                    // Remove any surrounding whitespace
+                    const timeStr = order.scheduledTime.trim();
+                    const parts = timeStr.split(':');
                     if (parts.length >= 1) {
                         const h = parseInt(parts[0], 10);
                         if (!isNaN(h)) hour = h;
