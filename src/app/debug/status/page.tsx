@@ -151,6 +151,62 @@ export default function DebugStatusPage() {
                             })()}
                         </pre>
                     </div>
+
+                    <div className="mb-4 p-2 bg-blue-50 rounded border">
+                        <p className="font-bold text-xs">Time & Travel Analysis Debug:</p>
+                        <pre className="text-[10px] overflow-auto max-h-48">
+                            {(() => {
+                                const timeOrder = orders.find(o => o.scheduledTime);
+                                const travelOrder = orders.find(o => o.startTravelTime || o.raw?.['移動開始'] || o.raw?.['startTravel']);
+
+                                let debugInfo = {};
+                                if (timeOrder) {
+                                    // Simulate Analytics Parsing Logic
+                                    let hour = -1;
+                                    const t = timeOrder.scheduledTime!;
+                                    if (t.includes('T') || t.includes('-')) {
+                                        // ISO
+                                        const d = new Date(t);
+                                        hour = !isNaN(d.getTime()) ? d.getHours() : -999;
+                                    } else {
+                                        const parts = t.trim().split(':');
+                                        if (parts.length >= 1) hour = parseInt(parts[0], 10);
+                                    }
+
+                                    debugInfo = {
+                                        ...debugInfo,
+                                        "Scheduled Time Sample": {
+                                            id: timeOrder.id,
+                                            raw_scheduledTime: timeOrder.scheduledTime,
+                                            parsed_hour: hour,
+                                            is_iso: t.includes('T'),
+                                            is_colon: t.includes(':')
+                                        }
+                                    };
+                                } else {
+                                    debugInfo = { ...debugInfo, "Scheduled Time Sample": "None found" };
+                                }
+
+                                if (travelOrder) {
+                                    debugInfo = {
+                                        ...debugInfo,
+                                        "Travel Time Sample": {
+                                            id: travelOrder.id,
+                                            startTravelTime: travelOrder.startTravelTime,
+                                            raw_startTravel: travelOrder.raw?.['移動開始'] || travelOrder.raw?.['startTravel'],
+                                            arrivalTimestamp: travelOrder.arrivalTimestamp,
+                                            raw_arrive: travelOrder.raw?.['現場到着'] || travelOrder.raw?.['arrive']
+                                        }
+                                    };
+                                } else {
+                                    debugInfo = { ...debugInfo, "Travel Time Sample": "None found (No startTravelTime in any order)" };
+                                }
+
+                                return JSON.stringify(debugInfo, null, 2);
+                            })()}
+                        </pre>
+                    </div>
+
                     <div className="space-y-4">
                         {filteredRawOrders.map((order, idx) => (
                             <div key={idx} className="border p-4 rounded bg-gray-50 text-xs font-mono overflow-auto">
