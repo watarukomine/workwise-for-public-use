@@ -81,7 +81,7 @@ const timeStringToDate = (timeStr: string, baseDate: Date) => {
 
 const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
 
-const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 5) * 5;
+const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
 
 const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
   const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventStart;
