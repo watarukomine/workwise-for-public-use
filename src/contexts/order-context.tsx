@@ -303,9 +303,12 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setErrorState(null);
 
     try {
-      const data = await fetchGasData(orderGasUrl);
-      if (Array.isArray(data)) {
-        setRawOrdersData(data);
+      const result = await fetchGasData(orderGasUrl);
+      if (result.error) throw new Error(result.error);
+
+      const orders = result.data || result;
+      if (Array.isArray(orders)) {
+        setRawOrdersData(orders);
       } else {
         throw new Error("Invalid data format");
       }
