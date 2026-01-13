@@ -36,7 +36,7 @@ interface OrderContextType {
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
 const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppressedTripIds: Set<string>) => {
-  if (!rawOrdersData || !Array.isArray(rawOrdersData) || !allStaff.length) {
+  if (!rawOrdersData || !Array.isArray(rawOrdersData)) {
     return { orders: [], scheduleEvents: [], statuses: [], unassignedOrders: [] };
   }
 
