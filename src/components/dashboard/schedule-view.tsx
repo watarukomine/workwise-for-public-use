@@ -1579,6 +1579,7 @@ interface StaffRowProps {
 
 const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, isToday }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
+  const { toggleTripSuppression } = useOrder();
   const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
 
   const emergencyEvent = events.find(e => {
