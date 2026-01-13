@@ -287,7 +287,59 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // ... (existing code)
+  const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
+
+  const setOrderGasUrl = (url: string) => {
+    setOrderGasUrlState(url);
+    try {
+      localStorage.setItem('custom_order_gas_url', url);
+    } catch (e) {
+      console.error("Failed to save GAS URL", e);
+    }
+  };
+
+  const fetchAndProcessData = useCallback(async (isBackground = false) => {
+    if (!isBackground) setIsLoading(true);
+    setErrorState(null);
+
+    try {
+      const data = await fetchGasData(orderGasUrl);
+      if (Array.isArray(data)) {
+        setRawOrdersData(data);
+      } else {
+        throw new Error("Invalid data format");
+      }
+    } catch (e: any) {
+      setErrorState(e.message);
+      console.error("Fetch error:", e);
+    } finally {
+      if (!isBackground) setIsLoading(false);
+    }
+  }, [orderGasUrl]);
+
+  useEffect(() => {
+    fetchAndProcessData();
+    const interval = setInterval(() => fetchAndProcessData(true), 60000 * 5); // Poll every 5 mins
+    return () => clearInterval(interval);
+  }, [fetchAndProcessData]);
+
+  const saveLocalEvent = (event: WithId<ScheduleEvent>) => {
+    setLocalScheduleEvents(prev => {
+      const idx = prev.findIndex(e => e.id === event.id);
+      let next;
+      if (idx >= 0) {
+        next = [...prev];
+        next[idx] = event;
+      } else {
+        next = [...prev, event];
+      }
+      return next;
+    });
+  };
+
+  const deleteLocalEvent = (eventId: string) => {
+    setLocalScheduleEvents(prev => prev.filter(e => e.id !== eventId));
+  };
 
   // Process data when raw data or staff changes
   useEffect(() => {
