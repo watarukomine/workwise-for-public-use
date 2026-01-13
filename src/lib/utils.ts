@@ -108,8 +108,20 @@ export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
     // Optionally format time if needed, but raw string might be enough for detail view
     // taskDetails += `\n予定: ${scheduledTime}`; 
   }
+  let scheduledDateVal = formatDate(String(findKey(rawOrder, ['作業予定日']) || ''), 'yyyy-MM-dd');
 
-  const scheduledDateVal = formatDate(String(findKey(rawOrder, ['作業予定日']) || ''), 'yyyy-MM-dd');
+  // Fallback: If no explicit date column, try to extract date from scheduledTime if it contains a full date
+  if (!scheduledDateVal && scheduledTime) {
+    const timeStr = String(scheduledTime);
+    if (timeStr.includes('/') || timeStr.includes('-')) {
+      try {
+        const d = new Date(timeStr);
+        if (!isNaN(d.getTime())) {
+          scheduledDateVal = format(d, 'yyyy-MM-dd');
+        }
+      } catch (e) { }
+    }
+  }
 
   // Helper to parse date/time values which might be just time strings
   const parseDateTimeValue = (val: any): Date | undefined => {
