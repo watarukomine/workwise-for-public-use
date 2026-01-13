@@ -134,7 +134,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
     }
 
     // 2. Process Scheduled Events
-    if (staffMember && order.scheduledTime && order.scheduledDate) {
+    if (staffMember && order.scheduledTime) {
       let scheduledTime: Date | null = null;
       let dateStr = order.scheduledDate;
 
@@ -344,11 +344,15 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   // Process data when raw data or staff changes
   useEffect(() => {
     // Logic to process raw data into orders/events
+    console.log(`[OrderProvider] Processing. rawOrders: ${rawOrdersData?.length}, isLoading: ${isLoading}, allStaff: ${allStaff?.length}`);
+
     if (isLoading && !rawOrdersData.length) return; // Wait if loading initial
 
     try {
       // We need processOrderData to handle raw objects
+      console.log('[OrderProvider] Calling processOrderData...');
       const { orders, scheduleEvents: backendEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff, suppressedTripIds);
+      console.log(`[OrderProvider] Processed: ${orders.length} orders, ${backendEvents.length} events, ${unassignedOrders.length} unassigned.`);
 
       setOrders(orders);
       setScheduleEvents([...backendEvents, ...localScheduleEvents]);
