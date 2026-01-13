@@ -196,9 +196,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
                 const parsedIds = JSON.parse(savedIds);
                 setAppliedSelectedStaffIds(parsedIds);
                 setPendingSelectedStaffIds(parsedIds);
-                // Default to empty if no saved selection
-                setAppliedSelectedStaffIds([]);
-                setPendingSelectedStaffIds([]);
               }
               // Show UI immediately with cached data
               setIsLoading(false);
