@@ -29,11 +29,13 @@ interface OrderContextType {
   rawOrdersData: WithId<Order>[];
   orderGasUrl: string;
   setOrderGasUrl: (url: string) => void;
+  toggleTripSuppression: (tripId: string) => void;
+  suppressedTripIds: Set<string>;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
+const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppressedTripIds: Set<string>) => {
   if (!rawOrdersData || !Array.isArray(rawOrdersData) || !allStaff.length) {
     return { orders: [], scheduleEvents: [], statuses: [], unassignedOrders: [] };
   }
@@ -61,7 +63,6 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
     orders.push(order);
 
     // 1. Process Staff Status
-    // Improve matching: Normalize by removing spaces and lowercasing
     const normalizeName = (n: any) => {
       if (typeof n !== 'string') return '';
       return n.replace(/\s+/g, '').toLowerCase();
@@ -69,25 +70,10 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
 
     const staffMember = order.staffName
       ? allStaff.find(s => {
-        // Try exact match first for performance/safety
         if (s.name === order.staffName) return true;
-        // Try normalized match
         return normalizeName(s.name) === normalizeName(order.staffName);
       })
       : undefined;
-
-    // Debug Log
-    if (order.status === '移動中' || order.status === '移動開始') {
-      console.log('DEBUG: Found Moving Order', {
-        orderId: order.id,
-        staffName: order.staffName,
-        matchedStaff: !!staffMember,
-        allStaffCount: allStaff.length,
-        rawLastUpdate: findKey(rawOrder, ['最終更新日時']),
-        rawLocation: findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']),
-        rawStatus: findKey(rawOrder, ['受注ステータス']),
-      });
-    }
 
     if (staffMember) {
       const lastUpdateStr = findKey(rawOrder, ['最終更新日時']);
@@ -97,12 +83,9 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
         const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
 
         if (!isNaN(lastUpdate.getTime())) {
-          // Define variables needed for logic
           const status = findKey(rawOrder, ['受注ステータス']) || '待機中';
           const actionText = order.rawOrderId ? `[${order.rawOrderId}]` : '[汎用タスク]';
 
-          // Priority Logic: Active statuses should persist over newer Passive statuses
-          // And older Active statuses should restore over current Passive statuses
           const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着'];
           const passiveStatuses = ['未着手', '未割当', '待機中'];
 
@@ -115,22 +98,16 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
           let shouldUpdate = false;
 
           if (isNewer) {
-            // New data is newer
             if (isCandidatePassive && isCurrentActive) {
-              // Ignore newer passive if we have active
-              console.log(`DEBUG: Ignoring newer passive status '${status}' (${lastUpdateStr}) for active staff ${staffMember.name} (Current: ${currentStatus.status})`);
               shouldUpdate = false;
             } else {
-              shouldUpdate = true; // Normal case: newer wins
+              shouldUpdate = true;
             }
           } else {
-            // New data is OLDER (or same)
             if (isCandidateActive && isCurrentPassive) {
-              // Restore older active if current is merely passive
-              console.log(`DEBUG: Restoring older active status '${status}' (${lastUpdateStr}) over passive staff ${staffMember.name} (Current: ${currentStatus.status})`);
               shouldUpdate = true;
             } else {
-              shouldUpdate = false; // Normal case: older loses
+              shouldUpdate = false;
             }
           }
 
@@ -138,8 +115,6 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
             const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';
             let [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
 
-            // Location Persistence: If new location is invalid, keep existing valid location
-            // (Only if existing location is valid number)
             if ((isNaN(lat) || isNaN(lon)) && currentStatus.latitude && currentStatus.longitude) {
               lat = currentStatus.latitude;
               lon = currentStatus.longitude;
@@ -159,15 +134,11 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
     }
 
     // 2. Process Scheduled Events
-    if (staffMember && order.scheduledTime) {
+    if (staffMember && order.scheduledTime && order.scheduledDate) {
       let scheduledTime: Date | null = null;
       let dateStr = order.scheduledDate;
 
-      // Ensure dateStr is valid YYYY-MM-DD
       if (!dateStr || !isValid(parseISO(dateStr))) {
-        // If date is missing in mapped order, try to parse from raw or use Today?
-        // For direct fetch, we might rely on 'scheduledTime' containing date if it's ISO?
-        // Or fallback to today.
         dateStr = format(new Date(), 'yyyy-MM-dd');
       }
 
@@ -175,19 +146,15 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
         if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(order.scheduledTime)) {
           scheduledTime = parseISO(`${dateStr}T${order.scheduledTime}`);
         } else {
-          // Try standard Date parsing for "yyyy/MM/dd HH:mm:ss" which parseISO dislikes
           const timeComponent = new Date(order.scheduledTime);
           if (isValid(timeComponent)) {
-            // If it has full date info, use it directly (prioritize the "Shotgun" payload we sent)
             if (order.scheduledTime.includes('/') || order.scheduledTime.includes('-')) {
               scheduledTime = timeComponent;
             } else {
-              // Time only (1899 base)
               const timeStr = format(timeComponent, 'HH:mm:ss');
               scheduledTime = parseISO(`${dateStr}T${timeStr}`);
             }
           } else {
-            // Fallback to ISO
             scheduledTime = parseISO(order.scheduledTime);
           }
         }
@@ -197,19 +164,21 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
         if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
 
         const tripId = `trip-${order.rawOrderId || order.id}`;
-        let taskEndTime: Date;
+        let taskEndTime: Date | null = null;
 
         if (order.scheduledEndTime) {
-          if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(order.scheduledEndTime)) {
-            taskEndTime = parseISO(`${dateStr}T${order.scheduledEndTime}`);
-          } else {
-            // Use new Date() for flexible parsing
-            taskEndTime = new Date(order.scheduledEndTime);
-            if (!isValid(taskEndTime)) {
-              taskEndTime = parseISO(order.scheduledEndTime);
+          // Basic parsing for end time
+          try {
+            if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(order.scheduledEndTime)) {
+              taskEndTime = parseISO(`${dateStr}T${order.scheduledEndTime}`);
+            } else {
+              taskEndTime = new Date(order.scheduledEndTime);
+              if (!isValid(taskEndTime)) taskEndTime = parseISO(order.scheduledEndTime);
             }
-          }
-        } else {
+          } catch (e) { taskEndTime = addMinutes(scheduledTime, order.estimatedDuration); }
+        }
+
+        if (!taskEndTime || !isValid(taskEndTime)) {
           taskEndTime = addMinutes(scheduledTime, order.estimatedDuration);
         }
 
@@ -226,23 +195,25 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
             rawOrderId: order.rawOrderId,
           };
 
-
           const isGenericTask = order.id.startsWith('task-');
           if (isGenericTask) {
             newScheduleEvents.push(taskEvent);
           } else {
-            const travelEvent: WithId<ScheduleEvent> = {
-              ...order,
-              id: `${tripId}-travel`,
-              tripId,
-              title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
-              staffId: staffMember.id,
-              locationId: order.customerCode || '',
-              start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
-              end: scheduledTime.toISOString(),
-              rawOrderId: order.rawOrderId,
-            };
-            newScheduleEvents.push(travelEvent, taskEvent);
+            if (!suppressedTripIds.has(tripId)) {
+              const travelEvent: WithId<ScheduleEvent> = {
+                ...order,
+                id: `${tripId}-travel`,
+                tripId,
+                title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
+                staffId: staffMember.id,
+                locationId: order.customerCode || '',
+                start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
+                end: scheduledTime.toISOString(),
+                rawOrderId: order.rawOrderId,
+              };
+              newScheduleEvents.push(travelEvent);
+            }
+            newScheduleEvents.push(taskEvent);
           }
         }
       }
@@ -253,16 +224,10 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[]) => {
   const unassignedOrders = orders.filter(order => {
     const hasRawOrderId = !!order.rawOrderId;
     const isAlreadyScheduled = order.rawOrderId ? scheduledRawOrderIds.has(order.rawOrderId) : false;
-
-    // Filter out Generic Tasks from Unassigned List
-    // Generic tasks (Work, Break, etc.) usually don't have a customerCode.
-    // If it's a "Real Order", it should generally have a customerCode or at least a customerName that isn't just the task name.
     const isGenericTask = !order.customerCode && ['業務', '休憩', '移動', '研修', '同行', '商談'].some(t => order.taskDetails.includes(t));
 
     if (!hasRawOrderId || isAlreadyScheduled || isGenericTask) return false;
-
     if (order.staffName && order.scheduledTime) return false;
-    // Show undated or dated-but-unassigned
     return true;
   });
 
@@ -285,6 +250,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const [error, setErrorState] = useState<string | null>(null);
 
   const [localScheduleEvents, setLocalScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
+  const [suppressedTripIds, setSuppressedTripIds] = useState<Set<string>>(new Set()); // New state
   const { allStaff, isStaffLoading } = useSelectedStaff();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
 
@@ -293,96 +259,35 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const savedUrl = localStorage.getItem('custom_order_gas_url');
-      if (savedUrl) {
-        setOrderGasUrlState(savedUrl);
+      if (savedUrl) setOrderGasUrlState(savedUrl);
+
+      const savedSuppressed = localStorage.getItem('suppressed_trip_ids');
+      if (savedSuppressed) {
+        setSuppressedTripIds(new Set(JSON.parse(savedSuppressed)));
       }
     } catch (e) {
-      console.warn('Failed to load saved order GAS URL:', e);
+      console.warn('Failed to load saved settings:', e);
     }
   }, []);
 
-  const setOrderGasUrl = useCallback((url: string) => {
-    setOrderGasUrlState(url);
-    try {
-      localStorage.setItem('custom_order_gas_url', url);
-    } catch (e) {
-      console.warn('Failed to save order GAS URL:', e);
-    }
-  }, []);
-
-  // Load local events
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('local_schedule_events');
-      if (saved) setLocalScheduleEvents(JSON.parse(saved));
-    } catch (e) {
-      console.warn('Failed to load local schedule events:', e);
-    }
-  }, []);
-
-  const saveLocalEvent = useCallback((event: WithId<ScheduleEvent>) => {
-    setLocalScheduleEvents(prev => {
-      const exists = prev.some(e => e.id === event.id);
-      let newEvents;
-      if (exists) {
-        newEvents = prev.map(e => e.id === event.id ? event : e);
+  const toggleTripSuppression = useCallback((tripId: string) => {
+    setSuppressedTripIds(prev => {
+      const next = new Set(prev);
+      if (next.has(tripId)) {
+        next.delete(tripId);
       } else {
-        newEvents = [...prev, event];
+        next.add(tripId);
       }
       try {
-        localStorage.setItem('local_schedule_events', JSON.stringify(newEvents));
+        localStorage.setItem('suppressed_trip_ids', JSON.stringify(Array.from(next)));
       } catch (e) {
-        console.error('Failed to save local event:', e);
+        console.error("Failed to save suppressed trip IDs", e);
       }
-      return newEvents;
+      return next;
     });
   }, []);
 
-  const deleteLocalEvent = useCallback((eventId: string) => {
-    setLocalScheduleEvents(prev => {
-      const newEvents = prev.filter(e => e.id !== eventId);
-      try {
-        localStorage.setItem('local_schedule_events', JSON.stringify(newEvents));
-      } catch (e) {
-        console.error('Failed to save local event:', e);
-      }
-      return newEvents;
-    });
-  }, []);
-
-  /* Removed loadOrders and syncOrders/date params */
-  const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
-
-  const fetchAndProcessData = useCallback(async (showLoading = true) => {
-    // Use state orderGasUrl
-    if (!orderGasUrl) {
-      setErrorState('GASのURLが設定されていません。');
-      if (showLoading) setIsLoading(false);
-      return;
-    }
-
-    if (showLoading) setIsLoading(true);
-    setErrorState(null);
-
-    try {
-      const result = await fetchGasData(orderGasUrl);
-      if (result.error && result.message) throw new Error(result.message);
-
-      const newRaw = result.data || (Array.isArray(result) ? result : []);
-      setRawOrdersData(newRaw);
-    } catch (e: any) {
-      console.error("Failed to fetch from GAS:", e);
-      setErrorState(`受注データ取得エラー: ${e.message}`);
-      setRawOrdersData([]);
-    } finally {
-      if (showLoading) setIsLoading(false);
-    }
-  }, [orderGasUrl]);
-
-  // Initial Fetch
-  useEffect(() => {
-    fetchAndProcessData(true);
-  }, [fetchAndProcessData]);
+  // ... (existing code)
 
   // Process data when raw data or staff changes
   useEffect(() => {
@@ -391,7 +296,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     try {
       // We need processOrderData to handle raw objects
-      const { orders, scheduleEvents: backendEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff);
+      const { orders, scheduleEvents: backendEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff, suppressedTripIds);
 
       setOrders(orders);
       setScheduleEvents([...backendEvents, ...localScheduleEvents]);
@@ -400,8 +305,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error("Error processing orders:", e);
     }
-
-  }, [rawOrdersData, allStaff, localScheduleEvents]);
+  }, [rawOrdersData, allStaff, localScheduleEvents, suppressedTripIds]); // Added suppressedTripIds dependency
 
   const value: OrderContextType = {
     orders,
@@ -421,7 +325,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     refetchOrders: async () => { await fetchAndProcessData(false); }, // force refetch
     rawOrdersData,
     orderGasUrl: orderGasUrl || ORDER_GAS_URL,
-    setOrderGasUrl
+    setOrderGasUrl,
+    toggleTripSuppression, // New
+    suppressedTripIds // New
   };
 
   return (

@@ -81,7 +81,7 @@ const timeStringToDate = (timeStr: string, baseDate: Date) => {
 
 const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
 
-const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
+const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 5) * 5;
 
 const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
   const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventStart;
@@ -439,7 +439,7 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { allStaff } = useSelectedStaff(); // Get full list
   const { toast } = useToast();
-  const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent } = useOrder();
+  const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, toggleTripSuppression } = useOrder();
 
   const [isClient, setIsClient] = React.useState(false);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
@@ -1606,7 +1606,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
       </div>
       <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
         <div className="absolute top-0 left-0 h-full w-full">
-          {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)} />))}
+          {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)} onDelete={() => toggleTripSuppression(event.tripId || '')} />))}
         </div>
       </div>
       <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[120px]")}>
@@ -1622,9 +1622,10 @@ interface DraggableEventProps {
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   onDoubleClick: () => void;
   isOverlay?: boolean;
+  onDelete?: () => void;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, isOverlay }) => {
+const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, isOverlay, onDelete }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: event.id, data: event });
   const { left, width } = getEventDimensions(event.start, event.end);
 
@@ -1729,9 +1730,28 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       {...listeners}
       {...attributes}
       onDoubleClick={handleDoubleClick}
-      className={cn("rounded-md flex flex-col justify-center cursor-move h-12", isOverlay ? 'shadow-lg' : '')}
+      className={cn("rounded-md flex flex-col justify-center cursor-move h-12 relative group", isOverlay ? 'shadow-lg' : '')}
       data-event-chip="true"
     >
+      {isTravelEvent && onDelete && !isOverlay && (
+        <div
+          className="absolute -top-2 -right-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer p-1"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDelete();
+          }}
+          title="移動時間を削除"
+        >
+          <div className="bg-red-500 text-white rounded-full p-0.5 shadow-md flex items-center justify-center w-5 h-5">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </div>
+        </div>
+      )}
       <Tooltip>
         <TooltipTrigger asChild>
           {eventContent}
