@@ -1150,7 +1150,7 @@ export function ScheduleView({
   };
 
   const handleDeleteEvent = async () => {
-    if (!dialogState.event) return;
+    if (dialogState.mode !== 'details' && dialogState.mode !== 'edit') return;
     const eventToDelete = dialogState.event;
 
     // Optimistic UI Update
