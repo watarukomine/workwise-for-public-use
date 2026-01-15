@@ -42,7 +42,8 @@ export default function DashboardPage() {
     scheduleEvents,
     loadOrders,
     syncOrders,
-    isSyncingOrders
+    isSyncingOrders,
+    refetchOrders
   } = useOrder();
 
   const { isLoading: isLoadingCustomers } = useCustomer();
@@ -223,7 +224,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const intervalId = setInterval(async () => {
       setIsAutoRefreshing(true);
-      await syncOrders();
+      await refetchOrders();
       setIsAutoRefreshing(false);
     }, 60000); // 1 minute
 
