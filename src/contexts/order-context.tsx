@@ -60,7 +60,11 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
       raw: rawOrder
     };
 
-    orders.push(order);
+    // Filter out generic tasks from the main orders list
+    // Generic tasks (created on timeline) should only appear as events, not as "Orders" in the table
+    if (!order.id.startsWith('task-')) {
+      orders.push(order);
+    }
 
     // 1. Process Staff Status
     const normalizeName = (n: any) => {
