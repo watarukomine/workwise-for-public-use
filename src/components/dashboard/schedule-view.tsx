@@ -615,7 +615,7 @@ export function ScheduleView({
       });
 
       await refetchOrders();
-      toast({ title: 'タスクを未割り当てに戻しました' });
+      toast({ title: 'タスクを未割り当てに戻しました', duration: 3000 });
     } catch (e: any) {
       console.error("Unassignment failed:", e);
       toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
@@ -665,7 +665,7 @@ export function ScheduleView({
           }
         }
         deleteLocalEvent(item.id);
-        toast({ title: '汎用タスクを削除しました' });
+        toast({ title: '汎用タスクを削除しました', duration: 3000 });
       }
       return;
     }
@@ -737,7 +737,7 @@ export function ScheduleView({
               end: addMinutes(newStart, duration).toISOString()
             };
             saveLocalEvent(updatedEvent);
-            toast({ title: "スケジュールを更新しました" });
+            toast({ title: "スケジュールを更新しました", duration: 3000 });
           } else if (draggedEvent.rawOrderId) {
             let taskStart = newStart;
             let taskDuration = 60;
@@ -786,7 +786,7 @@ export function ScheduleView({
               "作業時間（分）": taskDuration,
               systemId: draggedEvent.id
             });
-            toast({ title: "スケジュールを更新しました" });
+            toast({ title: "スケジュールを更新しました", duration: 3000 });
             // await new Promise(resolve => setTimeout(resolve, 2000)); // Removed artificial delay
             await refetchOrders();
           }
@@ -1149,27 +1149,61 @@ export function ScheduleView({
     }
   };
 
-
   const handleDeleteEvent = async () => {
-    if (dialogState.mode !== 'details' && dialogState.mode !== 'edit') return;
+    if (!dialogState.event) return;
+    const eventToDelete = dialogState.event;
 
-    setIsSaving(true);
+    // Optimistic UI Update
+    setIsSaving(false);
+    setDialogState({ mode: 'closed' });
+
+    const isGeneric = eventToDelete.id.startsWith('event-') || eventToDelete.id.startsWith('generic-');
+
+    if (isGeneric) {
+      deleteLocalEvent(eventToDelete.id);
+      toast({ title: '汎用タスクを削除しました', duration: 3000 });
+    } else {
+      // Optimistic Unassign
+      saveLocalEvent({ ...eventToDelete, staffId: '', start: '', end: '' });
+      if (eventToDelete.tripId) {
+        toggleTripSuppression(eventToDelete.tripId);
+      }
+      toast({ title: 'タスクを未割り当てに戻しました', duration: 3000 });
+    }
+
     try {
-      const eventToDelete = dialogState.event;
-
-      if (eventToDelete.rawOrderId) {
-        await unassignTask(eventToDelete);
+      if (isGeneric) {
+        if (eventToDelete.rawOrderId) {
+          await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: `(ID: ${eventToDelete.rawOrderId})`,
+            staffName: "",
+            statusValue: "キャンセル",
+            timestamp: new Date().toISOString(),
+            systemId: eventToDelete.id
+          });
+        }
       } else {
-        setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
-        deleteLocalEvent(eventToDelete.id);
-        toast({ title: '予定を削除しました' });
+        const orderToUnassign = mapRawToOrder(eventToDelete.raw);
+        await updateSheetStatus({
+          gasUrl: ORDER_GAS_URL,
+          eventTitle: `(ID: ${eventToDelete.rawOrderId})`,
+          staffName: "",
+          statusValue: "未割当",
+          scheduledTime: "",
+          timestamp: new Date().toISOString(),
+          systemId: orderToUnassign.id
+        });
       }
 
-      setDialogState({ mode: 'closed' });
+      await refetchOrders();
+
     } catch (e: any) {
-      toast({ variant: 'destructive', title: '削除エラー', description: `削除に失敗しました: ${e.message}` });
-    } finally {
-      setIsSaving(false);
+      console.error("Delete failed:", e);
+      toast({ variant: 'destructive', title: '更新エラー', description: `削除に失敗しました: ${e.message}`, duration: 5000 });
+      // Revert logic (optional, but good practice)
+      deleteLocalEvent(eventToDelete.id);
+      if (eventToDelete.tripId) toggleTripSuppression(eventToDelete.tripId);
     }
   };
 
