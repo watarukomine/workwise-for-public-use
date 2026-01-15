@@ -358,13 +358,31 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       console.log(`[OrderProvider] Processed: ${orders.length} orders, ${backendEvents.length} events, ${unassignedOrders.length} unassigned.`);
 
       setOrders(orders);
-      setScheduleEvents([...backendEvents, ...localScheduleEvents]);
+
+      // Merge: backend events + local events. If an event is in local (optimistic), use that instead of backend.
+      const localIds = new Set(localScheduleEvents.map(e => e.id));
+      const filteredBackendEvents = backendEvents.filter(e => !localIds.has(e.id));
+
+      setScheduleEvents([...filteredBackendEvents, ...localScheduleEvents]);
       setStatuses(statuses);
-      setUnassignedOrders(unassignedOrders);
+
+      // Merge local unassigned events into unassignedOrders
+      // This ensures that if we optimistically unassign a task (staffId=''), it appears in the unassigned list
+      // even if the backend still thinks it's assigned.
+      const localUnassignedEvents = localScheduleEvents.filter(e => !e.staffId && e.rawOrderId);
+      let finalUnassignedOrders = [...unassignedOrders];
+      if (localUnassignedEvents.length > 0) {
+        const existingIds = new Set(unassignedOrders.map(o => o.id));
+        const localOrders = localUnassignedEvents
+          .map(e => mapRawToOrder(e.raw))
+          .filter(o => !existingIds.has(o.id));
+        finalUnassignedOrders = [...finalUnassignedOrders, ...localOrders];
+      }
+      setUnassignedOrders(finalUnassignedOrders);
     } catch (e) {
       console.error("Error processing orders:", e);
     }
-  }, [rawOrdersData, allStaff, localScheduleEvents, suppressedTripIds]); // Added suppressedTripIds dependency
+  }, [rawOrdersData, allStaff, localScheduleEvents, suppressedTripIds]);
 
   const value: OrderContextType = {
     orders,
@@ -381,7 +399,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     error,
     saveLocalEvent,
     deleteLocalEvent,
-    refetchOrders: async () => { await fetchAndProcessData(false); }, // force refetch
+    refetchOrders: async () => { await fetchAndProcessData(true); }, // Background fetch to suppress loading spinner
     rawOrdersData,
     orderGasUrl: orderGasUrl || ORDER_GAS_URL,
     setOrderGasUrl,

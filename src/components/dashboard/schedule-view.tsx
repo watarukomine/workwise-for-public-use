@@ -591,9 +591,17 @@ export function ScheduleView({
     const previousSchedule = [...scheduleEvents];
     const orderToUnassign = mapRawToOrder(eventToUnassign.raw);
 
-    // Optimistic UI update
-    setScheduleEvents(prev => prev.filter(e => e.tripId !== eventToUnassign.tripId));
-    setUnassignedOrders(prev => [...prev, orderToUnassign]);
+    // Optimistic Update: Save as unassigned locally to prevent reverting
+    saveLocalEvent({ ...eventToUnassign, staffId: '', start: '', end: '' });
+
+    // If it's part of a trip, suppress the travel event so it doesn't linger
+    if (eventToUnassign.tripId) {
+      toggleTripSuppression(eventToUnassign.tripId);
+    }
+
+    // We don't need manual setScheduleEvents/setUnassignedOrders here because 
+    // saveLocalEvent updates the context, which triggers the effect that 
+    // recalculates and pushes the new state (including the unassigned list).
 
     try {
       await updateSheetStatus({
@@ -611,9 +619,10 @@ export function ScheduleView({
     } catch (e: any) {
       console.error("Unassignment failed:", e);
       toast({ variant: 'destructive', title: '更新エラー', description: `シートの更新に失敗しました: ${e.message}` });
-      // Revert UI on error
-      setScheduleEvents(previousSchedule);
-      setUnassignedOrders(prev => prev.filter(o => o.id !== orderToUnassign.id));
+      // Revert is harder with saveLocalEvent principle, but hopefully rarely needed.
+      // To revert, we would deleteLocalEvent(eventToUnassign.id) and untoggle.
+      deleteLocalEvent(eventToUnassign.id);
+      if (eventToUnassign.tripId) toggleTripSuppression(eventToUnassign.tripId);
     }
   };
 
@@ -655,7 +664,7 @@ export function ScheduleView({
             console.error("Failed to cancel generic task:", e);
           }
         }
-        setScheduleEvents(prev => prev.filter(e => e.id !== item.id));
+        deleteLocalEvent(item.id);
         toast({ title: '汎用タスクを削除しました' });
       }
       return;
@@ -750,6 +759,18 @@ export function ScheduleView({
             }
             const taskEnd = addMinutes(taskStart, taskDuration);
 
+            // Optimistic Save to Context (prevents reverting on background refetch)
+            const optimisticEvent = {
+              ...draggedEvent,
+              staffId: newStaffId,
+              start: newStart.toISOString(),
+              end: addMinutes(newStart, differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string))).toISOString()
+            };
+            // For trips, we might need to be careful, but generally saving the dragged item is key.
+            // Actually, for a trip, the "draggedEvent" is just one part.
+            // But let's save the main moved item.
+            saveLocalEvent(optimisticEvent);
+
             await updateSheetStatus({
               gasUrl: ORDER_GAS_URL,
               eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
@@ -766,7 +787,7 @@ export function ScheduleView({
               systemId: draggedEvent.id
             });
             toast({ title: "スケジュールを更新しました" });
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // await new Promise(resolve => setTimeout(resolve, 2000)); // Removed artificial delay
             await refetchOrders();
           }
         } catch (e: any) {
