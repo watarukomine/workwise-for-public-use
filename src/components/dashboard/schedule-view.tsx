@@ -877,6 +877,10 @@ export function ScheduleView({
           };
           newEvents = [newEvent];
         }
+
+        // Persist generic events too
+        newEvents.forEach(e => saveLocalEvent(e));
+
         setScheduleEvents(prev => [...prev, ...newEvents]);
       } else {
         const tripId = `trip-${order.rawOrderId}`;
@@ -898,6 +902,12 @@ export function ScheduleView({
           rawOrderId: order.rawOrderId, raw: order.raw,
         };
         newEvents = [travelEvent, taskEvent];
+
+        // CRITICAL FIX: Persist both Task and Travel events to local context state immediately
+        // This prevents them from being wiped out by the next OrderContext refresh
+        saveLocalEvent(travelEvent);
+        saveLocalEvent(taskEvent);
+
         setScheduleEvents(prev => [...prev.filter(e => e.rawOrderId !== order.rawOrderId), ...newEvents]);
         setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
       }
