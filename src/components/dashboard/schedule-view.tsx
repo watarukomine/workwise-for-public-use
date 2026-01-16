@@ -1580,7 +1580,7 @@ export function ScheduleView({
                             {isSaving ? '送信中...' : '保存して送信'}
                           </Button>
                           <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
-                            {isSaving ? '処理中...' : (isGenericTask(dialogState.order) ? 'タスクの削除' : '未割当に戻す')}
+                            {isSaving ? '処理中...' : (isGenericTask((dialogState as any).event || (dialogState as any).order) ? 'タスクの削除' : '未割当に戻す')}
                           </Button>
                           <Button variant="destructive" onClick={() => setIsCancelling(true)} disabled={isSaving} className="bg-red-700 hover:bg-red-800">
                             作業キャンセル
