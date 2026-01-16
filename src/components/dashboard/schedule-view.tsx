@@ -1264,18 +1264,17 @@ export function ScheduleView({
           saveLocalEvent({ ...companionTravel, staffId: '__DELETED__' });
 
           // CRITICAL: Also delete the companion event from GAS Backend
-          if (companionTravel.id.startsWith('task-')) {
-            await updateSheetStatus({
-              gasUrl: ORDER_GAS_URL,
-              eventTitle: companionTravel.title,
-              staffName: staffName,
-              statusValue: "キャンセル",
-              timestamp: new Date().toISOString(),
-              systemId: companionTravel.id,
-              scheduledTime: companionTravel.start instanceof Date ? companionTravel.start.toISOString() : companionTravel.start,
-              actionType: 'cancel'
-            });
-          }
+          // Even if it doesn't have a task- ID, the fallback search in GAS (by Staff+Time) will catch it.
+          await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: companionTravel.title,
+            staffName: staffName,
+            statusValue: "キャンセル",
+            timestamp: new Date().toISOString(),
+            systemId: companionTravel.id,
+            scheduledTime: companionTravel.start instanceof Date ? companionTravel.start.toISOString() : companionTravel.start,
+            actionType: 'cancel'
+          });
         }
       }
 
