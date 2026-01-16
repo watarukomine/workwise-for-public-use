@@ -1223,7 +1223,6 @@ export function ScheduleView({
     const isGeneric = eventToDelete.id.startsWith('event-') || eventToDelete.id.startsWith('generic-') || !eventToDelete.customerCode || ['休憩', '移動', '業務', '研修', '同行', '商談'].some(t => eventToDelete.title.includes(t));
 
     if (isGeneric) {
-      // Resolve Staff Name for Fallback Search
       const staff = allStaff?.find(s => s.id === eventToDelete.staffId);
       const staffName = staff?.name || '';
 
@@ -1248,7 +1247,7 @@ export function ScheduleView({
         statusValue: "キャンセル",
         timestamp: new Date().toISOString(),
         systemId: eventToDelete.id, // Pass stable ID
-        scheduledTime: eventToDelete.start, // Pass Start Time for fallback search
+        scheduledTime: eventToDelete.start instanceof Date ? eventToDelete.start.toISOString() : eventToDelete.start, // Pass Start Time for fallback search
         actionType: 'cancel' // Optional context
       });
 
