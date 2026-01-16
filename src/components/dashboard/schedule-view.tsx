@@ -934,8 +934,10 @@ export function ScheduleView({
       (async () => {
         try {
           if (isGeneric) {
-            for (const ev of newEvents) {
-              await createTask({
+            const updatedEvents = [...newEvents];
+            for (let i = 0; i < newEvents.length; i++) {
+              const ev = newEvents[i];
+              const res = await createTask({
                 gasUrl: ORDER_GAS_URL,
                 staffName: staff.name,
                 taskName: ev.title,
@@ -943,10 +945,26 @@ export function ScheduleView({
                 endTime: ev.end as string,
                 estimatedDuration: differenceInMinutes(parseISO(ev.end as string), parseISO(ev.start as string))
               });
+
+              // CRITICAL FIX: Update local event ID with real backend ID
+              if (res.eventId) {
+                const tempId = ev.id;
+                const realId = res.eventId;
+
+                // Swap ID in local array for immediate state update
+                updatedEvents[i] = { ...ev, id: realId };
+
+                // Update Persistence
+                deleteLocalEvent(tempId);
+                saveLocalEvent(updatedEvents[i]);
+
+                // Update State
+                setScheduleEvents(prev => prev.map(e => e.id === tempId ? updatedEvents[i] : e));
+              }
             }
             toast({ title: "アクションログを保存しました" });
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            await refetchOrders();
+            // await new Promise(resolve => setTimeout(resolve, 1500));
+            // await refetchOrders(); // No longer strictly needed if state is updated correctly, but good for sync
           } else {
             // Updating Real Order
             const taskEvent = newEvents.find(e => e.id.endsWith('-task'));
@@ -1224,7 +1242,16 @@ export function ScheduleView({
 
     if (isGeneric) {
       const staff = allStaff?.find(s => s.id === eventToDelete.staffId);
-      const staffName = staff?.name || '';
+      // Priority: use staffName from event if available, otherwise lookup from allStaff
+      const staffName = eventToDelete.staffName || staff?.name || '';
+
+      console.log('WorkWise Deletion Debug:', {
+        title: eventToDelete.title,
+        id: eventToDelete.id,
+        rawOrderId: eventToDelete.rawOrderId,
+        staffName: staffName,
+        scheduledTime: eventToDelete.start
+      });
 
       // Soft Delete: Mark as deleted to hide it, but keep it in local state to block backend Sync
       saveLocalEvent({ ...eventToDelete, staffId: '__DELETED__' });
