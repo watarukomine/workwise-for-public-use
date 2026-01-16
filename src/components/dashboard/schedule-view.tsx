@@ -1218,10 +1218,15 @@ export function ScheduleView({
     setIsSaving(false);
     setDialogState({ mode: 'closed' });
 
+    // Generic Task Deletion Logic
     // Improved Generic Check: check ID OR title/content
     const isGeneric = eventToDelete.id.startsWith('event-') || eventToDelete.id.startsWith('generic-') || !eventToDelete.customerCode || ['休憩', '移動', '業務', '研修', '同行', '商談'].some(t => eventToDelete.title.includes(t));
 
     if (isGeneric) {
+      // Resolve Staff Name for Fallback Search
+      const staff = allStaff?.find(s => s.id === eventToDelete.staffId);
+      const staffName = staff?.name || '';
+
       // Soft Delete: Mark as deleted to hide it, but keep it in local state to block backend Sync
       saveLocalEvent({ ...eventToDelete, staffId: '__DELETED__' });
 
