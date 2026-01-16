@@ -741,35 +741,68 @@ export function ScheduleView({
           } else if (draggedEvent.rawOrderId) {
             let taskStart = newStart;
             let taskDuration = 60;
+            let travelDuration = TRAVEL_TIME_MINUTES;
+
+            // Recalculate trip event timings
             if (draggedEvent.tripId) {
               const tripEvents = previousSchedule.filter(e => e.tripId === draggedEvent.tripId);
-              const taskEvent = tripEvents.find(e => e.id.endsWith('-task'));
+              const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
+              const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
+
               if (taskEvent) {
                 taskDuration = differenceInMinutes(parseISO(taskEvent.end as string), parseISO(taskEvent.start as string));
-              } else if (!draggedEvent.id.endsWith('-travel')) {
-                taskDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
               }
+
+              if (travelEvent) {
+                travelDuration = differenceInMinutes(parseISO(travelEvent.end as string), parseISO(travelEvent.start as string));
+              }
+
+              // Adjust start time if we dragged the travel event
+              if (draggedEvent.id.endsWith('-travel')) {
+                taskStart = addMinutes(newStart, travelDuration);
+              }
+
+              const taskEnd = addMinutes(taskStart, taskDuration);
+              const travelStart = subMinutes(taskStart, travelDuration);
+
+              // 1. Optimistic Save of TASK Event
+              // Even if we dragged the travel event, we must update the task event locally
+              if (taskEvent) {
+                const optimisticTask = {
+                  ...taskEvent,
+                  staffId: newStaffId,
+                  start: taskStart.toISOString(),
+                  end: taskEnd.toISOString()
+                };
+                saveLocalEvent(optimisticTask);
+              }
+
+              // 2. Optimistic Save of TRAVEL Event (if exists)
+              if (travelEvent) {
+                const optimisticTravel = {
+                  ...travelEvent,
+                  staffId: newStaffId,
+                  start: travelStart.toISOString(),
+                  end: taskStart.toISOString()
+                };
+                saveLocalEvent(optimisticTravel);
+              }
+
             } else {
+              // Standalone event (unlikely given logic but fallback)
               taskDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+              const taskEnd = addMinutes(taskStart, taskDuration);
+              const optimisticEvent = {
+                ...draggedEvent,
+                staffId: newStaffId,
+                start: newStart.toISOString(),
+                end: taskEnd.toISOString()
+              };
+              saveLocalEvent(optimisticEvent);
             }
 
-            if (draggedEvent.id.endsWith('-travel')) {
-              const travelDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
-              taskStart = addMinutes(newStart, travelDuration);
-            }
+            // Backend Sync (Trigger updateSheetStatus)
             const taskEnd = addMinutes(taskStart, taskDuration);
-
-            // Optimistic Save to Context (prevents reverting on background refetch)
-            const optimisticEvent = {
-              ...draggedEvent,
-              staffId: newStaffId,
-              start: newStart.toISOString(),
-              end: addMinutes(newStart, differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string))).toISOString()
-            };
-            // For trips, we might need to be careful, but generally saving the dragged item is key.
-            // Actually, for a trip, the "draggedEvent" is just one part.
-            // But let's save the main moved item.
-            saveLocalEvent(optimisticEvent);
 
             await updateSheetStatus({
               gasUrl: ORDER_GAS_URL,
