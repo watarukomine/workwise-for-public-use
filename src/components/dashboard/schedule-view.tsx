@@ -1121,30 +1121,7 @@ export function ScheduleView({
         });
 
         toast({ title: '予定を保存しました' });
-        // Optimistic update omitted as refetch## Solution
-
-### 1. Frontend: Immediate ID Persistence
-The root cause of "resurrecting" new tasks was that the frontend continued using a temporary ID (`event-...` or `generic-...`) even after the backend assigned a permanent ID(`task-...`).
-- ** Fix in `schedule-view.tsx` **: Updated `handleDragEnd` to capture the `eventId` returned by `createTask` and immediately swap the temporary ID with the real ID in local state.
-
-### 2. Backend: Physical Deletion Logic
-The "Action Log" sheet update logic(`updateTaskSheet`) previously only supported updating fields, not deleting rows.
-- ** Fix in `gas_full_code.js` **: Added logic to physically delete the row(`sheet.deleteRow(rowNum)`) and call `SpreadsheetApp.flush()` when the status is "キャンセル".
-
-### 3. Backend: Cross - Sheet Fallback Search(Safety Net)
-To handle legacy "ghost" tasks that might still linger with incorrect IDs:
-- ** Fix in `gas_full_code.js` **: If an ID search fails in the Main Order Sheet, the script now falls back to searching the "Action Log" sheet using ** Staff Name + Scheduled Time ** (ignoring spaces). If found, it deletes the row.
-
-### 4. Companion Event Deletion
-          - ** Fix in `schedule-view.tsx` **: When deleting a task(e.g., "Accompany"), the system now also identifies the associated "Travel" event(via`tripId`) and sends a separate deletion request to the backend for it.
-
-## Verification
-
-To verify the fix:
-
-        1. ** New Task Deletion **: Create a task(e.g., "同行"), wait a moment, then delete it.It should disappear permanently.
-2. ** Companion Deletion **: Creating a "同行" task also creates a "移動" chip.Deleting "同行" should also delete "移動" from the backend(check Action Log sheet).
-3. ** Legacy Task Deletion **: If you have a task that previously wouldn't delete, try deleting it now. The fallback search should catch it by name/time and delete it.
+        // Optimistic update omitted as refetch will handle it
         await new Promise(r => setTimeout(r, 1500));
         await refetchOrders();
 
