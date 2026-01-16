@@ -68,6 +68,15 @@ const STAFF_COL_WIDTH = 144;
 const STATUS_COL_WIDTH = 120;
 const TOTAL_TIMELINE_WIDTH = STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH;
 
+const isGenericTask = (order: any) => {
+  if (!order) return false;
+  const id = order.id || '';
+  const title = order.title || order.taskDetails || '';
+  return id.startsWith('task-') || id.startsWith('generic-') ||
+    ['休憩', '移動', '業務', '研修', '同行', '商談'].includes(title) ||
+    !order.customerCode;
+};
+
 const timeStringToDate = (timeStr: string, baseDate: Date) => {
   if (!/^\d{2}:\d{2}$/.test(timeStr)) {
     console.error("Invalid time string format:", timeStr);
@@ -1209,7 +1218,8 @@ export function ScheduleView({
     setIsSaving(false);
     setDialogState({ mode: 'closed' });
 
-    const isGeneric = eventToDelete.id.startsWith('event-') || eventToDelete.id.startsWith('generic-');
+    // Improved Generic Check: check ID OR title/content
+    const isGeneric = eventToDelete.id.startsWith('event-') || eventToDelete.id.startsWith('generic-') || !eventToDelete.customerCode || ['休憩', '移動', '業務', '研修', '同行', '商談'].some(t => eventToDelete.title.includes(t));
 
     if (isGeneric) {
       deleteLocalEvent(eventToDelete.id);
@@ -1570,7 +1580,7 @@ export function ScheduleView({
                             {isSaving ? '送信中...' : '保存して送信'}
                           </Button>
                           <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
-                            {isSaving ? '処理中...' : '未割当に戻す'}
+                            {isSaving ? '処理中...' : (isGenericTask(dialogState.order) ? 'タスクの削除' : '未割当に戻す')}
                           </Button>
                           <Button variant="destructive" onClick={() => setIsCancelling(true)} disabled={isSaving} className="bg-red-700 hover:bg-red-800">
                             作業キャンセル

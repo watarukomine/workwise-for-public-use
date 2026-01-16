@@ -409,7 +409,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         // Defensively map local events, ensuring 'raw' data exists to avoid "ghost" empty orders
         const localOrders = localUnassignedEvents
           .filter(e => e.raw) // CRITICAL: Only map if raw data exists
-          .map(e => mapRawToOrder(e.raw))
+          .map(e => mapRawToOrder(e.raw, e.id)) // PASS STABLE ID (e.id) to prevent random ID gen
           .filter(o => {
             // Check by ID
             if (existingIds.has(o.id)) return false;
