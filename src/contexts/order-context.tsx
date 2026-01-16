@@ -373,28 +373,38 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       // Merge local unassigned events into unassignedOrders
       // This ensures that if we optimistically unassign a task (staffId=''), it appears in the unassigned list
       // even if the backend still thinks it's assigned.
+      // Merge local unassigned events into unassignedOrders
+      // This ensures that if we optimistically unassign a task (staffId=''), it appears in the unassigned list
+      // even if the backend still thinks it's assigned.
       const localUnassignedEvents = localScheduleEvents.filter(e => !e.staffId && e.rawOrderId);
 
       // Also, we must REMOVE from unassignedOrders any order that is LOCALLY ASSIGNED
       // (i.e. present in localScheduleEvents with a staffId)
       // This fixes the issue where an assigned task reverts to unassigned because backend is stale.
+      // Defensively map and filter to avoid crashes if rawOrderId is missing
       const localAssignedOrderIds = new Set(
         localScheduleEvents
           .filter(e => e.staffId && e.rawOrderId) // Locally assigned
-          .map(e => e.rawOrderId)
+          .map(e => String(e.rawOrderId)) // Make sure it's a string
       );
 
       let finalUnassignedOrders = unassignedOrders.filter(o => {
         // If this order ID is in our local "assigned" list, do not show it as unassigned
+        // Safe check for rawOrderId existence
         if (o.rawOrderId && localAssignedOrderIds.has(o.rawOrderId)) return false;
         return true;
       });
 
       if (localUnassignedEvents.length > 0) {
         const existingIds = new Set(finalUnassignedOrders.map(o => o.id));
+
+        // Defensively map local events, ensuring 'raw' data exists to avoid "ghost" empty orders
+        // This is where the crash likely happened (mapRawToOrder(undefined))
         const localOrders = localUnassignedEvents
+          .filter(e => e.raw) // CRITICAL: Only map if raw data exists
           .map(e => mapRawToOrder(e.raw))
           .filter(o => !existingIds.has(o.id));
+
         finalUnassignedOrders = [...finalUnassignedOrders, ...localOrders];
       }
       setUnassignedOrders(finalUnassignedOrders);
