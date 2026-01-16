@@ -374,9 +374,24 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       // This ensures that if we optimistically unassign a task (staffId=''), it appears in the unassigned list
       // even if the backend still thinks it's assigned.
       const localUnassignedEvents = localScheduleEvents.filter(e => !e.staffId && e.rawOrderId);
-      let finalUnassignedOrders = [...unassignedOrders];
+
+      // Also, we must REMOVE from unassignedOrders any order that is LOCALLY ASSIGNED
+      // (i.e. present in localScheduleEvents with a staffId)
+      // This fixes the issue where an assigned task reverts to unassigned because backend is stale.
+      const localAssignedOrderIds = new Set(
+        localScheduleEvents
+          .filter(e => e.staffId && e.rawOrderId) // Locally assigned
+          .map(e => e.rawOrderId)
+      );
+
+      let finalUnassignedOrders = unassignedOrders.filter(o => {
+        // If this order ID is in our local "assigned" list, do not show it as unassigned
+        if (o.rawOrderId && localAssignedOrderIds.has(o.rawOrderId)) return false;
+        return true;
+      });
+
       if (localUnassignedEvents.length > 0) {
-        const existingIds = new Set(unassignedOrders.map(o => o.id));
+        const existingIds = new Set(finalUnassignedOrders.map(o => o.id));
         const localOrders = localUnassignedEvents
           .map(e => mapRawToOrder(e.raw))
           .filter(o => !existingIds.has(o.id));
