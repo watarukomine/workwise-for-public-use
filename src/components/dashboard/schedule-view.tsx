@@ -646,8 +646,20 @@ export function ScheduleView({
       const scheduleItem = item as WithId<ScheduleEvent>;
       const isRealOrder = !!scheduleItem.customerCode;
 
+      const scheduleItem = item as WithId<ScheduleEvent>;
+      const isRealOrder = !!scheduleItem.customerCode;
+
       if (scheduleItem.rawOrderId && isRealOrder) {
         await unassignTask(scheduleItem);
+
+        // Also unassign companion travel event locally
+        if (scheduleItem.tripId) {
+          toggleTripSuppression(scheduleItem.tripId); // Reset suppression if needed
+          const companionTravel = previousSchedule.find(e => e.tripId === scheduleItem.tripId && e.id.endsWith('-travel') && e.id !== scheduleItem.id);
+          if (companionTravel) {
+            saveLocalEvent({ ...companionTravel, staffId: '', start: '', end: '' });
+          }
+        }
       } else {
         if (scheduleItem.rawOrderId) {
           try {
