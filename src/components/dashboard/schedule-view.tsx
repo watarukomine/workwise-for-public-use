@@ -1256,12 +1256,17 @@ export function ScheduleView({
       // Soft Delete: Mark as deleted to hide it, but keep it in local state to block backend Sync
       saveLocalEvent({ ...eventToDelete, staffId: '__DELETED__' });
 
+      // OPTIMISTIC UI: Immediately remove from view state
+      setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
+
       // Also delete companion travel event if generic
       if (eventToDelete.tripId) {
         // Find ANY event with same tripId that isn't this one
         const companionTravel = scheduleEvents.find(e => e.tripId === eventToDelete.tripId && e.id !== eventToDelete.id);
         if (companionTravel) {
           saveLocalEvent({ ...companionTravel, staffId: '__DELETED__' });
+          // OPTIMISTIC UI: Immediately remove companion from view state
+          setScheduleEvents(prev => prev.filter(e => e.id !== companionTravel.id && e.id !== eventToDelete.id));
 
           // CRITICAL: Also delete the companion event from GAS Backend
           // Even if it doesn't have a task- ID, the fallback search in GAS (by Staff+Time) will catch it.
