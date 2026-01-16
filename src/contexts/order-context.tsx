@@ -403,18 +403,20 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       });
 
       if (localUnassignedEvents.length > 0) {
-        const existingIds = new Set(finalUnassignedOrders.map(o => o.id));
-        const existingRawIds = new Set(finalUnassignedOrders.map(o => o.rawOrderId).filter(Boolean));
+        // Normalize IDs to strings for comparison
+        const existingIds = new Set(finalUnassignedOrders.map(o => String(o.id)));
+        const existingRawIds = new Set(finalUnassignedOrders.map(o => String(o.rawOrderId)).filter(Boolean));
 
         // Defensively map local events, ensuring 'raw' data exists to avoid "ghost" empty orders
         const localOrders = localUnassignedEvents
           .filter(e => e.raw) // CRITICAL: Only map if raw data exists
-          .map(e => mapRawToOrder(e.raw, e.id)) // PASS STABLE ID (e.id) to prevent random ID gen
+          // Use rawOrderId as prefered fallback to match backend ID calculation
+          .map(e => mapRawToOrder(e.raw, String(e.rawOrderId || e.id)))
           .filter(o => {
-            // Check by ID
-            if (existingIds.has(o.id)) return false;
-            // Check by Raw Order ID (crucial for distinguishing "same order, different generated ID")
-            if (o.rawOrderId && existingRawIds.has(o.rawOrderId)) return false;
+            // Check by ID (Normalize to string)
+            if (existingIds.has(String(o.id))) return false;
+            // Check by Raw Order ID (Normalize to string)
+            if (o.rawOrderId && existingRawIds.has(String(o.rawOrderId))) return false;
             return true;
           });
 
