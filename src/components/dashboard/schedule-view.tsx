@@ -1227,7 +1227,8 @@ export function ScheduleView({
 
       // Also delete companion travel event if generic
       if (eventToDelete.tripId) {
-        const companionTravel = scheduleEvents.find(e => e.tripId === eventToDelete.tripId && e.id.endsWith('-travel') && e.id !== eventToDelete.id);
+        // Simplified lookup: find ANY event with same tripId that isn't this one
+        const companionTravel = scheduleEvents.find(e => e.tripId === eventToDelete.tripId && e.id !== eventToDelete.id);
         if (companionTravel) {
           saveLocalEvent({ ...companionTravel, staffId: '__DELETED__' });
         }

@@ -76,9 +76,31 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
   // Find the visual ID (Row Number)
   const visualId = findKey(rawOrder, ['受注 ID', '受注id', '受注ID', 'id']);
 
-  // If SystemID exists, use it. Otherwise fallback to visualId (for backward compatibility)
-  // If both missing, use provided fallbackId or random (fallbackId preferred for stability)
-  const orderId = sysId ? String(sysId) : (visualId ? String(visualId) : (fallbackId || `ord-${Math.random()}`));
+  // Generate a deterministic ID based on content if System/Visual IDs are missing
+  // This is crucial for "Accompanying" (同行) tasks to have stable IDs across refreshes, preventing "resurrection" after deletion
+  let contentId = '';
+  if (!sysId && !visualId) {
+    const cDate = findKey(rawOrder, ['作業予定日', 'date']);
+    const cTime = findKey(rawOrder, ['予定時間', 'expectedTime', 'scheduledTime']);
+    const cStaff = findKey(rawOrder, ['担当者', 'staffName', 'staff']);
+    const cContent = findKey(rawOrder, ['業務内容', 'taskDetails', 'title']);
+
+    if (cDate && cStaff && cContent) {
+      // Simple hash-like string: gen-DATE-TIME-STAFF-CONTENT (sanitized)
+      const rawStr = `${String(cDate)}-${String(cTime || '')}-${String(cStaff)}-${String(cContent)}`;
+      // Create a simple mostly-unique hash code
+      let hash = 0;
+      for (let i = 0; i < rawStr.length; i++) {
+        const char = rawStr.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32bit integer
+      }
+      contentId = `gen-${Math.abs(hash).toString(36)}`;
+    }
+  }
+
+  // If SystemID exists, use it. Otherwise fallback to visualId, then contentId, then fallbackId/random
+  const orderId = sysId ? String(sysId) : (visualId ? String(visualId) : (contentId || fallbackId || `ord-${Math.random()}`));
 
   const rawDurationVal = findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間']);
   let duration = 60; // Default
