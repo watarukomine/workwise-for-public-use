@@ -368,7 +368,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       const localIds = new Set(localScheduleEvents.map(e => e.id));
       const filteredBackendEvents = backendEvents.filter(e => !localIds.has(e.id));
 
-      setScheduleEvents([...filteredBackendEvents, ...localScheduleEvents]);
+      setScheduleEvents([...filteredBackendEvents, ...localScheduleEvents.filter(e => e.staffId !== '__DELETED__')]);
       setStatuses(statuses);
 
       // Merge local unassigned events into unassignedOrders

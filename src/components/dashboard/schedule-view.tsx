@@ -1222,12 +1222,14 @@ export function ScheduleView({
     const isGeneric = eventToDelete.id.startsWith('event-') || eventToDelete.id.startsWith('generic-') || !eventToDelete.customerCode || ['休憩', '移動', '業務', '研修', '同行', '商談'].some(t => eventToDelete.title.includes(t));
 
     if (isGeneric) {
-      deleteLocalEvent(eventToDelete.id);
+      // Soft Delete: Mark as deleted to hide it, but keep it in local state to block backend Sync
+      saveLocalEvent({ ...eventToDelete, staffId: '__DELETED__' });
+
       // Also delete companion travel event if generic
       if (eventToDelete.tripId) {
         const companionTravel = scheduleEvents.find(e => e.tripId === eventToDelete.tripId && e.id.endsWith('-travel') && e.id !== eventToDelete.id);
         if (companionTravel) {
-          deleteLocalEvent(companionTravel.id);
+          saveLocalEvent({ ...companionTravel, staffId: '__DELETED__' });
         }
       }
 
