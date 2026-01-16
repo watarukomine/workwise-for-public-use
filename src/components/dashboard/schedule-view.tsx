@@ -1258,10 +1258,24 @@ export function ScheduleView({
 
       // Also delete companion travel event if generic
       if (eventToDelete.tripId) {
-        // Simplified lookup: find ANY event with same tripId that isn't this one
+        // Find ANY event with same tripId that isn't this one
         const companionTravel = scheduleEvents.find(e => e.tripId === eventToDelete.tripId && e.id !== eventToDelete.id);
         if (companionTravel) {
           saveLocalEvent({ ...companionTravel, staffId: '__DELETED__' });
+
+          // CRITICAL: Also delete the companion event from GAS Backend
+          if (companionTravel.id.startsWith('task-')) {
+            await updateSheetStatus({
+              gasUrl: ORDER_GAS_URL,
+              eventTitle: companionTravel.title,
+              staffName: staffName,
+              statusValue: "キャンセル",
+              timestamp: new Date().toISOString(),
+              systemId: companionTravel.id,
+              scheduledTime: companionTravel.start instanceof Date ? companionTravel.start.toISOString() : companionTravel.start,
+              actionType: 'cancel'
+            });
+          }
         }
       }
 
