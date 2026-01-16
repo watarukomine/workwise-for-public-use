@@ -70,14 +70,15 @@ export const formatTime = (date: Date | string) => {
   return format(d, 'HH:mm');
 };
 
-export const mapRawToOrder = (rawOrder: any): WithId<Order> => {
+export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order> => {
   // Try to find the robust System ID first
   const sysId = findKey(rawOrder, ['SystemID', 'systemId', 'sysId']);
   // Find the visual ID (Row Number)
   const visualId = findKey(rawOrder, ['受注 ID', '受注id', '受注ID', 'id']);
 
   // If SystemID exists, use it. Otherwise fallback to visualId (for backward compatibility)
-  const orderId = sysId ? String(sysId) : (visualId ? String(visualId) : `ord-${Math.random()}`);
+  // If both missing, use provided fallbackId or random (fallbackId preferred for stability)
+  const orderId = sysId ? String(sysId) : (visualId ? String(visualId) : (fallbackId || `ord-${Math.random()}`));
 
   const rawDurationVal = findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間']);
   let duration = 60; // Default

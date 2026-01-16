@@ -52,11 +52,12 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
   const scheduledRawOrderIds = new Set<string>();
 
   rawOrdersData.forEach((rawOrder, index) => {
-    // Basic Mapping using utility
-    const mappedOrder = mapRawToOrder(rawOrder);
+    // Basic Mapping using utility - PASS STABLE FALLBACK ID (row index based)
+    // This prevents IDs from changing on every background refresh if data lacks SystemID
+    const mappedOrder = mapRawToOrder(rawOrder, `ord-row-${index}`);
     const order: WithId<Order> = {
       ...mappedOrder,
-      id: mappedOrder.id || `order-${index}`, // Ensure ID
+      id: mappedOrder.id, // mappedOrder.id is now guaranteed stable
       raw: rawOrder
     };
 
@@ -390,8 +391,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
       let finalUnassignedOrders = unassignedOrders.filter(o => {
         // If this order ID is in our local "assigned" list, do not show it as unassigned
-        // Safe check for rawOrderId existence
+
+        // Check 1: Match by rawOrderId (preferred)
         if (o.rawOrderId && localAssignedOrderIds.has(o.rawOrderId)) return false;
+
+        // Check 2: Match by exact ID (fallback for valid stable IDs)
+        // This handles cases where rawOrderId is missing but ID is stable
+        if (localIds.has(o.id)) return false;
+
         return true;
       });
 
