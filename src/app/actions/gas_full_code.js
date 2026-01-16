@@ -355,6 +355,7 @@ function updateSheetWithOrderInfo(params) {
         // 2. フォールバック検索: IDで見つからなかった場合、かつ担当者名と時間がある場合 (汎用タスク救済)
         if (targetRowNum === -1 && staffName && scheduledTime) {
             console.log("No matching ID found. Trying content-based search (Staff+Date+Time)...");
+            console.log("Target: Staff=" + staffName + ", Time=" + scheduledTime); // Debug Log
 
             const staffColIdx = headers.indexOf("担当") !== -1 ? headers.indexOf("担当") : headers.indexOf("スタッフ名");
             const dateColIdx = headers.indexOf("作業予定日");
@@ -365,6 +366,7 @@ function updateSheetWithOrderInfo(params) {
                 const targetTimeStr = Utilities.formatDate(targetDate, "Asia/Tokyo", "HH:mm");
                 targetDate.setHours(0, 0, 0, 0);
 
+                // Start searching from recent rows backwards? No, standard forward search is fine for now but safer to match exact
                 for (let i = 1; i < data.length; i++) {
                     const rowStaff = String(data[i][staffColIdx]);
                     const rowDateVal = data[i][dateColIdx];
@@ -390,8 +392,13 @@ function updateSheetWithOrderInfo(params) {
 
                     if (rowDate) {
                         rowDate.setHours(0, 0, 0, 0);
-                        // 条件一致確認: 担当者、日付、時間
-                        if (rowStaff.trim() === staffName.trim() && rowDate.getTime() === targetDate.getTime()) {
+                        // 条件一致確認: 担当者(スペース削除)、日付、時間
+                        // Normalize names by removing ALL spaces
+                        const normalizedRowStaff = rowStaff.replace(/\s+/g, '');
+                        const normalizedTargetStaff = staffName.replace(/\s+/g, '');
+
+                        if (normalizedRowStaff === normalizedTargetStaff && rowDate.getTime() === targetDate.getTime()) {
+                            // Check Time match strictly first
                             if (rowTimeStr === targetTimeStr) {
                                 targetRowNum = i + 1;
                                 console.log("Found match by Content (Staff+Date+Time) at Row:", targetRowNum);
@@ -403,7 +410,16 @@ function updateSheetWithOrderInfo(params) {
             }
         }
 
-        if (targetRowNum === -1) throw new Error(`ID: ${searchId || '(ID指定なし)'} が見つかりませんでした。`);
+        if (targetRowNum === -1) {
+            // Order Sheetで見つからなかった場合、Action Logシートも探してみる
+            console.log("Not found in Order Sheet. Trying Action Log Sheet Fallback...");
+            try {
+                return updateTaskSheet(null, params); // IDなしで呼び出し
+            } catch (e) {
+                console.log("Not found in Action Log Sheet either.");
+                throw new Error(`ID: ${searchId || '(ID指定なし)'} がどちらのシートにも見つかりませんでした。`);
+            }
+        }
 
         const updateColumn = (colName, value) => {
             const colIdx = headers.indexOf(colName);
@@ -448,27 +464,94 @@ function updateSheetWithOrderInfo(params) {
         return errorResponse(error.message);
     }
 }
-// 汎用タスク更新用
+// 汎用タスク（行動記録）更新用
 function updateTaskSheet(taskId, params) {
     const ss = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
     const sheet = ss.getSheetByName(ACTION_LOG_SHEET_NAME);
     if (!sheet) throw new Error("行動予定シートが見つかりません");
+
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
     const idCol = headers.indexOf("ID");
+
     let rowNum = -1;
-    for (let i = 1; i < data.length; i++) {
-        if (String(data[i][idCol]) === String(taskId)) {
-            rowNum = i + 1;
-            break;
+    // 1. ID検索
+    if (taskId) {
+        for (let i = 1; i < data.length; i++) {
+            if (String(data[i][idCol]) === String(taskId)) {
+                rowNum = i + 1;
+                break;
+            }
         }
     }
-    if (rowNum === -1) throw new Error("タスクIDが見つかりません");
+
+    // 2. IDで見つからない場合、Fallback検索 (Staff + Time)
+    if (rowNum === -1 && params.staffName && params.scheduledTime) {
+        const staffName = params.staffName;
+        const scheduledTime = params.scheduledTime;
+        console.log("updateTaskSheet: ID mismatch or missing. Trying content search...", staffName, scheduledTime);
+
+        const staffColIdx = headers.indexOf("スタッフ名");
+        const startColIdx = headers.indexOf("開始日時");
+
+        if (staffColIdx !== -1 && startColIdx !== -1) {
+            const targetDate = new Date(scheduledTime);
+            const targetTimeStr = Utilities.formatDate(targetDate, "Asia/Tokyo", "HH:mm");
+            targetDate.setHours(0, 0, 0, 0);
+
+            // Normalize target staff name
+            const normTargetStaff = staffName.replace(/\s+/g, '');
+
+            for (let i = 1; i < data.length; i++) {
+                const rowStaff = String(data[i][staffColIdx]);
+                const rowStartVal = data[i][startColIdx];
+
+                let rowDate = null;
+                if (rowStartVal instanceof Date) rowDate = rowStartVal;
+                else if (rowStartVal && !isNaN(new Date(rowStartVal).getTime())) rowDate = new Date(rowStartVal);
+
+                if (rowDate) {
+                    // Check match
+                    // 1. Name (normalized)
+                    const normRowStaff = rowStaff.replace(/\s+/g, '');
+                    // 2. Date & Time
+                    const rowTimeStr = Utilities.formatDate(rowDate, "Asia/Tokyo", "HH:mm");
+                    rowDate.setHours(0, 0, 0, 0);
+
+                    if (normRowStaff === normTargetStaff && rowDate.getTime() === targetDate.getTime() && rowTimeStr === targetTimeStr) {
+                        rowNum = i + 1;
+                        console.log("Found task match by Content at Row:", rowNum);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (rowNum === -1) throw new Error("タスクIDが見つかりません: " + (taskId || 'ID不明'));
+
+    // キャンセル（削除）処理
+    if (params.statusValue === 'キャンセル' || params.actionType === 'cancel') {
+        sheet.deleteRow(rowNum);
+        SpreadsheetApp.flush(); // 即時反映
+        return successResponse(`タスクID: ${taskId} を削除しました。`, {
+            debug: {
+                action: 'deleteRow',
+                row: rowNum,
+                id: taskId,
+                paramsStatus: params.statusValue
+            }
+        });
+    }
+
+    // 通常更新
     const mapping = {
         'スタッフ名': params.staffName,
+        '業務内容': params.eventTitle, // タイトルも更新可能に
         '開始日時': params.scheduledTime ? new Date(params.scheduledTime) : undefined,
         '終了日時': params.scheduledEndTime ? new Date(params.scheduledEndTime) : undefined,
     };
+
     Object.keys(mapping).forEach(header => {
         const val = mapping[header];
         if (val !== undefined) {
@@ -476,6 +559,7 @@ function updateTaskSheet(taskId, params) {
             if (col !== -1) sheet.getRange(rowNum, col + 1).setValue(val);
         }
     });
+
     return successResponse(`タスクID: ${taskId} を更新しました。`);
 }
 function sendIcsEmail(params) {
