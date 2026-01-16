@@ -646,9 +646,6 @@ export function ScheduleView({
       const scheduleItem = item as WithId<ScheduleEvent>;
       const isRealOrder = !!scheduleItem.customerCode;
 
-      const scheduleItem = item as WithId<ScheduleEvent>;
-      const isRealOrder = !!scheduleItem.customerCode;
-
       if (scheduleItem.rawOrderId && isRealOrder) {
         await unassignTask(scheduleItem);
 
