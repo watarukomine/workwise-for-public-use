@@ -86,8 +86,14 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     const cContent = findKey(rawOrder, ['業務内容', 'taskDetails', 'title']);
 
     if (cDate && cStaff && cContent) {
+      // Normalize components to ensure stability across format variations
+      const normDate = formatDate(String(cDate), 'yyyy-MM-dd');
+      const normTime = cTime ? formatTime(cTime) : '';
+      const normStaff = String(cStaff).trim();
+      const normContent = String(cContent).trim();
+
       // Simple hash-like string: gen-DATE-TIME-STAFF-CONTENT (sanitized)
-      const rawStr = `${String(cDate)}-${String(cTime || '')}-${String(cStaff)}-${String(cContent)}`;
+      const rawStr = `${normDate}-${normTime}-${normStaff}-${normContent}`;
       // Create a simple mostly-unique hash code
       let hash = 0;
       for (let i = 0; i < rawStr.length; i++) {
