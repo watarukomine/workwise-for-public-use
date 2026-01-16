@@ -1234,6 +1234,19 @@ export function ScheduleView({
         }
       }
 
+      // Update Backend for Generic Task (Cancel status)
+      // Even if rawOrderId is missing, we send systemId (gen-HASH) and other details for content-based lookup in GAS
+      await updateSheetStatus({
+        gasUrl: ORDER_GAS_URL,
+        eventTitle: eventToDelete.title || `(ID: ${eventToDelete.rawOrderId || 'N/A'})`,
+        staffName: staffName, // Needed for fallback search
+        statusValue: "キャンセル",
+        timestamp: new Date().toISOString(),
+        systemId: eventToDelete.id, // Pass stable ID
+        scheduledTime: eventToDelete.start, // Pass Start Time for fallback search
+        actionType: 'cancel' // Optional context
+      });
+
       toast({ title: '汎用タスクを削除しました', duration: 3000 });
     } else {
       // Optimistic Unassign

@@ -2,420 +2,491 @@
 // 「受注管理」シートがあるスプレッドシートのIDを貼り付けてください
 const ORDER_SPREADSHEET_ID = "17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s";
 const ORDER_SHEET_NAME = "受注管理";
-
 // 「スタッフマスタ」シートがあるスプレッドシートのIDを貼り付けてください
 const STAFF_SPREADSHEET_ID = "18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo";
 const STAFF_SHEET_NAME = "スタッフマスタ";
+const ACTION_LOG_SHEET_NAME = "行動予定"; // 汎用タスク（休憩・移動等）の保存先
 // ↓↓↓↓【設定はここまで】↓↓↓↓
-
-
 /**
  * GET リクエストを処理し、スプレッドシートのデータを JSON で返します
+ * 受注データと行動予定データを統合して返します
  */
 function doGet(e) {
     try {
-        const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
-        const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
-        if (!sheet) throw new Error(`シート '${ORDER_SHEET_NAME}' がスプレッドシートID '${ORDER_SPREADSHEET_ID}' 内に見つかりません。`);
-
-        const dataRange = sheet.getDataRange();
-        const values = dataRange.getValues();
-
-        if (values.length < 1) {
-            return ContentService.createTextOutput(JSON.stringify({ data: [] })).setMimeType(ContentService.MimeType.JSON);
+        const data = [];
+        // 1. 受注データの取得
+        try {
+            const orderSpreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+            const orderSheet = orderSpreadsheet.getSheetByName(ORDER_SHEET_NAME);
+            if (orderSheet) {
+                const orderData = getSheetData(orderSheet);
+                orderData.forEach(row => {
+                    row._type = 'order'; // 識別子
+                    data.push(row);
+                });
+            }
+        } catch (err) {
+            console.error("Order Sheet Read Error:", err);
         }
-
-        const headers = values.shift();
-        const sheetId = sheet.getSheetId();
-        const spreadsheetId = sheet.getParent().getId();
-
-        const data = values.map((row, rowIndex) => {
-            const obj = {};
-            headers.forEach((header, index) => {
-                const cellValue = row[index];
-                if (cellValue && cellValue instanceof Date && !isNaN(cellValue)) {
-                    obj[header] = cellValue.toISOString();
-                } else {
-                    obj[header] = cellValue;
-                }
-            });
-            obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowIndex + 2}`;
-            return obj;
-        });
-
+        // 2. 行動予定データの取得
+        try {
+            const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
+            let actionSheet = staffSpreadsheet.getSheetByName(ACTION_LOG_SHEET_NAME);
+            if (actionSheet) {
+                const actionData = getSheetData(actionSheet);
+                actionData.forEach(row => {
+                    row._type = 'task'; // 識別子
+                    // フロントエンドの形式に合わせてフィールドをマッピング
+                    row.id = row['ID'];
+                    row.staffName = row['スタッフ名'];
+                    row.taskDetails = row['業務内容'];
+                    row.description = row['詳細'];
+                    row.scheduledTime = row['開始日時']; // 開始
+                    row.scheduledEndTime = row['終了日時']; // 終了
+                    row.status = '未割当'; // 便宜上
+                    data.push(row);
+                });
+            }
+        } catch (err) {
+            console.error("Action Log Sheet Read Error:", err);
+        }
         return ContentService.createTextOutput(JSON.stringify({ data: data })).setMimeType(ContentService.MimeType.JSON);
     } catch (error) {
         console.error("GAS doGet Error:", error.message, error.stack);
         return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
     }
 }
+// シートデータをオブジェクト配列として取得するヘルパー
+function getSheetData(sheet) {
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getDisplayValues(); // 文字列としてそのまま取得（日付自動変換を防ぐ）
+    if (values.length < 1) return [];
+    const headers = values.shift();
+    const sheetId = sheet.getSheetId();
+    const spreadsheetId = sheet.getParent().getId();
+    return values.map((row, rowIndex) => {
+        const obj = {};
+        headers.forEach((header, index) => {
+            const cellValue = row[index];
+            if (cellValue && cellValue instanceof Date && !isNaN(cellValue)) {
+                obj[header] = cellValue.toISOString();
+            } else {
+                obj[header] = cellValue;
+            }
+        });
+        // Order_URL (編集用リンク)
+        obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowIndex + 2}`;
 
+        // SystemIDがない古いデータへの互換性対応
+        // SystemIDが空なら、便宜的にRowIDを使う（ただしソート危険性は残るが、アプリが落ちないようにする）
+        if (!obj['SystemID']) {
+            // 下位互換用：SystemID列が無い、または空の場合は
+            // 既存ロジック(createOrderでSystemIDを埋めるまではここに来ないかもですが)
+        }
+        return obj;
+    });
+}
 /**
  * POST リクエストを処理し、スプレッドシートを更新します
  */
 function doPost(e) {
     try {
-        console.log("doPost Request received:", JSON.stringify(e));
-
         let params;
         if (e.postData && e.postData.type === "application/json") {
             try {
                 params = JSON.parse(e.postData.contents);
-                console.log("JSON data parsed:", JSON.stringify(params));
             } catch (parseError) {
-                console.error("JSON parse error:", parseError.message);
-                return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "JSONデータの解析に失敗しました: " + parseError.message })).setMimeType(ContentService.MimeType.JSON);
+                return errorResponse("JSONデータの解析に失敗しました: " + parseError.message);
             }
         } else {
-            console.error("No JSON data received in request");
-            return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "リクエストにJSONデータがありません" })).setMimeType(ContentService.MimeType.JSON);
+            return errorResponse("リクエストにJSONデータがありません");
         }
-
         // アクション分岐
-        if (params.action === 'createOrder') {
-            return createOrder(params);
-        }
-
-        // 既存の分岐処理
         if (params.operation === 'sendEmail') {
             return sendIcsEmail(params);
-        } else if (params.eventTitle) { // Update sheet from app
+        } else if (params.action === 'createTask') { // 新規: 汎用タスク作成
+            return createTask(params);
+        } else if (params.eventTitle || params.systemId || params.orderId) { // 既存更新
             return updateSheetWithOrderInfo(params);
+        } else if (params.action === 'createOrder') { // 新規注文
+            return createOrder(params);
         } else {
-            return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "必要なパラメータ (eventTitle, operation, action) がありません" })).setMimeType(ContentService.MimeType.JSON);
+            return errorResponse("必要なパラメータ (eventTitle, action, または operation) がありません");
         }
     } catch (error) {
-        console.error("Error in doPost:", error.message, error.stack);
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "エラーが発生しました: " + error.message })).setMimeType(ContentService.MimeType.JSON);
+        return errorResponse("エラーが発生しました: " + error.message);
     }
 }
-
+function errorResponse(msg) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: msg })).setMimeType(ContentService.MimeType.JSON);
+}
+function successResponse(msg, data) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", message: msg, ...data })).setMimeType(ContentService.MimeType.JSON);
+}
 /**
- * 新規注文を作成する関数
+ * 汎用タスク（行動記録）を新規作成する機能
+ * スタッフマスタ側の「行動予定」シートに追記します
  */
-function createOrder(data) {
+function createTask(params) {
+    const { staffName, taskName, description, startTime, endTime } = params;
+    try {
+        const ss = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
+        let sheet = ss.getSheetByName(ACTION_LOG_SHEET_NAME);
+        // シートが無ければ作成
+        if (!sheet) {
+            sheet = ss.insertSheet(ACTION_LOG_SHEET_NAME);
+            // ヘッダー行作成
+            sheet.appendRow(['ID', 'スタッフ名', '業務内容', '詳細', '開始日時', '終了日時', '作成日時']);
+        }
+        // ID生成
+        const id = 'task-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
+        const now = new Date();
+        // 行追加
+        sheet.appendRow([
+            id,
+            staffName,
+            taskName,
+            description || '',
+            startTime ? new Date(startTime) : '',
+            endTime ? new Date(endTime) : '',
+            now
+        ]);
+        return successResponse("タスクを作成しました", { eventId: id });
+    } catch (e) {
+        console.error("createTask Error:", e);
+        return errorResponse("タスク作成エラー: " + e.message);
+    }
+}
+/**
+ * 注文（受注）を新規作成する機能
+ * 受注管理シートに追記します
+ */
+function createOrder(params) {
     try {
         const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
-        let sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
+        const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
+        if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
+        const headers = sheet.getDataRange().getValues()[0];
+        // SystemID列があるかチェック
+        let sysIdColIndex = -1;
+        headers.forEach((h, i) => {
+            if (String(h).trim() === "SystemID") sysIdColIndex = i;
+        });
+        if (sysIdColIndex === -1) {
+            // SystemID列がなければ自動追加（危険回避のため、追加後にメッセージを返すのもありだが、ここでは追加して続行）
+            // ただし、列挿入はユーザーに行わせるほうが安全（上記手順1に従ってもらう）
+            // throw new Error("「SystemID」列が見つかりません。シートに追加してください。");
+        }
+        // 新しいSystemIDの生成: ScheduledDate_UserCode_Random3
+        // 作成日ではなく「作業予定日」をIDのプレフィックスにする
 
-        if (!sheet) {
-            // もしシート名が見つからない場合は、名前で探さずに一番左のシートを使う（フォールバック）
-            sheet = spreadsheet.getSheets()[0];
+        let targetDate = new Date();
+        if (params.scheduledDate) {
+            const scheduled = new Date(params.scheduledDate);
+            if (!isNaN(scheduled.getTime())) {
+                targetDate = scheduled;
+            }
         }
 
-        var nextRow = sheet.getLastRow() + 1;
-        var timestamp = Utilities.formatDate(new Date(), "Asia/Tokyo", "yyyy/MM/dd HH:mm:ss");
+        const yyyy = targetDate.getFullYear();
+        const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+        const dd = String(targetDate.getDate()).padStart(2, '0');
+        const dateStr = `${yyyy}${mm}${dd}`;
 
-        // カラム構成（A列=0番目スタート）に合わせてデータを配置
-        // ※シートの列順序が変更された場合は、この配列の順序も修正する必要があります。
-        // 今回の変更: C列を「店舗名」、D列を「主管店舗」として扱います。
-        var rowData = [
-            '',                   // A: 受注ID (自動採番または空欄)
-            data.userCode,        // B: ユーザーコード
-            data.storeName,       // C: 店舗名 (旧: お取引先名)
-            data.mainStore || '', // D: 主管店舗 (新規追加)
-            '',                   // E: 機材有無 (フォーム入力なし、空欄)
-            "'" + data.scheduledDate, // F: 作業予定日
-            "'" + data.scheduledTime, // G: 予定時間
-            data.picName,         // H: ご担当者様
-            data.workType || '販売店店舗内作業', // I: 作業 (デフォルト「販売店店舗内作業」)
-            data.orderNo,         // J: 受注No(リマーク1)
-            data.comment,         // K: 任意コメント(リマーク2)
-            data.carName,         // L: 車名
-            data.regNo,           // M: 登録ナンバー
-            data.status,          // N: 入庫状況
-            data.tireNumber,      // O: タイヤ品番
-            data.tireSize,        // P: タイヤサイズ
-            data.productName,     // Q: 品名
-            '',                   // R: 作業内容
-            data.quantity,        // S: 本数
-            data.sensor,          // T: タイヤ手配状況 (注意: カラムズレの可能性あり、元のコードの順序に従う)
-            data.arrangement,     // U: タイヤ手配状況 (選択式)
-            data.disposal,        // V: 廃タイヤ処分
-            data.contact,         // W: 連絡先
-            '未着手',             // X: 受注ステータス (デフォルト)
-            '',                   // Y: 担当
-            timestamp             // Z: 最終更新日時
-        ];
+        const userCode = params.userCode || 'guest';
+        const randomStr = Utilities.getUuid().split('-')[0].substring(0, 3);
+        const newSystemId = `${dateStr}_${userCode}_${randomStr}`;
+        // ---------------------------------------------------------
+        // 2. Prepare Data (Static Order ID Calculation)
+        // ---------------------------------------------------------
+        // 数式の =ROW()-1 ではなく、現在の最大値を取得して +1 した値を固定値としてセットする
+        // これにより行の並び替えを行ってもIDが変わらなくなる
 
-        sheet.appendRow(rowData);
+        let maxId = 0;
+        const idColIndex = headers.indexOf("受注ID");
+        if (idColIndex !== -1) {
+            const colLetter = String.fromCharCode(65 + idColIndex);
+            // ID列の既存値をすべて取得 (ヘッダー除く 2行目以降)
+            const existingIds = sheet.getRange(`${colLetter}2:${colLetter}`).getValues();
+            for (let i = 0; i < existingIds.length; i++) {
+                const val = existingIds[i][0];
+                const numVal = Number(val);
+                // 数値として有効で、現在の最大値より大きければ記録
+                if (!isNaN(numVal) && numVal > maxId) {
+                    maxId = numVal;
+                }
+            }
+        }
 
-        return ContentService.createTextOutput(JSON.stringify({ status: 'success', message: 'Order created', row: nextRow })).setMimeType(ContentService.MimeType.JSON);
-
+        const nextId = maxId + 1;
+        const numericId = nextId; // レスポンス用
+        // データの書き込み先行を決定 (最終行+1)
+        const targetRow = sheet.getLastRow() + 1;
+        const newRow = [];
+        headers.forEach(header => {
+            const h = String(header).trim();
+            if (h === "受注ID") {
+                newRow.push(nextId); // 固定数値！
+            } else if (h === "SystemID") {
+                newRow.push(newSystemId); // 【重要】絶対不変のID
+            } else if (h === "顧客コード" || h === "ユーザーコード") {
+                newRow.push(params.userCode || "");
+            } else if (h === "お取引先名" || h === "店舗" || h === "店舗名") {
+                newRow.push(params.storeName || "");
+            } else if (h === "主管店舗") {
+                newRow.push(params.mainStore || "");
+            } else if (h === "作業内容" || h === "作業") {
+                newRow.push(params.workType || "");
+            } else if (h === "作業予定日") {
+                newRow.push(params.scheduledDate || "");
+            } else if (h === "予定時間") {
+                newRow.push(params.scheduledTime || "");
+            } else if (h === "ご担当者様" || h === "担当者名") {
+                newRow.push(params.picName || "");
+            } else if (h === "担当") {
+                newRow.push(""); // 弊社担当者はフォームからは空欄にする
+            } else if (h === "注文番号" || h.includes("受注No")) {
+                newRow.push(params.orderNo || "");
+            } else if (h.includes("任意コメント")) {
+                newRow.push(params.comment || "");
+            } else if (h === "緊急連絡") {
+                newRow.push(""); // フォームからは緊急連絡は空欄
+            } else if (h === "車名") {
+                newRow.push(params.carName || "");
+            } else if (h.includes("登録ナンバー")) {
+                newRow.push(params.regNo || "");
+            } else if (h === "受注ステータス" || h === "入庫状況") {
+                newRow.push(params.status || "入庫待ち");
+            } else if (h === "タイヤ品番") {
+                newRow.push(params.tireNumber || "");
+            } else if (h === "タイヤサイズ") {
+                newRow.push(params.tireSize || "");
+            } else if (h === "品名") {
+                newRow.push(params.productName || "");
+            } else if (h === "本数") {
+                newRow.push(params.quantity || "");
+            } else if (h.includes("センサー")) {
+                newRow.push(params.sensor || "");
+            } else if (h === "タイヤ手配状況" || h === "手配") {
+                newRow.push(params.arrangement || "");
+            } else if (h === "廃タイヤ処分" || h === "廃タイヤ") {
+                newRow.push(params.disposal || "");
+            } else if (h === "連絡者名" || h === "連絡者") {
+                newRow.push(params.contact || "");
+            } else if (h === "特記事項") {
+                newRow.push(params.specialNotes || "");
+            } else if (h === "最終更新日時" || h === "受信日時") {
+                newRow.push(new Date());
+            } else {
+                newRow.push("");
+            }
+        });
+        // 書き込み
+        sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
+        // SystemIDを返す (Frontendはこれを使って管理する)
+        return successResponse("注文を登録しました。", { orderId: newSystemId, displayId: targetRow - 1 });
     } catch (error) {
-        console.error("Error in createOrder:", error.message, error.stack);
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "作成中にエラーが発生しました: " + error.message })).setMimeType(ContentService.MimeType.JSON);
+        console.error("createOrder Error:", error);
+        return errorResponse("注文登録エラー: " + error.message);
     }
 }
-
 /**
- * 受注IDでシートを検索し、指定された情報で更新する
- */
-/**
- * 受注IDでシートを検索し、指定された情報で更新する
+ * SystemID (または旧ID) でシートを検索し更新する
  */
 function updateSheetWithOrderInfo(params) {
-    const {
-        eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType,
-        actionTimestamp, scheduledTime, scheduledEndTime, comment
-    } = params;
-
+    const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp, scheduledTime, scheduledEndTime, scheduledDate, comment, specialNotes, systemId } = params;
     try {
-        console.log("Updating sheet with:", JSON.stringify(params));
+        let searchId = systemId;
+        let searchColumnName = "SystemID";
+        // SystemIDが指定されていない場合は、従来のタイトルパースを試みる
+        if (!searchId) {
+            const match = eventTitle ? eventTitle.match(/\(ID:\s*([\w-]+)\)/) : null;
+            searchId = match ? match[1] : null;
+        }
 
+        // 【修正点】IDが見つからないが、eventTitleなどが渡っている場合はフォールバック検索のために続行させるフラグなどが必要
+        // 本来は searchId が必須だが、汎用タスク(ID無し)の削除のために、searchIdなしでも検索へ進む
+        let isFallbackSearch = false;
+        if (!searchId) {
+            // return errorResponse("更新対象のIDが見つかりません (SystemID または Title内ID)");
+            isFallbackSearch = true;
+        }
+
+        // 汎用タスク（行動記録シート）の更新判定
+        if (searchId && String(searchId).startsWith('task-')) {
+            return updateTaskSheet(searchId, params);
+        }
+
+        // --- Order Sheet Update ---
         const orderSpreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
         const sheet = orderSpreadsheet.getSheetByName(ORDER_SHEET_NAME);
-        if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」がスプレッドシートID '${ORDER_SPREADSHEET_ID}' 内に見つかりません。`);
-
+        if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
         const data = sheet.getDataRange().getValues();
         const headers = data[0];
 
-        let rowNum = -1;
-        let foundOrder = false;
-        let orderId = null;
+        // 検索変数
+        let targetRowNum = -1;
 
-        // 1. Try to extract Order ID from eventTitle
-        const match = eventTitle ? eventTitle.match(/\(ID:\s*([\w-]+)\)/) : null;
-
-        if (match && match[1] && match[1].toUpperCase() !== 'N/A') {
-            orderId = match[1];
-            const orderIdCol = headers.indexOf("受注ID");
-            if (orderIdCol !== -1) {
+        // 1. SystemID / 受注ID で検索
+        if (searchId) {
+            let sysIdColIndex = headers.indexOf("SystemID");
+            if (sysIdColIndex !== -1) {
                 for (let i = 1; i < data.length; i++) {
-                    if (String(data[i][orderIdCol]) === String(orderId)) {
-                        rowNum = i + 1;
+                    if (String(data[i][sysIdColIndex]) === String(searchId)) {
+                        targetRowNum = i + 1;
                         break;
+                    }
+                }
+            }
+            // SystemIDで見つからなかった場合、かつ searchId が数字っぽい場合は「受注ID」列も探してみる
+            if (targetRowNum === -1) {
+                const displayIdColIndex = headers.indexOf("受注ID");
+                if (displayIdColIndex !== -1) {
+                    for (let i = 1; i < data.length; i++) {
+                        if (String(data[i][displayIdColIndex]) === String(searchId)) {
+                            targetRowNum = i + 1;
+                            break;
+                        }
                     }
                 }
             }
         }
 
-        // 2. Special Logic for "Clock In" only: If no ID found/provided, search for FIRST order of the day
-        if (rowNum === -1 && actionType === 'Clock In' && staffName) {
-            console.log("Clock In: No ID provided. Searching for first order of day for staff:", staffName);
+        // 2. フォールバック検索: IDで見つからなかった場合、かつ担当者名と時間がある場合 (汎用タスク救済)
+        if (targetRowNum === -1 && staffName && scheduledTime) {
+            console.log("No matching ID found. Trying content-based search (Staff+Date+Time)...");
 
-            const today = timestamp ? new Date(timestamp) : new Date();
-            today.setHours(0, 0, 0, 0);
-
-            // Support both "スタッフ名" and "担当"
-            let staffColIdx = headers.indexOf("スタッフ名");
-            if (staffColIdx === -1) staffColIdx = headers.indexOf("担当");
-
+            const staffColIdx = headers.indexOf("担当") !== -1 ? headers.indexOf("担当") : headers.indexOf("スタッフ名");
             const dateColIdx = headers.indexOf("作業予定日");
             const timeColIdx = headers.indexOf("予定時間");
 
             if (staffColIdx !== -1 && dateColIdx !== -1) {
-                let candidates = [];
+                const targetDate = new Date(scheduledTime);
+                const targetTimeStr = Utilities.formatDate(targetDate, "Asia/Tokyo", "HH:mm");
+                targetDate.setHours(0, 0, 0, 0);
+
                 for (let i = 1; i < data.length; i++) {
                     const rowStaff = String(data[i][staffColIdx]);
                     const rowDateVal = data[i][dateColIdx];
+                    const rowTimeVal = data[i][timeColIdx]; // String or Date
 
                     let rowDate = null;
                     if (rowDateVal instanceof Date) rowDate = rowDateVal;
                     else if (rowDateVal && !isNaN(new Date(rowDateVal).getTime())) rowDate = new Date(rowDateVal);
 
-                    if (rowDate) {
-                        rowDate.setHours(0, 0, 0, 0);
-                        // Clean up staff name comparison (trim)
-                        if (rowStaff.trim() === staffName.trim() && rowDate.getTime() === today.getTime()) {
-                            candidates.push({ rowIndex: i + 1, timeVal: data[i][timeColIdx], rowData: data[i] });
+                    // 時間比較用の文字列生成
+                    let rowTimeStr = "";
+                    if (rowTimeVal instanceof Date) rowTimeStr = Utilities.formatDate(rowTimeVal, "Asia/Tokyo", "HH:mm");
+                    else if (rowTimeVal) {
+                        const s = String(rowTimeVal);
+                        if (s.includes(":")) {
+                            const parts = s.split(":");
+                            if (parts.length >= 2) {
+                                let d = new Date(); d.setHours(parts[0], parts[1]);
+                                rowTimeStr = Utilities.formatDate(d, "Asia/Tokyo", "HH:mm");
+                            }
                         }
                     }
-                }
 
-                if (candidates.length > 0) {
-                    // Sort by time
-                    candidates.sort((a, b) => {
-                        let tA = a.timeVal;
-                        let tB = b.timeVal;
-                        // Handle Date objects or Strings
-                        if (tA instanceof Date) tA = Utilities.formatDate(tA, "Asia/Tokyo", "HH:mm");
-                        if (tB instanceof Date) tB = Utilities.formatDate(tB, "Asia/Tokyo", "HH:mm");
-                        return (tA < tB) ? -1 : (tA > tB) ? 1 : 0;
-                    });
-
-                    rowNum = candidates[0].rowIndex;
-                    foundOrder = true;
-                    console.log("Found first order for Clock In. Row:", rowNum);
-                } else {
-                    console.log("No orders found for staff today.");
-                }
-            } else {
-                console.warn("Columns 'スタッフ名'/'担当' or '作業予定日' not found.");
-            }
-        }
-
-
-        // 3. Update Logic
-        const updateColumn = (colName, value) => {
-            if (value !== undefined) {
-                let colIdx = headers.indexOf(colName);
-
-                // Fallback alias for Staff/ 担当
-                if (colIdx === -1) {
-                    if (colName === "担当") colIdx = headers.indexOf("スタッフ名");
-                    else if (colName === "スタッフ名") colIdx = headers.indexOf("担当");
-                }
-
-                if (colIdx !== -1) {
-                    sheet.getRange(rowNum, colIdx + 1).setValue(value);
-                    console.log(`Updated column '${colName}' (or alias) with value: ${value}`);
-                } else {
-                    console.log(`Column '${colName}' not found. Skipping.`);
-                }
-            }
-        };
-
-        if (rowNum !== -1) {
-            console.log(`Updating row: ${rowNum}`);
-
-            // For normal flow with ID, we update everything.
-            // For Clock In flow (foundOrder), specific updates.
-
-            if (foundOrder && actionType === 'Clock In') {
-                // Logic: Found first order -> Update "出勤ボタン"
-                updateColumn("出勤ボタン", actionTimestamp ? new Date(actionTimestamp) : new Date());
-                // Also update Location and Timestamp
-                updateColumn("最終更新日時", timestamp ? new Date(timestamp) : new Date());
-                if (latitude !== undefined && longitude !== undefined) {
-                    updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
-                }
-
-                return ContentService.createTextOutput(JSON.stringify({
-                    status: "success",
-                    message: "当日の最初の案件の出勤ボタンを更新しました。",
-                    row: rowNum
-                })).setMimeType(ContentService.MimeType.JSON);
-
-            } else {
-                // Normal Update (ID based)
-                updateColumn("担当", staffName); // Uses helper to find '担当' or 'スタッフ名'
-                updateColumn("受注ステータス", statusValue);
-                updateColumn("最終更新日時", timestamp ? new Date(timestamp) : undefined);
-                if (latitude !== undefined && longitude !== undefined) {
-                    updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
-                }
-                updateColumn("チップ配置作業予定", scheduledTime ? new Date(scheduledTime) : (scheduledTime === "" ? "" : undefined));
-                updateColumn("チップ配置作業完了予定", scheduledEndTime ? new Date(scheduledEndTime) : (scheduledEndTime === "" ? "" : undefined));
-
-                if (comment !== undefined) {
-                    updateColumn("緊急連絡", comment);
-                }
-
-                if (actionType && actionTimestamp) {
-                    const dateValue = new Date(actionTimestamp);
-                    const actionColMap = {
-                        'Start Travel': "移動開始",
-                        'Arrive': "現場到着",
-                        'Begin Task': "作業開始",
-                        'Finish Task': "作業完了",
-                        // "Clock In" is handled above specifically for First Order logic,
-                        // but if we had an ID passed explicitly for Clock In, we might want to update it here too?
-                        // But usually Clock In doesn't have ID.
-                    };
-                    if (actionColMap[actionType]) {
-                        updateColumn(actionColMap[actionType], dateValue);
-                    }
-                }
-                return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `受注ID: ${orderId} を更新しました。`, })).setMimeType(ContentService.MimeType.JSON);
-            }
-
-        } else {
-            // No Row Found (and not found via search)
-            // If Clock In, we want to update LOCATION regardless?
-            // "出勤ボタン" logic: "もし...出動予定のない場合はタイムスタンプの入力はせず、位置情報の更新だけを行う"
-
-            if (actionType === 'Clock In' || actionType === 'Wait') {
-                console.log(`${actionType}: No order found. Attempting location update only.`);
-                // Where do we stick the location?
-                // If no order row, we can't stick it in an order row.
-                // Maybe update "Staff Master"?
-
-                // Let's try to find Staff in Staff Master
-                const staffSheet = orderSpreadsheet.getSheetByName(STAFF_SHEET_NAME); // Assuming same spreadsheet or use STAFF_SPREADSHEET_ID
-                if (staffSheet) { // Note: STAFF_SPREADSHEET_ID defined at top
-                    // Actually open the specific staff spreadsheet
-                    // The code at top defines STAFF_SPREADSHEET_ID separate from ORDER_SPREADSHEET_ID?
-                    // Yes: const STAFF_SPREADSHEET_ID = ...
-
-                    let staffSpreadsheet = null;
-                    try {
-                        staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
-                    } catch (e) {
-                        console.log("Could not open Staff Spreadsheet separate from Order Spreadsheet.");
-                    }
-
-                    if (staffSpreadsheet) {
-                        const sSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
-                        if (sSheet) {
-                            const sData = sSheet.getDataRange().getValues();
-                            const sHeaders = sData[0];
-
-                            // Support '氏名' or 'スタッフ名'
-                            let sNameCol = sHeaders.indexOf("氏名");
-                            if (sNameCol === -1) sNameCol = sHeaders.indexOf("スタッフ名");
-
-                            const sLocCol = sHeaders.indexOf("現在地"); // Assuming '現在地' exists? Or '位置情報'?
-
-                            // If headers don't match, we can't update.
-                            // But let's assume if it fails, we just log.
-
-                            if (sNameCol !== -1) {
-                                let sRowNum = -1;
-                                for (let j = 1; j < sData.length; j++) {
-                                    if (String(sData[j][sNameCol]).trim() === staffName.trim()) {
-                                        sRowNum = j + 1;
-                                        break;
-                                    }
-                                }
-
-                                if (sRowNum !== -1) {
-                                    if (latitude !== undefined && longitude !== undefined) {
-                                        // Check if column exists
-                                        let targetCol = sHeaders.indexOf("現在地");
-                                        if (targetCol === -1) targetCol = sHeaders.indexOf("Location");
-
-                                        if (targetCol !== -1) {
-                                            sSheet.getRange(sRowNum, targetCol + 1).setValue(`${latitude}, ${longitude}`);
-                                            // Update timestamp too?
-                                            let tsCol = sHeaders.indexOf("最終更新日時");
-                                            if (tsCol !== -1) {
-                                                sSheet.getRange(sRowNum, tsCol + 1).setValue(timestamp ? new Date(timestamp) : new Date());
-                                            }
-
-                                            return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "本日の予定はありませんが、スタッフマスタの位置情報を更新しました。" })).setMimeType(ContentService.MimeType.JSON);
-                                        }
-                                    }
-                                }
+                    if (rowDate) {
+                        rowDate.setHours(0, 0, 0, 0);
+                        // 条件一致確認: 担当者、日付、時間
+                        if (rowStaff.trim() === staffName.trim() && rowDate.getTime() === targetDate.getTime()) {
+                            if (rowTimeStr === targetTimeStr) {
+                                targetRowNum = i + 1;
+                                console.log("Found match by Content (Staff+Date+Time) at Row:", targetRowNum);
+                                break;
                             }
                         }
                     }
                 }
-
-                // If we couldn't update anything
-                return ContentService.createTextOutput(JSON.stringify({ status: "success", message: "本日の予定がなく、位置情報の更新先も見つかりませんでしたが、処理は完了しました。" })).setMimeType(ContentService.MimeType.JSON);
             }
-
-            throw new Error(`指定された受注IDまたは当日の予定が見つかりませんでした。`);
         }
 
+        if (targetRowNum === -1) throw new Error(`ID: ${searchId || '(ID指定なし)'} が見つかりませんでした。`);
+
+        const updateColumn = (colName, value) => {
+            const colIdx = headers.indexOf(colName);
+            if (colIdx !== -1 && value !== undefined) {
+                sheet.getRange(targetRowNum, colIdx + 1).setValue(value);
+            }
+        };
+        // Update Fields
+        updateColumn("担当", staffName);
+        updateColumn("受注ステータス", statusValue); // キャンセル等を反映
+
+        updateColumn("最終更新日時", timestamp ? new Date(timestamp) : undefined);
+        if (latitude !== undefined && longitude !== undefined) {
+            updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
+        }
+        if (scheduledTime) updateColumn("チップ配置作業予定", new Date(scheduledTime));
+        if (scheduledEndTime) updateColumn("チップ配置作業完了予定", new Date(scheduledEndTime));
+        if (scheduledDate) updateColumn("作業予定日", new Date(scheduledDate));
+        if (comment) updateColumn("任意コメント", comment);
+        if (specialNotes !== undefined) updateColumn("特記事項", specialNotes);
+        if (actionType && actionTimestamp) {
+            const dateValue = new Date(actionTimestamp);
+            const actionColMap = {
+                'Start Travel': "移動開始",
+                'Arrive': "現場到着",
+                'Begin Task': "作業開始",
+                'Finish Task': "作業完了",
+            };
+            if (actionColMap[actionType]) {
+                updateColumn(actionColMap[actionType], dateValue);
+            }
+        }
+
+        // キャンセル情報
+        if (params.cancelDate) {
+            updateColumn("キャンセル日時", new Date(params.cancelDate));
+            updateColumn("キャンセル連絡者", params.cancelContact);
+        }
+        return successResponse(`ID: ${searchId || '内容一致'} を更新しました。`, { row: targetRowNum });
     } catch (error) {
-        console.error("Error in updateSheetWithOrderInfo:", error.message, error.stack);
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: error.message })).setMimeType(ContentService.MimeType.JSON);
+        console.error("updateSheetWithOrderInfo Error:", error);
+        return errorResponse(error.message);
     }
 }
-
+// 汎用タスク更新用
+function updateTaskSheet(taskId, params) {
+    const ss = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(ACTION_LOG_SHEET_NAME);
+    if (!sheet) throw new Error("行動予定シートが見つかりません");
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const idCol = headers.indexOf("ID");
+    let rowNum = -1;
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][idCol]) === String(taskId)) {
+            rowNum = i + 1;
+            break;
+        }
+    }
+    if (rowNum === -1) throw new Error("タスクIDが見つかりません");
+    const mapping = {
+        'スタッフ名': params.staffName,
+        '開始日時': params.scheduledTime ? new Date(params.scheduledTime) : undefined,
+        '終了日時': params.scheduledEndTime ? new Date(params.scheduledEndTime) : undefined,
+    };
+    Object.keys(mapping).forEach(header => {
+        const val = mapping[header];
+        if (val !== undefined) {
+            const col = headers.indexOf(header);
+            if (col !== -1) sheet.getRange(rowNum, col + 1).setValue(val);
+        }
+    });
+    return successResponse(`タスクID: ${taskId} を更新しました。`);
+}
 function sendIcsEmail(params) {
     const { staffName, staffEmail, title, description, startTime, endTime, location, isUpdate } = params;
     try {
         if (!staffEmail) throw new Error("宛先メールアドレスが指定されていません。");
-
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(staffEmail)) {
             return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `担当者 (${staffName}) のメールアドレス形式が正しくありません。` }))
                 .setMimeType(ContentService.MimeType.JSON);
         }
-
         const startDate = new Date(startTime);
         const endDate = new Date(endTime);
         if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
@@ -424,7 +495,6 @@ function sendIcsEmail(params) {
         if (endDate <= startDate) {
             throw new Error("終了日時は開始日時より後である必要があります。");
         }
-
         const esc = s => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
         const formatToIcsDate = (date) =>
             date.getUTCFullYear() +
@@ -433,7 +503,6 @@ function sendIcsEmail(params) {
             ('0' + date.getUTCHours()).slice(-2) +
             ('0' + date.getUTCMinutes()).slice(-2) +
             ('0' + date.getUTCSeconds()).slice(-2) + 'Z';
-
         const now = new Date();
         const icsContent = [
             'BEGIN:VCALENDAR',
@@ -451,16 +520,13 @@ function sendIcsEmail(params) {
             'END:VEVENT',
             'END:VCALENDAR'
         ].join('\r\n');
-
         const subject = isUpdate ? "【予定変更】" + title : "【新規予定】" + title;
         const body = isUpdate
             ? "割り当てられた予定が変更されました。添付のiCalendarファイルを開いてカレンダーを更新してください。"
             : "新しい予定が割り当てられました。添付のiCalendarファイルを開いてカレンダーに追加してください。";
-
         const options = {
             attachments: [{ fileName: "invite.ics", content: icsContent, mimeType: "text/calendar; charset=UTF-8; method=REQUEST" }]
         };
-
         MailApp.sendEmail(staffEmail, subject, body, options);
         return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 ${staffName} に予定のメールを送信しました。` }))
             .setMimeType(ContentService.MimeType.JSON);
