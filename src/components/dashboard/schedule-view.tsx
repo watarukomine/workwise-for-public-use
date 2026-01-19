@@ -952,7 +952,15 @@ export function ScheduleView({
                 const realId = res.eventId;
 
                 // Swap ID in local array for immediate state update
-                updatedEvents[i] = { ...ev, id: realId };
+                // CRITICAL ALIGNMENT: Match OrderContext ID format (trip-task-...-task)
+                const derivedTripId = `trip-${realId}`;
+                const frontendId = `${derivedTripId}-task`;
+
+                updatedEvents[i] = {
+                  ...ev,
+                  id: frontendId,
+                  tripId: derivedTripId
+                };
 
                 // Update Persistence
                 deleteLocalEvent(tempId);
@@ -1110,7 +1118,7 @@ export function ScheduleView({
         const { title, description } = editedEventDetails;
 
         // Call createTask for new double-click events
-        await createTask({
+        const res = await createTask({
           gasUrl: ORDER_GAS_URL,
           staffName: staff.name,
           taskName: title,
@@ -1120,9 +1128,43 @@ export function ScheduleView({
           estimatedDuration: durationMinutes
         });
 
+        // CRITICAL FIX: Immediate Optimistic Update with ALIGNED ID
+        if (res.eventId) {
+          const realId = res.eventId;
+          const derivedTripId = `trip-${realId}`;
+          const frontendId = `${derivedTripId}-task`;
+          // Also create implicit Travel event if needed? 
+          // OrderContext logic: Generic tasks don't get travel events usually.
+          // But user claims "Accompany" gets it. If so, logic is elsewhere.
+          // For now, ensure Main Task is consistent.
+
+          const newEvent: WithId<ScheduleEvent> = {
+            id: frontendId,
+            title: title,
+            start: newStart.toISOString(),
+            end: finalEnd.toISOString(),
+            staffId: staff.id,
+            locationId: '',
+            customerCode: '',
+            customerName: '',
+            address: '',
+            taskDetails: description || title,
+            serviceType: '',
+            status: '未割当',
+            scheduledDate: format(newStart, 'yyyy/MM/dd'),
+            estimatedDuration: durationMinutes,
+            value: 0,
+            staffName: staff.name,
+            equipmentStatus: '',
+            tripId: derivedTripId,
+            raw: {}
+          };
+          saveLocalEvent(newEvent);
+          setScheduleEvents(prev => [...prev, newEvent]);
+        }
+
         toast({ title: '予定を保存しました' });
-        // Optimistic update omitted as refetch will handle it
-        await new Promise(r => setTimeout(r, 1500));
+        // Optimistic update done, explicit refetch for consistency
         await refetchOrders();
 
       } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
@@ -1285,13 +1327,19 @@ export function ScheduleView({
 
       // Update Backend for Generic Task (Cancel status)
       // Even if rawOrderId is missing, we send systemId (gen-HASH) and other details for content-based lookup in GAS
+      // CRITICAL: Strip "trip-" and "-task" prefixes if present to get the real GAS System ID
+      let cleanSystemId = eventToDelete.id;
+      if (cleanSystemId.startsWith('trip-task-') && cleanSystemId.endsWith('-task')) {
+        cleanSystemId = cleanSystemId.replace('trip-', '').replace('-task', '');
+      }
+
       await updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: eventToDelete.title || `(ID: ${eventToDelete.rawOrderId || 'N/A'})`,
         staffName: staffName, // Needed for fallback search
         statusValue: "キャンセル",
         timestamp: new Date().toISOString(),
-        systemId: eventToDelete.id, // Pass stable ID
+        systemId: cleanSystemId, // Pass CLEAN stable ID
         scheduledTime: eventToDelete.start instanceof Date ? eventToDelete.start.toISOString() : eventToDelete.start, // Pass Start Time for fallback search
         actionType: 'cancel' // Optional context
       });
