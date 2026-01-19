@@ -853,7 +853,8 @@ export function ScheduleView({
       if (!staff) return;
 
       const isGeneric = order.id.startsWith('generic-');
-      const isGenericAccompany = order.id === 'generic-accompany';
+      // Treat as Accompany if ID says so OR title contains "同行"
+      const isGenericAccompany = order.id === 'generic-accompany' || order.taskDetails.includes('同行');
       const taskStart = getNewStartFromDrop();
 
       let newEvents: WithId<ScheduleEvent>[] = [];
@@ -861,9 +862,12 @@ export function ScheduleView({
       // Optimistic UI Update
       if (isGeneric) {
         if (isGenericAccompany) {
+          const baseId = `event-${Date.now()}`;
+          const derivedTripId = `trip-${baseId}`;
+
           const travelStart = subMinutes(taskStart, 30);
           const travelEvent: WithId<ScheduleEvent> = {
-            id: `event-${Date.now()}-travel`,
+            id: `${derivedTripId}-travel`,
             title: '移動: 同行',
             description: '',
             staffId: newStaffId, locationId: '',
@@ -871,9 +875,10 @@ export function ScheduleView({
             end: taskStart.toISOString(),
             raw: {},
             customerCode: '', customerName: '', address: '', taskDetails: '移動', serviceType: '', status: '未割当', scheduledDate: '', estimatedDuration: 30, value: 0, staffName: staff.name, equipmentStatus: '',
+            tripId: derivedTripId
           };
           const taskEvent: WithId<ScheduleEvent> = {
-            id: `event-${Date.now()}-task`,
+            id: `${derivedTripId}-task`,
             title: order.taskDetails,
             description: '',
             staffId: newStaffId, locationId: '',
@@ -881,6 +886,7 @@ export function ScheduleView({
             end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
             raw: {},
             customerCode: '', customerName: '', address: '', taskDetails: order.taskDetails, serviceType: '', status: '未割当', scheduledDate: '', estimatedDuration: order.estimatedDuration, value: 0, staffName: staff.name, equipmentStatus: '',
+            tripId: derivedTripId
           };
           newEvents = [travelEvent, taskEvent];
         } else {
@@ -933,10 +939,14 @@ export function ScheduleView({
       // Backend Update
       (async () => {
         try {
-          if (isGeneric) {
+          if (isGeneric || isGenericAccompany) {
             const updatedEvents = [...newEvents];
-            for (let i = 0; i < newEvents.length; i++) {
-              const ev = newEvents[i];
+            // For Accompany tasks, we only send the MAIN task to backend
+            // The backend creates ONE row. Frontend (OrderContext) derives two events.
+            const eventsToCreate = isGenericAccompany ? newEvents.filter(e => e.id.endsWith('-task')) : newEvents;
+
+            for (let i = 0; i < eventsToCreate.length; i++) {
+              const ev = eventsToCreate[i];
               const res = await createTask({
                 gasUrl: ORDER_GAS_URL,
                 staffName: staff.name,
@@ -946,28 +956,59 @@ export function ScheduleView({
                 estimatedDuration: differenceInMinutes(parseISO(ev.end as string), parseISO(ev.start as string))
               });
 
-              // CRITICAL FIX: Update local event ID with real backend ID
               if (res.eventId) {
-                const tempId = ev.id;
                 const realId = res.eventId;
-
-                // Swap ID in local array for immediate state update
-                // CRITICAL ALIGNMENT: Match OrderContext ID format (trip-task-...-task)
                 const derivedTripId = `trip-${realId}`;
-                const frontendId = `${derivedTripId}-task`;
+                const frontendTaskId = `${derivedTripId}-task`;
+                const frontendTravelId = `${derivedTripId}-travel`;
 
-                updatedEvents[i] = {
-                  ...ev,
-                  id: frontendId,
-                  tripId: derivedTripId
-                };
+                if (isGenericAccompany) {
+                  // Update IDs for BOTH events (Task and Travel) via tripId association
+                  // We need to find the OLD IDs.
+                  // ev.tripId should be `trip-event-...`
+                  const oldTripId = ev.tripId;
+                  if (oldTripId) {
+                    // Update Local Persistence
+                    // 1. Delete Old Events
+                    const eventsToRemove = newEvents.filter(e => e.tripId === oldTripId);
+                    eventsToRemove.forEach(e => deleteLocalEvent(e.id));
 
-                // Update Persistence
-                deleteLocalEvent(tempId);
-                saveLocalEvent(updatedEvents[i]);
+                    // 2. Create New Events with Real IDs
+                    const travelEv = newEvents.find(e => e.id.endsWith('-travel') && e.tripId === oldTripId);
+                    const taskEv = newEvents.find(e => e.id.endsWith('-task') && e.tripId === oldTripId);
 
-                // Update State
-                setScheduleEvents(prev => prev.map(e => e.id === tempId ? updatedEvents[i] : e));
+                    if (travelEv) {
+                      const newTravel = { ...travelEv, id: frontendTravelId, tripId: derivedTripId };
+                      saveLocalEvent(newTravel);
+                    }
+                    if (taskEv) {
+                      const newTask = { ...taskEv, id: frontendTaskId, tripId: derivedTripId };
+                      saveLocalEvent(newTask);
+                    }
+
+                    // Update State
+                    setScheduleEvents(prev => prev.map(e => {
+                      if (e.tripId === oldTripId) {
+                        if (e.id.endsWith('-task')) return { ...e, id: frontendTaskId, tripId: derivedTripId };
+                        if (e.id.endsWith('-travel')) return { ...e, id: frontendTravelId, tripId: derivedTripId };
+                      }
+                      return e;
+                    }));
+                  }
+                } else {
+                  // Normal Generic Task (Single)
+                  const derivedTripId = `trip-${realId}`;
+                  const frontendId = `${derivedTripId}-task`;
+
+                  updatedEvents[i] = {
+                    ...ev,
+                    id: frontendId,
+                    tripId: derivedTripId
+                  };
+                  deleteLocalEvent(ev.id);
+                  saveLocalEvent(updatedEvents[i]);
+                  setScheduleEvents(prev => prev.map(e => e.id === ev.id ? updatedEvents[i] : e));
+                }
               }
             }
             toast({ title: "アクションログを保存しました" });

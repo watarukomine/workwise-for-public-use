@@ -201,7 +201,10 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
           };
 
           const isGenericTask = order.id.startsWith('task-');
-          if (isGenericTask) {
+          // Allow "同行" (Accompany) to have Travel events, behaving like Orders
+          const isAccompany = order.taskDetails.includes('同行');
+
+          if (isGenericTask && !isAccompany) {
             newScheduleEvents.push(taskEvent);
           } else {
             if (!suppressedTripIds.has(tripId)) {
