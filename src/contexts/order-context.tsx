@@ -4,7 +4,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect, useCa
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
 import { findKey, mapRawToOrder } from '@/lib/utils';
-import { addMinutes, subMinutes, parseISO, isValid, format } from 'date-fns';
+import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes } from 'date-fns';
 import { useSelectedStaff } from './selected-staff-context';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
@@ -139,7 +139,14 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
     }
 
     // 2. Process Scheduled Events
-    if (staffMember && order.scheduledTime) {
+    // 2. Process Scheduled Events (Sorted by Timeline for Auto-Travel Suppression)
+    // Avoid processing if no staffMember is found (though allStaff check implies it)
+    if (!staffMember) return;
+
+    const staffOrders = orders.filter(o => o.staffId === staffMember.id);
+
+    // Parse times first
+    const parsedOrders = staffOrders.map(order => {
       let scheduledTime: Date | null = null;
       let dateStr = order.scheduledDate;
 
@@ -147,20 +154,21 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         dateStr = format(new Date(), 'yyyy-MM-dd');
       }
 
+      const sTime = order.scheduledTime || '';
       try {
-        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(order.scheduledTime)) {
-          scheduledTime = parseISO(`${dateStr}T${order.scheduledTime}`);
+        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(sTime)) {
+          scheduledTime = parseISO(`${dateStr}T${sTime}`);
         } else {
-          const timeComponent = new Date(order.scheduledTime);
+          const timeComponent = new Date(sTime);
           if (isValid(timeComponent)) {
-            if (order.scheduledTime.includes('/') || order.scheduledTime.includes('-')) {
+            if (sTime.includes('/') || sTime.includes('-')) {
               scheduledTime = timeComponent;
             } else {
               const timeStr = format(timeComponent, 'HH:mm:ss');
               scheduledTime = parseISO(`${dateStr}T${timeStr}`);
             }
           } else {
-            scheduledTime = parseISO(order.scheduledTime);
+            scheduledTime = parseISO(sTime);
           }
         }
       } catch (e) { }
@@ -168,11 +176,8 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
       if (scheduledTime && isValid(scheduledTime)) {
         if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
 
-        const tripId = `trip-${order.rawOrderId || order.id}`;
         let taskEndTime: Date | null = null;
-
         if (order.scheduledEndTime) {
-          // Basic parsing for end time
           try {
             if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(order.scheduledEndTime)) {
               taskEndTime = parseISO(`${dateStr}T${order.scheduledEndTime}`);
@@ -187,45 +192,68 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
           taskEndTime = addMinutes(scheduledTime, order.estimatedDuration);
         }
 
-        if (isValid(taskEndTime)) {
-          const taskEvent: WithId<ScheduleEvent> = {
-            ...order,
-            id: `${tripId}-task`,
-            tripId,
-            title: order.taskDetails,
-            staffId: staffMember.id,
-            locationId: order.customerCode || '',
-            start: scheduledTime.toISOString(),
-            end: taskEndTime.toISOString(),
-            rawOrderId: order.rawOrderId,
-          };
+        return { order, start: scheduledTime, end: taskEndTime as Date };
+      }
+      return null;
+    }).filter((item): item is { order: Order, start: Date, end: Date } => item !== null);
 
-          const isGenericTask = order.id.startsWith('task-');
-          // Allow "同行" (Accompany) to have Travel events, behaving like Orders
-          const isAccompany = order.taskDetails.includes('同行');
+    // Sort by Start Time
+    parsedOrders.sort((a, b) => a.start.getTime() - b.start.getTime());
 
-          if (isGenericTask && !isAccompany) {
-            newScheduleEvents.push(taskEvent);
-          } else {
-            if (!suppressedTripIds.has(tripId)) {
-              const travelEvent: WithId<ScheduleEvent> = {
-                ...order,
-                id: `${tripId}-travel`,
-                tripId,
-                title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
-                staffId: staffMember.id,
-                locationId: order.customerCode || '',
-                start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
-                end: scheduledTime.toISOString(),
-                rawOrderId: order.rawOrderId,
-              };
-              newScheduleEvents.push(travelEvent);
-            }
-            newScheduleEvents.push(taskEvent);
+    let lastEndTime: Date | null = null;
+
+    parsedOrders.forEach(({ order, start, end }) => {
+      const tripId = `trip-${order.rawOrderId || order.id}`;
+
+      const taskEvent: WithId<ScheduleEvent> = {
+        ...order,
+        id: `${tripId}-task`,
+        tripId,
+        title: order.taskDetails,
+        staffId: staffMember.id,
+        locationId: order.customerCode || '',
+        start: start.toISOString(),
+        end: end.toISOString(),
+        rawOrderId: order.rawOrderId,
+      };
+
+      const isGenericTask = order.id.startsWith('task-');
+      const isAccompany = order.taskDetails.includes('同行');
+
+      let shouldGenerateTravel = true;
+      if (isGenericTask && !isAccompany) {
+        shouldGenerateTravel = false;
+      } else {
+        // Check for suppression (Manual OR Auto)
+        if (suppressedTripIds.has(tripId)) {
+          shouldGenerateTravel = false;
+        } else if (lastEndTime) {
+          // Auto-Suppression: If Start Time is within 1 minute of Previous End Time
+          const diffMinutes = Math.abs(differenceInMinutes(start, lastEndTime));
+          if (diffMinutes <= 1) {
+            shouldGenerateTravel = false;
           }
         }
       }
-    }
+
+      if (shouldGenerateTravel) {
+        const travelEvent: WithId<ScheduleEvent> = {
+          ...order,
+          id: `${tripId}-travel`,
+          tripId,
+          title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
+          staffId: staffMember.id,
+          locationId: order.customerCode || '',
+          start: subMinutes(start, TRAVEL_TIME_MINUTES).toISOString(),
+          end: start.toISOString(),
+          rawOrderId: order.rawOrderId,
+        };
+        newScheduleEvents.push(travelEvent);
+      }
+
+      newScheduleEvents.push(taskEvent);
+      lastEndTime = end;
+    });
   });
 
   // 3. Determine Unassigned Orders
