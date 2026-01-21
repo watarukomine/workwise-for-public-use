@@ -154,21 +154,26 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         dateStr = format(new Date(), 'yyyy-MM-dd');
       }
 
-      const sTime = order.scheduledTime || '';
+      const val = order.scheduledTime;
       try {
-        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(sTime)) {
-          scheduledTime = parseISO(`${dateStr}T${sTime}`);
+        // Handle various time formats (String HH:mm, ISO string, or Date object)
+        if (typeof val === 'string' && /^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
+          scheduledTime = parseISO(`${dateStr}T${val}`);
         } else {
-          const timeComponent = new Date(sTime);
+          // Use 'any' to allow Date object which matches original behavior
+          const timeComponent = new Date(val as any);
           if (isValid(timeComponent)) {
-            if (sTime.includes('/') || sTime.includes('-')) {
+            const valStr = String(val);
+            if (valStr.includes('/') || valStr.includes('-')) {
               scheduledTime = timeComponent;
             } else {
               const timeStr = format(timeComponent, 'HH:mm:ss');
               scheduledTime = parseISO(`${dateStr}T${timeStr}`);
             }
           } else {
-            scheduledTime = parseISO(sTime);
+            if (typeof val === 'string') {
+              scheduledTime = parseISO(val);
+            }
           }
         }
       } catch (e) { }
