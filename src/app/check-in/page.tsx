@@ -208,8 +208,11 @@ function CheckInClient() {
           throw new Error(result.message);
         }
 
+        // Optimistic update done
         setOptimisticStatus(statusValue);
-        await refetchOrders();
+
+        // Unblock UI immediately
+        setIsLoading(null);
 
         toast({
           title: action === 'Emergency' ? '緊急連絡を送信しました' : (isManual ? 'ステータス時間を修正しました' : 'ステータスを更新しました'),
@@ -222,13 +225,16 @@ function CheckInClient() {
 
         if (action === 'Emergency') setEmergencyMessage('');
 
-        // Turn off correction mode
         if (isManual && isCorrectionMode) {
           setIsCorrectionMode(false);
           setManualTime('');
         }
 
+        // Refetch in background
+        refetchOrders().catch(e => console.error("Background refetch failed:", e));
+
       } catch (e: any) {
+        setIsLoading(null); // Ensure loading is cleared on error too
         const errorMessage = e.message || 'スプレッドシートの更新に失敗しました。';
         setError(errorMessage);
         toast({
@@ -236,8 +242,6 @@ function CheckInClient() {
           title: '更新エラー',
           description: errorMessage
         });
-      } finally {
-        setIsLoading(null);
       }
     };
 
