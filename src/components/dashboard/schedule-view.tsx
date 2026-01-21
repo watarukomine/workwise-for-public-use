@@ -54,7 +54,7 @@ import { Textarea } from '../ui/textarea';
 import { useOrder } from '../../contexts/order-context';
 import { updateSheetStatus, sendIcsEmail, createTask } from '../../app/actions/gas-actions';
 import { ORDER_GAS_URL } from '../../lib/settings';
-import { Mail, Pencil, Loader2 } from 'lucide-react';
+import { Mail, Pencil, Loader2, CheckCircle } from 'lucide-react';
 import { createContext, useContext, useState } from 'react';
 import { STORE_COLORS } from '../../lib/constants';
 
@@ -1214,6 +1214,22 @@ export function ScheduleView({
 
         if (eventToUpdate.rawOrderId || (eventToUpdate.id && eventToUpdate.id.startsWith('task-'))) {
           // Sheet-based event (Order OR Generic Task)
+
+          // CRITICAL: Optimistic UI Update - Update local state immediately
+          const updatedEvent: WithId<ScheduleEvent> = {
+            ...eventToUpdate,
+            start: newStart.toISOString(),
+            end: finalEnd.toISOString(),
+            scheduledDate: format(newStart, 'yyyy/MM/dd'),
+            title: title || eventToUpdate.title,
+            estimatedDuration: durationMinutes,
+            taskDetails: description || eventToUpdate.taskDetails
+            // Note: We don't update tripId or id here
+          };
+
+          setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
+          saveLocalEvent(updatedEvent);
+
           // The updated GAS `updateSheetWithOrderInfo` handles `task-` IDs by updating the Action Log sheet.
           await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
@@ -1986,14 +2002,20 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const tireSize = event.raw ? findKey(event.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
   const honsu = event.raw ? findKey(event.raw, ['本数', 'honsu']) : undefined;
   const customerName = event.raw ? findKey(event.raw, ['お取引先名', '店舗', '取引先']) : (customer?.storeName || line1);
+  const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(event.status || ''));
 
   const eventContent = (
     // eslint-disable-next-line
     <div
-      className={cn("w-full h-full rounded-md flex flex-col justify-center p-1", textColorClass, isDragging && !isOverlay && "opacity-50")}
+      className={cn("w-full h-full rounded-md flex flex-col justify-center p-1 relative", textColorClass, isDragging && !isOverlay && "opacity-50")}
       style={{ ...divStyle, width: isOverlay ? `${width}px` : '100%' }}
     >
-      <p className="text-xs font-semibold truncate pointer-events-none">{customerName || line1}</p>
+      {isCompleted && (
+        <div className="absolute top-0.5 right-0.5 z-10">
+          <CheckCircle className={cn("h-3 w-3", textColorClass === 'text-white' ? 'text-white/90' : 'text-black/60')} />
+        </div>
+      )}
+      <p className="text-xs font-semibold truncate pointer-events-none pr-3">{customerName || line1}</p>
       <p className="text-xs opacity-80 truncate pointer-events-none">{formatTime(event.start)}</p>
     </div>
   );

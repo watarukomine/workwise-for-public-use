@@ -286,6 +286,10 @@ function CheckInClient() {
     if ((action as string) === 'Emergency') return !!isLoading;
     if (['Clock In', 'Clock Out', 'Wait'].includes(action)) return false;
     if (!orderId) return true;
+
+    // Explicitly disable workflow buttons if the task is already finished
+    if (['作業完了', '完了'].includes(currentStatus)) return true;
+
     if (isCorrectionMode) return false;
 
     switch (action) {

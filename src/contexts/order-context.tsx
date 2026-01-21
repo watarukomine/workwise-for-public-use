@@ -4,7 +4,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect, useCa
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
 import { findKey, mapRawToOrder } from '@/lib/utils';
-import { addMinutes, subMinutes, parseISO, isValid, format } from 'date-fns';
+import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes } from 'date-fns';
 import { useSelectedStaff } from './selected-staff-context';
 import { ORDER_GAS_URL } from '@/lib/settings';
 
@@ -41,19 +41,28 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
   }
 
   const orders: WithId<Order>[] = [];
-  const newScheduleEvents: WithId<ScheduleEvent>[] = [];
   const staffStatusMap = new Map<string, StaffStatus>();
+  const scheduledRawOrderIds = new Set<string>();
+
+  // Temporary array to hold valid items for scheduling before sorting
+  const explicitScheduleItems: {
+    order: WithId<Order>; // The order/task object
+    start: Date;
+    end: Date;
+    staffId: string;
+    tripId: string;
+    isGeneric: boolean;
+    isAccompany: boolean;
+  }[] = [];
 
   // Initialize statuses
   allStaff.forEach(sf => {
     staffStatusMap.set(sf.id, { staffId: sf.id, status: '待機中', lastAction: '情報なし' });
   });
 
-  const scheduledRawOrderIds = new Set<string>();
-
+  // --- PASS 1: Parse Data, Update Status, Collect Schedulable Items ---
   rawOrdersData.forEach((rawOrder, index) => {
     // Basic Mapping using utility - PASS STABLE FALLBACK ID (row index based)
-    // This prevents IDs from changing on every background refresh if data lacks SystemID
     const mappedOrder = mapRawToOrder(rawOrder, `ord-row-${index}`);
     const order: WithId<Order> = {
       ...mappedOrder,
@@ -61,9 +70,10 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
       raw: rawOrder
     };
 
+    const isGenericTask = order.id.startsWith('task-');
+
     // Filter out generic tasks from the main orders list
-    // Generic tasks (created on timeline) should only appear as events, not as "Orders" in the table
-    if (!order.id.startsWith('task-')) {
+    if (!isGenericTask) {
       orders.push(order);
     }
 
@@ -90,6 +100,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         if (!isNaN(lastUpdate.getTime())) {
           const status = findKey(rawOrder, ['受注ステータス']) || '待機中';
           const actionText = order.rawOrderId ? `[${order.rawOrderId}]` : '[汎用タスク]';
+          // ... (simplified status update logic for brevity if needed, but keeping full logic is safer)
 
           const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着'];
           const passiveStatuses = ['未着手', '未割当', '待機中'];
@@ -101,7 +112,6 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
           const isCurrentPassive = passiveStatuses.includes(currentStatus.status || '');
 
           let shouldUpdate = false;
-
           if (isNewer) {
             if (isCandidatePassive && isCurrentActive) {
               shouldUpdate = false;
@@ -109,11 +119,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
               shouldUpdate = true;
             }
           } else {
-            if (isCandidateActive && isCurrentPassive) {
-              shouldUpdate = true;
-            } else {
-              shouldUpdate = false;
-            }
+            if (isCandidateActive && isCurrentPassive) shouldUpdate = true;
           }
 
           if (shouldUpdate) {
@@ -136,99 +142,158 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
           }
         }
       }
-    }
 
-    // 2. Process Scheduled Events
-    if (staffMember && order.scheduledTime) {
-      let scheduledTime: Date | null = null;
-      let dateStr = order.scheduledDate;
+      // 2. Prepare Scheduled Event Data (Parsing)
+      if (order.scheduledTime) {
+        let scheduledTime: Date | null = null;
+        let dateStr = order.scheduledDate;
 
-      if (!dateStr || !isValid(parseISO(dateStr))) {
-        dateStr = format(new Date(), 'yyyy-MM-dd');
-      }
+        if (!dateStr || !isValid(parseISO(dateStr))) {
+          dateStr = format(new Date(), 'yyyy-MM-dd');
+        }
 
-      try {
-        if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(order.scheduledTime)) {
-          scheduledTime = parseISO(`${dateStr}T${order.scheduledTime}`);
-        } else {
-          const timeComponent = new Date(order.scheduledTime);
-          if (isValid(timeComponent)) {
-            if (order.scheduledTime.includes('/') || order.scheduledTime.includes('-')) {
-              scheduledTime = timeComponent;
+        // Robust Time Parsing
+        try {
+          const val = order.scheduledTime as any;
+          if (val instanceof Date) {
+            scheduledTime = val;
+          } else if (typeof val === 'string') {
+            if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
+              scheduledTime = parseISO(`${dateStr}T${val}`);
             } else {
-              const timeStr = format(timeComponent, 'HH:mm:ss');
-              scheduledTime = parseISO(`${dateStr}T${timeStr}`);
+              const d = new Date(val);
+              if (isValid(d)) {
+                if (val.includes('/') || val.includes('-')) scheduledTime = d;
+                else scheduledTime = parseISO(`${dateStr}T${format(d, 'HH:mm:ss')}`);
+              } else {
+                scheduledTime = parseISO(val);
+              }
             }
           } else {
-            scheduledTime = parseISO(order.scheduledTime);
+            // Fallback for unknown types (e.g. number timestamp)
+            scheduledTime = new Date(val as any);
           }
-        }
-      } catch (e) { }
+        } catch (e) { }
 
-      if (scheduledTime && isValid(scheduledTime)) {
-        if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
+        if (scheduledTime && isValid(scheduledTime)) {
+          if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
 
-        const tripId = `trip-${order.rawOrderId || order.id}`;
-        let taskEndTime: Date | null = null;
+          const tripId = `trip-${order.rawOrderId || order.id}`;
+          let taskEndTime: Date | null = null;
 
-        if (order.scheduledEndTime) {
-          // Basic parsing for end time
-          try {
-            if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(order.scheduledEndTime)) {
-              taskEndTime = parseISO(`${dateStr}T${order.scheduledEndTime}`);
-            } else {
-              taskEndTime = new Date(order.scheduledEndTime);
-              if (!isValid(taskEndTime)) taskEndTime = parseISO(order.scheduledEndTime);
-            }
-          } catch (e) { taskEndTime = addMinutes(scheduledTime, order.estimatedDuration); }
-        }
+          if (order.scheduledEndTime) {
+            try {
+              const eVal = order.scheduledEndTime as any;
+              if (eVal instanceof Date) {
+                taskEndTime = eVal;
+              } else if (typeof eVal === 'string') {
+                if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(eVal)) {
+                  taskEndTime = parseISO(`${dateStr}T${eVal}`);
+                } else {
+                  const ed = new Date(eVal);
+                  if (isValid(ed)) taskEndTime = ed;
+                  else taskEndTime = parseISO(eVal);
+                }
+              }
+            } catch (e) { }
+          }
 
-        if (!taskEndTime || !isValid(taskEndTime)) {
-          taskEndTime = addMinutes(scheduledTime, order.estimatedDuration);
-        }
+          if (!taskEndTime || !isValid(taskEndTime)) {
+            taskEndTime = addMinutes(scheduledTime, order.estimatedDuration);
+          }
 
-        if (isValid(taskEndTime)) {
-          const taskEvent: WithId<ScheduleEvent> = {
-            ...order,
-            id: `${tripId}-task`,
-            tripId,
-            title: order.taskDetails,
-            staffId: staffMember.id,
-            locationId: order.customerCode || '',
-            start: scheduledTime.toISOString(),
-            end: taskEndTime.toISOString(),
-            rawOrderId: order.rawOrderId,
-          };
-
-          const isGenericTask = order.id.startsWith('task-');
-          // Allow "同行" (Accompany) to have Travel events, behaving like Orders
-          const isAccompany = order.taskDetails.includes('同行');
-
-          if (isGenericTask && !isAccompany) {
-            newScheduleEvents.push(taskEvent);
-          } else {
-            if (!suppressedTripIds.has(tripId)) {
-              const travelEvent: WithId<ScheduleEvent> = {
-                ...order,
-                id: `${tripId}-travel`,
-                tripId,
-                title: `移動: ${order.customerName || order.taskDetails.split('\n')[0]}`,
-                staffId: staffMember.id,
-                locationId: order.customerCode || '',
-                start: subMinutes(scheduledTime, TRAVEL_TIME_MINUTES).toISOString(),
-                end: scheduledTime.toISOString(),
-                rawOrderId: order.rawOrderId,
-              };
-              newScheduleEvents.push(travelEvent);
-            }
-            newScheduleEvents.push(taskEvent);
+          if (isValid(taskEndTime)) {
+            explicitScheduleItems.push({
+              order,
+              start: scheduledTime,
+              end: taskEndTime!,
+              staffId: staffMember.id,
+              tripId,
+              isGeneric: isGenericTask,
+              isAccompany: order.taskDetails.includes('同行')
+            });
           }
         }
       }
     }
   });
 
-  // 3. Determine Unassigned Orders
+  // --- PASS 2: Sort & Generate Events with Auto-Suppression ---
+  const newScheduleEvents: WithId<ScheduleEvent>[] = [];
+
+  // Group by staff
+  const staffGroups = new Map<string, typeof explicitScheduleItems>();
+  explicitScheduleItems.forEach(item => {
+    if (!staffGroups.has(item.staffId)) staffGroups.set(item.staffId, []);
+    staffGroups.get(item.staffId)!.push(item);
+  });
+
+  staffGroups.forEach((items, staffId) => {
+    // Sort items by Start Time
+    items.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    let lastEndTime: Date | null = null;
+
+    items.forEach(item => {
+      // Logic for Task Event
+      const taskEvent: WithId<ScheduleEvent> = {
+        ...item.order,
+        id: `${item.tripId}-task`,
+        tripId: item.tripId,
+        title: item.order.taskDetails,
+        staffId: item.staffId,
+        locationId: item.order.customerCode || '',
+        start: item.start.toISOString(),
+        end: item.end.toISOString(),
+        rawOrderId: item.order.rawOrderId,
+      };
+
+      // Logic for Travel Event
+      // If it's a generic task and NOT accompany, no travel event is needed (usually).
+      if (item.isGeneric && !item.isAccompany) {
+        newScheduleEvents.push(taskEvent);
+      } else {
+        // Decide whether to suppress Travel
+        let shouldSuppress = false;
+
+        // Manual Suppression Check
+        if (suppressedTripIds.has(item.tripId)) {
+          shouldSuppress = true;
+        }
+        // Auto Suppression Check: "Changeover"
+        // If current start is within 1 minute of last task's end, it's a consecutive task -> No travel
+        else if (lastEndTime) {
+          const gapMinutes = differenceInMinutes(item.start, lastEndTime);
+          if (Math.abs(gapMinutes) <= 1) { // -1 to 1 min tolerance
+            shouldSuppress = true;
+          }
+        }
+
+        if (!shouldSuppress) {
+          const travelEvent: WithId<ScheduleEvent> = {
+            ...item.order,
+            id: `${item.tripId}-travel`,
+            tripId: item.tripId,
+            title: `移動: ${item.order.customerName || item.order.taskDetails.split('\n')[0]}`,
+            staffId: item.staffId,
+            locationId: item.order.customerCode || '',
+            start: subMinutes(item.start, TRAVEL_TIME_MINUTES).toISOString(),
+            end: item.start.toISOString(),
+            rawOrderId: item.order.rawOrderId,
+          };
+          newScheduleEvents.push(travelEvent);
+        }
+
+        newScheduleEvents.push(taskEvent);
+      }
+
+      // Update lastEndTime
+      lastEndTime = item.end;
+    });
+  });
+
+
+  // 3. Determine Unassigned Orders (Logic unchanged)
   const unassignedOrders = orders.filter(order => {
     const hasRawOrderId = !!order.rawOrderId;
     const isAlreadyScheduled = order.rawOrderId ? scheduledRawOrderIds.has(order.rawOrderId) : false;
