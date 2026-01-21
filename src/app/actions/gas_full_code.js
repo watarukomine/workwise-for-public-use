@@ -553,7 +553,7 @@ function updateTaskSheet(taskId, params) {
     // 通常更新
     const mapping = {
         'スタッフ名': params.staffName,
-        '業務内容': params.eventTitle, // タイトルも更新可能に
+        '業務内容': (params.title || params.taskName) ? (params.title || params.taskName) : (params.eventTitle && !String(params.eventTitle).startsWith('(ID:') ? params.eventTitle : undefined),
         '開始日時': params.scheduledTime ? new Date(params.scheduledTime) : undefined,
         '終了日時': params.scheduledEndTime ? new Date(params.scheduledEndTime) : undefined,
     };
