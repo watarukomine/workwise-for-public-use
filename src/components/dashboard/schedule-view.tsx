@@ -2011,11 +2011,13 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       style={{ ...divStyle, width: isOverlay ? `${width}px` : '100%' }}
     >
       {isCompleted && (
-        <div className="absolute top-0.5 right-0.5 z-10">
-          <CheckCircle className={cn("h-3 w-3", textColorClass === 'text-white' ? 'text-white/90' : 'text-black/60')} />
+        <div className="absolute -top-1 -right-1 z-10 pointer-events-none">
+          <div className="border border-red-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm" style={{ transform: 'rotate(-15deg)' }}>
+            <span className="text-[10px] font-bold text-red-600 leading-none select-none">済</span>
+          </div>
         </div>
       )}
-      <p className="text-xs font-semibold truncate pointer-events-none pr-3">{customerName || line1}</p>
+      <p className="text-xs font-semibold truncate pointer-events-none pr-4">{customerName || line1}</p>
       <p className="text-xs opacity-80 truncate pointer-events-none">{formatTime(event.start)}</p>
     </div>
   );
