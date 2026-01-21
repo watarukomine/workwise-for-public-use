@@ -435,8 +435,14 @@ function updateSheetWithOrderInfo(params) {
         if (latitude !== undefined && longitude !== undefined) {
             updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
         }
-        if (scheduledTime) updateColumn("チップ配置作業予定", new Date(scheduledTime));
-        if (scheduledEndTime) updateColumn("チップ配置作業完了予定", new Date(scheduledEndTime));
+        if (scheduledTime) {
+            updateColumn("チップ配置作業予定", new Date(scheduledTime));
+            updateColumn("予定時間", new Date(scheduledTime));
+        }
+        if (scheduledEndTime) {
+            updateColumn("チップ配置作業完了予定", new Date(scheduledEndTime));
+            updateColumn("終了時間", new Date(scheduledEndTime));
+        }
         if (scheduledDate) updateColumn("作業予定日", new Date(scheduledDate));
         if (comment) updateColumn("任意コメント", comment);
         if (specialNotes !== undefined) updateColumn("特記事項", specialNotes);
