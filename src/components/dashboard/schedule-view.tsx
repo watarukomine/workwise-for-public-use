@@ -2010,7 +2010,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       className={cn("w-full h-full rounded-md flex flex-col justify-center p-1 relative", textColorClass, isDragging && !isOverlay && "opacity-50")}
       style={{ ...divStyle, width: isOverlay ? `${width}px` : '100%' }}
     >
-      {isCompleted && (
+      {isCompleted && !isTravelEvent && (
         <div className="absolute -top-1 -right-1 z-10 pointer-events-none">
           <div className="border border-red-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm" style={{ transform: 'rotate(-15deg)' }}>
             <span className="text-[10px] font-bold text-red-600 leading-none select-none">済</span>
