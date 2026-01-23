@@ -59,19 +59,31 @@ function doGet(e) {
 // シートデータをオブジェクト配列として取得するヘルパー
 function getSheetData(sheet) {
     const dataRange = sheet.getDataRange();
-    const values = dataRange.getDisplayValues(); // 文字列としてそのまま取得（日付自動変換を防ぐ）
-    if (values.length < 1) return [];
-    const headers = values.shift();
+    const displayValues = dataRange.getDisplayValues(); // String representation (formatted)
+    const rawValues = dataRange.getValues(); // Raw objects (Date, number, boolean)
+
+    if (displayValues.length < 1) return [];
+
+    const headers = displayValues.shift();
+    rawValues.shift(); // Remove buffer for headers from raw array matches
+
     const sheetId = sheet.getSheetId();
     const spreadsheetId = sheet.getParent().getId();
-    return values.map((row, rowIndex) => {
+
+    return displayValues.map((row, rowIndex) => {
         const obj = {};
+        const rawRow = rawValues[rowIndex];
+
         headers.forEach((header, index) => {
-            const cellValue = row[index];
-            if (cellValue && cellValue instanceof Date && !isNaN(cellValue)) {
-                obj[header] = cellValue.toISOString();
+            const displayValue = row[index];
+            const rawValue = rawRow[index];
+
+            // CRITICAL FIX: If raw value is a Date object, use it (toISOString) to preserve full date info,
+            // even if the sheet formatting hides the date (e.g. "HH:mm").
+            if (rawValue && rawValue instanceof Date && !isNaN(rawValue.getTime())) {
+                obj[header] = rawValue.toISOString();
             } else {
-                obj[header] = cellValue;
+                obj[header] = displayValue;
             }
         });
         // Order_URL (編集用リンク)
