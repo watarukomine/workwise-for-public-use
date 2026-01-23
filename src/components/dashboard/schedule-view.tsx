@@ -756,6 +756,37 @@ export function ScheduleView({
             };
             saveLocalEvent(updatedEvent);
             toast({ title: "スケジュールを更新しました", duration: 3000 });
+          } else if (draggedEvent.id.startsWith('task-') || draggedEvent.id.startsWith('generic-')) {
+            // Generic Task persistence (Fix for Reversion Bug)
+            const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+            const taskEnd = addMinutes(newStart, duration);
+
+            const updatedEvent = {
+              ...draggedEvent,
+              staffId: newStaffId,
+              start: newStart.toISOString(),
+              end: taskEnd.toISOString()
+            };
+            // Optimistic Update
+            saveLocalEvent(updatedEvent);
+
+            // Backend Update
+            await updateSheetStatus({
+              gasUrl: ORDER_GAS_URL,
+              eventTitle: draggedEvent.title,
+              staffName: newStaff.name,
+              statusValue: undefined, // Status usually doesn't change for generic tasks on move
+              scheduledDate: format(newStart, 'yyyy/MM/dd'),
+              scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
+              scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
+              estimatedDuration: duration,
+              "チップ配置作業予定": format(newStart, 'yyyy/MM/dd HH:mm:ss'),
+              "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
+              "作業予定日": format(newStart, 'yyyy/MM/dd'),
+              systemId: draggedEvent.id
+            });
+            toast({ title: "タスク時間を更新しました", duration: 3000 });
+            await refetchOrders();
           } else if (draggedEvent.rawOrderId) {
             let taskStart = newStart;
             let taskDuration = 60;

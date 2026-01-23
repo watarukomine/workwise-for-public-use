@@ -464,6 +464,7 @@ function updateSheetWithOrderInfo(params) {
             updateColumn("キャンセル日時", new Date(params.cancelDate));
             updateColumn("キャンセル連絡者", params.cancelContact);
         }
+        SpreadsheetApp.flush(); // Ensure immediate write
         return successResponse(`ID: ${searchId || '内容一致'} を更新しました。`, { row: targetRowNum });
     } catch (error) {
         console.error("updateSheetWithOrderInfo Error:", error);
