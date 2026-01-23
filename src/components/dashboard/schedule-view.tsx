@@ -866,7 +866,7 @@ export function ScheduleView({
               "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
               "作業予定日": format(taskStart, 'yyyy/MM/dd'),
               "作業時間（分）": taskDuration,
-              systemId: draggedEvent.id
+              systemId: mapRawToOrder(draggedEvent.raw).id
             });
             toast({ title: "スケジュールを更新しました", duration: 3000 });
             // await new Promise(resolve => setTimeout(resolve, 2000)); // Removed artificial delay
