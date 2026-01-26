@@ -293,14 +293,28 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
   });
 
 
-  // 3. Determine Unassigned Orders (Logic unchanged)
+  // 3. Determine Unassigned Orders
   const unassignedOrders = orders.filter(order => {
     const hasRawOrderId = !!order.rawOrderId;
     const isAlreadyScheduled = order.rawOrderId ? scheduledRawOrderIds.has(order.rawOrderId) : false;
     const isGenericTask = !order.customerCode && ['業務', '休憩', '移動', '研修', '同行', '商談'].some(t => order.taskDetails.includes(t));
 
     if (!hasRawOrderId || isAlreadyScheduled || isGenericTask) return false;
-    if (order.staffName && order.scheduledTime) return false;
+
+    // If order has both staffName and scheduledTime, check if the staff actually exists
+    if (order.staffName && order.scheduledTime) {
+      const normalizeName = (n: string | undefined) => {
+        if (!n || typeof n !== 'string') return '';
+        return n.replace(/\s+/g, '').toLowerCase();
+      };
+      const staffExists = allStaff.find(s => {
+        if (s.name === order.staffName) return true;
+        return normalizeName(s.name) === normalizeName(order.staffName);
+      });
+      // If staff doesn't exist in master, treat as unassigned
+      return !staffExists;
+    }
+
     return true;
   });
 
