@@ -7,6 +7,7 @@ import { findKey, mapRawToOrder } from '@/lib/utils';
 import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes } from 'date-fns';
 import { useSelectedStaff } from './selected-staff-context';
 import { ORDER_GAS_URL } from '@/lib/settings';
+import { logStaffNotFound, logOldDateDetected, logInvalidDate } from '@/lib/order-validation-logger';
 
 
 const TRAVEL_TIME_MINUTES = 30;
@@ -156,9 +157,24 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         try {
           const val = order.scheduledTime as any;
           if (val instanceof Date) {
-            scheduledTime = val;
+            // Fix for Google Sheets time-only cells appearing as 1899/12/30
+            if (val.getFullYear() < 2000) {
+              const timeStr = format(val, 'HH:mm:ss');
+              scheduledTime = parseISO(`${dateStr}T${timeStr}`);
+            } else {
+              scheduledTime = val;
+            }
           } else if (typeof val === 'string') {
-            if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
+            // Check for old dates (1899/1900) from Google Sheets time-only cells
+            if (val.includes('1899') || val.includes('1900')) {
+              // Extract time from old date and combine with scheduledDate
+              logOldDateDetected(order.id, order.taskDetails || '不明', 'scheduledTime', val, 'order-context');
+              const oldDate = new Date(val);
+              if (isValid(oldDate)) {
+                const timeStr = `${String(oldDate.getHours()).padStart(2, '0')}:${String(oldDate.getMinutes()).padStart(2, '0')}:${String(oldDate.getSeconds()).padStart(2, '0')}`;
+                scheduledTime = parseISO(`${dateStr}T${timeStr}`);
+              }
+            } else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
               scheduledTime = parseISO(`${dateStr}T${val}`);
             } else {
               const d = new Date(val);
@@ -185,7 +201,12 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
             try {
               const eVal = order.scheduledEndTime as any;
               if (eVal instanceof Date) {
-                taskEndTime = eVal;
+                if (eVal.getFullYear() < 2000) {
+                  const timeStr = format(eVal, 'HH:mm:ss');
+                  taskEndTime = parseISO(`${dateStr}T${timeStr}`);
+                } else {
+                  taskEndTime = eVal;
+                }
               } else if (typeof eVal === 'string') {
                 if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(eVal)) {
                   taskEndTime = parseISO(`${dateStr}T${eVal}`);
@@ -295,24 +316,35 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
 
   // 3. Determine Unassigned Orders
   const unassignedOrders = orders.filter(order => {
-    const hasRawOrderId = !!order.rawOrderId;
-    const isAlreadyScheduled = order.rawOrderId ? scheduledRawOrderIds.has(order.rawOrderId) : false;
-    const isGenericTask = !order.customerCode && ['業務', '休憩', '移動', '研修', '同行', '商談'].some(t => order.taskDetails.includes(t));
+    // Check if already scheduled
+    // Use rawOrderId if available for reliable matching, otherwise fallback to ID
+    const isAlreadyScheduled = (order.rawOrderId && scheduledRawOrderIds.has(order.rawOrderId)) ||
+      newScheduleEvents.some(e => e.id === order.id);
 
-    if (!hasRawOrderId || isAlreadyScheduled || isGenericTask) return false;
+    if (isAlreadyScheduled) return false;
 
     // If order has both staffName and scheduledTime, check if the staff actually exists
-    if (order.staffName && order.scheduledTime) {
+    if (order.staffName) {
       const normalizeName = (n: string | undefined) => {
         if (!n || typeof n !== 'string') return '';
         return n.replace(/\s+/g, '').toLowerCase();
       };
+
       const staffExists = allStaff.find(s => {
+        if (!s.name) return false;
         if (s.name === order.staffName) return true;
         return normalizeName(s.name) === normalizeName(order.staffName);
       });
-      // If staff doesn't exist in master, treat as unassigned
-      return !staffExists;
+
+      // If staff doesn't exist in master, treat as unassigned (keep in list)
+      if (!staffExists) {
+        logStaffNotFound(order.id, order.taskDetails || '不明', order.staffName || '', 'order-context');
+        return true;
+      }
+
+      // If staff exists, but it wasn't added to scheduleEvents (e.g. invalid time), it should be here.
+      // Since we already returned false for isAlreadyScheduled, we just return true here.
+      return true;
     }
 
     return true;

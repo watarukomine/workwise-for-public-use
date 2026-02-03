@@ -3,6 +3,7 @@ import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { isValid, format, parseISO } from 'date-fns';
 import type { Order, WithId, Staff } from './types';
+import { logMissingField, logInvalidDate, logOldDateDetected, validationLogger } from './order-validation-logger';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -12,10 +13,14 @@ export function findKey(item: any, possibleKeys: string[]) {
   if (!item || typeof item !== 'object') {
     return undefined;
   }
+
+  // Helper to normalize keys: remove all whitespace (including full-width) and lowercase
+  const normalize = (s: string) => s.replace(/[\s\u3000]+/g, '').toLowerCase();
+
   for (const key of possibleKeys) {
-    const lowerKey = key.toLowerCase().trim();
+    const normKey = normalize(key);
     for (const itemKey in item) {
-      if (itemKey.toLowerCase().trim() === lowerKey) {
+      if (normalize(itemKey) === normKey) {
         return item[itemKey];
       }
     }
@@ -125,7 +130,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
       }
     }
   }
-  const scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定', 'scheduledTime', '開始日時']);
+  let scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定', 'scheduledTime', '開始日時']);
 
   const customerName = findKey(rawOrder, ['お取引先名', '店舗名', '店舗', '取引先']) || '';
 
@@ -138,6 +143,49 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     // taskDetails += `\n予定: ${scheduledTime}`; 
   }
   let scheduledDateVal = formatDate(String(findKey(rawOrder, ['作業予定日']) || ''), 'yyyy-MM-dd');
+
+  // Log if scheduled date is missing
+  if (!scheduledDateVal && scheduledTime) {
+    logMissingField(String(orderId), customerName || '不明', '作業予定日', 'utils');
+  }
+
+  // Improved: Combine F column (date) with G column (time)
+  // CRITICAL FIX: Always use date from scheduledDateVal if available. 
+  // Ignore date component in scheduledTime (G column) because it might be wrong (e.g. 1899, or next day).
+  if (scheduledTime) {
+    const timeStr = String(scheduledTime);
+
+    if (scheduledDateVal) {
+      // Try to extract time components
+      let hours = '00';
+      let minutes = '00';
+      let seconds = '00';
+      let foundTime = false;
+
+      // Case 1: HH:mm format
+      if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(timeStr)) {
+        const parts = timeStr.split(':');
+        hours = parts[0].padStart(2, '0');
+        minutes = parts[1].padStart(2, '0');
+        seconds = (parts[2] || '00').padStart(2, '0');
+        foundTime = true;
+      }
+      // Case 2: Date object / ISO string (handle standard JS Date str or ISO)
+      else {
+        const d = new Date(timeStr);
+        if (!isNaN(d.getTime())) {
+          hours = String(d.getHours()).padStart(2, '0');
+          minutes = String(d.getMinutes()).padStart(2, '0');
+          seconds = String(d.getSeconds()).padStart(2, '0');
+          foundTime = true;
+        }
+      }
+
+      if (foundTime) {
+        scheduledTime = `${scheduledDateVal}T${hours}:${minutes}:${seconds}`;
+      }
+    }
+  }
 
   // Fallback: If no explicit date column, try to extract date from scheduledTime if it contains a full date
   if (!scheduledDateVal && scheduledTime) {
@@ -170,6 +218,36 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     return undefined;
   };
 
+  // FIX: Also normalize scheduledEndTime to use the correct date
+  let scheduledEndTime = findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime', 'scheduledEndTime', '終了日時']);
+  if (scheduledEndTime && scheduledDateVal) {
+    const timeStr = String(scheduledEndTime);
+    let hours = '00';
+    let minutes = '00';
+    let seconds = '00';
+    let foundTime = false;
+
+    if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(timeStr)) {
+      const parts = timeStr.split(':');
+      hours = parts[0].padStart(2, '0');
+      minutes = parts[1].padStart(2, '0');
+      seconds = (parts[2] || '00').padStart(2, '0');
+      foundTime = true;
+    } else {
+      const d = new Date(timeStr);
+      if (!isNaN(d.getTime())) {
+        hours = String(d.getHours()).padStart(2, '0');
+        minutes = String(d.getMinutes()).padStart(2, '0');
+        seconds = String(d.getSeconds()).padStart(2, '0');
+        foundTime = true;
+      }
+    }
+
+    if (foundTime) {
+      scheduledEndTime = `${scheduledDateVal}T${hours}:${minutes}:${seconds}`;
+    }
+  }
+
   return {
     id: String(orderId),
     displayId: visualId ? String(visualId) : undefined,
@@ -191,7 +269,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     mainStore: findKey(rawOrder, ['主管店舗', 'mainStore']) || '',
     customerName: customerName,
     address: findKey(rawOrder, ['住所', 'Address']) || '',
-    scheduledEndTime: findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime', 'scheduledEndTime', '終了日時']) || '',
+    scheduledEndTime: scheduledEndTime || '',
     actualStartTime: (() => {
       const val = findKey(rawOrder, ['作業開始', '作業開始時間', '開始時間', 'startTime', 'startedAt', 'actualStartTime']);
       return parseDateTimeValue(val);
@@ -214,7 +292,18 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     tireSize: String(tireSize || ''),
     '本数': findKey(rawOrder, ['本数', 'honsu']) || '',
     serviceType: findKey(rawOrder, ['サービス種別', 'サービス区分']) || '',
-    raw: rawOrder // Preserve raw data for context processing
+    raw: rawOrder, // Preserve raw data for context processing
+    // Validation metadata - check if this order has any logged issues
+    hasValidationIssues: (() => {
+      const logs = validationLogger.getLogsForOrder(String(orderId));
+      return logs.some(log => log.severity === 'error' || log.severity === 'warning');
+    })(),
+    validationWarnings: (() => {
+      const logs = validationLogger.getLogsForOrder(String(orderId));
+      return logs
+        .filter(log => log.severity === 'error' || log.severity === 'warning')
+        .map(log => log.reason);
+    })(),
   };
 };
 

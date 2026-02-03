@@ -118,6 +118,8 @@ function doPost(e) {
             return sendIcsEmail(params);
         } else if (params.action === 'createTask') { // 新規: 汎用タスク作成
             return createTask(params);
+        } else if (params.action === 'updateOrderSchedule') { // 新規: 受注の日時更新
+            return updateOrderSchedule(params);
         } else if (params.eventTitle || params.systemId || params.orderId) { // 既存更新
             return updateSheetWithOrderInfo(params);
         } else if (params.action === 'createOrder') { // 新規注文
@@ -636,5 +638,126 @@ function sendIcsEmail(params) {
     } catch (error) {
         return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `メール送信中にエラーが発生しました: ${error.message}` }))
             .setMimeType(ContentService.MimeType.JSON);
+    }
+}
+
+/**
+ * 受注の作業予定日と予定時間を更新する機能
+ * フロントエンドから編集された日付・時間をスプレッドシートに反映します
+ */
+function updateOrderSchedule(params) {
+    try {
+        const { orderId, scheduledDate, scheduledTime } = params;
+
+        if (!orderId) {
+            return errorResponse("受注IDが指定されていません");
+        }
+
+        const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+        const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
+
+        if (!sheet) {
+            return errorResponse(`シート「${ORDER_SHEET_NAME}」が見つかりません`);
+        }
+
+        const dataRange = sheet.getDataRange();
+        const values = dataRange.getValues();
+        const headers = values[0];
+
+        // Find column indices
+        let idColumnIndex = -1;
+        let dateColumnIndex = -1;
+        let timeColumnIndex = -1;
+
+        headers.forEach((header, index) => {
+            const h = String(header).trim();
+            // ID列を探す（受注ID、SystemID、ID など）
+            if (h === '受注ID' || h === 'SystemID' || h === 'ID') {
+                if (idColumnIndex === -1) idColumnIndex = index;
+            }
+            // 作業予定日列を探す
+            if (h === '作業予定日') {
+                dateColumnIndex = index;
+            }
+            // 予定時間列を探す
+            if (h === '予定時間' || h === 'チップ配置作業予定') {
+                timeColumnIndex = index;
+            }
+        });
+
+        if (idColumnIndex === -1) {
+            return errorResponse("受注ID列が見つかりません");
+        }
+
+        // Find the row with matching orderId
+        let foundRow = -1;
+        for (let i = 1; i < values.length; i++) {
+            const currentId = String(values[i][idColumnIndex]).trim();
+            const searchId = String(orderId).trim();
+
+            if (currentId === searchId) {
+                foundRow = i;
+                break;
+            }
+        }
+
+        if (foundRow === -1) {
+            return errorResponse(`受注が見つかりませんでした (ID: ${orderId})`);
+        }
+
+        const rowNumber = foundRow + 1; // 1-indexed for sheet
+        let updatedFields = [];
+
+        // Update scheduled date (F column)
+        if (scheduledDate && dateColumnIndex !== -1) {
+            try {
+                const parsedDate = new Date(scheduledDate);
+                if (!isNaN(parsedDate.getTime())) {
+                    sheet.getRange(rowNumber, dateColumnIndex + 1).setValue(parsedDate);
+                    updatedFields.push('作業予定日');
+                }
+            } catch (e) {
+                console.error("Date parse error:", e);
+            }
+        }
+
+        // Update scheduled time (G column)
+        if (scheduledTime && timeColumnIndex !== -1) {
+            try {
+                // Parse HH:mm format and create a Date object for today with that time
+                const timeParts = scheduledTime.split(':');
+                if (timeParts.length === 2) {
+                    const hours = parseInt(timeParts[0], 10);
+                    const minutes = parseInt(timeParts[1], 10);
+
+                    // Create a date object with the time (use base date of 1899-12-30 for consistency with Excel time-only format)
+                    const baseDate = new Date(1899, 11, 30, hours, minutes, 0);
+                    sheet.getRange(rowNumber, timeColumnIndex + 1).setValue(baseDate);
+                    updatedFields.push('予定時間');
+                } else {
+                    // If not in HH:mm format, just store as string
+                    sheet.getRange(rowNumber, timeColumnIndex + 1).setValue(scheduledTime);
+                    updatedFields.push('予定時間');
+                }
+            } catch (e) {
+                console.error("Time parse error:", e);
+                // Fallback: store as string
+                sheet.getRange(rowNumber, timeColumnIndex + 1).setValue(scheduledTime);
+                updatedFields.push('予定時間');
+            }
+        }
+
+        if (updatedFields.length === 0) {
+            return errorResponse("更新するフィールドがありません");
+        }
+
+        return successResponse(`受注の${updatedFields.join('、')}を更新しました`, {
+            orderId: orderId,
+            updatedFields: updatedFields
+        });
+
+    } catch (error) {
+        console.error("updateOrderSchedule Error:", error);
+        return errorResponse(`受注の更新中にエラーが発生しました: ${error.message}`);
     }
 }

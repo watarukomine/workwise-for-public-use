@@ -76,6 +76,9 @@ export type Order = {
   cancelContact?: string;
   '本数'?: string;
   raw?: Record<string, any>;
+  // Validation metadata
+  hasValidationIssues?: boolean;
+  validationWarnings?: string[];
 };
 
 export type ScheduleEvent = WithId<Order> & {

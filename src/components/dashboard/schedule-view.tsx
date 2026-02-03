@@ -52,9 +52,9 @@ import { useCustomer } from '../../contexts/customer-context';
 import { useToast } from '../../hooks/use-toast';
 import { Textarea } from '../ui/textarea';
 import { useOrder } from '../../contexts/order-context';
-import { updateSheetStatus, sendIcsEmail, createTask } from '../../app/actions/gas-actions';
+import { updateSheetStatus, sendIcsEmail, createTask, updateOrderDateTime } from '../../app/actions/gas-actions';
 import { ORDER_GAS_URL } from '../../lib/settings';
-import { Mail, Pencil, Loader2, CheckCircle } from 'lucide-react';
+import { Mail, Pencil, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { createContext, useContext, useState } from 'react';
 import { STORE_COLORS } from '../../lib/constants';
 
@@ -163,15 +163,23 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
 
   const content = (
     // eslint-disable-next-line react-dom/no-unsafe-inline-style
-    <div style={style} className={cn("h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight", className)}>
-      {/* Row 1: StoreName(Equip) Time */}
+    <div style={style} className={cn("group h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight relative", className)}>
+      {/* Validation Warning Badge */}
+      {order.hasValidationIssues && (
+        <div className="absolute -top-1 -right-1 z-10 bg-yellow-500 rounded-full p-0.5 shadow-md" title={order.validationWarnings?.join(', ')}>
+          <AlertTriangle className="h-3 w-3 text-white" />
+        </div>
+      )}
+
       <div className="flex justify-between items-center w-full overflow-hidden">
         <span className="font-bold truncate mr-1 flex-1">
-          {order.customerName || line1}
-          {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) && `(${equipmentSymbol})`}
+          {order.customerName || line1 || <span className="text-xs font-normal opacity-70">ID:{order.rawOrderId || order.id}</span>}
+          {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) && order.customerName && `(${equipmentSymbol})`}
         </span>
         <span className="shrink-0 font-medium">{scheduledTime}</span>
       </div>
+
+
 
       {/* Row 2: TireSize Quantity (Only for non-generic tasks) */}
       {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) && (
@@ -448,7 +456,7 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { allStaff } = useSelectedStaff(); // Get full list
   const { toast } = useToast();
-  const { refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, toggleTripSuppression } = useOrder();
+  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, toggleTripSuppression } = useOrder();
 
   const [isClient, setIsClient] = React.useState(false);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
@@ -456,6 +464,12 @@ export function ScheduleView({
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '', destination: '' });
   const [active, setActive] = React.useState<Active | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
+
+  // Order date/time editing state
+  const [isEditingOrderSchedule, setIsEditingOrderSchedule] = React.useState(false);
+  const [editedOrderDate, setEditedOrderDate] = React.useState('');
+  const [editedOrderTime, setEditedOrderTime] = React.useState('');
+
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   // Use allStaff instead of filtered staffData for lookup
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => allStaff?.find(s => s.id === id);
@@ -1724,8 +1738,35 @@ export function ScheduleView({
                         {renderDetailItem('担当者', staff?.name)}
                         {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
                         {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
-                        {renderDetailItem('作業予定日', formatDate(findKey(event.raw, ['作業予定日']), 'MM/dd'))}
-                        {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
+                        {isEditingOrderSchedule ? (
+                          <>
+                            <div className="sm:col-span-2">
+                              <Label htmlFor="edit-assigned-date" className="text-sm font-medium">作業予定日</Label>
+                              <Input
+                                id="edit-assigned-date"
+                                type="date"
+                                value={editedOrderDate}
+                                onChange={(e) => setEditedOrderDate(e.target.value)}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div className="sm:col-span-2">
+                              <Label htmlFor="edit-assigned-time" className="text-sm font-medium">予定時間</Label>
+                              <Input
+                                id="edit-assigned-time"
+                                type="time"
+                                value={editedOrderTime}
+                                onChange={(e) => setEditedOrderTime(e.target.value)}
+                                className="mt-1"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            {renderDetailItem('作業予定日', formatDate(findKey(event.raw, ['作業予定日']), 'MM/dd'))}
+                            {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
+                          </>
+                        )}
                         {renderDetailItem('車名', findKey(event.raw, ['車名']))}
                         {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
                         {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
@@ -1773,49 +1814,146 @@ export function ScheduleView({
                   </div>
 
                   <DialogFooter className="sm:justify-between pt-4 border-t">
-                    <div className="flex flex-wrap gap-2">
-                      {!isCancelling ? (
-                        <>
-                          <Button variant="outline" onClick={() => handleSaveEvent(true)} disabled={isSaving}>
-                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
-                            {isSaving ? '送信中...' : '保存して送信'}
-                          </Button>
-                          <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
-                            {isSaving ? '処理中...' : (isGenericTask((dialogState as any).event || (dialogState as any).order) ? 'タスクの削除' : '未割当に戻す')}
-                          </Button>
-                          <Button variant="destructive" onClick={() => setIsCancelling(true)} disabled={isSaving} className="bg-red-700 hover:bg-red-800">
-                            作業キャンセル
-                          </Button>
-                        </>
-                      ) : (
-                        <div className="flex items-center gap-2 w-full">
-                          <Input
-                            placeholder="キャンセル連絡者名"
-                            value={cancelContact}
-                            onChange={(e) => setCancelContact(e.target.value)}
-                            className="flex-1"
-                          />
-                          <Button variant="destructive" onClick={handleWorkCancel} disabled={isSaving}>
-                            確定
-                          </Button>
-                          <Button variant="ghost" onClick={() => setIsCancelling(false)} disabled={isSaving}>
-                            戻る
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    {!isCancelling && (
-                      <div className='flex gap-2 mt-4 sm:mt-0'>
-                        <DialogClose asChild><Button variant="ghost" disabled={isSaving}>閉じる</Button></DialogClose>
-                        <Button onClick={() => handleSaveEvent(false)} disabled={isSaving}>
-                          {isSaving ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              保存中...
-                            </>
-                          ) : '保存'}
+                    {isEditingOrderSchedule ? (
+                      <div className="flex justify-end w-full gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setIsEditingOrderSchedule(false);
+                            setEditedOrderDate('');
+                            setEditedOrderTime('');
+                          }}
+                          disabled={isSaving}
+                        >
+                          キャンセル
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            // Get Order ID safely
+                            const rawValues = (event as any).raw || {};
+                            const orderId = findKey(rawValues, ['受注ID', 'SystemID', 'id']) || event.id;
+
+                            if (!orderId) {
+                              toast({ title: 'エラー', description: '受注IDが見つかりません', variant: 'destructive' });
+                              return;
+                            }
+
+                            // Validation
+                            if (!editedOrderDate || !editedOrderTime) {
+                              toast({ title: 'エラー', description: '日付と時間を入力してください', variant: 'destructive' });
+                              return;
+                            }
+
+                            setIsSaving(true);
+
+                            try {
+                              const result = await updateOrderDateTime({
+                                gasUrl: ORDER_GAS_URL,
+                                orderId: orderId,
+                                scheduledDate: editedOrderDate,
+                                scheduledTime: editedOrderTime,
+                              });
+
+                              if (result.status === 'success') {
+                                toast({ title: '保存しました', description: '日付・時間を更新しました' });
+                                setIsEditingOrderSchedule(false);
+                                setEditedOrderDate('');
+                                setEditedOrderTime('');
+                                await refetchOrders();
+                                setDialogState({ mode: 'closed' });
+                              } else {
+                                toast({ title: 'エラー', description: result.message || '更新に失敗しました', variant: 'destructive' });
+                              }
+                            } catch (error) {
+                              console.error('Failed to update order schedule:', error);
+                              toast({ title: 'エラー', description: '更新に失敗しました', variant: 'destructive' });
+                            } finally {
+                              setIsSaving(false);
+                            }
+                          }}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : '保存'}
                         </Button>
                       </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          {!isCancelling ? (
+                            <>
+                              <Button variant="outline" onClick={() => handleSaveEvent(true)} disabled={isSaving}>
+                                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                                {isSaving ? '送信中...' : '保存して送信'}
+                              </Button>
+
+                              {dialogState.mode === 'details' && (
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    const rawDate = findKey(event.raw, ['作業予定日']);
+                                    const rawTime = findKey(event.raw, ['予定時間', 'チップ配置作業予定']);
+
+                                    // Init Date
+                                    if (rawDate) {
+                                      try {
+                                        const d = new Date(rawDate);
+                                        if (!isNaN(d.getTime())) setEditedOrderDate(format(d, 'yyyy-MM-dd'));
+                                        else setEditedOrderDate(String(rawDate));
+                                      } catch (e) { setEditedOrderDate(''); }
+                                    }
+
+                                    // Init Time
+                                    if (rawTime) {
+                                      setEditedOrderTime(formatTime(rawTime));
+                                    }
+
+                                    setIsEditingOrderSchedule(true);
+                                  }}
+                                  disabled={isSaving}
+                                >
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  日時変更
+                                </Button>
+                              )}
+
+                              <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
+                                {isSaving ? '処理中...' : (isGenericTask((dialogState as any).event || (dialogState as any).order) ? 'タスクの削除' : '未割当に戻す')}
+                              </Button>
+                              <Button variant="destructive" onClick={() => setIsCancelling(true)} disabled={isSaving} className="bg-red-700 hover:bg-red-800">
+                                作業キャンセル
+                              </Button>
+                            </>
+                          ) : (
+                            <div className="flex items-center gap-2 w-full">
+                              <Input
+                                placeholder="キャンセル連絡者名"
+                                value={cancelContact}
+                                onChange={(e) => setCancelContact(e.target.value)}
+                                className="flex-1"
+                              />
+                              <Button variant="destructive" onClick={handleWorkCancel} disabled={isSaving}>
+                                確定
+                              </Button>
+                              <Button variant="ghost" onClick={() => setIsCancelling(false)} disabled={isSaving}>
+                                戻る
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        {!isCancelling && (
+                          <div className='flex gap-2 mt-4 sm:mt-0'>
+                            <DialogClose asChild><Button variant="ghost" disabled={isSaving}>閉じる</Button></DialogClose>
+                            <Button onClick={() => handleSaveEvent(false)} disabled={isSaving}>
+                              {isSaving ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  保存中...
+                                </>
+                              ) : '保存'}
+                            </Button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </DialogFooter>
                 </>
@@ -1875,8 +2013,38 @@ export function ScheduleView({
                       {renderDetailItem('受注ID', dialogState.order.id)}
                       {renderDetailItem('お取引先名', findKey(dialogState.order.raw, ['お取引先名', '店舗']))}
                       {renderDetailItem('機材有無', findKey(dialogState.order.raw, ['機材有無']))}
-                      {renderDetailItem('作業予定日', findKey(dialogState.order.raw, ['作業予定日']))}
-                      {renderDetailItem('予定時間', formatTime(findKey(dialogState.order.raw, ['予定時間', 'チップ配置作業予定'])))}
+
+                      {/* Editable date/time fields */}
+                      {isEditingOrderSchedule ? (
+                        <>
+                          <div className="sm:col-span-2">
+                            <Label htmlFor="edit-order-date" className="text-sm font-medium">作業予定日</Label>
+                            <Input
+                              id="edit-order-date"
+                              type="date"
+                              value={editedOrderDate}
+                              onChange={(e) => setEditedOrderDate(e.target.value)}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div className="sm:col-span-2">
+                            <Label htmlFor="edit-order-time" className="text-sm font-medium">予定時間</Label>
+                            <Input
+                              id="edit-order-time"
+                              type="time"
+                              value={editedOrderTime}
+                              onChange={(e) => setEditedOrderTime(e.target.value)}
+                              className="mt-1"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          {renderDetailItem('作業予定日', formatDate(findKey(dialogState.order.raw, ['作業予定日']), 'MM/dd'))}
+                          {renderDetailItem('予定時間', formatTime(findKey(dialogState.order.raw, ['予定時間', 'チップ配置作業予定'])))}
+                        </>
+                      )}
+
                       {renderDetailItem('車名', findKey(dialogState.order.raw, ['車名']))}
                       {renderDetailItem('登録ナンバー', findKey(dialogState.order.raw, ['登録ナンバー(下４桁)']))}
                       {renderDetailItem('入庫状況', findKey(dialogState.order.raw, ['入庫状況']))}
@@ -1891,7 +2059,117 @@ export function ScheduleView({
                     </div>
                   </div>
                   <DialogFooter className="sm:justify-between">
-                    <div className="flex gap-2"></div>
+                    <div className="flex gap-2">
+                      {isEditingOrderSchedule ? (
+                        <>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsEditingOrderSchedule(false);
+                              setEditedOrderDate('');
+                              setEditedOrderTime('');
+                            }}
+                            disabled={isSaving}
+                          >
+                            キャンセル
+                          </Button>
+                          <Button
+                            onClick={async () => {
+                              if (!dialogState.order) return;
+
+                              // Validation
+                              if (!editedOrderDate || !editedOrderTime) {
+                                toast({
+                                  title: 'エラー',
+                                  description: '日付と時間を入力してください',
+                                  variant: 'destructive'
+                                });
+                                return;
+                              }
+
+                              setIsSaving(true);
+
+                              try {
+                                const result = await updateOrderDateTime({
+                                  gasUrl: ORDER_GAS_URL,
+                                  orderId: dialogState.order.id,
+                                  scheduledDate: editedOrderDate,
+                                  scheduledTime: editedOrderTime,
+                                });
+
+                                if (result.status === 'success') {
+                                  toast({
+                                    title: '保存しました',
+                                    description: '日付・時間を更新しました'
+                                  });
+                                  setIsEditingOrderSchedule(false);
+                                  setEditedOrderDate('');
+                                  setEditedOrderTime('');
+                                  // Refresh orders to show updated data
+                                  await refetchOrders();
+                                  setDialogState({ mode: 'closed' });
+                                } else {
+                                  toast({
+                                    title: 'エラー',
+                                    description: result.message || '更新に失敗しました',
+                                    variant: 'destructive'
+                                  });
+                                }
+                              } catch (error) {
+                                console.error('Failed to update order schedule:', error);
+                                toast({
+                                  title: 'エラー',
+                                  description: '更新に失敗しました',
+                                  variant: 'destructive'
+                                });
+                              } finally {
+                                setIsSaving(false);
+                              }
+                            }}
+                            disabled={isSaving}
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                保存中...
+                              </>
+                            ) : '保存'}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          onClick={() => {
+                            const rawDate = findKey(dialogState.order.raw, ['作業予定日']);
+                            const rawTime = findKey(dialogState.order.raw, ['予定時間', 'チップ配置作業予定']);
+
+                            // Initialize date
+                            if (rawDate) {
+                              try {
+                                const d = new Date(rawDate);
+                                if (!isNaN(d.getTime())) {
+                                  setEditedOrderDate(format(d, 'yyyy-MM-dd'));
+                                } else {
+                                  setEditedOrderDate(String(rawDate));
+                                }
+                              } catch (e) {
+                                setEditedOrderDate('');
+                              }
+                            }
+
+                            // Initialize time
+                            if (rawTime) {
+                              const tStr = formatTime(rawTime);
+                              setEditedOrderTime(tStr);
+                            }
+
+                            setIsEditingOrderSchedule(true);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          編集
+                        </Button>
+                      )}
+                    </div>
                     <DialogClose asChild><Button variant="ghost">閉じる</Button></DialogClose>
                   </DialogFooter>
                 </>

@@ -1,11 +1,12 @@
 'use client';
 import * as React from 'react';
+import { mapRawToOrder } from '../../lib/utils';
 import { ScheduleView } from '../../components/dashboard/schedule-view';
 import { Staff, StaffStatus, WithId } from '../../lib/types';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';
 import { useUserProfile } from '../../hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
-import { AlertCircle, Loader2, ChevronLeft, ChevronRight, Smartphone, RefreshCw } from 'lucide-react';
+import { AlertCircle, Loader2, ChevronLeft, ChevronRight, Smartphone, RefreshCw, Database } from 'lucide-react';
 import { useCustomer } from '../../contexts/customer-context';
 import { Button } from '../../components/ui/button';
 import { useOrder } from '../../contexts/order-context';
@@ -20,6 +21,8 @@ import { ShareOrderFormModal } from '../../components/dashboard/share-order-form
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 
+
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -43,8 +46,64 @@ export default function DashboardPage() {
     loadOrders,
     syncOrders,
     isSyncingOrders,
-    refetchOrders
+    refetchOrders,
+    rawOrdersData,
+    orders
   } = useOrder();
+
+  const counts = React.useMemo(() => {
+    if (!rawOrdersData || !orders) return { total: 0, displayed: 0, hidden: 0 };
+
+    const dateStr = format(currentDate, 'yyyy-MM-dd');
+
+    // Normalize and Filter raw data using mapRawToOrder
+    const dayOrders = rawOrdersData
+      .map((raw, idx) => mapRawToOrder(raw, `check-${idx}`))
+      .filter(o => {
+        // Filter out empty rows
+        if (!o.customerCode && !o.customerName && !o.taskDetails) return false;
+
+        // Check scheduledDate
+        if (o.scheduledDate === dateStr) return true;
+
+        // Check scheduledTime (handles fixed 1899 dates too)
+        if (o.scheduledTime) {
+          if ((o.scheduledTime as any) instanceof Date) {
+            if (isSameDay((o.scheduledTime as any), currentDate)) return true;
+          } else if (typeof o.scheduledTime === 'string') {
+            if (o.scheduledTime.startsWith(dateStr)) return true;
+            const d = parseISO(o.scheduledTime);
+            if (isValid(d) && isSameDay(d, currentDate)) return true;
+          }
+        }
+        return false;
+      });
+
+    // Count displayed orders
+    const displayedOrders = dayOrders.filter(o => {
+      return orders.some(displayed =>
+        displayed.id === o.id ||
+        (displayed.rawOrderId && displayed.rawOrderId === o.rawOrderId) ||
+        // Fallback for ID matching
+        (displayed.rawOrderId && displayed.rawOrderId === o.id)
+      );
+    });
+
+    const hiddenDetails = dayOrders
+      .filter(o => !orders.some(displayed =>
+        displayed.id === o.id ||
+        (displayed.rawOrderId && displayed.rawOrderId === o.rawOrderId) ||
+        (displayed.rawOrderId && displayed.rawOrderId === o.id)
+      ))
+      .map(o => `${o.rawOrderId || o.id} ${o.customerName}`.trim());
+
+    return {
+      total: dayOrders.length,
+      displayed: displayedOrders.length,
+      hidden: dayOrders.length - displayedOrders.length,
+      hiddenItems: hiddenDetails
+    };
+  }, [rawOrdersData, orders, currentDate]);
 
   const { isLoading: isLoadingCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -446,6 +505,7 @@ export default function DashboardPage() {
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center space-x-2">
             <div className="flex items-center space-x-2 mr-4">
+
               <ShareOrderFormModal />
 
               <Switch
@@ -482,6 +542,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="flex-1 overflow-auto bg-muted/10 p-2">
+
         {showVerticalView ? (
           <VerticalScheduleView
             staffData={filteredStaff}

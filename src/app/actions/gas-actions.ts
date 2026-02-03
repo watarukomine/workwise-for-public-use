@@ -136,3 +136,12 @@ export async function createOrder(args: {
 }): Promise<GasResponse> {
     return callGasApi({ ...args, action: 'createOrder' });
 }
+
+export async function updateOrderDateTime(args: {
+    gasUrl: string;
+    orderId: string;
+    scheduledDate?: string;
+    scheduledTime?: string;
+}): Promise<GasResponse> {
+    return callGasApi({ ...args, action: 'updateOrderSchedule' });
+}
