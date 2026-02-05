@@ -21,7 +21,7 @@ import { findKey } from '@/lib/utils';
 const orderFormSchema = z.object({
     userCode: z.string().optional(),
     storeName: z.string().min(1, '店舗名（お取引先様名）は必須です'),
-    workType: z.string().min(1, '作業を選択してください'), // Changed to string to allow 'その他' and custom logic
+    workType: z.string().min(1, '作業区分を選択してください'), // Changed to string to allow 'その他' and custom logic
     otherWorkType: z.string().optional(), // Added for custom input
     scheduledDate: z.string().min(1, '作業予定日は必須です'),
     scheduledTime: z.string().min(1, '予定時間は必須です'),
@@ -33,21 +33,31 @@ const orderFormSchema = z.object({
     regNo: z.string().min(4, '登録ナンバー(下4桁)は必須です'),
     status: z.string().optional(),
     tireNumber: z.string().min(1, 'タイヤ品番は必須です'),
-    tireSize: z.string().min(1, 'タイヤサイズは必須です'),
+    tireSize: z.string().optional(), // Made optional in base schema, validated in superRefine
     productName: z.string().optional(),
     quantity: z.string().min(1, '本数は必須です'),
     sensor: z.string().optional(),
     arrangement: z.string().optional(),
     disposal: z.string().min(1, '廃タイヤ処分は必須です'),
     contact: z.string().optional(),
-}).refine((data) => {
+}).superRefine((data, ctx) => {
+    // Custom validation for 'その他' workType
     if (data.workType === 'その他' && !data.otherWorkType) {
-        return false;
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: '作業内容を入力してください',
+            path: ['otherWorkType'],
+        });
     }
-    return true;
-}, {
-    message: "作業内容を入力してください",
-    path: ["otherWorkType"],
+
+    // Custom validation for tireSize: Required unless workType is 'ホイールセット付替'
+    if (data.workType !== 'ホイールセット付替' && !data.tireSize) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'タイヤサイズは必須です',
+            path: ['tireSize'],
+        });
+    }
 });
 
 type OrderFormValues = z.infer<typeof orderFormSchema>;
@@ -81,6 +91,7 @@ export default function OrderFormPage() {
     // Watch storeName and userCode for changes
     const storeNameWatched = watch('storeName');
     const userCodeWatched = watch('userCode');
+    const workTypeWatched = watch('workType'); // Watch for conditional UI logic
 
     // 1. Store Name -> User Code (and Abbreviations)
     React.useEffect(() => {
@@ -274,19 +285,23 @@ export default function OrderFormPage() {
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="workType">作業 <span className="text-red-500">*</span></Label>
+                                        <Label htmlFor="workType">作業区分 <span className="text-red-500">*</span></Label>
                                         <select id="workType" {...register('workType')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                                             <option value="販売店店舗内作業">販売店店舗内作業</option>
                                             <option value="TCC作業">TCC作業</option>
                                             <option value="持ち帰り作業">持ち帰り作業</option>
+                                            <option value="ホイールセット付替">ホイールセット付替</option>
                                             <option value="配送のみ">配送のみ</option>
                                             <option value="その他">その他</option>
                                         </select>
                                         {errors.workType && <p className="text-red-500 text-xs">{errors.workType.message}</p>}
+                                        {workTypeWatched === 'ホイールセット付替' && (
+                                            <p className="text-xs text-gray-500">※「ホイールセット付替」の場合、タイヤサイズの入力は任意となります。</p>
+                                        )}
                                     </div>
                                     {form.watch('workType') === 'その他' && (
                                         <div className="space-y-2">
-                                            <Label htmlFor="otherWorkType">作業内容 (その他) <span className="text-red-500">*</span></Label>
+                                            <Label htmlFor="otherWorkType">作業区分詳細 (その他) <span className="text-red-500">*</span></Label>
                                             <Input id="otherWorkType" {...register('otherWorkType')} className={errors.otherWorkType ? "border-red-500" : ""} />
                                             {errors.otherWorkType && <p className="text-red-500 text-xs">{errors.otherWorkType.message}</p>}
                                         </div>
@@ -352,7 +367,7 @@ export default function OrderFormPage() {
                                         {errors.tireNumber && <p className="text-red-500 text-xs">{errors.tireNumber.message}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="tireSize">タイヤサイズ <span className="text-red-500">*</span></Label>
+                                        <Label htmlFor="tireSize">タイヤサイズ <span className={workTypeWatched === 'ホイールセット付替' ? "text-gray-400" : "text-red-500"}>{workTypeWatched === 'ホイールセット付替' ? '(任意)' : '*'}</span></Label>
                                         <Input id="tireSize" placeholder="195/65R15" {...register('tireSize')} className={errors.tireSize ? "border-red-500" : ""} />
                                         {errors.tireSize && <p className="text-red-500 text-xs">{errors.tireSize.message}</p>}
                                     </div>
