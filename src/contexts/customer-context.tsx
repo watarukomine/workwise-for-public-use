@@ -105,12 +105,29 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
 
         const customerData = result.data || [];
         if (customerData.length > 0) {
-          setCustomers(customerData);
+          // Normalize data: Ensure userCode is 5 digits (zero-padded)
+          const normalizedData = customerData.map((customer: any) => {
+            const rawCode = customer['ユーザーコード'] || customer.userCode;
+            // Pad to 5 digits if it looks like a number
+            let normalizedCode = rawCode;
+            if (rawCode !== undefined && rawCode !== null && rawCode !== '') {
+              // Ensure it's treated as a string and padded
+              normalizedCode = String(rawCode).trim().padStart(5, '0');
+            }
+
+            return {
+              ...customer,
+              userCode: normalizedCode,
+              'ユーザーコード': normalizedCode,
+            };
+          });
+
+          setCustomers(normalizedData);
 
           // Cache the fresh data
           try {
             localStorage.setItem(CUSTOMER_CACHE_KEY, JSON.stringify({
-              customers: customerData,
+              customers: normalizedData,
               timestamp: Date.now()
             }));
           } catch (e) {
