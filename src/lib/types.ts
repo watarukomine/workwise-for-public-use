@@ -69,6 +69,7 @@ export type Order = {
   startTravelTime?: Date; // Added for travel analysis
   arrivalTimestamp?: Date; // Added for travel analysis
   equipmentStatus?: string;
+  tireNumber?: string;
   tireSize?: string;
   taskCalendarEventId?: string;
   travelCalendarEventId?: string;

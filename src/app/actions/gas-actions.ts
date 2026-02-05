@@ -124,7 +124,7 @@ export async function createOrder(args: {
     carName?: string;
     regNo: string;
     status?: string;
-    tireNumber: string;
+    tireNumber?: string;
     tireSize?: string;
     productName?: string;
     quantity: string;

@@ -32,7 +32,7 @@ const orderFormSchema = z.object({
     carName: z.string().optional(),
     regNo: z.string().min(4, '登録ナンバー(下4桁)は必須です'),
     status: z.string().optional(),
-    tireNumber: z.string().min(1, 'タイヤ品番は必須です'),
+    tireNumber: z.string().optional(), // Validated in superRefine
     tireSize: z.string().optional(), // Made optional in base schema, validated in superRefine
     productName: z.string().optional(),
     quantity: z.string().min(1, '本数は必須です'),
@@ -56,6 +56,15 @@ const orderFormSchema = z.object({
             code: z.ZodIssueCode.custom,
             message: 'タイヤサイズは必須です',
             path: ['tireSize'],
+        });
+    }
+
+    // Custom validation for tireNumber: Required unless workType is 'ホイールセット付替'
+    if (data.workType !== 'ホイールセット付替' && !data.tireNumber) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'タイヤ品番は必須です',
+            path: ['tireNumber'],
         });
     }
 });
@@ -362,7 +371,7 @@ export default function OrderFormPage() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label htmlFor="tireNumber">タイヤ品番 <span className="text-red-500">*</span></Label>
+                                        <Label htmlFor="tireNumber">タイヤ品番 <span className={workTypeWatched === 'ホイールセット付替' ? "text-gray-400" : "text-red-500"}>{workTypeWatched === 'ホイールセット付替' ? '(任意)' : '*'}</span></Label>
                                         <Input id="tireNumber" {...register('tireNumber')} className={errors.tireNumber ? "border-red-500" : ""} />
                                         {errors.tireNumber && <p className="text-red-500 text-xs">{errors.tireNumber.message}</p>}
                                     </div>
