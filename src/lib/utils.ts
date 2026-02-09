@@ -203,10 +203,29 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
   // Helper to parse date/time values which might be just time strings
   const parseDateTimeValue = (val: any): Date | undefined => {
     if (!val) return undefined;
+
+    // Handle Date objects (GAS/Sheets often return Date objects)
+    if (val instanceof Date) {
+      if (!isNaN(val.getTime())) {
+        // If year is >= 1970, it's likely a real timestamp
+        if (val.getFullYear() >= 1970) return val;
+
+        // If year is < 1970 (e.g. 1899/1900), it's likely a time-only cell
+        // Combine with scheduledDateVal if available
+        if (scheduledDateVal) {
+          const base = new Date(scheduledDateVal);
+          base.setHours(val.getHours(), val.getMinutes(), val.getSeconds(), 0);
+          return base;
+        }
+        return val; // Fallback
+      }
+    }
+
     const date = new Date(val);
     if (!isNaN(date.getTime()) && date.getFullYear() > 1970) {
       return date;
     }
+
     // Try parsing as Time string (HH:mm) combined with scheduled date
     const valStr = String(val).trim();
     if (valStr.match(/^\d{1,2}:\d{2}/) && scheduledDateVal) {

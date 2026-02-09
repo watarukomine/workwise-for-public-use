@@ -526,10 +526,26 @@ export function ScheduleView({
       // Remove "【緊急】" from the comment
       const newComment = event.message.replace(/【緊急】/g, '').trim();
 
+      // Calculate recovery status based on timestamps
+      let recoveryStatus = '未着手';
+      const orderData = mapRawToOrder(event.message.includes('【緊急】') ? { ...scheduleEvents.find(e => e.id === event.systemId)?.raw } : {});
+      if (orderData) {
+        if (orderData.actualEndTime) {
+          recoveryStatus = '待機中';
+        } else if (orderData.actualStartTime) {
+          recoveryStatus = '作業中';
+        } else if (orderData.arrivalTimestamp) {
+          recoveryStatus = '作業待ち';
+        } else if (orderData.startTravelTime) {
+          recoveryStatus = '移動中';
+        }
+      }
+
       await updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: `(ID: ${event.rawOrderId})`,
         staffName: event.staffName,
+        statusValue: recoveryStatus, // Restore status
         comment: newComment,
         systemId: event.systemId
       });
