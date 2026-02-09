@@ -699,13 +699,10 @@ function sendIcsEmail(params) {
      * 必要な権限を一度に認可できます。
      */
 function doAuth() {
-    Logger.log("Authorization success. Mail and Sheets scopes recognized.");
-    // Spreadsheetへのアクセス権限をトリガー
-    SpreadsheetApp.openById(ORDER_SPREADSHEET_ID).getName();
-    // MailAppへのアクセス権限をトリガー (実際に送信はしません)
-    if (false) {
-        MailApp.sendEmail("test@example.com", "dummy", "dummy");
-    }
+    // スプレッドシートへのアクセスとログ出力のみ行います。
+    // スコア（権限）の検知はコード内に MailApp.sendEmail が存在するだけで自動で行われます。
+    const ssName = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID).getName();
+    Logger.log("認可チェック完了: " + ssName);
 }
 
 /**
