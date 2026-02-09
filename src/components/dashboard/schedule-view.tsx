@@ -527,9 +527,12 @@ export function ScheduleView({
       const currentComment = event.raw ? (findKey(event.raw, ['緊急連絡']) || '') : '';
       const newComment = String(currentComment).replace(/【緊急】/g, '').trim();
 
+      // Optimistic update
+      const fullEvent = scheduleEvents.find(e => e.id === event.systemId);
+
       // Calculate recovery status based on timestamps
       let recoveryStatus = '未着手';
-      const orderData = mapRawToOrder(event.message.includes('【緊急】') ? { ...scheduleEvents.find(e => e.id === event.systemId)?.raw } : {});
+      const orderData = fullEvent; // Use the event we already found
       if (orderData) {
         if (orderData.actualEndTime) {
           recoveryStatus = '待機中';
@@ -542,6 +545,18 @@ export function ScheduleView({
         }
       }
 
+      if (fullEvent) {
+        saveLocalEvent({
+          ...fullEvent,
+          isEmergency: false,
+          message: newComment,
+          raw: {
+            ...fullEvent.raw,
+            '緊急連絡': newComment
+          }
+        });
+      }
+
       await updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: `(ID: ${event.rawOrderId})`,
@@ -552,8 +567,9 @@ export function ScheduleView({
       });
 
       toast({ title: "緊急ステータスを解除しました" });
-      deleteLocalEvent(event.systemId);
       await refetchOrders();
+      // wait a bit for backend to process before clearing local optimistic state
+      setTimeout(() => deleteLocalEvent(event.systemId), 5000);
     } catch (e: any) {
       console.error(e);
       toast({ variant: 'destructive', title: "エラー", description: "解除に失敗しました" });

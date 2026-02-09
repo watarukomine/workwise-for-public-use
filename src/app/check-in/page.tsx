@@ -39,7 +39,7 @@ function CheckInClient() {
   const { profile } = useUserProfile();
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
-  const { refetchOrders, orders } = useOrder();
+  const { refetchOrders, orders, saveLocalEvent, deleteLocalEvent } = useOrder();
   const [manualTime, setManualTime] = React.useState('');
   const [isCorrectionMode, setIsCorrectionMode] = React.useState(false);
   const [pendingAction, setPendingAction] = React.useState<ActionType | null>(null);
@@ -422,6 +422,25 @@ function CheckInClient() {
                       const currentComment = currentOrder?.raw ? (findKey(currentOrder.raw, ['緊急連絡']) || '') : '';
                       const newComment = String(currentComment).replace(/【緊急】/g, '').trim();
 
+                      // Optimistic Update
+                      if (currentOrder && currentOrder.raw) {
+                        saveLocalEvent({
+                          id: currentOrder.id,
+                          staffId: profile.id,
+                          staffName: profile.name,
+                          status: recoveryStatus,
+                          isEmergency: false,
+                          message: newComment,
+                          start: currentOrder.scheduledTime,
+                          end: currentOrder.scheduledEndTime,
+                          raw: {
+                            ...currentOrder.raw,
+                            '緊急連絡': newComment,
+                            '受注ステータス': recoveryStatus
+                          }
+                        });
+                      }
+
                       await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: eventTitleForUpdate,
@@ -429,11 +448,17 @@ function CheckInClient() {
                         statusValue: recoveryStatus,
                         timestamp: now.toISOString(),
                         actionType: null,
-                        comment: newComment, // This will only update '緊急連絡' column now thanks to GAS change
+                        comment: newComment,
                         systemId: currentOrder?.rawOrderId || (currentOrder?.id && !currentOrder.id.startsWith('trip-') ? currentOrder.id : (orderId?.replace(/^(trip-)/, '').replace(/(-task|-travel)$/, '') || ''))
                       });
                       toast({ title: '緊急連絡を解除しました', description: `ステータスを「${recoveryStatus}」に戻しました。` });
                       setEmergencyMessage('');
+                      if (typeof refetchOrders === 'function') {
+                        await refetchOrders();
+                      }
+                      setTimeout(() => {
+                        if (currentOrder) deleteLocalEvent(currentOrder.id);
+                      }, 5000);
                     } catch (error) {
                       console.error("Failed to clear emergency:", error);
                       toast({ variant: "destructive", title: "解除に失敗しました" });
