@@ -33,7 +33,7 @@ import {
   TooltipTrigger,
 } from '../ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate } from '../../lib/utils';
+import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate, sanitizeOrderId } from '../../lib/utils';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import {
@@ -569,7 +569,7 @@ export function ScheduleView({
         comment: newComment,
         emergencyFlag: false,
         adminReply: '',
-        systemId: event.systemId
+        systemId: sanitizeOrderId(event.systemId)
       });
 
       toast({ title: "緊急ステータスを解除しました" });
@@ -601,14 +601,15 @@ export function ScheduleView({
       const timestamp = format(new Date(), 'HH:mm');
       const finalReply = `[${timestamp}]: ${replyMessage}`;
 
-      await updateSheetStatus({
+      const result = await updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: `(ID: ${rawOrderId})`,
         staffName: staffName,
         adminReply: finalReply,
         emergencyFlag: true, // Keep it active
-        systemId: (targetEmergencyEvent as any).systemId
+        systemId: sanitizeOrderId((targetEmergencyEvent as any).systemId)
       });
+      console.log("Send Reply Result:", result);
 
       toast({ title: "返信を送信しました" });
       setReplyDialogOpen(false);
