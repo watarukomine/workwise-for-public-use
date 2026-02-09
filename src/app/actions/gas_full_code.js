@@ -462,13 +462,14 @@ function updateSheetWithOrderInfo(params) {
             }
         }
 
+        const debugLog = [];
         const updateColumn = (colNames, value) => {
             const colIdx = findColumnIndex(colNames);
             if (colIdx !== -1 && value !== undefined) {
                 sheet.getRange(targetRowNum, colIdx + 1).setValue(value);
-                console.log("Updated column: " + rawHeaders[colIdx] + " with value: " + value);
+                debugLog.push(`Updated ${rawHeaders[colIdx]} to ${value}`);
             } else if (value !== undefined) {
-                console.log("Column not found for update: " + JSON.stringify(colNames));
+                debugLog.push(`Column NOT FOUND for candidates: ${JSON.stringify(colNames)}`);
             }
         };
         // Update Fields
@@ -488,11 +489,11 @@ function updateSheetWithOrderInfo(params) {
         if (scheduledDate) updateColumn(["作業予定日", "予定日"], new Date(scheduledDate));
         if (comment !== undefined) {
             // スタッフからの緊急連絡
-            updateColumn(["緊急連絡", "任意コメント", "受注コメント"], comment);
+            updateColumn(["緊急連絡", "任意コメント", "受注コメント", "スタッフ連絡", "連絡事項"], comment);
         }
-        if (emergencyFlag !== undefined) updateColumn(["緊急フラグ", "緊急ステータス", "緊急"], emergencyFlag);
-        if (adminReply !== undefined) updateColumn(["管理者返信", "返信", "管理者からの返信"], adminReply);
-        if (specialNotes !== undefined) updateColumn(["特記事項", "備考", "メモ"], specialNotes);
+        if (emergencyFlag !== undefined) updateColumn(["緊急フラグ", "緊急ステータス", "緊急", "フラグ"], emergencyFlag);
+        if (adminReply !== undefined) updateColumn(["管理者返信", "返信", "管理者からの返信", "回答", "管理者回答", "コメント", "管理者コメント"], adminReply);
+        if (specialNotes !== undefined) updateColumn(["特記事項", "備考", "メモ", "特記"], specialNotes);
         if (actionType && actionTimestamp) {
             const dateValue = new Date(actionTimestamp);
             const actionColMap = {
@@ -512,7 +513,14 @@ function updateSheetWithOrderInfo(params) {
             updateColumn("キャンセル連絡者", params.cancelContact);
         }
         SpreadsheetApp.flush(); // Ensure immediate write
-        return successResponse(`ID: ${searchId || '内容一致'} を更新しました。`, { row: targetRowNum });
+        return successResponse(`ID: ${searchId || '内容一致'} を更新しました。`, {
+            debugInfo: {
+                targetRowNum: targetRowNum,
+                searchId: searchId,
+                updates: debugLog,
+                actualHeaders: headers
+            }
+        });
     } catch (error) {
         console.error("updateSheetWithOrderInfo Error:", error);
         return errorResponse(error.message);
