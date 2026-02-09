@@ -367,10 +367,11 @@ function updateSheetWithOrderInfo(params) {
 
         // 検索変数
         let targetRowNum = -1;
+        let sysIdColIndex = -1;
 
         // 1. SystemID / 受注ID で検索
         if (searchId) {
-            let sysIdColIndex = findColumnIndex(["SystemID", "システムID", "sid"]);
+            sysIdColIndex = findColumnIndex(["SystemID", "システムID", "sid"]);
             if (sysIdColIndex !== -1) {
                 for (let i = 1; i < data.length; i++) {
                     const cellVal = String(data[i][sysIdColIndex]).trim();
