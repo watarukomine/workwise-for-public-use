@@ -81,6 +81,8 @@ export type Order = {
   hasValidationIssues?: boolean;
   validationWarnings?: string[];
   isEmergency?: boolean;
+  emergencyMessage?: string;
+  adminReply?: string;
 };
 
 export type ScheduleEvent = WithId<Order> & {

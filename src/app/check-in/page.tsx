@@ -200,7 +200,8 @@ function CheckInClient() {
           longitude: longitude,
           actionType: action as any,
           actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
-          comment: action === 'Emergency' ? `【緊急】${emergencyMessage}` : (isManual ? '【修正】' : ''),
+          comment: action === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
+          emergencyFlag: action === 'Emergency' ? true : undefined,
           systemId: currentOrder?.rawOrderId || (currentOrder?.id && !currentOrder.id.startsWith('trip-') ? currentOrder.id : (orderId?.replace(/^(trip-)/, '').replace(/(-task|-travel)$/, '') || ''))
         });
 
@@ -377,8 +378,12 @@ function CheckInClient() {
               </h3>
               {currentOrder?.raw && findKey(currentOrder.raw, ['緊急連絡']) && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-md text-sm text-red-900">
-                  <p className="font-bold mb-1">現在の連絡事項・返信:</p>
-                  <p className="whitespace-pre-wrap">{String(findKey(currentOrder.raw, ['緊急連絡'])).replace(/【緊急】/g, '').trim()}</p>
+                  <p className="font-bold mb-1">管理者からの返信:</p>
+                  <div className="bg-blue-50 p-2 rounded border border-blue-100 mb-2">
+                    <p className="whitespace-pre-wrap text-blue-800">{String(findKey(currentOrder.raw, ['管理者返信']) || '返信待ち...')}</p>
+                  </div>
+                  <p className="font-bold mb-1">あなたの送信内容:</p>
+                  <p className="whitespace-pre-wrap text-muted-foreground">{String(findKey(currentOrder.raw, ['緊急連絡']) || '').replace(/【緊急】/g, '').trim()}</p>
                 </div>
               )}
               <Textarea
@@ -437,6 +442,8 @@ function CheckInClient() {
                           raw: {
                             ...currentOrder.raw,
                             '緊急連絡': newComment,
+                            '緊急フラグ': false,
+                            '管理者返信': '',
                             '受注ステータス': recoveryStatus
                           }
                         } as WithId<ScheduleEvent>);
@@ -450,6 +457,8 @@ function CheckInClient() {
                         timestamp: now.toISOString(),
                         actionType: null,
                         comment: newComment,
+                        emergencyFlag: false,
+                        adminReply: '',
                         systemId: currentOrder?.rawOrderId || (currentOrder?.id && !currentOrder.id.startsWith('trip-') ? currentOrder.id : (orderId?.replace(/^(trip-)/, '').replace(/(-task|-travel)$/, '') || ''))
                       });
                       toast({ title: '緊急連絡を解除しました', description: `ステータスを「${recoveryStatus}」に戻しました。` });

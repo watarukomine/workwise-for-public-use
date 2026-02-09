@@ -550,9 +550,13 @@ export function ScheduleView({
           ...fullEvent,
           isEmergency: false,
           description: newComment,
+          emergencyMessage: newComment,
+          adminReply: '',
           raw: {
             ...fullEvent.raw,
-            '緊急連絡': newComment
+            '緊急フラグ': false,
+            '緊急連絡': newComment,
+            '管理者返信': ''
           }
         });
       }
@@ -563,6 +567,8 @@ export function ScheduleView({
         staffName: event.staffName,
         statusValue: recoveryStatus, // Restore status
         comment: newComment,
+        emergencyFlag: false,
+        adminReply: '',
         systemId: event.systemId
       });
 
@@ -593,13 +599,14 @@ export function ScheduleView({
     try {
       const { rawOrderId, currentComment, staffName } = targetEmergencyEvent;
       const timestamp = format(new Date(), 'HH:mm');
-      const newComment = `${currentComment}\n[管理者返信 ${timestamp}]: ${replyMessage}`;
+      const finalReply = `[${timestamp}]: ${replyMessage}`;
 
       await updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: `(ID: ${rawOrderId})`,
         staffName: staffName,
-        comment: newComment,
+        adminReply: finalReply,
+        emergencyFlag: true, // Keep it active
         systemId: (targetEmergencyEvent as any).systemId
       });
 
@@ -631,7 +638,7 @@ export function ScheduleView({
         gasUrl: ORDER_GAS_URL,
         systemId: event.id,
         statusValue: event.status,
-        comment: newComment,
+        emergencyFlag: isEmergency,
       });
 
       if (result.status === 'success') {

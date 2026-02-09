@@ -311,6 +311,8 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     tireSize: String(tireSize || ''),
     '本数': findKey(rawOrder, ['本数', 'honsu']) || '',
     serviceType: findKey(rawOrder, ['サービス種別', 'サービス区分']) || '',
+    emergencyMessage: findKey(rawOrder, ['緊急連絡']) || '',
+    adminReply: findKey(rawOrder, ['管理者返信']) || '',
     raw: rawOrder, // Preserve raw data for context processing
     // Validation metadata - check if this order has any logged issues
     hasValidationIssues: (() => {
@@ -324,10 +326,13 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
         .map(log => log.reason);
     })(),
     isEmergency: (() => {
-      // Only check the dedicated '緊急連絡' column to avoid false positives 
-      // from '任意コメント' (which is for invoices).
-      const emergencyVal = findKey(rawOrder, ['緊急連絡']) || '';
-      return String(emergencyVal).includes('【緊急】');
+      // 1. Check the dedicated '緊急フラグ' column (Boolean or text "TRUE")
+      const flagVal = findKey(rawOrder, ['緊急フラグ']);
+      if (flagVal === true || String(flagVal).toLowerCase() === 'true') return true;
+
+      // 2. Fallback for older data: check '緊急連絡' for tags
+      const msg = findKey(rawOrder, ['緊急連絡']) || '';
+      return String(msg).includes('【緊急】');
     })(),
   };
 };

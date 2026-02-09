@@ -265,6 +265,10 @@ function createOrder(params) {
                 newRow.push(params.comment || "");
             } else if (h === "緊急連絡") {
                 newRow.push(""); // フォームからは緊急連絡は空欄
+            } else if (h === "緊急フラグ") {
+                newRow.push(false); // 初期値はfalse
+            } else if (h === "管理者返信") {
+                newRow.push(""); // 初期値は空
             } else if (h === "車名") {
                 newRow.push(params.carName || "");
             } else if (h.includes("登録ナンバー")) {
@@ -308,7 +312,7 @@ function createOrder(params) {
  * SystemID (または旧ID) でシートを検索し更新する
  */
 function updateSheetWithOrderInfo(params) {
-    const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp, scheduledTime, scheduledEndTime, scheduledDate, comment, specialNotes, systemId } = params;
+    const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp, scheduledTime, scheduledEndTime, scheduledDate, comment, specialNotes, systemId, emergencyFlag, adminReply } = params;
     try {
         let searchId = systemId;
         let searchColumnName = "SystemID";
@@ -459,10 +463,11 @@ function updateSheetWithOrderInfo(params) {
         }
         if (scheduledDate) updateColumn("作業予定日", new Date(scheduledDate));
         if (comment !== undefined) {
-            // 緊急連絡系のメッセージ（返信含む）は「緊急連絡」列のみを更新し、
-            // 請求書用の「任意コメント」列を保護する
+            // スタッフからの緊急連絡
             updateColumn("緊急連絡", comment);
         }
+        if (emergencyFlag !== undefined) updateColumn("緊急フラグ", emergencyFlag);
+        if (adminReply !== undefined) updateColumn("管理者返信", adminReply);
         if (specialNotes !== undefined) updateColumn("特記事項", specialNotes);
         if (actionType && actionTimestamp) {
             const dateValue = new Date(actionTimestamp);
