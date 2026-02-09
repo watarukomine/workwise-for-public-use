@@ -458,7 +458,17 @@ function updateSheetWithOrderInfo(params) {
             updateColumn("終了時間", new Date(scheduledEndTime));
         }
         if (scheduledDate) updateColumn("作業予定日", new Date(scheduledDate));
-        if (comment) updateColumn("任意コメント", comment);
+        if (comment) {
+            updateColumn("任意コメント", comment);
+            // 【緊急】タグが含まれる場合、または以前のコメントが緊急だった場合に「緊急連絡」列も同期する
+            if (String(comment).includes("【緊急】")) {
+                updateColumn("緊急連絡", comment);
+            } else {
+                // 緊急でない場合は「緊急連絡」列をクリア（または同期）
+                // 既存の「緊急連絡」列がある場合に備えて、タグがないなら空にする
+                updateColumn("緊急連絡", "");
+            }
+        }
         if (specialNotes !== undefined) updateColumn("特記事項", specialNotes);
         if (actionType && actionTimestamp) {
             const dateValue = new Date(actionTimestamp);
