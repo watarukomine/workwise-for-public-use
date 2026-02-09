@@ -443,7 +443,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     fetchAndProcessData();
-    const interval = setInterval(() => fetchAndProcessData(true), 60000 * 5); // Poll every 5 mins
+    const interval = setInterval(() => fetchAndProcessData(true), 60000); // Poll every 1 min
     return () => clearInterval(interval);
   }, [fetchAndProcessData]);
 

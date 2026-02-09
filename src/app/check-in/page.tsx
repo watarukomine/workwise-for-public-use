@@ -71,6 +71,18 @@ function CheckInClient() {
     setOptimisticStatus(null);
   }, [orderId]);
 
+  // Visibility API: Sync whenever tab/app becomes visible
+  React.useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[CheckIn] Tab became visible, refetching...');
+        refetchOrders().catch(e => console.error(e));
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [refetchOrders]);
+
 
   const getJapaneseActionName = (action: ActionType | 'Emergency') => {
     // ... (existing map)
@@ -329,13 +341,28 @@ function CheckInClient() {
               <CardDescription>現在地情報と共に、作業状況を記録します。</CardDescription>
               {orderId && <div className="text-sm font-medium mt-1 text-slate-600">現在のステータス: <span className="text-blue-600">{currentStatus}</span></div>}
             </div>
-            <Button
-              variant={isCorrectionMode ? "destructive" : "outline"}
-              size="sm"
-              onClick={() => setIsCorrectionMode(!isCorrectionMode)}
-            >
-              {isCorrectionMode ? "修正モードON" : "修正"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsLoading('Wait' as any);
+                  refetchOrders()
+                    .then(() => toast({ title: "データを更新しました" }))
+                    .finally(() => setIsLoading(null));
+                }}
+                disabled={!!isLoading}
+              >
+                <RefreshCw className={cn("h-4 w-4", isLoading === 'Wait' && "animate-spin")} />
+              </Button>
+              <Button
+                variant={isCorrectionMode ? "destructive" : "outline"}
+                size="sm"
+                onClick={() => setIsCorrectionMode(!isCorrectionMode)}
+              >
+                {isCorrectionMode ? "修正モードON" : "修正"}
+              </Button>
+            </div>
           </div>
 
           {isCorrectionMode && (
