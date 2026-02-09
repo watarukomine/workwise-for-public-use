@@ -340,7 +340,15 @@ function updateSheetWithOrderInfo(params) {
         const sheet = orderSpreadsheet.getSheetByName(ORDER_SHEET_NAME);
         if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
         const data = sheet.getDataRange().getValues();
-        const headers = data[0];
+        const headers = data[0].map(h => String(h).trim());
+
+        const findColumnIndex = (names) => {
+            for (let name of names) {
+                const idx = headers.indexOf(name);
+                if (idx !== -1) return idx;
+            }
+            return -1;
+        };
 
         // 検索変数
         let targetRowNum = -1;
@@ -439,8 +447,9 @@ function updateSheetWithOrderInfo(params) {
             }
         }
 
-        const updateColumn = (colName, value) => {
-            const colIdx = headers.indexOf(colName);
+        const updateColumn = (colNames, value) => {
+            const names = Array.isArray(colNames) ? colNames : [colNames];
+            const colIdx = findColumnIndex(names);
             if (colIdx !== -1 && value !== undefined) {
                 sheet.getRange(targetRowNum, colIdx + 1).setValue(value);
             }
@@ -464,11 +473,11 @@ function updateSheetWithOrderInfo(params) {
         if (scheduledDate) updateColumn("作業予定日", new Date(scheduledDate));
         if (comment !== undefined) {
             // スタッフからの緊急連絡
-            updateColumn("緊急連絡", comment);
+            updateColumn(["緊急連絡", "任意コメント"], comment);
         }
-        if (emergencyFlag !== undefined) updateColumn("緊急フラグ", emergencyFlag);
-        if (adminReply !== undefined) updateColumn("管理者返信", adminReply);
-        if (specialNotes !== undefined) updateColumn("特記事項", specialNotes);
+        if (emergencyFlag !== undefined) updateColumn(["緊急フラグ", "緊急"], emergencyFlag);
+        if (adminReply !== undefined) updateColumn(["管理者返信", "返信"], adminReply);
+        if (specialNotes !== undefined) updateColumn(["特記事項", "備考"], specialNotes);
         if (actionType && actionTimestamp) {
             const dateValue = new Date(actionTimestamp);
             const actionColMap = {

@@ -2294,12 +2294,11 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
   const { toggleTripSuppression } = useOrder();
   const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
 
-  const emergencyEvent = events.find(e => {
-    const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
-    return String(comment).includes('【緊急】');
-  });
+  const emergencyEvent = events.find(e => e.isEmergency);
 
-  const emergencyMessage = emergencyEvent ? findKey(emergencyEvent.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) : '';
+  const emergencyMessage = emergencyEvent
+    ? (emergencyEvent.emergencyMessage || findKey(emergencyEvent.raw, ['緊急連絡', '任意コメント', 'comment']) || '')
+    : '';
 
   return (
     <div className={cn("flex relative h-14 border-b", areaBgClass)}>
