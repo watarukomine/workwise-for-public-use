@@ -50,7 +50,8 @@ function CheckInClient() {
 
   const currentOrder = React.useMemo(() => {
     if (!orderId) return null;
-    return orders.find(o => o.rawOrderId === orderId || o.id === orderId);
+    const cleanId = orderId.replace(/(-task|-travel)$/i, '');
+    return orders.find(o => o.id === cleanId || o.rawOrderId === cleanId || o.id === orderId || o.rawOrderId === orderId);
   }, [orders, orderId]);
 
   // Use optimistic status if available, otherwise fall back to context data

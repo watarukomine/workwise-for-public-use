@@ -373,7 +373,9 @@ function updateSheetWithOrderInfo(params) {
             let sysIdColIndex = findColumnIndex(["SystemID", "システムID", "sid"]);
             if (sysIdColIndex !== -1) {
                 for (let i = 1; i < data.length; i++) {
-                    if (String(data[i][sysIdColIndex]) === String(searchId)) {
+                    const cellVal = String(data[i][sysIdColIndex]).trim();
+                    const targetId = String(searchId).trim();
+                    if (cellVal === targetId) {
                         targetRowNum = i + 1;
                         break;
                     }
@@ -384,7 +386,9 @@ function updateSheetWithOrderInfo(params) {
                 const displayIdColIndex = findColumnIndex(["受注ID", "オーダーID", "管理番号", "ID"]);
                 if (displayIdColIndex !== -1) {
                     for (let i = 1; i < data.length; i++) {
-                        if (String(data[i][displayIdColIndex]) === String(searchId)) {
+                        const cellVal = String(data[i][displayIdColIndex]).trim();
+                        const targetId = String(searchId).trim();
+                        if (cellVal === targetId) {
                             targetRowNum = i + 1;
                             break;
                         }
@@ -517,6 +521,7 @@ function updateSheetWithOrderInfo(params) {
             debugInfo: {
                 targetRowNum: targetRowNum,
                 searchId: searchId,
+                foundId: targetRowNum !== -1 && sysIdColIndex !== -1 ? data[targetRowNum - 1][sysIdColIndex] : null,
                 updates: debugLog,
                 actualHeaders: headers
             }

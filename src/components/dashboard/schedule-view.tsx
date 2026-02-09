@@ -506,7 +506,7 @@ export function ScheduleView({
         notifications.push({
           staffId: e.staffId,
           staffName: staff.name,
-          systemId: e.id,
+          systemId: e.systemId || e.id,
           message: comment,
           rawOrderId: e.rawOrderId || '',
           raw: e.raw
@@ -1360,7 +1360,7 @@ export function ScheduleView({
           await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`, // Use ID for tasks
-            systemId: mapRawToOrder(eventToUpdate.raw).id,
+            systemId: eventToUpdate.systemId,
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
             scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
