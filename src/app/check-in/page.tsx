@@ -375,6 +375,12 @@ function CheckInClient() {
                 <AlertCircle className="h-4 w-4" />
                 緊急連絡
               </h3>
+              {currentOrder?.raw && findKey(currentOrder.raw, ['緊急連絡']) && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-md text-sm text-red-900">
+                  <p className="font-bold mb-1">現在の連絡事項・返信:</p>
+                  <p className="whitespace-pre-wrap">{String(findKey(currentOrder.raw, ['緊急連絡'])).replace(/【緊急】/g, '').trim()}</p>
+                </div>
+              )}
               <Textarea
                 placeholder="事故・遅延・トラブルなど、緊急時の連絡事項を入力してください。"
                 className="mb-2"
@@ -413,7 +419,7 @@ function CheckInClient() {
                         }
                       }
 
-                      const currentComment = currentOrder?.raw ? (findKey(currentOrder.raw, ['任意コメント', '任意コメント(リマーク2)', 'comment', '緊急連絡']) || '') : '';
+                      const currentComment = currentOrder?.raw ? (findKey(currentOrder.raw, ['緊急連絡']) || '') : '';
                       const newComment = String(currentComment).replace(/【緊急】/g, '').trim();
 
                       await updateSheetStatus({
@@ -423,7 +429,7 @@ function CheckInClient() {
                         statusValue: recoveryStatus,
                         timestamp: now.toISOString(),
                         actionType: null,
-                        comment: newComment,
+                        comment: newComment, // This will only update '緊急連絡' column now thanks to GAS change
                         systemId: currentOrder?.rawOrderId || (currentOrder?.id && !currentOrder.id.startsWith('trip-') ? currentOrder.id : (orderId?.replace(/^(trip-)/, '').replace(/(-task|-travel)$/, '') || ''))
                       });
                       toast({ title: '緊急連絡を解除しました', description: `ステータスを「${recoveryStatus}」に戻しました。` });

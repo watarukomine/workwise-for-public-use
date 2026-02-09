@@ -523,8 +523,8 @@ export function ScheduleView({
         return;
       }
 
-      // Remove "【緊急】" from the comment
-      const newComment = event.message.replace(/【緊急】/g, '').trim();
+      const currentComment = event.raw ? (findKey(event.raw, ['緊急連絡']) || '') : '';
+      const newComment = String(currentComment).replace(/【緊急】/g, '').trim();
 
       // Calculate recovery status based on timestamps
       let recoveryStatus = '未着手';
@@ -1691,7 +1691,7 @@ export function ScheduleView({
                 <DialogHeader>
                   <DialogTitle>緊急連絡への返信</DialogTitle>
                   <DialogDescription>
-                    スタッフ {targetEmergencyEvent?.staffName} のスケジュールコメントに返信を追記します。
+                    スタッフ {targetEmergencyEvent?.staffName} の受注コメント（スプレッドシートの「任意コメント」欄）に返信を追記します。
                   </DialogDescription>
                 </DialogHeader>
                 <div className="py-4">

@@ -324,13 +324,10 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
         .map(log => log.reason);
     })(),
     isEmergency: (() => {
-      // Check multiple possible columns independently to ensure we don't miss the tag
-      // if one column is empty but another contains it.
-      const columnsToCheck = ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment'];
-      return columnsToCheck.some(key => {
-        const val = findKey(rawOrder, [key]);
-        return val && String(val).includes('【緊急】');
-      });
+      // Only check the dedicated '緊急連絡' column to avoid false positives 
+      // from '任意コメント' (which is for invoices).
+      const emergencyVal = findKey(rawOrder, ['緊急連絡']) || '';
+      return String(emergencyVal).includes('【緊急】');
     })(),
   };
 };

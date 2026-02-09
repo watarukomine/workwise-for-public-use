@@ -458,20 +458,10 @@ function updateSheetWithOrderInfo(params) {
             updateColumn("終了時間", new Date(scheduledEndTime));
         }
         if (scheduledDate) updateColumn("作業予定日", new Date(scheduledDate));
-        const commentHeaders = ["任意コメント", "任意コメント(リマーク2)", "comment", "緊急連絡"];
         if (comment !== undefined) {
-            headers.forEach((h, idx) => {
-                const nh = String(h).trim();
-                if (commentHeaders.includes(nh)) {
-                    if (nh === "緊急連絡") {
-                        // 【緊急】タグが含まれる場合のみ「緊急連絡」列に書き込み、そうでない場合はクリア
-                        updateColumn(h, String(comment).includes("【緊急】") ? comment : "");
-                    } else {
-                        // 任意コメント系の列はすべて同期
-                        updateColumn(h, comment);
-                    }
-                }
-            });
+            // 緊急連絡系のメッセージ（返信含む）は「緊急連絡」列のみを更新し、
+            // 請求書用の「任意コメント」列を保護する
+            updateColumn("緊急連絡", comment);
         }
         if (specialNotes !== undefined) updateColumn("特記事項", specialNotes);
         if (actionType && actionTimestamp) {
