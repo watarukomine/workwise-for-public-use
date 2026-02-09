@@ -1,4 +1,5 @@
 'use client';
+// Force update to sync with server actions
 
 import * as React from 'react';
 import { Suspense } from 'react';
