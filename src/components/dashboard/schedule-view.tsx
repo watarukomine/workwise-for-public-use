@@ -549,7 +549,7 @@ export function ScheduleView({
         saveLocalEvent({
           ...fullEvent,
           isEmergency: false,
-          message: newComment,
+          description: newComment,
           raw: {
             ...fullEvent.raw,
             '緊急連絡': newComment

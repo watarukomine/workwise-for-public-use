@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
-import type { StaffStatus } from '@/lib/types';
+import type { StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
 import { updateStaffStatus } from '@/services/attendance-service';
 import { cn, findKey } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
@@ -425,20 +425,21 @@ function CheckInClient() {
                       // Optimistic Update
                       if (currentOrder && currentOrder.raw) {
                         saveLocalEvent({
-                          id: currentOrder.id,
+                          ...currentOrder,
                           staffId: profile.id,
                           staffName: profile.name,
+                          title: currentOrder.customerName || '受注',
                           status: recoveryStatus,
                           isEmergency: false,
-                          message: newComment,
-                          start: currentOrder.scheduledTime,
-                          end: currentOrder.scheduledEndTime,
+                          description: newComment,
+                          start: currentOrder.scheduledTime ?? '',
+                          end: currentOrder.scheduledEndTime ?? '',
                           raw: {
                             ...currentOrder.raw,
                             '緊急連絡': newComment,
                             '受注ステータス': recoveryStatus
                           }
-                        });
+                        } as WithId<ScheduleEvent>);
                       }
 
                       await updateSheetStatus({
