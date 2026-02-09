@@ -492,7 +492,7 @@ export function ScheduleView({
     const emergencyEvents = scheduleEvents.filter(e => e.isEmergency);
 
     // return generic structure
-    const notifications: { staffId: string, staffName: string, message: string, rawOrderId: string, systemId: string }[] = [];
+    const notifications: { staffId: string, staffName: string, message: string, rawOrderId: string, systemId: string, raw?: any }[] = [];
 
     const seenStaff = new Set<string>();
 
@@ -508,7 +508,8 @@ export function ScheduleView({
           staffName: staff.name,
           systemId: e.id,
           message: comment,
-          rawOrderId: e.rawOrderId || ''
+          rawOrderId: e.rawOrderId || '',
+          raw: e.raw
         });
       }
     });
@@ -516,7 +517,7 @@ export function ScheduleView({
     return notifications;
   }, [scheduleEvents, staffData]);
 
-  const handleClearEmergency = async (event: { rawOrderId: string, message: string, staffName: string, systemId: string }) => {
+  const handleClearEmergency = async (event: { rawOrderId: string, message: string, staffName: string, systemId: string, raw?: any }) => {
     try {
       if (!event.rawOrderId && !event.systemId) {
         toast({ variant: 'destructive', title: "エラー", description: "イベントIDが見つかりません" });
@@ -599,7 +600,7 @@ export function ScheduleView({
   const handleToggleEmergency = async (event: WithId<ScheduleEvent>, isEmergency: boolean) => {
     setIsSaving(true);
     try {
-      const currentComment = event.raw ? (findKey(event.raw, ['任意コメント', '任意コメント(リマーク2)', 'comment']) || '') : '';
+      const currentComment = event.raw ? (findKey(event.raw, ['緊急連絡']) || '') : '';
       let newComment = currentComment;
 
       if (isEmergency) {
