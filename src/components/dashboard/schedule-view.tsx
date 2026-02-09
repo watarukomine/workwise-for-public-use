@@ -489,10 +489,7 @@ export function ScheduleView({
   const emergencyNotifications = React.useMemo(() => {
     if (!scheduleEvents) return [];
 
-    const emergencyEvents = scheduleEvents.filter(e => {
-      const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
-      return String(comment).includes('【緊急】');
-    });
+    const emergencyEvents = scheduleEvents.filter(e => e.isEmergency);
 
     // return generic structure
     const notifications: { staffId: string, staffName: string, message: string, rawOrderId: string, systemId: string }[] = [];
@@ -505,7 +502,7 @@ export function ScheduleView({
       const staff = getStaffById(e.staffId);
       if (staff) {
         seenStaff.add(e.staffId);
-        const comment = findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
+        const comment = e.raw ? findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) : '';
         notifications.push({
           staffId: e.staffId,
           staffName: staff.name,
@@ -579,6 +576,47 @@ export function ScheduleView({
     } catch (e: any) {
       console.error(e);
       toast({ variant: 'destructive', title: "エラー", description: "返信の送信に失敗しました" });
+    }
+  };
+
+  const handleToggleEmergency = async (event: WithId<ScheduleEvent>, isEmergency: boolean) => {
+    setIsSaving(true);
+    try {
+      const currentComment = event.raw ? (findKey(event.raw, ['任意コメント', '任意コメント(リマーク2)', 'comment']) || '') : '';
+      let newComment = currentComment;
+
+      if (isEmergency) {
+        if (!currentComment.includes('【緊急】')) {
+          newComment = `【緊急】${currentComment}`;
+        }
+      } else {
+        newComment = currentComment.replace(/【緊急】/g, '').trim();
+      }
+
+      const result = await updateSheetStatus({
+        gasUrl: ORDER_GAS_URL,
+        systemId: event.id,
+        statusValue: event.status,
+        comment: newComment,
+      });
+
+      if (result.status === 'success') {
+        toast({
+          title: isEmergency ? '緊急ステータスに設定しました' : '緊急ステータスを解除しました',
+        });
+        await refetchOrders();
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error) {
+      console.error('Failed to toggle emergency status:', error);
+      toast({
+        title: 'エラー',
+        description: '緊急ステータスの更新に失敗しました',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1779,6 +1817,21 @@ export function ScheduleView({
                         {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
                         {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
                         {renderDetailItem('特記事項', findKey(event.raw, ['特記事項', 'specialNotes']))}
+                        <div className="sm:col-span-2 flex items-center space-x-2 mt-2 p-2 bg-red-50 rounded-md border border-red-100">
+                          <Checkbox
+                            id="emergency-toggle"
+                            checked={event.isEmergency}
+                            onCheckedChange={(checked) => handleToggleEmergency(event, checked as boolean)}
+                            disabled={isSaving}
+                          />
+                          <Label
+                            htmlFor="emergency-toggle"
+                            className="text-sm font-bold text-red-700 cursor-pointer"
+                          >
+                            緊急対応としてマークする
+                          </Label>
+                          {isSaving && <Loader2 className="h-3 w-3 animate-spin text-red-600" />}
+                        </div>
                       </div>
                     )}
 
@@ -2323,6 +2376,13 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         <div className="absolute -top-1 -right-1 z-10 pointer-events-none">
           <div className="border border-red-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm" style={{ transform: 'rotate(-15deg)' }}>
             <span className="text-[10px] font-bold text-red-600 leading-none select-none">済</span>
+          </div>
+        </div>
+      )}
+      {event.isEmergency && !isTravelEvent && (
+        <div className="absolute -top-1 -left-1 z-20 pointer-events-none">
+          <div className="bg-red-600 rounded-full p-0.5 shadow-md">
+            <AlertTriangle className="h-3 w-3 text-white" />
           </div>
         </div>
       )}

@@ -80,6 +80,7 @@ export type Order = {
   // Validation metadata
   hasValidationIssues?: boolean;
   validationWarnings?: string[];
+  isEmergency?: boolean;
 };
 
 export type ScheduleEvent = WithId<Order> & {

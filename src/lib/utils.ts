@@ -304,6 +304,10 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
         .filter(log => log.severity === 'error' || log.severity === 'warning')
         .map(log => log.reason);
     })(),
+    isEmergency: (() => {
+      const emergencyVal = findKey(rawOrder, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) || '';
+      return String(emergencyVal).includes('【緊急】');
+    })(),
   };
 };
 

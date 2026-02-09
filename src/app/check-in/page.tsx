@@ -13,7 +13,7 @@ import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus } from '@/lib/types';
 import { updateStaffStatus } from '@/services/attendance-service';
-import { cn } from '@/lib/utils';
+import { cn, findKey } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
 import {
@@ -413,6 +413,9 @@ function CheckInClient() {
                         }
                       }
 
+                      const currentComment = currentOrder?.raw ? (findKey(currentOrder.raw, ['任意コメント', '任意コメント(リマーク2)', 'comment', '緊急連絡']) || '') : '';
+                      const newComment = String(currentComment).replace(/【緊急】/g, '').trim();
+
                       await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: eventTitleForUpdate,
@@ -420,7 +423,7 @@ function CheckInClient() {
                         statusValue: recoveryStatus,
                         timestamp: now.toISOString(),
                         actionType: null,
-                        comment: '', // Clear comment
+                        comment: newComment,
                         systemId: currentOrder?.rawOrderId || (currentOrder?.id && !currentOrder.id.startsWith('trip-') ? currentOrder.id : (orderId?.replace(/^(trip-)/, '').replace(/(-task|-travel)$/, '') || ''))
                       });
                       toast({ title: '緊急連絡を解除しました', description: `ステータスを「${recoveryStatus}」に戻しました。` });
