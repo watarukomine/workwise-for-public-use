@@ -535,6 +535,7 @@ export function ScheduleView({
       });
 
       toast({ title: "緊急ステータスを解除しました" });
+      deleteLocalEvent(event.systemId);
       await refetchOrders();
     } catch (e: any) {
       console.error(e);
@@ -604,6 +605,7 @@ export function ScheduleView({
         toast({
           title: isEmergency ? '緊急ステータスに設定しました' : '緊急ステータスを解除しました',
         });
+        deleteLocalEvent(event.id);
         await refetchOrders();
       } else {
         throw new Error(result.message);
