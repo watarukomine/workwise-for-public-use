@@ -24,7 +24,7 @@ export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxGeXICGCJ
 export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbz9CFA3PdNTi5fQhnxz5Dm6-copXjMPpCKvJtSGB80Na5cVSsdYXfgO-g5EQPK66BrcCA/exec';
 
 // Order & Task Management Script (Unified)
-export const ORDER_GAS_URL = "https://script.google.com/macros/s/AKfycbys_B4yaqZs-RuBPpkNIRreT7YK1dJ638-WxyzydzR3HxSgec0PjXClr1f_kr5rJZmY/exec";
+export const ORDER_GAS_URL = "https://script.google.com/macros/s/AKfycbwwSeeadXe-id97_jS_91BrTipqdG7W2Z4Q9uedFKHTnpfR7vF0ZrBl8hUcoLwdx_io/exec";
 
 
 // --- スプレッドシート本体のURL ---
