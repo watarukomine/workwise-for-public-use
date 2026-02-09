@@ -340,12 +340,27 @@ function updateSheetWithOrderInfo(params) {
         const sheet = orderSpreadsheet.getSheetByName(ORDER_SHEET_NAME);
         if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
         const data = sheet.getDataRange().getValues();
-        const headers = data[0].map(h => String(h).trim());
+        const rawHeaders = data[0];
+        const headers = rawHeaders.map(h => String(h).trim().toLowerCase());
 
         const findColumnIndex = (names) => {
-            for (let name of names) {
-                const idx = headers.indexOf(name);
+            const candidates = Array.isArray(names) ? names : [names];
+            const lowerCandidates = candidates.map(n => String(n).trim().toLowerCase());
+
+            // 1. Exact match (case-insensitive)
+            for (let cand of lowerCandidates) {
+                const idx = headers.indexOf(cand);
                 if (idx !== -1) return idx;
+            }
+
+            // 2. Partial match (if header contains candidate or vice versa)
+            for (let i = 0; i < headers.length; i++) {
+                for (let cand of lowerCandidates) {
+                    if (headers[i] && cand && (headers[i].indexOf(cand) !== -1 || cand.indexOf(headers[i]) !== -1)) {
+                        console.log("Fuzzy match found: '" + rawHeaders[i] + "' for candidate '" + cand + "'");
+                        return i;
+                    }
+                }
             }
             return -1;
         };
@@ -355,7 +370,7 @@ function updateSheetWithOrderInfo(params) {
 
         // 1. SystemID / 受注ID で検索
         if (searchId) {
-            let sysIdColIndex = headers.indexOf("SystemID");
+            let sysIdColIndex = findColumnIndex(["SystemID", "システムID", "sid"]);
             if (sysIdColIndex !== -1) {
                 for (let i = 1; i < data.length; i++) {
                     if (String(data[i][sysIdColIndex]) === String(searchId)) {
@@ -366,7 +381,7 @@ function updateSheetWithOrderInfo(params) {
             }
             // SystemIDで見つからなかった場合、かつ searchId が数字っぽい場合は「受注ID」列も探してみる
             if (targetRowNum === -1) {
-                const displayIdColIndex = headers.indexOf("受注ID");
+                const displayIdColIndex = findColumnIndex(["受注ID", "オーダーID", "管理番号", "ID"]);
                 if (displayIdColIndex !== -1) {
                     for (let i = 1; i < data.length; i++) {
                         if (String(data[i][displayIdColIndex]) === String(searchId)) {
@@ -383,9 +398,9 @@ function updateSheetWithOrderInfo(params) {
             console.log("No matching ID found. Trying content-based search (Staff+Date+Time)...");
             console.log("Target: Staff=" + staffName + ", Time=" + scheduledTime); // Debug Log
 
-            const staffColIdx = headers.indexOf("担当") !== -1 ? headers.indexOf("担当") : headers.indexOf("スタッフ名");
-            const dateColIdx = headers.indexOf("作業予定日");
-            const timeColIdx = headers.indexOf("予定時間");
+            const staffColIdx = findColumnIndex(["担当", "スタッフ名", "弊社担当", "担当者"]);
+            const dateColIdx = findColumnIndex(["作業予定日", "予定日", "日付"]);
+            const timeColIdx = findColumnIndex(["予定時間", "開始時間", "時間"]);
 
             if (staffColIdx !== -1 && dateColIdx !== -1) {
                 const targetDate = new Date(scheduledTime);
@@ -448,36 +463,36 @@ function updateSheetWithOrderInfo(params) {
         }
 
         const updateColumn = (colNames, value) => {
-            const names = Array.isArray(colNames) ? colNames : [colNames];
-            const colIdx = findColumnIndex(names);
+            const colIdx = findColumnIndex(colNames);
             if (colIdx !== -1 && value !== undefined) {
                 sheet.getRange(targetRowNum, colIdx + 1).setValue(value);
+                console.log("Updated column: " + rawHeaders[colIdx] + " with value: " + value);
+            } else if (value !== undefined) {
+                console.log("Column not found for update: " + JSON.stringify(colNames));
             }
         };
         // Update Fields
-        updateColumn("担当", staffName);
-        updateColumn("受注ステータス", statusValue); // キャンセル等を反映
+        updateColumn(["担当", "スタッフ名", "弊社担当"], staffName);
+        updateColumn(["受注ステータス", "ステータス", "判定結果"], statusValue); // キャンセル等を反映
 
-        updateColumn("最終更新日時", timestamp ? new Date(timestamp) : undefined);
+        updateColumn(["最終更新日時", "更新日時", "timestamp"], timestamp ? new Date(timestamp) : undefined);
         if (latitude !== undefined && longitude !== undefined) {
-            updateColumn("最終位置情報（緯度,経度）", `${latitude}, ${longitude}`);
+            updateColumn(["最終位置情報（緯度,経度）", "位置情報", "座標"], `${latitude}, ${longitude}`);
         }
         if (scheduledTime) {
-            updateColumn("チップ配置作業予定", new Date(scheduledTime));
-            updateColumn("予定時間", new Date(scheduledTime));
+            updateColumn(["チップ配置作業予定", "予定時間", "開始時間"], new Date(scheduledTime));
         }
         if (scheduledEndTime) {
-            updateColumn("チップ配置作業完了予定", new Date(scheduledEndTime));
-            updateColumn("終了時間", new Date(scheduledEndTime));
+            updateColumn(["チップ配置作業完了予定", "終了時間", "完了時間"], new Date(scheduledEndTime));
         }
-        if (scheduledDate) updateColumn("作業予定日", new Date(scheduledDate));
+        if (scheduledDate) updateColumn(["作業予定日", "予定日"], new Date(scheduledDate));
         if (comment !== undefined) {
             // スタッフからの緊急連絡
-            updateColumn(["緊急連絡", "任意コメント"], comment);
+            updateColumn(["緊急連絡", "任意コメント", "受注コメント"], comment);
         }
-        if (emergencyFlag !== undefined) updateColumn(["緊急フラグ", "緊急"], emergencyFlag);
-        if (adminReply !== undefined) updateColumn(["管理者返信", "返信"], adminReply);
-        if (specialNotes !== undefined) updateColumn(["特記事項", "備考"], specialNotes);
+        if (emergencyFlag !== undefined) updateColumn(["緊急フラグ", "緊急ステータス", "緊急"], emergencyFlag);
+        if (adminReply !== undefined) updateColumn(["管理者返信", "返信", "管理者からの返信"], adminReply);
+        if (specialNotes !== undefined) updateColumn(["特記事項", "備考", "メモ"], specialNotes);
         if (actionType && actionTimestamp) {
             const dateValue = new Date(actionTimestamp);
             const actionColMap = {
