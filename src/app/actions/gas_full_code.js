@@ -678,8 +678,8 @@ function sendIcsEmail(params) {
         const options = {
             attachments: [{ fileName: "invite.ics", content: icsContent, mimeType: "text/calendar; charset=UTF-8; method=REQUEST" }]
         };
-        MailApp.sendEmail(staffEmail, subject, body, options);
-        return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 ${staffName} に予定のメールを送信しました。` }))
+        GmailApp.sendEmail(staffEmail, subject, body, options);
+        return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 ${staffName} (${staffEmail}) に予定のメールを送信しました。` }))
             .setMimeType(ContentService.MimeType.JSON);
     } catch (error) {
         return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `メール送信中にエラーが発生しました: ${error.message}` }))

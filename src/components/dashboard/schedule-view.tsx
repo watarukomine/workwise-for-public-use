@@ -1860,21 +1860,6 @@ export function ScheduleView({
                         {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
                         {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
                         {renderDetailItem('特記事項', findKey(event.raw, ['特記事項', 'specialNotes']))}
-                        <div className="sm:col-span-2 flex items-center space-x-2 mt-2 p-2 bg-red-50 rounded-md border border-red-100">
-                          <Checkbox
-                            id="emergency-toggle"
-                            checked={event.isEmergency}
-                            onCheckedChange={(checked) => handleToggleEmergency(event, checked as boolean)}
-                            disabled={isSaving}
-                          />
-                          <Label
-                            htmlFor="emergency-toggle"
-                            className="text-sm font-bold text-red-700 cursor-pointer"
-                          >
-                            緊急対応としてマークする
-                          </Label>
-                          {isSaving && <Loader2 className="h-3 w-3 animate-spin text-red-600" />}
-                        </div>
                       </div>
                     )}
 
