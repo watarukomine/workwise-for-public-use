@@ -50,7 +50,8 @@ function CheckInClient() {
 
   const currentOrder = React.useMemo(() => {
     if (!orderId) return null;
-    const cleanId = orderId.replace(/(-task|-travel)$/i, '');
+    // Strip UI prefixes and suffixes to get the pure SystemID
+    const cleanId = orderId.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
     return orders.find(o => o.id === cleanId || o.rawOrderId === cleanId || o.id === orderId || o.rawOrderId === orderId);
   }, [orders, orderId]);
 
