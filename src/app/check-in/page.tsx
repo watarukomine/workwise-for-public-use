@@ -202,7 +202,7 @@ function CheckInClient() {
           actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
           comment: action === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
           emergencyFlag: action === 'Emergency' ? true : undefined,
-          systemId: currentOrder?.rawOrderId || (currentOrder?.id && !currentOrder.id.startsWith('trip-') ? currentOrder.id : (orderId?.replace(/^(trip-)/, '').replace(/(-task|-travel)$/, '') || ''))
+          systemId: currentOrder?.id || orderId?.replace(/^(trip-)/, '').replace(/(-task|-travel)$/, '') || ''
         });
 
         if (result.status === 'error') {
@@ -324,7 +324,7 @@ function CheckInClient() {
           <div className="flex justify-between items-start">
             <div>
               <CardTitle>作業記録</CardTitle>
-              <CardDescription>現在地情報と共に、作業状況を記録します。対象のオーダーID: {orderId || '未選択'}</CardDescription>
+              <CardDescription>現在地情報と共に、作業状況を記録します。</CardDescription>
               {orderId && <div className="text-sm font-medium mt-1 text-slate-600">現在のステータス: <span className="text-blue-600">{currentStatus}</span></div>}
             </div>
             <Button
