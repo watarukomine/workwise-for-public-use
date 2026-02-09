@@ -694,13 +694,18 @@ function sendIcsEmail(params) {
 }
 
 /**
- * 初回の権限承認を行うためのダミー関数です
- * GASエディタでこの関数を選択して実行（「実行」ボタンをクリック）することで
- * 必要な権限を一度に認可できます。
- */
+     * 初回の権限承認を行うためのダミー関数です
+     * GASエディタでこの関数を選択して実行（「実行」ボタンをクリック）することで
+     * 必要な権限を一度に認可できます。
+     */
 function doAuth() {
     Logger.log("Authorization success. Mail and Sheets scopes recognized.");
-    MailApp.sendEmail(Session.getEffectiveUser().getEmail(), "WorkWise Auth Test", "Authorization logic is ready.");
+    // Spreadsheetへのアクセス権限をトリガー
+    SpreadsheetApp.openById(ORDER_SPREADSHEET_ID).getName();
+    // MailAppへのアクセス権限をトリガー (実際に送信はしません)
+    if (false) {
+        MailApp.sendEmail("test@example.com", "dummy", "dummy");
+    }
 }
 
 /**
