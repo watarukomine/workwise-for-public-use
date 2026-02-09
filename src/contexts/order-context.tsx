@@ -5,8 +5,8 @@ import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
 import { findKey, mapRawToOrder } from '@/lib/utils';
 import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes } from 'date-fns';
-import { useSelectedStaff } from './selected-staff-context';
 import { ORDER_GAS_URL } from '@/lib/settings';
+import { useSelectedStaff, processStaffData } from './selected-staff-context';
 import { logStaffNotFound, logOldDateDetected, logInvalidDate } from '@/lib/order-validation-logger';
 
 
@@ -371,11 +371,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const [error, setErrorState] = useState<string | null>(null);
 
   const [localScheduleEvents, setLocalScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
-  const [suppressedTripIds, setSuppressedTripIds] = useState<Set<string>>(new Set()); // New state
-  const { allStaff, isStaffLoading } = useSelectedStaff();
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
-
+  const [suppressedTripIds, setSuppressedTripIds] = useState<Set<string>>(new Set());
+  const { allStaff, isStaffLoading, setAllStaff } = useSelectedStaff();
+  const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
+  const ORDERS_CACHE_KEY = 'cached_orders_results';
 
   useEffect(() => {
     try {
@@ -408,8 +408,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
-
   const setOrderGasUrl = (url: string) => {
     setOrderGasUrlState(url);
     try {
@@ -419,27 +417,67 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // 1. Initial Cache Load
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(ORDERS_CACHE_KEY);
+      if (cached) {
+        const { orders, timestamp } = JSON.parse(cached);
+        if (orders && Array.isArray(orders)) {
+          console.log(`[OrderProvider] Initial cache load: ${orders.length} items`);
+          setRawOrdersData(orders);
+          // If we have cache, treat as loaded (Optimistic)
+          setIsLoading(false);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load orders cache", e);
+    }
+  }, []);
+
   const fetchAndProcessData = useCallback(async (isBackground = false) => {
-    if (!isBackground) setIsLoading(true);
+    // Only show loader if we have NO data yet
+    if (!isBackground && rawOrdersData.length === 0) setIsLoading(true);
     setErrorState(null);
 
     try {
-      const result = await fetchGasData(orderGasUrl);
+      const result = await fetchGasData(orderGasUrl) as any;
       if (result.error) throw new Error(result.error);
 
-      const orders = result.data || result;
+      // Support consolidated response format: { orders, staff } OR legacy array
+      const orders = result.orders || result.data || result;
+
       if (Array.isArray(orders)) {
         setRawOrdersData(orders);
+
+        // Cache data
+        try {
+          localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify({
+            orders: orders,
+            timestamp: Date.now()
+          }));
+        } catch (e) {
+          console.warn("Failed to cache orders results", e);
+        }
+
+        // 統合されたスタッフデータがあれば更新
+        if (result.staff && Array.isArray(result.staff)) {
+          console.log(`[OrderProvider] Consolidated staff data received: ${result.staff.length} items`);
+          const processedStaff = processStaffData(result.staff);
+          if (processedStaff.length > 0) {
+            setAllStaff(processedStaff);
+          }
+        }
       } else {
-        throw new Error("Invalid data format");
+        throw new Error("Invalid data format received from GAS");
       }
     } catch (e: any) {
       setErrorState(e.message);
       console.error("Fetch error:", e);
     } finally {
-      if (!isBackground) setIsLoading(false);
+      setIsLoading(false);
     }
-  }, [orderGasUrl]);
+  }, [orderGasUrl, rawOrdersData.length]);
 
   useEffect(() => {
     fetchAndProcessData();

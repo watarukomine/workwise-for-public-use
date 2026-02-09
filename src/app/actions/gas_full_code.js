@@ -13,7 +13,9 @@ const ACTION_LOG_SHEET_NAME = "行動予定"; // 汎用タスク（休憩・移�
  */
 function doGet(e) {
     try {
-        const data = [];
+        const orderDataResult = [];
+        let staffDataResult = [];
+
         // 1. 受注データの取得
         try {
             const orderSpreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
@@ -22,12 +24,13 @@ function doGet(e) {
                 const orderData = getSheetData(orderSheet);
                 orderData.forEach(row => {
                     row._type = 'order'; // 識別子
-                    data.push(row);
+                    orderDataResult.push(row);
                 });
             }
         } catch (err) {
             console.error("Order Sheet Read Error:", err);
         }
+
         // 2. 行動予定データの取得
         try {
             const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
@@ -36,24 +39,47 @@ function doGet(e) {
                 const actionData = getSheetData(actionSheet);
                 actionData.forEach(row => {
                     row._type = 'task'; // 識別子
-                    // フロントエンドの形式に合わせてフィールドをマッピング
                     row.id = row['ID'];
                     row.staffName = row['スタッフ名'];
                     row.taskDetails = row['業務内容'];
                     row.description = row['詳細'];
-                    row.scheduledTime = row['開始日時']; // 開始
-                    row.scheduledEndTime = row['終了日時']; // 終了
-                    row.status = '未割当'; // 便宜上
-                    data.push(row);
+                    row.scheduledTime = row['開始日時'];
+                    row.scheduledEndTime = row['終了日時'];
+                    row.status = '未割当';
+                    orderDataResult.push(row);
                 });
             }
         } catch (err) {
             console.error("Action Log Sheet Read Error:", err);
         }
-        return ContentService.createTextOutput(JSON.stringify({ data: data })).setMimeType(ContentService.MimeType.JSON);
+
+        // 3. スタッフマスタの取得 (高速化のための統合)
+        try {
+            const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
+            const staffSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
+            if (staffSheet) {
+                staffDataResult = getSheetData(staffSheet);
+            }
+        } catch (err) {
+            console.error("Staff Sheet Read Error:", err);
+        }
+
+        // 統合されたレスポンスを返す
+        const response = {
+            status: "success",
+            orders: orderDataResult,
+            staff: staffDataResult,
+            // 互換性維持のための data フィールド（旧バージョン対応）
+            data: orderDataResult
+        };
+
+        return ContentService.createTextOutput(JSON.stringify(response))
+            .setMimeType(ContentService.MimeType.JSON);
+
     } catch (error) {
         console.error("GAS doGet Error:", error.message, error.stack);
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` })).setMimeType(ContentService.MimeType.JSON);
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `GAS doGet Error: ${error.message}` }))
+            .setMimeType(ContentService.MimeType.JSON);
     }
 }
 // シートデータをオブジェクト配列として取得するヘルパー

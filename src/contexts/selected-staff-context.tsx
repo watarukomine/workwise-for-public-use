@@ -18,6 +18,38 @@ const simpleHash = (str: string) => {
   return Math.abs(hash);
 };
 
+export const processStaffData = (dataToProcess: any[]): WithId<Staff>[] => {
+  if (!dataToProcess || dataToProcess.length === 0) return [];
+
+  return dataToProcess.map((item: any): WithId<Staff> => {
+    const getRole = (): 'admin' | 'staff' => {
+      const roleValue = findKey(item, ['ロール', '権限', 'role', 'Role']);
+      if (typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
+        return 'admin';
+      }
+      return 'staff';
+    };
+
+    const staffId = String(findKey(item, ['id', 'ID', 'スタッフID']) || `gas-staff-${Math.random()}`);
+
+    const assignedColor = findKey(item, ['color', 'カラー']);
+    const fallbackColor = `hsl(${simpleHash(staffId) % 360}, 70%, 60%)`;
+
+    return {
+      id: staffId,
+      name: findKey(item, ['スタッフ名', 'name']) || 'No Name',
+      email: findKey(item, ['メールアドレス', 'email', 'e-mail', 'mail', 'Email Address', 'email address']) || '',
+      password: findKey(item, ['パスワード', 'password', 'Password']) || '',
+      role: getRole(),
+      color: assignedColor || fallbackColor,
+      avatarUrl: findKey(item, ['avatarUrl']) || '',
+      calendarId: findKey(item, ['calendarId', 'カレンダーID']),
+      '母店': findKey(item, ['母店']),
+      ...item
+    };
+  });
+};
+
 export const fetchStaffDataFromGAS = async (url: string = STAFF_GAS_URL): Promise<{ staffList?: WithId<Staff>[]; error?: string }> => {
   if (!url || url.includes('TODO_REPLACE_THIS_URL')) {
     const errorMessage = "スタッフ情報を取得するためのURLが /src/lib/settings.ts で設定されていません。";
@@ -39,33 +71,7 @@ export const fetchStaffDataFromGAS = async (url: string = STAFF_GAS_URL): Promis
       return { staffList: [] };
     }
 
-    const staffList = dataToProcess.map((item: any): WithId<Staff> => {
-      const getRole = (): 'admin' | 'staff' => {
-        const roleValue = findKey(item, ['ロール', '権限', 'role', 'Role']);
-        if (typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
-          return 'admin';
-        }
-        return 'staff';
-      };
-
-      const staffId = String(findKey(item, ['id', 'ID', 'スタッフID']) || `gas-staff-${Math.random()}`);
-
-      const assignedColor = findKey(item, ['color', 'カラー']);
-      const fallbackColor = `hsl(${simpleHash(staffId) % 360}, 70%, 60%)`;
-
-      return {
-        id: staffId,
-        name: findKey(item, ['スタッフ名', 'name']) || 'No Name',
-        email: findKey(item, ['メールアドレス', 'email', 'e-mail', 'mail', 'Email Address', 'email address']) || '',
-        password: findKey(item, ['パスワード', 'password', 'Password']) || '',
-        role: getRole(),
-        color: assignedColor || fallbackColor,
-        avatarUrl: findKey(item, ['avatarUrl']) || '',
-        calendarId: findKey(item, ['calendarId', 'カレンダーID']),
-        '母店': findKey(item, ['母店']),
-        ...item
-      };
-    });
+    const staffList = processStaffData(dataToProcess);
     return { staffList };
 
   } catch (error: any) {
@@ -264,6 +270,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
 
   const setAllStaff = React.useCallback((staff: WithId<Staff>[]) => {
     setAllStaffState(staff);
+    setIsLoading(false);
   }, []);
 
   const togglePendingStaffSelection = React.useCallback((staffId: string) => {
