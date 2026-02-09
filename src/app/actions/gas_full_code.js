@@ -518,7 +518,23 @@ function updateSheetWithOrderInfo(params) {
             updateColumn("キャンセル連絡者", params.cancelContact);
         }
         SpreadsheetApp.flush(); // Ensure immediate write
-        return successResponse(`ID: ${searchId || '内容一致'} を更新しました。`, {
+
+        // --- パフォーマンス改善: メール送信の統合 ---
+        let emailResultMsg = "";
+        if (params.shouldSendEmail && params.emailParams) {
+            try {
+                const res = sendIcsEmailInternal(params.emailParams);
+                if (res.status === "success") {
+                    emailResultMsg = " (メール送信成功)";
+                } else {
+                    emailResultMsg = ` (メール送信失敗: ${res.message})`;
+                }
+            } catch (e) {
+                emailResultMsg = ` (メール送信エラー: ${e.message})`;
+            }
+        }
+
+        return successResponse(`ID: ${searchId || '内容一致'} を更新しました。${emailResultMsg}`, {
             debugInfo: {
                 targetRowNum: targetRowNum,
                 searchId: searchId,
@@ -631,13 +647,22 @@ function updateTaskSheet(taskId, params) {
     return successResponse(`タスクID: ${taskId} を更新しました。`);
 }
 function sendIcsEmail(params) {
+    const res = sendIcsEmailInternal(params);
+    return ContentService.createTextOutput(JSON.stringify(res))
+        .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * メールの送信ロジック（内部用）
+ * さまざまなアクションから共通で呼び出せるように分離
+ */
+function sendIcsEmailInternal(params) {
     const { staffName, staffEmail, title, description, startTime, endTime, location, isUpdate } = params;
     try {
         if (!staffEmail) throw new Error("宛先メールアドレスが指定されていません。");
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(staffEmail)) {
-            return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `担当者 (${staffName}) のメールアドレス形式が正しくありません。` }))
-                .setMimeType(ContentService.MimeType.JSON);
+            return { status: "error", message: `担当者 (${staffName}) のメールアドレス形式が正しくありません。` };
         }
         const startDate = new Date(startTime);
         const endDate = new Date(endTime);
@@ -682,16 +707,13 @@ function sendIcsEmail(params) {
         };
         try {
             MailApp.sendEmail(staffEmail, subject, body, options);
-            return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 ${staffName} (${staffEmail}) に予定のメールを送信しました。` }))
-                .setMimeType(ContentService.MimeType.JSON);
+            return { status: "success", message: `担当者 ${staffName} (${staffEmail}) に予定のメールを送信しました。` };
         } catch (mailError) {
             console.error("MailApp Error:", mailError.message);
-            return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `メールの送信権限がないか、アドレスに誤りがあります (${staffEmail}): ${mailError.message}` }))
-                .setMimeType(ContentService.MimeType.JSON);
+            return { status: "error", message: `メールの送信権限がないか、アドレスに誤りがあります (${staffEmail}): ${mailError.message}` };
         }
     } catch (error) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `処理中にエラーが発生しました: ${error.message}` }))
-            .setMimeType(ContentService.MimeType.JSON);
+        return { status: "error", message: `処理中にメール送信でエラーが発生しました: ${error.message}` };
     }
 }
 

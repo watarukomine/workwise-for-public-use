@@ -1334,8 +1334,20 @@ export function ScheduleView({
           setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           saveLocalEvent(updatedEvent);
 
-          // Prepare parallel promises
-          const updatePromise = updateSheetStatus({
+          // Prepare combined update (Consolidated for performance)
+          const staff = getStaffById(eventToUpdate.staffId);
+          const emailParams = shouldSendEmail ? {
+            staffName: staff?.name || "",
+            staffEmail: staff?.email || "",
+            title: dialogState.mode === 'details' ? (eventToUpdate.title || '作業予定') : editedEventDetails.title,
+            description: dialogState.mode === 'details' ? (eventToUpdate.description || '') : editedEventDetails.description,
+            startTime: newStart.toISOString(),
+            endTime: finalEnd.toISOString(),
+            location: getCustomerByCode(eventToUpdate.locationId)?.address || "",
+            isUpdate: dialogState.mode === 'edit'
+          } : undefined;
+
+          const sheetResult = await updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`,
             systemId: eventToUpdate.systemId,
@@ -1348,37 +1360,18 @@ export function ScheduleView({
             "チップ配置作業完了予定": format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
             "作業予定日": format(newStart, 'yyyy/MM/dd'),
             "作業時間（分）": durationMinutes,
-            staffName: getStaffById(eventToUpdate.staffId)?.name,
+            staffName: staff?.name,
+            shouldSendEmail: !!emailParams,
+            emailParams: emailParams
           });
 
-          let emailPromise = Promise.resolve({ status: 'success', message: 'No email' } as any);
-          if (shouldSendEmail) {
-            const staff = getStaffById(eventToUpdate.staffId);
-            const staffEmail = staff?.email || "";
-            if (!staffEmail) {
-              toast({ variant: 'destructive', title: '送信エラー', description: '担当者のメールアドレスが登録されていません。' });
-            } else {
-              emailPromise = sendIcsEmail({
-                gasUrl: ORDER_GAS_URL,
-                staffName: staff?.name || "",
-                staffEmail,
-                title: dialogState.mode === 'details' ? (eventToUpdate.title || '作業予定') : editedEventDetails.title,
-                description: dialogState.mode === 'details' ? (eventToUpdate.description || '') : editedEventDetails.description,
-                startTime: newStart.toISOString(),
-                endTime: finalEnd.toISOString(),
-                location: getCustomerByCode(eventToUpdate.locationId)?.address || "",
-                isUpdate: dialogState.mode === 'edit'
-              });
-            }
-          }
-
-          const [sheetResult, emailResult] = await Promise.all([updatePromise, emailPromise]);
           if (sheetResult.status === 'error') throw new Error(sheetResult.message);
-          if (shouldSendEmail && emailResult.status === 'success') {
-            toast({ title: 'メール送信成功', description: emailResult.message });
-          } else if (shouldSendEmail && emailResult.status === 'error') {
-            toast({ variant: 'destructive', title: 'メール送信エラー', description: emailResult.message });
-          }
+
+          toast({
+            title: '保存完了',
+            description: sheetResult.message
+          });
+
         } else {
           // Legacy Local event
           const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: finalEnd.toISOString() };
@@ -1387,8 +1380,7 @@ export function ScheduleView({
         }
       }
 
-      // Shared cleanup
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Shared cleanup (Removed artificial 1.5s delay for performance)
       await refetchOrders();
       setDialogState({ mode: 'closed' });
 
