@@ -678,13 +678,29 @@ function sendIcsEmail(params) {
         const options = {
             attachments: [{ fileName: "invite.ics", content: icsContent, mimeType: "text/calendar; charset=UTF-8; method=REQUEST" }]
         };
-        GmailApp.sendEmail(staffEmail, subject, body, options);
-        return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 ${staffName} (${staffEmail}) に予定のメールを送信しました。` }))
-            .setMimeType(ContentService.MimeType.JSON);
+        try {
+            MailApp.sendEmail(staffEmail, subject, body, options);
+            return ContentService.createTextOutput(JSON.stringify({ status: "success", message: `担当者 ${staffName} (${staffEmail}) に予定のメールを送信しました。` }))
+                .setMimeType(ContentService.MimeType.JSON);
+        } catch (mailError) {
+            console.error("MailApp Error:", mailError.message);
+            return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `メールの送信権限がないか、アドレスに誤りがあります (${staffEmail}): ${mailError.message}` }))
+                .setMimeType(ContentService.MimeType.JSON);
+        }
     } catch (error) {
-        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `メール送信中にエラーが発生しました: ${error.message}` }))
+        return ContentService.createTextOutput(JSON.stringify({ status: "error", message: `処理中にエラーが発生しました: ${error.message}` }))
             .setMimeType(ContentService.MimeType.JSON);
     }
+}
+
+/**
+ * 初回の権限承認を行うためのダミー関数です
+ * GASエディタでこの関数を選択して実行（「実行」ボタンをクリック）することで
+ * 必要な権限を一度に認可できます。
+ */
+function doAuth() {
+    Logger.log("Authorization success. Mail and Sheets scopes recognized.");
+    MailApp.sendEmail(Session.getEffectiveUser().getEmail(), "WorkWise Auth Test", "Authorization logic is ready.");
 }
 
 /**

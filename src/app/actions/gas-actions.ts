@@ -20,6 +20,9 @@ async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
         console.log("Sending request to GAS with body:", bodyPayload);
 
         const response = await fetch(gasUrl, {
@@ -30,7 +33,9 @@ async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
             body: JSON.stringify(bodyPayload),
             cache: 'no-store',
             redirect: 'follow',
+            signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
         console.log("GAS response status:", response.status);
 

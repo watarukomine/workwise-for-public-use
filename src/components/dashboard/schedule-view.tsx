@@ -1254,60 +1254,43 @@ export function ScheduleView({
     if (dialogState.mode === 'closed') return;
     setIsSaving(true);
 
-    let finalDescription = editedEventDetails.description;
-    if (editedEventDetails.destination) {
-      finalDescription = `[行き先: ${editedEventDetails.destination}] ${finalDescription}`;
-    }
-
-
-    const newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
-    const newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
-
-    if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
-      toast({ variant: 'destructive', title: 'エラー', description: '無効な時間形式です。' });
-      return;
-    }
-
-    // Handle overnight shifts (if End is before Start, assume next day)
-    let finalEnd = newEnd;
-    if (finalEnd < newStart) {
-      finalEnd = addMinutes(finalEnd, 24 * 60);
-    }
-
-    // Calculate duration in minutes
-    const durationMinutes = Math.round((finalEnd.getTime() - newStart.getTime()) / (1000 * 60));
-
     try {
+      const newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
+      const newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
+
+      if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
+        toast({ variant: 'destructive', title: 'エラー', description: '無効な時間形式です。' });
+        setIsSaving(false);
+        return;
+      }
+
+      let finalEnd = newEnd;
+      if (finalEnd < newStart) {
+        finalEnd = addMinutes(finalEnd, 24 * 60);
+      }
+      const durationMinutes = Math.round((finalEnd.getTime() - newStart.getTime()) / (1000 * 60));
+
+      // --- Mode 1: New Event ---
       if (dialogState.mode === 'new') {
         const staff = getStaffById(dialogState.staffId);
         if (!staff) throw new Error("担当スタッフが見つかりません。");
 
-        const { title, description } = editedEventDetails;
-
-        // Call createTask for new double-click events
         const res = await createTask({
           gasUrl: ORDER_GAS_URL,
           staffName: staff.name,
-          taskName: title,
-          description: description,
+          taskName: editedEventDetails.title,
+          description: editedEventDetails.description,
           startTime: newStart.toISOString(),
           endTime: finalEnd.toISOString(),
           estimatedDuration: durationMinutes
         });
 
-        // CRITICAL FIX: Immediate Optimistic Update with ALIGNED ID
         if (res.eventId) {
-          const realId = res.eventId;
-          const derivedTripId = `trip-${realId}`;
+          const derivedTripId = `trip-${res.eventId}`;
           const frontendId = `${derivedTripId}-task`;
-          // Also create implicit Travel event if needed? 
-          // OrderContext logic: Generic tasks don't get travel events usually.
-          // But user claims "Accompany" gets it. If so, logic is elsewhere.
-          // For now, ensure Main Task is consistent.
-
           const newEvent: WithId<ScheduleEvent> = {
             id: frontendId,
-            title: title,
+            title: editedEventDetails.title,
             start: newStart.toISOString(),
             end: finalEnd.toISOString(),
             staffId: staff.id,
@@ -1315,7 +1298,7 @@ export function ScheduleView({
             customerCode: '',
             customerName: '',
             address: '',
-            taskDetails: description || title,
+            taskDetails: editedEventDetails.description || editedEventDetails.title,
             serviceType: '',
             status: '未割当',
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
@@ -1329,19 +1312,16 @@ export function ScheduleView({
           saveLocalEvent(newEvent);
           setScheduleEvents(prev => [...prev, newEvent]);
         }
-
         toast({ title: '予定を保存しました' });
-        // Optimistic update done, explicit refetch for consistency
-        await refetchOrders();
 
       } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
+        // --- Mode 2: Edit/Details ---
         const eventToUpdate = dialogState.event;
         const { title, description } = editedEventDetails;
 
+        // Sheet-based event (Order OR Generic Task)
         if (eventToUpdate.rawOrderId || (eventToUpdate.id && eventToUpdate.id.startsWith('task-'))) {
-          // Sheet-based event (Order OR Generic Task)
-
-          // CRITICAL: Optimistic UI Update - Update local state immediately
+          // Optimistic UI Update first
           const updatedEvent: WithId<ScheduleEvent> = {
             ...eventToUpdate,
             start: newStart.toISOString(),
@@ -1350,103 +1330,70 @@ export function ScheduleView({
             title: title || eventToUpdate.title,
             estimatedDuration: durationMinutes,
             taskDetails: description || eventToUpdate.taskDetails
-            // Note: We don't update tripId or id here
           };
-
           setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           saveLocalEvent(updatedEvent);
 
-          // The updated GAS `updateSheetWithOrderInfo` handles `task-` IDs by updating the Action Log sheet.
-          await updateSheetStatus({
+          // Prepare parallel promises
+          const updatePromise = updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
-            eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`, // Use ID for tasks
+            eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`,
             systemId: eventToUpdate.systemId,
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
             scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
             estimatedDuration: durationMinutes,
             timestamp: new Date().toISOString(),
-            // Exact Column Matching
             "チップ配置作業予定": format(newStart, 'yyyy/MM/dd HH:mm:ss'),
             "チップ配置作業完了予定": format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
             "作業予定日": format(newStart, 'yyyy/MM/dd'),
             "作業時間（分）": durationMinutes,
-            // For Generic Tasks (Action Log) fields if needed explicitly, but GAS mapping takes care of it
             staffName: getStaffById(eventToUpdate.staffId)?.name,
           });
-          // Add slight delay to allow GAS propagation
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          await refetchOrders();
-        } else { // Legacy Local event
+
+          let emailPromise = Promise.resolve({ status: 'success', message: 'No email' } as any);
+          if (shouldSendEmail) {
+            const staff = getStaffById(eventToUpdate.staffId);
+            const staffEmail = staff?.email || "";
+            if (!staffEmail) {
+              toast({ variant: 'destructive', title: '送信エラー', description: '担当者のメールアドレスが登録されていません。' });
+            } else {
+              emailPromise = sendIcsEmail({
+                gasUrl: ORDER_GAS_URL,
+                staffName: staff?.name || "",
+                staffEmail,
+                title: dialogState.mode === 'details' ? (eventToUpdate.title || '作業予定') : editedEventDetails.title,
+                description: dialogState.mode === 'details' ? (eventToUpdate.description || '') : editedEventDetails.description,
+                startTime: newStart.toISOString(),
+                endTime: finalEnd.toISOString(),
+                location: getCustomerByCode(eventToUpdate.locationId)?.address || "",
+                isUpdate: dialogState.mode === 'edit'
+              });
+            }
+          }
+
+          const [sheetResult, emailResult] = await Promise.all([updatePromise, emailPromise]);
+          if (sheetResult.status === 'error') throw new Error(sheetResult.message);
+          if (shouldSendEmail && emailResult.status === 'success') {
+            toast({ title: 'メール送信成功', description: emailResult.message });
+          } else if (shouldSendEmail && emailResult.status === 'error') {
+            toast({ variant: 'destructive', title: 'メール送信エラー', description: emailResult.message });
+          }
+        } else {
+          // Legacy Local event
           const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: finalEnd.toISOString() };
           setScheduleEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e));
           saveLocalEvent(updatedEvent);
         }
       }
 
-      if (shouldSendEmail) {
-        let staffName = "";
-        let staffEmail = "";
-        let eventStart = "";
-        let eventEnd = "";
-        let location = "";
-
-        if (dialogState.mode === 'new') {
-          const staff = getStaffById(dialogState.staffId);
-          staffName = staff?.name || "";
-          staffEmail = staff?.email || "";
-          eventStart = newStart.toISOString();
-          eventEnd = newEnd.toISOString();
-          location = ""; // New generic event no location
-        } else if (dialogState.mode === 'edit') {
-          const event = dialogState.event;
-          const staff = getStaffById(event.staffId);
-          staffName = staff?.name || "";
-          staffEmail = staff?.email || "";
-          eventStart = newStart.toISOString();
-          eventEnd = newEnd.toISOString();
-          location = getCustomerByCode(event.locationId)?.address || "";
-        } else if (dialogState.mode === 'details') {
-          const event = dialogState.event;
-          const staff = getStaffById(event.staffId);
-          staffName = staff?.name || "";
-          staffEmail = staff?.email || "";
-          // For details mode, use original event times or current newStart/newEnd if they happen to be set (though usually they aren't edited in details)
-          // Actually in details mode newStart/newEnd are initialized from event.start/end
-          eventStart = newStart.toISOString();
-          eventEnd = newEnd.toISOString();
-          location = getCustomerByCode(event.locationId)?.address || "";
-        }
-
-        if (!staffEmail) {
-          toast({ variant: 'destructive', title: '送信エラー', description: '担当者のメールアドレスが登録されていません。' });
-        } else {
-          try {
-            const result = await sendIcsEmail({
-              gasUrl: ORDER_GAS_URL,
-              staffName: staffName,
-              staffEmail: staffEmail,
-              title: dialogState.mode === 'details' ? (dialogState.event.title || '作業予定') : editedEventDetails.title,
-              description: dialogState.mode === 'details' ? (dialogState.event.description || '') : editedEventDetails.description,
-              startTime: eventStart,
-              endTime: eventEnd,
-              location: location,
-              isUpdate: dialogState.mode === 'edit'
-            });
-
-            if (result.status === 'success') {
-              toast({ title: 'メール送信成功', description: 'スタッフにメールを送信しました。' });
-            } else {
-              toast({ variant: 'destructive', title: 'メール送信エラー', description: result.message });
-            }
-          } catch (e: any) {
-            toast({ variant: 'destructive', title: 'メール送信エラー', description: e.message });
-          }
-        }
-      }
-
+      // Shared cleanup
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      await refetchOrders();
       setDialogState({ mode: 'closed' });
+
     } catch (e: any) {
+      console.error("Save error:", e);
       toast({ variant: 'destructive', title: '保存エラー', description: `更新に失敗しました: ${e.message}` });
     } finally {
       setIsSaving(false);
