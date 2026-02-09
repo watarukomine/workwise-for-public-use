@@ -13,7 +13,7 @@ import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
 import { updateStaffStatus } from '@/services/attendance-service';
-import { cn, findKey, sanitizeOrderId } from '@/lib/utils';
+import { cn, findKey } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
 import {
@@ -202,7 +202,7 @@ function CheckInClient() {
           actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
           comment: action === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
           emergencyFlag: action === 'Emergency' ? true : undefined,
-          systemId: sanitizeOrderId(currentOrder?.id || orderId)
+          systemId: currentOrder?.id || orderId
         });
 
         if (result.status === 'error') {
@@ -459,7 +459,7 @@ function CheckInClient() {
                         comment: newComment,
                         emergencyFlag: false,
                         adminReply: '',
-                        systemId: sanitizeOrderId(currentOrder?.rawOrderId || currentOrder?.id || orderId)
+                        systemId: currentOrder?.id || orderId
                       });
                       toast({ title: '緊急連絡を解除しました', description: `ステータスを「${recoveryStatus}」に戻しました。` });
                       setEmergencyMessage('');

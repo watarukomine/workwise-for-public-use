@@ -9,17 +9,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-/**
- * IDからプレフィックス(trip-, ord-)やサフィックス(-task, -travel)を除去して
- * スプレッドシート上のID（SystemID）と一致するように正規化します。
- */
-export function sanitizeOrderId(id: string | null | undefined): string {
-  if (!id) return '';
-  return id
-    .replace(/^(trip-|ord-)/i, '')
-    .replace(/(-task|-travel)$/i, '');
-}
-
 export function findKey(item: any, possibleKeys: string[]) {
   if (!item || typeof item !== 'object') {
     return undefined;

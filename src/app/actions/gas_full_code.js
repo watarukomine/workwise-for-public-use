@@ -315,24 +315,11 @@ function updateSheetWithOrderInfo(params) {
     const { eventTitle, staffName, statusValue, timestamp, latitude, longitude, actionType, actionTimestamp, scheduledTime, scheduledEndTime, scheduledDate, comment, specialNotes, systemId, emergencyFlag, adminReply } = params;
     try {
         let searchId = systemId;
-        // Prefix/Suffix normalization
-        if (searchId) {
-            searchId = String(searchId)
-                .replace(/^(trip-|ord-)/i, '')
-                .replace(/(-task|-travel)$/i, '');
-        }
-
         let searchColumnName = "SystemID";
         // SystemIDが指定されていない場合は、従来のタイトルパースを試みる
         if (!searchId) {
             const match = eventTitle ? eventTitle.match(/\(ID:\s*([\w-]+)\)/) : null;
             searchId = match ? match[1] : null;
-            if (searchId) {
-                // Parse results also need normalization
-                searchId = String(searchId)
-                    .replace(/^(trip-|ord-)/i, '')
-                    .replace(/(-task|-travel)$/i, '');
-            }
         }
 
         // 【修正点】IDが見つからないが、eventTitleなどが渡っている場合はフォールバック検索のために続行させるフラグなどが必要

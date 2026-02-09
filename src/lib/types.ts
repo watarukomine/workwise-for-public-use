@@ -88,6 +88,7 @@ export type Order = {
 export type ScheduleEvent = WithId<Order> & {
   tripId?: string;
   orderId?: string;
+  systemId?: string; // Original spreadsheet ID (clean)
   title: string;
   description?: string;
   locationId?: string;

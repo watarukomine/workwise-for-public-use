@@ -33,7 +33,7 @@ import {
   TooltipTrigger,
 } from '../ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate, sanitizeOrderId } from '../../lib/utils';
+import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate } from '../../lib/utils';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import {
@@ -569,7 +569,7 @@ export function ScheduleView({
         comment: newComment,
         emergencyFlag: false,
         adminReply: '',
-        systemId: sanitizeOrderId(event.systemId)
+        systemId: event.systemId
       });
 
       toast({ title: "緊急ステータスを解除しました" });
@@ -607,7 +607,7 @@ export function ScheduleView({
         staffName: staffName,
         adminReply: finalReply,
         emergencyFlag: true, // Keep it active
-        systemId: sanitizeOrderId((targetEmergencyEvent as any).systemId)
+        systemId: (targetEmergencyEvent as any).systemId
       });
       console.log("Send Reply Result:", result);
 

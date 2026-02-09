@@ -267,6 +267,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         start: item.start.toISOString(),
         end: item.end.toISOString(),
         rawOrderId: item.order.rawOrderId,
+        systemId: item.order.id, // Explicitly carry the clean SystemID
       };
 
       // Logic for Travel Event
@@ -301,6 +302,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
             start: subMinutes(item.start, TRAVEL_TIME_MINUTES).toISOString(),
             end: item.start.toISOString(),
             rawOrderId: item.order.rawOrderId,
+            systemId: item.order.id, // Explicitly carry the clean SystemID
           };
           newScheduleEvents.push(travelEvent);
         }
