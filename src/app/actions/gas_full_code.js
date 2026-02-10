@@ -6,6 +6,9 @@ const ORDER_SHEET_NAME = "受注管理";
 const STAFF_SPREADSHEET_ID = "18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo";
 const STAFF_SHEET_NAME = "スタッフマスタ";
 const ACTION_LOG_SHEET_NAME = "行動予定"; // 汎用タスク（休憩・移動等）の保存先
+
+// Firebase Realtime Database URL (シグナル用)
+const FIREBASE_DB_URL = "https://workwisebu2-31559534-cd9ee-default-rtdb.firebaseio.com";
 // ↓↓↓↓【設定はここまで】↓↓↓↓
 /**
  * GET リクエストを処理し、スプレッドシートのデータを JSON で返します
@@ -191,6 +194,10 @@ function createTask(params) {
             endTime ? new Date(endTime) : '',
             now
         ]);
+        // 信号を送信
+        SpreadsheetApp.flush();
+        // 信号を送信
+        sendFirebaseSignal();
         return successResponse("タスクを作成しました", { eventId: id });
     } catch (e) {
         console.error("createTask Error:", e);
@@ -327,6 +334,8 @@ function createOrder(params) {
         });
         // 書き込み
         sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
+        // 信号を送信
+        sendFirebaseSignal();
         // SystemIDを返す (Frontendはこれを使って管理する)
         return successResponse("注文を登録しました。", { orderId: newSystemId, displayId: targetRow - 1 });
     } catch (error) {
@@ -544,6 +553,8 @@ function updateSheetWithOrderInfo(params) {
             updateColumn("キャンセル連絡者", params.cancelContact);
         }
         SpreadsheetApp.flush(); // Ensure immediate write
+        // 信号を送信
+        sendFirebaseSignal();
 
         // --- パフォーマンス改善: メール送信の統合 ---
         let emailResultMsg = "";
@@ -644,6 +655,8 @@ function updateTaskSheet(taskId, params) {
     if (params.statusValue === 'キャンセル' || params.actionType === 'cancel') {
         sheet.deleteRow(rowNum);
         SpreadsheetApp.flush(); // 即時反映
+        // 信号を送信
+        sendFirebaseSignal();
         return successResponse(`タスクID: ${taskId} を削除しました。`, {
             debug: {
                 action: 'deleteRow',
@@ -670,7 +683,30 @@ function updateTaskSheet(taskId, params) {
         }
     });
 
+    // 信号を送信
+    sendFirebaseSignal();
     return successResponse(`タスクID: ${taskId} を更新しました。`);
+}
+/**
+ * Firebase Realtime Database にデータ更新の信号を送る
+ */
+function sendFirebaseSignal() {
+    try {
+        if (!FIREBASE_DB_URL) return;
+        const url = FIREBASE_DB_URL + "/signals/orders_updated.json";
+        const payload = JSON.stringify({
+            timestamp: new Date().getTime()
+        });
+        const options = {
+            method: "put",
+            contentType: "application/json",
+            payload: payload,
+            muteHttpExceptions: true
+        };
+        UrlFetchApp.fetch(url, options);
+    } catch (e) {
+        console.error("Firebase Signal Error:", e);
+    }
 }
 function sendIcsEmail(params) {
     const res = sendIcsEmailInternal(params);

@@ -8,6 +8,8 @@ import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes 
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { useSelectedStaff, processStaffData } from './selected-staff-context';
 import { logStaffNotFound, logOldDateDetected, logInvalidDate } from '@/lib/order-validation-logger';
+import { useDatabase } from '@/firebase';
+import { ref, onValue } from 'firebase/database';
 
 
 const TRAVEL_TIME_MINUTES = 30;
@@ -477,8 +479,30 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [orderGasUrl, rawOrdersData.length]);
+  }, [orderGasUrl, rawOrdersData.length, setAllStaff]);
 
+  // 1.5 Real-time Signal Listener
+  const database = useDatabase();
+  useEffect(() => {
+    if (!database) return;
+
+    console.log('[OrderProvider] Setting up real-time signal listener');
+    const signalRef = ref(database, 'signals/orders_updated');
+
+    // Listen for changes to the signal
+    const unsubscribe = onValue(signalRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        console.log('[OrderProvider] Real-time signal received:', data);
+        // Trigger a background fetch
+        fetchAndProcessData(true);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [database, fetchAndProcessData]);
+
+  // 2. Fetch data on mount and interval
   useEffect(() => {
     fetchAndProcessData();
     const interval = setInterval(() => fetchAndProcessData(true), 60000); // Poll every 1 min
@@ -505,71 +529,44 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   // Process data when raw data or staff changes
   useEffect(() => {
-    // Logic to process raw data into orders/events
     console.log(`[OrderProvider] Processing. rawOrders: ${rawOrdersData?.length}, isLoading: ${isLoading}, allStaff: ${allStaff?.length}`);
 
     if (isLoading && !rawOrdersData.length) return; // Wait if loading initial
 
     try {
-      // We need processOrderData to handle raw objects
-      console.log('[OrderProvider] Calling processOrderData...');
       const { orders, scheduleEvents: backendEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff, suppressedTripIds);
       console.log(`[OrderProvider] Processed: ${orders.length} orders, ${backendEvents.length} events, ${unassignedOrders.length} unassigned.`);
 
       setOrders(orders);
 
-      // Merge: backend events + local events. If an event is in local (optimistic), use that instead of backend.
       const localIds = new Set(localScheduleEvents.map(e => e.id));
       const filteredBackendEvents = backendEvents.filter(e => !localIds.has(e.id));
 
       setScheduleEvents([...filteredBackendEvents, ...localScheduleEvents.filter(e => e.staffId !== '__DELETED__')]);
       setStatuses(statuses);
 
-      // Merge local unassigned events into unassignedOrders
-      // This ensures that if we optimistically unassign a task (staffId=''), it appears in the unassigned list
-      // even if the backend still thinks it's assigned.
-      // Merge local unassigned events into unassignedOrders
-      // This ensures that if we optimistically unassign a task (staffId=''), it appears in the unassigned list
-      // even if the backend still thinks it's assigned.
       const localUnassignedEvents = localScheduleEvents.filter(e => !e.staffId && e.rawOrderId);
-
-      // Also, we must REMOVE from unassignedOrders any order that is LOCALLY ASSIGNED
-      // (i.e. present in localScheduleEvents with a staffId)
-      // This fixes the issue where an assigned task reverts to unassigned because backend is stale.
-      // Defensively map and filter to avoid crashes if rawOrderId is missing
       const localAssignedOrderIds = new Set(
         localScheduleEvents
-          .filter(e => e.staffId && e.rawOrderId) // Locally assigned
-          .map(e => String(e.rawOrderId)) // Make sure it's a string
+          .filter(e => e.staffId && e.rawOrderId)
+          .map(e => String(e.rawOrderId))
       );
 
       let finalUnassignedOrders = unassignedOrders.filter(o => {
-        // If this order ID is in our local "assigned" list, do not show it as unassigned
-
-        // Check 1: Match by rawOrderId (preferred)
         if (o.rawOrderId && localAssignedOrderIds.has(o.rawOrderId)) return false;
-
-        // Check 2: Match by exact ID (fallback for valid stable IDs)
-        // This handles cases where rawOrderId is missing but ID is stable
         if (localIds.has(o.id)) return false;
-
         return true;
       });
 
       if (localUnassignedEvents.length > 0) {
-        // Normalize IDs to strings for comparison
         const existingIds = new Set(finalUnassignedOrders.map(o => String(o.id)));
         const existingRawIds = new Set(finalUnassignedOrders.map(o => String(o.rawOrderId)).filter(Boolean));
 
-        // Defensively map local events, ensuring 'raw' data exists to avoid "ghost" empty orders
         const localOrders = localUnassignedEvents
-          .filter(e => e.raw) // CRITICAL: Only map if raw data exists
-          // Use rawOrderId as prefered fallback to match backend ID calculation
+          .filter(e => e.raw)
           .map(e => mapRawToOrder(e.raw, String(e.rawOrderId || e.id)))
           .filter(o => {
-            // Check by ID (Normalize to string)
             if (existingIds.has(String(o.id))) return false;
-            // Check by Raw Order ID (Normalize to string)
             if (o.rawOrderId && existingRawIds.has(String(o.rawOrderId))) return false;
             return true;
           });
@@ -580,7 +577,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error("Error processing orders:", e);
     }
-  }, [rawOrdersData, allStaff, localScheduleEvents, suppressedTripIds]);
+  }, [rawOrdersData, allStaff, localScheduleEvents, suppressedTripIds, isLoading]);
 
   const value: OrderContextType = {
     orders,
@@ -589,20 +586,19 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     scheduleEvents,
     setScheduleEvents,
     statuses,
-    // Compat stubs for interface (although we should update interface too, but for speed just stub)
     loadOrders: async () => { },
     syncOrders: async () => { await fetchAndProcessData(false); },
     isLoading,
-    isSyncingOrders: isLoading, // map to loading
+    isSyncingOrders: isLoading,
     error,
     saveLocalEvent,
     deleteLocalEvent,
-    refetchOrders: async () => { await fetchAndProcessData(true); }, // Background fetch to suppress loading spinner
+    refetchOrders: async () => { await fetchAndProcessData(true); },
     rawOrdersData,
-    orderGasUrl: orderGasUrl || ORDER_GAS_URL,
+    orderGasUrl,
     setOrderGasUrl,
-    toggleTripSuppression, // New
-    suppressedTripIds // New
+    toggleTripSuppression,
+    suppressedTripIds
   };
 
   return (

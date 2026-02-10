@@ -2,9 +2,10 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, initializeFirestore, memoryLocalCache } from 'firebase/firestore';
-import { getFunctions } from 'firebase/functions';
+import { getFirestore, initializeFirestore, memoryLocalCache, Firestore } from 'firebase/firestore';
+import { getFunctions, Functions } from 'firebase/functions';
+import { getDatabase, Database } from 'firebase/database';
+import { Auth, getAuth } from 'firebase/auth';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -81,8 +82,17 @@ export function getSdks(firebaseApp: FirebaseApp) {
     auth: getAuth(firebaseApp),
     firestore,
     functions: getFunctions(firebaseApp, region),
+    database: getDatabase(firebaseApp),
   };
 }
+
+export type FirebaseSdks = {
+  firebaseApp: FirebaseApp;
+  auth: Auth;
+  firestore: Firestore;
+  functions: Functions;
+  database: Database;
+};
 
 export * from './provider';
 export * from './client-provider';
