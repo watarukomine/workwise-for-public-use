@@ -9,6 +9,7 @@ import { SelectedStaffProvider } from '@/contexts/selected-staff-context';
 import { CustomerProvider } from '@/contexts/customer-context';
 import { OrderProvider } from '@/contexts/order-context';
 import { UserProfileProvider } from '@/contexts/user-profile-provider';
+import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { useRouter } from 'next/navigation';
 
 export default function RootLayout({
@@ -30,19 +31,21 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png"></link>
       </head>
       <body className="font-body antialiased">
-        <UserProfileProvider>
-          <SelectedStaffProvider>
-            <CustomerProvider>
-              <OrderProvider>
-                <AppShellProvider>
+        <FirebaseClientProvider>
+          <UserProfileProvider>
+            <SelectedStaffProvider>
+              <CustomerProvider>
+                <OrderProvider>
+                  <AppShellProvider>
                     <AppShell>
-                        {children}
+                      {children}
                     </AppShell>
-                </AppShellProvider>
-              </OrderProvider>
-            </CustomerProvider>
-          </SelectedStaffProvider>
-        </UserProfileProvider>
+                  </AppShellProvider>
+                </OrderProvider>
+              </CustomerProvider>
+            </SelectedStaffProvider>
+          </UserProfileProvider>
+        </FirebaseClientProvider>
         <Toaster />
       </body>
     </html>
