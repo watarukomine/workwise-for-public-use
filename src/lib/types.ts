@@ -71,6 +71,10 @@ export type Order = {
   equipmentStatus?: string;
   tireNumber?: string;
   tireSize?: string;
+  carName?: string;
+  regNo?: string;
+  comment?: string;
+  specialNotes?: string;
   taskCalendarEventId?: string;
   travelCalendarEventId?: string;
   cancelDate?: string;
