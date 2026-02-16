@@ -19,7 +19,9 @@ import { Label } from '../../components/ui/label';
 import { useAppShell } from '../../components/app-shell';
 import { ShareOrderFormModal } from '../../components/dashboard/share-order-form-modal';
 import Link from 'next/link';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Calendar as CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
+import { Calendar } from '../../components/ui/calendar';
 
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
@@ -449,11 +451,8 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-none px-4 py-2 space-y-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">ダッシュボード</h1>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-y-2">
-          {/* Title Area */}
-          <div className="flex items-center justify-between w-full md:w-auto">
-            <h1 className="text-xl font-bold tracking-tight whitespace-nowrap">ダッシュボード</h1>
-          </div>
 
           {/* Controls Row (Date + Mobile Buttons) */}
           <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-start">
@@ -489,6 +488,32 @@ export default function DashboardPage() {
               >
                 今日
               </Button>
+
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 hover:bg-background shadow-sm transition-all"
+                  >
+                    <CalendarIcon className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={currentDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        setIsSyncing(true);
+                        setCurrentDate(date);
+                      }
+                    }}
+                    initialFocus
+                    locale={ja}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Mobile Actions: Form Link & Attendance */}
