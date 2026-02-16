@@ -767,8 +767,10 @@ function sendIcsEmailInternal(params) {
             : "新しい予定が割り当てられました。\n\n") +
             "【受注詳細】\n" + description + "\n\n" +
             "添付のiCalendarファイルを開いてカレンダーに追加/更新してください。";
+        const htmlBody = body.replace(/\n/g, '<br>');
         const options = {
             name: "WorkWise",
+            htmlBody: htmlBody,
             attachments: [{ fileName: "invite.ics", content: icsContent, mimeType: "text/calendar; charset=UTF-8; method=REQUEST" }]
         };
         try {
