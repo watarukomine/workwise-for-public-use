@@ -453,7 +453,7 @@ export default function DashboardPage() {
       <div className="flex-none px-4 py-2 space-y-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <h1 className="text-xl font-bold tracking-tight whitespace-nowrap flex items-center gap-2">
           ダッシュボード
-          <span className="text-[10px] text-gray-400 font-mono font-normal">v1.0.6</span>
+          <span className="text-[10px] text-gray-400 font-mono font-normal">v1.0.7</span>
         </h1>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-y-2">
 

@@ -474,6 +474,20 @@ export function ScheduleView({
   // Use allStaff instead of filtered staffData for lookup
   const getStaffById = (id: string | undefined): WithId<Staff> | undefined => allStaff?.find(s => s.id === id);
 
+  const formatEventDescription = (event: any) => {
+    const descriptionParts = [
+      `店舗名: ${event.customerName || findKey(event.raw, ['お取引先名', '店舗', '店舗名', '名称', '店舗名称', 'Customer', 'お名前']) || '---'}`,
+      `住所: ${event.address || findKey(event.raw, ['住所', 'Address', '納品先', 'お届け先', '納品先住所', 'お届け先住所', '現場住所']) || '---'}`,
+      `車名: ${event.carName || findKey(event.raw, ['車名', 'vehicleName', '車種', '車両', '車輌', '登録車名']) || '---'}`,
+      `登録ナンバー: ${event.regNo || findKey(event.raw, ['登録ナンバー(下４桁)', '登録ナンバー', 'ナンバー', '車番', '登録番号']) || '---'}`,
+      `作業内容: ${event.taskDetails || findKey(event.raw, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '---'}`,
+      `サイズ/本数: ${event.tireSize || findKey(event.raw, ['タイヤサイズ', 'サイズ', 'Size', 'タイヤ名/サイズ']) || '---'} / ${event.tireNumber || (event as any).tireNumber || findKey(event.raw, ['本数', 'honsu', '数量', 'Qty', 'Quantity', '本', 'タイヤ本数']) || '---'}`,
+      `特記事項: ${event.specialNotes || event.comment || findKey(event.raw, ['特記事項', '備考', '連絡事項', 'comment', '任意コメント', 'コメント']) || 'なし'}`,
+      `フォーム入力者: ${event.submitter || findKey(event.raw, ['フォーム入力者', '入力者', 'Submitter']) || 'なし'}`,
+    ];
+    return descriptionParts.join('\n');
+  };
+
   const dailySchedule = React.useMemo(() => {
     if (!scheduleEvents) return [];
     return scheduleEvents.filter(event => {
@@ -1340,7 +1354,7 @@ export function ScheduleView({
             staffName: staff?.name || "",
             staffEmail: staff?.email || "",
             title: dialogState.mode === 'details' ? (eventToUpdate.title || '作業予定') : editedEventDetails.title,
-            description: dialogState.mode === 'details' ? (eventToUpdate.description || '') : editedEventDetails.description,
+            description: formatEventDescription(updatedEvent),
             startTime: newStart.toISOString(),
             endTime: finalEnd.toISOString(),
             location: getCustomerByCode(eventToUpdate.locationId)?.address || "",
@@ -1532,17 +1546,7 @@ export function ScheduleView({
       return;
     }
     try {
-      const descriptionParts = [
-        `店舗名: ${event.customerName || findKey(event.raw, ['お取引先名', '店舗', '店舗名', '名称', '店舗名称', 'Customer', 'お名前']) || '---'}`,
-        `住所: ${event.address || findKey(event.raw, ['住所', 'Address', '納品先', 'お届け先', '納品先住所', 'お届け先住所', '現場住所']) || '---'}`,
-        `車名: ${event.carName || findKey(event.raw, ['車名', 'vehicleName', '車種', '車両', '車輌', '登録車名']) || '---'}`,
-        `登録ナンバー: ${event.regNo || findKey(event.raw, ['登録ナンバー(下４桁)', '登録ナンバー', 'ナンバー', '車番', '登録番号']) || '---'}`,
-        `作業内容: ${event.taskDetails || findKey(event.raw, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '---'}`,
-        `サイズ/本数: ${event.tireSize || findKey(event.raw, ['タイヤサイズ', 'サイズ', 'Size', 'タイヤ名/サイズ']) || '---'} / ${event.tireNumber || (event as any).tireNumber || findKey(event.raw, ['本数', 'honsu', '数量', 'Qty', 'Quantity', '本', 'タイヤ本数']) || '---'}`,
-        `特記事項: ${event.specialNotes || event.comment || findKey(event.raw, ['特記事項', '備考', '連絡事項', 'comment', '任意コメント', 'コメント']) || 'なし'}`,
-        `フォーム入力者: ${event.submitter || findKey(event.raw, ['フォーム入力者', '入力者', 'Submitter']) || 'なし'}`,
-      ];
-      const descriptionString = descriptionParts.join('\n');
+      const descriptionString = formatEventDescription(event);
       console.warn("--- [Email Debug] START ---");
       console.warn("Sending Email with details:", descriptionString);
       console.warn("Event Object:", event);
