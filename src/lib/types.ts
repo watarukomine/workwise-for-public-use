@@ -83,6 +83,7 @@ export type Order = {
   isEmergency?: boolean;
   emergencyMessage?: string;
   adminReply?: string;
+  submitter?: string;
 };
 
 export type ScheduleEvent = WithId<Order> & {

@@ -41,6 +41,7 @@ const orderFormSchema = z.object({
     disposal: z.string().min(1, '廃タイヤ処分は必須です'),
     contact: z.string().optional(),
     customQuantity: z.string().optional(),
+    submitter: z.string().min(1, 'フォーム入力者は必須です'),
 }).superRefine((data, ctx) => {
     // Custom validation for 'その他' workType
     if (data.workType === 'その他' && !data.otherWorkType) {
@@ -333,16 +334,26 @@ export default function OrderFormPage() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
+                                        <Label htmlFor="submitter">フォーム入力者 <span className="text-red-500">*</span></Label>
+                                        <Input
+                                            id="submitter"
+                                            placeholder="入力者のお名前"
+                                            {...register('submitter')}
+                                            className={errors.submitter ? "border-red-500" : ""}
+                                        />
+                                        {errors.submitter && <p className="text-red-500 text-xs">{errors.submitter.message}</p>}
+                                    </div>
+                                    <div className="space-y-2">
                                         <Label htmlFor="scheduledDate">作業予定日 <span className="text-red-500">*</span></Label>
                                         <Input id="scheduledDate" type="date" {...register('scheduledDate')} className={errors.scheduledDate ? "border-red-500" : ""} />
                                         {errors.scheduledDate && <p className="text-red-500 text-xs">{errors.scheduledDate.message}</p>}
                                     </div>
+                                </div>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="scheduledTime">予定時間 <span className="text-red-500">*</span></Label>
-                                        <Input id="scheduledTime" type="time" {...register('scheduledTime')} className={errors.scheduledTime ? "border-red-500" : ""} />
-                                        {errors.scheduledTime && <p className="text-red-500 text-xs">{errors.scheduledTime.message}</p>}
-                                    </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="scheduledTime">予定時間 <span className="text-red-500">*</span></Label>
+                                    <Input id="scheduledTime" type="time" {...register('scheduledTime')} className={errors.scheduledTime ? "border-red-500" : ""} />
+                                    {errors.scheduledTime && <p className="text-red-500 text-xs">{errors.scheduledTime.message}</p>}
                                 </div>
 
                                 <div className="space-y-2">

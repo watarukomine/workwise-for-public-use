@@ -100,6 +100,7 @@ export async function sendIcsEmail(args: {
     endTime: string;
     location: string;
     isUpdate: boolean;
+    submitter?: string;
 }): Promise<GasResponse> {
     return callGasApi({ ...args, operation: 'sendEmail' });
 }
@@ -138,6 +139,7 @@ export async function createOrder(args: {
     disposal: string;
     contact?: string;
     specialNotes?: string;
+    submitter?: string;
 }): Promise<GasResponse> {
     return callGasApi({ ...args, action: 'createOrder' });
 }

@@ -334,6 +334,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
       const msg = findKey(rawOrder, ['緊急連絡']) || '';
       return String(msg).includes('【緊急】');
     })(),
+    submitter: findKey(rawOrder, ['フォーム入力者']) || '',
   };
 };
 

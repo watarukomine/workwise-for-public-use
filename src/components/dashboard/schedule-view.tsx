@@ -1542,6 +1542,7 @@ export function ScheduleView({
         endTime: event.end as string,
         location: findKey(event.raw, ['住所']) || '',
         isUpdate: false,
+        submitter: event.submitter,
       });
       if (result.status === 'error') throw new Error(result.message);
 
@@ -1756,6 +1757,7 @@ export function ScheduleView({
                     {dialogState.mode === 'details' && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
                         {renderDetailItem('担当者', staff?.name)}
+                        {renderDetailItem('フォーム入力者', event.submitter)}
                         {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
                         {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
                         {isEditingOrderSchedule ? (

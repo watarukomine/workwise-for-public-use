@@ -326,6 +326,8 @@ function createOrder(params) {
                 newRow.push(params.contact || "");
             } else if (h === "特記事項") {
                 newRow.push(params.specialNotes || "");
+            } else if (h === "フォーム入力者") {
+                newRow.push(params.submitter || "");
             } else if (h === "最終更新日時" || h === "受信日時") {
                 newRow.push(new Date());
             } else {
@@ -719,7 +721,7 @@ function sendIcsEmail(params) {
  * さまざまなアクションから共通で呼び出せるように分離
  */
 function sendIcsEmailInternal(params) {
-    const { staffName, staffEmail, title, description, startTime, endTime, location, isUpdate } = params;
+    const { staffName, staffEmail, title, description, startTime, endTime, location, isUpdate, submitter } = params;
     try {
         if (!staffEmail) throw new Error("宛先メールアドレスが指定されていません。");
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -754,7 +756,7 @@ function sendIcsEmailInternal(params) {
             'DTSTART:' + formatToIcsDate(startDate),
             'DTEND:' + formatToIcsDate(endDate),
             'SUMMARY:' + esc(title),
-            'DESCRIPTION:' + esc(description),
+            'DESCRIPTION:' + esc(submitter ? `${description}\\nフォーム入力者: ${submitter}` : description),
             'LOCATION:' + esc(location),
             'END:VEVENT',
             'END:VCALENDAR'
