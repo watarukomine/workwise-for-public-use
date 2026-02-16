@@ -263,7 +263,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         ...item.order,
         id: `${item.tripId}-task`,
         tripId: item.tripId,
-        title: item.order.taskDetails,
+        title: item.order.customerName || item.order.taskDetails,
         staffId: item.staffId,
         locationId: item.order.customerCode || '',
         start: item.start.toISOString(),

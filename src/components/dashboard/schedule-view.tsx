@@ -173,8 +173,9 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
 
       <div className="flex justify-between items-center w-full overflow-hidden">
         <span className="font-bold truncate mr-1 flex-1">
-          {order.customerName || line1 || <span className="text-xs font-normal opacity-70">ID:{order.rawOrderId || order.id}</span>}
-          {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) && order.customerName && `(${equipmentSymbol})`}
+          {order.customerName || (order as any).title || line1 || <span className="text-xs font-normal opacity-70">ID:{order.rawOrderId || order.id}</span>}
+          {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) &&
+            (order.customerName || (order as any).title) && `(${equipmentSymbol})`}
         </span>
         <span className="shrink-0 font-medium">{scheduledTime}</span>
       </div>
