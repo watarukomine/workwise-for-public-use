@@ -477,7 +477,6 @@ export function ScheduleView({
   const formatEventDescription = (event: any) => {
     const descriptionParts = [
       `店舗名: ${event.customerName || findKey(event.raw, ['お取引先名', '店舗', '店舗名', '名称', '店舗名称', 'Customer', 'お名前']) || '---'}`,
-      `住所: ${event.address || findKey(event.raw, ['住所', 'Address', '納品先', 'お届け先', '納品先住所', 'お届け先住所', '現場住所']) || '---'}`,
       `車名: ${event.carName || findKey(event.raw, ['車名', 'vehicleName', '車種', '車両', '車輌', '登録車名']) || '---'}`,
       `登録ナンバー: ${event.regNo || findKey(event.raw, ['登録ナンバー(下４桁)', '登録ナンバー', 'ナンバー', '車番', '登録番号']) || '---'}`,
       `作業内容: ${event.taskDetails || findKey(event.raw, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '---'}`,
@@ -1353,7 +1352,7 @@ export function ScheduleView({
           const emailParams = shouldSendEmail ? {
             staffName: staff?.name || "",
             staffEmail: staff?.email || "",
-            title: dialogState.mode === 'details' ? (eventToUpdate.title || '作業予定') : editedEventDetails.title,
+            title: updatedEvent.customerName || updatedEvent.title || '作業予定',
             description: formatEventDescription(updatedEvent),
             startTime: newStart.toISOString(),
             endTime: finalEnd.toISOString(),
@@ -1556,7 +1555,7 @@ export function ScheduleView({
         gasUrl: ORDER_GAS_URL,
         staffName: staff.name,
         staffEmail: staff.email || '',
-        title: event.title,
+        title: event.customerName || event.title,
         description: descriptionString,
         startTime: event.start as string,
         endTime: event.end as string,
