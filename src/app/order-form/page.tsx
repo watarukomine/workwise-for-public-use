@@ -90,7 +90,7 @@ export default function OrderFormPage() {
             disposal: '回収有り：廃タイヤラベル在庫有り',
             quantity: '4',
             sensor: '無', // Default to '無' as it's common
-            arrangement: '手配済み', // Default pick
+            arrangement: '定期便で配送手配済', // Default pick
             workType: '販売店店舗内作業', // Default
         }
     });
@@ -417,9 +417,8 @@ export default function OrderFormPage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="arrangement">タイヤ手配状況</Label>
                                     <select id="arrangement" {...register('arrangement')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                                        <option value="手配済み">手配済み</option>
-                                        <option value="TMP手配">TMP手配</option>
-                                        <option value="委託在庫使用">委託在庫使用</option>
+                                        <option value="定期便で配送手配済">定期便で配送手配済</option>
+                                        <option value="タイヤ持込み">タイヤ持込み</option>
                                     </select>
                                 </div>
                             </div>
