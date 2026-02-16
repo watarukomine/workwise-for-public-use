@@ -1532,21 +1532,25 @@ export function ScheduleView({
       return;
     }
     try {
+      const descriptionParts = [
+        `店舗名: ${event.customerName || findKey(event.raw, ['お取引先名', '店舗', '店舗名']) || '---'}`,
+        `住所: ${event.address || findKey(event.raw, ['住所', 'Address']) || '---'}`,
+        `車名: ${event.carName || findKey(event.raw, ['車名', 'vehicleName', '車種']) || '---'}`,
+        `登録ナンバー: ${event.regNo || findKey(event.raw, ['登録ナンバー(下４桁)', '登録ナンバー', 'ナンバー']) || '---'}`,
+        `作業内容: ${event.taskDetails || findKey(event.raw, ['作業内容', '業務内容']) || '---'}`,
+        `サイズ/本数: ${event.tireSize || findKey(event.raw, ['タイヤサイズ', 'サイズ']) || '---'} / ${event.tireNumber || (event as any).tireNumber || findKey(event.raw, ['本数', '数量']) || '---'}`,
+        `特記事項: ${event.specialNotes || event.comment || findKey(event.raw, ['特記事項', '備考', 'コメント']) || 'なし'}`,
+        `フォーム入力者: ${event.submitter || 'なし'}`,
+      ];
+      const descriptionString = descriptionParts.join('\n');
+      console.log("[Email Debug] Sending Email with details:", descriptionString);
+
       const result = await sendIcsEmail({
         gasUrl: ORDER_GAS_URL,
         staffName: staff.name,
         staffEmail: staff.email || '',
         title: event.title,
-        description: [
-          `店舗名: ${event.customerName || findKey(event.raw, ['お取引先名', '店舗']) || 'N/A'}`,
-          `住所: ${event.address || findKey(event.raw, ['住所']) || 'N/A'}`,
-          `車名: ${event.carName || findKey(event.raw, ['車名']) || 'N/A'}`,
-          `登録ナンバー: ${event.regNo || findKey(event.raw, ['登録ナンバー(下４桁)']) || 'N/A'}`,
-          `作業内容: ${event.taskDetails || findKey(event.raw, ['作業内容']) || 'N/A'}`,
-          `サイズ/本数: ${event.tireSize || findKey(event.raw, ['タイヤサイズ']) || 'N/A'} / ${event.tireNumber || findKey(event.raw, ['本数']) || 'N/A'}`,
-          `特記事項: ${event.specialNotes || event.comment || findKey(event.raw, ['特記事項', 'specialNotes', 'コメント']) || 'なし'}`,
-          `フォーム入力者: ${event.submitter || 'なし'}`,
-        ].join('\n'),
+        description: descriptionString,
         startTime: event.start as string,
         endTime: event.end as string,
         location: event.address || findKey(event.raw, ['住所']) || '',

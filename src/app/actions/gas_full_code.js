@@ -762,11 +762,19 @@ function sendIcsEmailInternal(params) {
             'END:VCALENDAR'
         ].join('\r\n');
         const subject = isUpdate ? "【予定変更】" + title : "【新規予定】" + title;
-        const body = (isUpdate
-            ? "割り当てられた予定が変更されました。\n\n"
-            : "新しい予定が割り当てられました。\n\n") +
-            "【受注詳細】\n" + description + "\n\n" +
-            "添付のiCalendarファイルを開いてカレンダーに追加/更新してください。";
+        const descriptionText = (description || "").trim() || "(受注詳細データが見つかりませんでした。画面から再送をお試しください)";
+        const bodyContent = [
+            (isUpdate ? "割り当てられた予定が変更されました。" : "新しい予定が割り当てられました。"),
+            "",
+            "【受注詳細】",
+            descriptionText,
+            "",
+            "添付のiCalendarファイルを開いてカレンダーに追加/更新してください。",
+            "",
+            "---",
+            "送信日時: " + now.toLocaleString("ja-JP")
+        ];
+        const body = bodyContent.join("\n");
         const htmlBody = body.replace(/\n/g, '<br>');
         const options = {
             name: "WorkWise",
