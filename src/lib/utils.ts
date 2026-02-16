@@ -271,8 +271,8 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     id: String(orderId),
     displayId: visualId ? String(visualId) : undefined,
     rawOrderId: visualId ? String(visualId) : undefined,
-    customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode']) || ''),
-    taskDetails: taskDetails,
+    customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode', '顧客コード']) || ''),
+    taskDetails: findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '',
     status: (() => {
       const raw = findKey(rawOrder, ['受注ステータス', 'status']) || '未割当';
       if (['お客まち', '点検', 'お預かり済', '点検待ち', '洗車待ち'].some(s => raw.includes(s))) {
@@ -284,10 +284,10 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     scheduledTime: scheduledTime || '',
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     value: parseFloat(findKey(rawOrder, ['金額']) || 0),
-    staffName: findKey(rawOrder, ['担当', 'スタッフ名', 'staffName']) || '',
-    mainStore: findKey(rawOrder, ['主管店舗', 'mainStore']) || '',
-    customerName: customerName,
-    address: findKey(rawOrder, ['住所', 'Address']) || '',
+    staffName: findKey(rawOrder, ['担当', 'スタッフ名', 'staffName', '氏名', '担当者']) || '',
+    mainStore: findKey(rawOrder, ['主管店舗', 'mainStore', '主管']) || '',
+    customerName: findKey(rawOrder, ['お取引先名', '店舗', '店舗名', '名称', '店舗名称', 'Customer', 'お名前']) || '',
+    address: findKey(rawOrder, ['住所', 'Address', '納品先', 'お届け先', '納品先住所', 'お届け先住所', '現場住所']) || '',
     scheduledEndTime: scheduledEndTime || '',
     actualStartTime: (() => {
       const val = findKey(rawOrder, ['作業開始', '作業開始時間', '開始時間', 'startTime', 'startedAt', 'actualStartTime']);
@@ -308,14 +308,14 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     cancelDate: findKey(rawOrder, ['キャンセル日時', 'cancelDate']),
     cancelContact: findKey(rawOrder, ['キャンセル連絡者', 'cancelContact']),
     equipmentStatus: findKey(rawOrder, ['機材有無']) || '',
-    tireNumber: String(findKey(rawOrder, ['本数', 'honsu', '数量']) || ''),
-    tireSize: String(tireSize || ''),
-    carName: String(findKey(rawOrder, ['車名', 'vehicleName']) || ''),
-    regNo: String(findKey(rawOrder, ['登録ナンバー(下４桁)', 'regNo', '登録ナンバー']) || ''),
-    comment: String(findKey(rawOrder, ['コメント', '備考', 'comment']) || ''),
-    specialNotes: String(findKey(rawOrder, ['特記事項', 'specialNotes']) || ''),
-    description: taskDetails, // Ensure description is set for ScheduleEvent
-    '本数': findKey(rawOrder, ['本数', 'honsu']) || '',
+    tireNumber: String(findKey(rawOrder, ['本数', 'honsu', '数量', 'Qty', 'Quantity', '本', 'タイヤ本数']) || ''),
+    tireSize: String(findKey(rawOrder, ['タイヤサイズ', 'サイズ', 'Size', 'タイヤ名/サイズ']) || ''),
+    carName: String(findKey(rawOrder, ['車名', 'vehicleName', '車種', '車両', '車輌', '登録車名']) || ''),
+    regNo: String(findKey(rawOrder, ['登録ナンバー(下４桁)', 'regNo', '登録ナンバー', 'ナンバー', '車番', '登録番号']) || ''),
+    comment: String(findKey(rawOrder, ['コメント', '備考', 'comment', '任意コメント']) || ''),
+    specialNotes: String(findKey(rawOrder, ['特記事項', 'specialNotes', '連絡事項']) || ''),
+    description: findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '',
+    '本数': findKey(rawOrder, ['本数', 'honsu', '数量', 'Qty', 'Quantity', '本']) || '',
     serviceType: findKey(rawOrder, ['サービス種別', 'サービス区分']) || '',
     emergencyMessage: findKey(rawOrder, ['緊急連絡']) || '',
     adminReply: findKey(rawOrder, ['管理者返信']) || '',
