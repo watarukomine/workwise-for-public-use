@@ -40,6 +40,7 @@ const orderFormSchema = z.object({
     arrangement: z.string().optional(),
     disposal: z.string().min(1, '廃タイヤ処分は必須です'),
     contact: z.string().optional(),
+    customQuantity: z.string().optional(),
 }).superRefine((data, ctx) => {
     // Custom validation for 'その他' workType
     if (data.workType === 'その他' && !data.otherWorkType) {
@@ -65,6 +66,15 @@ const orderFormSchema = z.object({
             code: z.ZodIssueCode.custom,
             message: 'タイヤ品番は必須です',
             path: ['tireNumber'],
+        });
+    }
+
+    // Custom validation for customQuantity: Required if quantity is 'その他'
+    if (data.quantity === 'その他' && !data.customQuantity) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: '本数を入力してください',
+            path: ['customQuantity'],
         });
     }
 });
@@ -101,6 +111,7 @@ export default function OrderFormPage() {
     const storeNameWatched = watch('storeName');
     const userCodeWatched = watch('userCode');
     const workTypeWatched = watch('workType'); // Watch for conditional UI logic
+    const quantityWatched = watch('quantity');
 
     // 1. Store Name -> User Code (and Abbreviations)
     React.useEffect(() => {
@@ -202,10 +213,13 @@ export default function OrderFormPage() {
                 throw new Error('システム設定エラー: 連携URLが設定されていません。');
             }
 
-            // Handle 'その他' work type
+            // Handle 'その他' values
             const submissionData = { ...data };
             if (data.workType === 'その他' && data.otherWorkType) {
                 submissionData.workType = data.otherWorkType;
+            }
+            if (data.quantity === 'その他' && data.customQuantity) {
+                submissionData.quantity = data.customQuantity;
             }
 
             const result = await createOrder({
@@ -397,6 +411,18 @@ export default function OrderFormPage() {
                                             <option value="その他">その他</option>
                                         </select>
                                     </div>
+                                    {quantityWatched === 'その他' && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="customQuantity">自由入力 (本数) <span className="text-red-500">*</span></Label>
+                                            <Input
+                                                id="customQuantity"
+                                                placeholder="例: 6"
+                                                {...register('customQuantity')}
+                                                className={errors.customQuantity ? "border-red-500" : ""}
+                                            />
+                                            {errors.customQuantity && <p className="text-red-500 text-xs">{errors.customQuantity.message}</p>}
+                                        </div>
+                                    )}
                                     <div className="space-y-2">
                                         <Label htmlFor="disposal">廃タイヤ処分 <span className="text-red-500">*</span></Label>
                                         <select id="disposal" {...register('disposal')} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
