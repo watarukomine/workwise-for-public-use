@@ -88,6 +88,7 @@ export type Order = {
   emergencyMessage?: string;
   adminReply?: string;
   submitter?: string;
+  description?: string;
 };
 
 export type ScheduleEvent = WithId<Order> & {

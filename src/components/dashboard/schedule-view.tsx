@@ -1543,7 +1543,10 @@ export function ScheduleView({
         `フォーム入力者: ${event.submitter || 'なし'}`,
       ];
       const descriptionString = descriptionParts.join('\n');
-      console.log("[Email Debug] Sending Email with details:", descriptionString);
+      console.warn("--- [Email Debug] START ---");
+      console.warn("Sending Email with details:", descriptionString);
+      console.warn("Event Object:", event);
+      console.warn("--- [Email Debug] END ---");
 
       const result = await sendIcsEmail({
         gasUrl: ORDER_GAS_URL,

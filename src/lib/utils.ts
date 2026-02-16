@@ -314,6 +314,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     regNo: String(findKey(rawOrder, ['登録ナンバー(下４桁)', 'regNo', '登録ナンバー']) || ''),
     comment: String(findKey(rawOrder, ['コメント', '備考', 'comment']) || ''),
     specialNotes: String(findKey(rawOrder, ['特記事項', 'specialNotes']) || ''),
+    description: taskDetails, // Ensure description is set for ScheduleEvent
     '本数': findKey(rawOrder, ['本数', 'honsu']) || '',
     serviceType: findKey(rawOrder, ['サービス種別', 'サービス区分']) || '',
     emergencyMessage: findKey(rawOrder, ['緊急連絡']) || '',
