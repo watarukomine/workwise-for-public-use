@@ -762,9 +762,11 @@ function sendIcsEmailInternal(params) {
             'END:VCALENDAR'
         ].join('\r\n');
         const subject = isUpdate ? "【予定変更】" + title : "【新規予定】" + title;
-        const body = isUpdate
-            ? "割り当てられた予定が変更されました。添付のiCalendarファイルを開いてカレンダーを更新してください。"
-            : "新しい予定が割り当てられました。添付のiCalendarファイルを開いてカレンダーに追加してください。";
+        const body = (isUpdate
+            ? "割り当てられた予定が変更されました。\n\n"
+            : "新しい予定が割り当てられました。\n\n") +
+            "【受注詳細】\n" + description + "\n\n" +
+            "添付のiCalendarファイルを開いてカレンダーに追加/更新してください。";
         const options = {
             name: "WorkWise",
             attachments: [{ fileName: "invite.ics", content: icsContent, mimeType: "text/calendar; charset=UTF-8; method=REQUEST" }]
