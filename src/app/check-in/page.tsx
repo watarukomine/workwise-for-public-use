@@ -314,7 +314,8 @@ function CheckInClient() {
 
     switch (action) {
       case 'Start Travel':
-        return !['未着手', '未割当', '待機中', ''].includes(currentStatus);
+        // Enable if not already started travel/task, or if in an initial/idle status
+        return !['未着手', '未割当', '割当済', '待機中', '出勤済', ''].includes(currentStatus);
       case 'Arrive':
         return currentStatus !== '移動中';
       case 'Begin Task':
