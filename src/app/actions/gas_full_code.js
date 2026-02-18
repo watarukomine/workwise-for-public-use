@@ -435,31 +435,30 @@ function updateSheetWithOrderInfo(params) {
             }
         }
 
-        // 2. フォールバック検索: IDで見つからなかった場合、かつ担当者名と時間がある場合 (汎用タスク救済)
-        if (targetRowNum === -1 && staffName && scheduledTime) {
-            console.log("No matching ID found. Trying content-based search (Staff+Date+Time)...");
-            console.log("Target: Staff=" + staffName + ", Time=" + scheduledTime); // Debug Log
+        // 2. フォールバック検索: IDで見つからなかった場合
+        if (targetRowNum === -1 && scheduledTime) {
+            console.log("No matching ID found. Trying content-based search...");
 
             const staffColIdx = findColumnIndex(["担当", "スタッフ名", "弊社担当", "担当者"]);
             const dateColIdx = findColumnIndex(["作業予定日", "予定日", "日付"]);
             const timeColIdx = findColumnIndex(["予定時間", "開始時間", "時間"]);
+            const storeColIdx = findColumnIndex(["店舗名", "お取引先名", "店舗", "取引先"]);
 
-            if (staffColIdx !== -1 && dateColIdx !== -1) {
+            if (dateColIdx !== -1) {
                 const targetDate = new Date(scheduledTime);
                 const targetTimeStr = Utilities.formatDate(targetDate, "Asia/Tokyo", "HH:mm");
                 targetDate.setHours(0, 0, 0, 0);
 
-                // Start searching from recent rows backwards? No, standard forward search is fine for now but safer to match exact
                 for (let i = 1; i < data.length; i++) {
-                    const rowStaff = String(data[i][staffColIdx]);
                     const rowDateVal = data[i][dateColIdx];
-                    const rowTimeVal = data[i][timeColIdx]; // String or Date
+                    const rowTimeVal = data[i][timeColIdx];
+                    const rowStaff = staffColIdx !== -1 ? String(data[i][staffColIdx]) : "";
+                    const rowStore = storeColIdx !== -1 ? String(data[i][storeColIdx]) : "";
 
                     let rowDate = null;
                     if (rowDateVal instanceof Date) rowDate = rowDateVal;
                     else if (rowDateVal && !isNaN(new Date(rowDateVal).getTime())) rowDate = new Date(rowDateVal);
 
-                    // 時間比較用の文字列生成
                     let rowTimeStr = "";
                     if (rowTimeVal instanceof Date) rowTimeStr = Utilities.formatDate(rowTimeVal, "Asia/Tokyo", "HH:mm");
                     else if (rowTimeVal) {
@@ -475,16 +474,24 @@ function updateSheetWithOrderInfo(params) {
 
                     if (rowDate) {
                         rowDate.setHours(0, 0, 0, 0);
-                        // 条件一致確認: 担当者(スペース削除)、日付、時間
-                        // Normalize names by removing ALL spaces
-                        const normalizedRowStaff = rowStaff.replace(/\s+/g, '');
-                        const normalizedTargetStaff = staffName.replace(/\s+/g, '');
+                        if (rowDate.getTime() === targetDate.getTime() && rowTimeStr === targetTimeStr) {
+                            // Match by Staff (if provided and exists) OR Match by Store Name
+                            const normRowStaff = rowStaff.replace(/\s+/g, '');
+                            const normTargetStaff = (staffName || "").replace(/\s+/g, '');
+                            const normRowStore = rowStore.replace(/\s+/g, '');
+                            // Store name can be passed via eventTitle or other params, but here we check against raw sheet
 
-                        if (normalizedRowStaff === normalizedTargetStaff && rowDate.getTime() === targetDate.getTime()) {
-                            // Check Time match strictly first
-                            if (rowTimeStr === targetTimeStr) {
+                            // 2A. If staff matches (for existing assigned orders)
+                            if (staffName && normRowStaff === normTargetStaff) {
                                 targetRowNum = i + 1;
-                                console.log("Found match by Content (Staff+Date+Time) at Row:", targetRowNum);
+                                break;
+                            }
+                            // 2B. If it's unassigned in sheet and we are assigning it (or it's the same unassigned row)
+                            // We don't have the target store name explicitly here easily, but we can check if it's the ONLY row-time match
+                            // For now, let's assume if it's unassigned and matches time/date, it's a strong candidate.
+                            if (rowStaff.trim() === "") {
+                                targetRowNum = i + 1;
+                                console.log("Found unassigned match at Row:", targetRowNum);
                                 break;
                             }
                         }
