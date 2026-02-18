@@ -39,7 +39,7 @@ function CheckInClient() {
   const { profile } = useUserProfile();
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
-  const { refetchOrders, orders, saveLocalEvent, deleteLocalEvent } = useOrder();
+  const { refetchOrders, orders, scheduleEvents, saveLocalEvent, deleteLocalEvent } = useOrder();
   const [manualTime, setManualTime] = React.useState('');
   const [isCorrectionMode, setIsCorrectionMode] = React.useState(false);
   const [pendingAction, setPendingAction] = React.useState<ActionType | null>(null);
@@ -50,10 +50,15 @@ function CheckInClient() {
 
   const currentOrder = React.useMemo(() => {
     if (!orderId) return null;
-    // Strip UI prefixes and suffixes to get the pure SystemID
     const cleanId = orderId.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
-    return orders.find(o => o.id === cleanId || o.rawOrderId === cleanId || o.id === orderId || o.rawOrderId === orderId);
-  }, [orders, orderId]);
+
+    // Search in orders AND scheduleEvents
+    const fromOrders = orders.find(o => o.id === cleanId || o.rawOrderId === cleanId || o.id === orderId || o.rawOrderId === orderId);
+    if (fromOrders) return fromOrders;
+
+    const fromEvents = scheduleEvents.find(e => (e as any).systemId === cleanId || e.id === cleanId || e.id === orderId);
+    return fromEvents || null;
+  }, [orders, scheduleEvents, orderId]);
 
   // Use optimistic status if available, otherwise fall back to context data
   const currentStatus = optimisticStatus || currentOrder?.status || '未着手';
@@ -216,7 +221,7 @@ function CheckInClient() {
           actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
           comment: action === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
           emergencyFlag: action === 'Emergency' ? true : undefined,
-          systemId: currentOrder?.id || orderId
+          systemId: (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '')
         });
 
         if (result.status === 'error') {
@@ -309,7 +314,7 @@ function CheckInClient() {
 
     switch (action) {
       case 'Start Travel':
-        return !['未着手', '待機中', ''].includes(currentStatus);
+        return !['未着手', '未割当', '待機中', ''].includes(currentStatus);
       case 'Arrive':
         return currentStatus !== '移動中';
       case 'Begin Task':
@@ -488,7 +493,7 @@ function CheckInClient() {
                         comment: newComment,
                         emergencyFlag: false,
                         adminReply: '',
-                        systemId: currentOrder?.id || orderId
+                        systemId: (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '')
                       });
                       toast({ title: '緊急連絡を解除しました', description: `ステータスを「${recoveryStatus}」に戻しました。` });
                       setEmergencyMessage('');
