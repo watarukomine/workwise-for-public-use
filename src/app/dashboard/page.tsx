@@ -365,17 +365,7 @@ export default function DashboardPage() {
         if (displayStatus === '作業開始' || displayStatus === '作業中') return '作業中';
         // Note: '作業完了' falls through to step 3.
 
-        // 3. Attendance / Shift Status (Priority 3: Fallback)
-        if (presentStaffIds.has(staff.id)) {
-          // Present but not in active button state
-          return '待機中';
-          // Note: Logic simplified to '待機中' if present and not working/moving.
-          // '出勤済' can be used if explicit differentiation needed, but '待機中' is safe.
-        } else if (scheduledStaffIds.has(staff.id)) {
-          return '出勤予定';
-        }
-
-        // 3.5. Overdue Task Check (Implied Status)
+        // 3. Overdue Task Check (Implied Status)
         // If staff has a task that should have started but no button was pressed,
         // hint at the likely status with a question mark.
         let hasTasksToday = false;
@@ -384,7 +374,6 @@ export default function DashboardPage() {
           // Check if staff has any tasks TODAY
           hasTasksToday = scheduleEvents.some(event => {
             if (event.staffId !== staff.id) return false;
-            // Filter by date
             const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
             return isValid(start) && isSameDay(start, currentDate);
           });
@@ -392,9 +381,7 @@ export default function DashboardPage() {
           // Find the active event for THIS moment
           const activeEvent = scheduleEvents.find(event => {
             if (event.staffId !== staff.id) return false;
-            // Ignore generic here because they are handled in Step 1 (Time Window)
-            // But wait, step 1 handles "Generic Title" (Break/Meeting). 
-            // Here we care about "Order Trip" (Travel/Task).
+            // Ignore generic here because they are handled in Step 1
             if (event.staffId === 'unassigned') return false;
 
             const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
@@ -404,19 +391,19 @@ export default function DashboardPage() {
 
           if (activeEvent) {
             const title = activeEvent.title || '';
-            // If it's a Travel event
-            if (title.startsWith('移動')) {
-              return '移動中？';
-            }
-            // If it's a Task event (and not generic, since generic is caught in Step 1)
-            // Step 1 only catches specific titles. If this is a real task:
+            if (title.startsWith('移動')) return '移動中？';
             return '作業中？';
           }
         }
 
-        // 4. Final Fallback
-        // If they have tasks today -> '待機中' (Waiting for next task)
-        // If they have NO tasks today -> '-' (No status/Off)
+        // 4. Attendance / Shift Status (Fallback)
+        if (presentStaffIds.has(staff.id)) {
+          return '待機中';
+        } else if (scheduledStaffIds.has(staff.id)) {
+          return '出勤予定';
+        }
+
+        // 5. Final Fallback
         return hasTasksToday ? '待機中' : '-';
       };
 
@@ -453,7 +440,7 @@ export default function DashboardPage() {
       <div className="flex-none px-4 py-2 space-y-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <h1 className="text-xl font-bold tracking-tight whitespace-nowrap flex items-center gap-2">
           ダッシュボード
-          <span className="text-[10px] text-gray-400 font-mono font-normal">v1.1.6</span>
+          <span className="text-[10px] text-gray-400 font-mono font-normal">v1.1.7</span>
         </h1>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-y-2">
 
