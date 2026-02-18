@@ -130,7 +130,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
       }
     }
   }
-  let scheduledTime = findKey(rawOrder, ['予定時間', 'チップ配置作業予定', 'scheduledTime', '開始日時']);
+  let scheduledTime = findKey(rawOrder, ['チップ配置作業予定', '予定時間', 'scheduledTime', '開始日時']);
 
   const customerName = findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) || '';
 

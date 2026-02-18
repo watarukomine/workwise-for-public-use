@@ -69,14 +69,14 @@ export default function DashboardPage() {
         if (o.scheduledDate === dateStr) return true;
 
         // Check scheduledTime (handles fixed 1899 dates too)
-        if (o.scheduledTime) {
-          if ((o.scheduledTime as any) instanceof Date) {
-            if (isSameDay((o.scheduledTime as any), currentDate)) return true;
-          } else if (typeof o.scheduledTime === 'string') {
-            if (o.scheduledTime.startsWith(dateStr)) return true;
-            const d = parseISO(o.scheduledTime);
-            if (isValid(d) && isSameDay(d, currentDate)) return true;
-          }
+        // The prioritization for scheduledTime is handled within mapRawToOrder,
+        // using "チップ配置作業予定" before "予定時間". (v1.1.5)
+        if ((o.scheduledTime as any) instanceof Date) {
+          if (isSameDay((o.scheduledTime as any), currentDate)) return true;
+        } else if (typeof o.scheduledTime === 'string') {
+          if (o.scheduledTime.startsWith(dateStr)) return true;
+          const d = parseISO(o.scheduledTime);
+          if (isValid(d) && isSameDay(d, currentDate)) return true;
         }
         return false;
       });
@@ -453,7 +453,7 @@ export default function DashboardPage() {
       <div className="flex-none px-4 py-2 space-y-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <h1 className="text-xl font-bold tracking-tight whitespace-nowrap flex items-center gap-2">
           ダッシュボード
-          <span className="text-[10px] text-gray-400 font-mono font-normal">v1.1.4</span>
+          <span className="text-[10px] text-gray-400 font-mono font-normal">v1.1.5</span>
         </h1>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-y-2">
 
