@@ -2351,7 +2351,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const equipmentSymbol = getStatusSymbol(equipmentStatus);
   const tireSize = event.raw ? findKey(event.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
   const honsu = event.raw ? findKey(event.raw, ['本数', 'honsu']) : undefined;
-  const customerName = event.raw ? findKey(event.raw, ['お取引先名', '店舗', '取引先']) : (customer?.storeName || line1);
+  const customerName = event.customerName || event.raw ? findKey(event.raw, ['店舗名', 'お取引先名', '店舗', '取引先']) : (customer?.storeName || event.title || line1);
   const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(event.status || ''));
 
   const eventContent = (
@@ -2374,7 +2374,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
           </div>
         </div>
       )}
-      <p className="text-xs font-semibold truncate pointer-events-none pr-4">{customerName || line1}</p>
+      <p className="text-xs font-semibold truncate pointer-events-none pr-4">{customerName || event.title || line1}</p>
       <p className="text-xs opacity-80 truncate pointer-events-none">{formatTime(event.start)}</p>
     </div>
   );
@@ -2382,7 +2382,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const tooltipContent = (
     <div className="space-y-1">
       <p className="font-bold">
-        {customerName || line1}
+        {customerName || event.title || line1}
         {(!isTravelEvent && !['移動', '業務', '休憩'].some(t => String(event.title || '').includes(t))) && <span className="ml-1">({equipmentSymbol})</span>}
         <span className="ml-2">{formatTime(event.start)}</span>
       </p>
