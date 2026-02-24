@@ -16,8 +16,8 @@ export const signInWithEmail = async (email: string, password: string): Promise<
   console.log(`Attempting to sign in via spreadsheet for email: ${email}`);
   try {
     const { staffList, error } = await fetchStaffDataFromGAS();
-    if(error || !staffList) {
-        throw new Error(error || 'Could not fetch staff data.');
+    if (error || !staffList) {
+      throw new Error(error || 'Could not fetch staff data.');
     }
 
     const staffMember = staffList.find(s => s.email === email);
@@ -33,7 +33,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 
     // On successful login, save profile to session storage
     sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffMember));
-    
+
     console.log('Spreadsheet sign in successful for:', staffMember.name);
     return staffMember;
 
@@ -52,21 +52,21 @@ export const signInWithEmail = async (email: string, password: string): Promise<
  * @returns A promise that rejects as this is not a real operation.
  */
 export const signUpWithEmail = async (email: string, password: string, name: string): Promise<void> => {
-    console.warn('Sign up is not supported in spreadsheet-only authentication mode.');
-    throw new Error('新規登録は現在サポートされていません。管理者に連絡してスプレッドシートにアカウントを追加してもらってください。');
+  console.warn('Sign up is not supported in spreadsheet-only authentication mode.');
+  throw new Error('新規登録は現在サポートされていません。管理者に連絡してスプレッドシートにアカウントを追加してもらってください。');
 };
 
 /**
  * Signs out the current user by clearing session storage.
  */
 export const signOut = (): void => {
-    console.log('Signing out user by clearing session storage.');
-    try {
-        sessionStorage.removeItem(USER_SESSION_KEY);
-    } catch (error) {
-        console.error('Sign out error:', error);
-        // This should rarely fail, but we'll log it if it does.
-    }
+  console.log('Signing out user by clearing session storage.');
+  try {
+    sessionStorage.removeItem(USER_SESSION_KEY);
+  } catch (error) {
+    console.error('Sign out error:', error);
+    // This should rarely fail, but we'll log it if it does.
+  }
 };
 
 /**

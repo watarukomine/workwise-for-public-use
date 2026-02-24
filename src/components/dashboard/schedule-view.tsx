@@ -962,6 +962,11 @@ export function ScheduleView({
             // Backend Sync (Trigger updateSheetStatus)
             const taskEnd = addMinutes(taskStart, taskDuration);
 
+            // Determine correct system ID based on whether raw is present
+            const finalSystemId = draggedEvent.raw && Object.keys(draggedEvent.raw).length > 0
+              ? mapRawToOrder(draggedEvent.raw).id
+              : draggedEvent.id.replace(/-(task|travel)$/, '');
+
             await updateSheetStatus({
               gasUrl: ORDER_GAS_URL,
               eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
@@ -975,7 +980,7 @@ export function ScheduleView({
               "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
               "作業予定日": format(taskStart, 'yyyy/MM/dd'),
               "作業時間（分）": taskDuration,
-              systemId: mapRawToOrder(draggedEvent.raw).id
+              systemId: finalSystemId
             });
             toast({ title: "スケジュールを更新しました", duration: 3000 });
             // await new Promise(resolve => setTimeout(resolve, 2000)); // Removed artificial delay
@@ -1055,7 +1060,7 @@ export function ScheduleView({
           title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
           staffId: newStaffId, locationId: customer?.userCode || '',
           start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(), end: taskStart.toISOString(),
-          rawOrderId: order.rawOrderId, raw: order.raw,
+          rawOrderId: order.rawOrderId, raw: order.raw, systemId: order.id,
         };
         const taskEvent: WithId<ScheduleEvent> = {
           ...order,
@@ -1063,7 +1068,7 @@ export function ScheduleView({
           title: order.taskDetails,
           staffId: newStaffId, locationId: customer?.userCode || '',
           start: taskStart.toISOString(), end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
-          rawOrderId: order.rawOrderId, raw: order.raw,
+          rawOrderId: order.rawOrderId, raw: order.raw, systemId: order.id,
         };
         newEvents = [travelEvent, taskEvent];
 
@@ -1171,7 +1176,8 @@ export function ScheduleView({
                 "チップ配置作業完了予定": format(parseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
                 "作業予定日": format(parseISO(taskEvent.start as string), 'yyyy/MM/dd'),
                 "作業時間（分）": order.estimatedDuration,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                systemId: order.id
               });
               await refetchOrders();
               toast({ title: "タスクを割り当てました。" });
