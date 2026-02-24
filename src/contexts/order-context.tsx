@@ -261,7 +261,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
       // Logic for Task Event
       const taskEvent: WithId<ScheduleEvent> = {
         ...item.order,
-        id: `${item.tripId}-task`,
+        id: item.order.id,
         tripId: item.tripId,
         title: item.order.customerName || item.order.taskDetails,
         staffId: item.staffId,
