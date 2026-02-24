@@ -1205,7 +1205,13 @@ export function ScheduleView({
       endTime: formatTime(event.end),
       destination: destination
     });
-    if (event.rawOrderId) {
+
+    const isActionLogTask = event.id.startsWith('task-') || (event.systemId && event.systemId.startsWith('task-'));
+    const isGenericBlock = event.id.startsWith('event-');
+    // If it has a rawOrderId (meaning it came from a spreadsheet row) AND it's not a generic action log task or UI block
+    const isRealOrder = event.rawOrderId && !isActionLogTask && !isGenericBlock;
+
+    if (isRealOrder) {
       setDialogState({ mode: 'details', event });
     } else {
       setDialogState({ mode: 'edit', event });

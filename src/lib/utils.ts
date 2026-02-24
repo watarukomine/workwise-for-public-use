@@ -270,7 +270,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
   return {
     id: String(orderId),
     displayId: visualId ? String(visualId) : undefined,
-    rawOrderId: visualId ? String(visualId) : undefined,
+    rawOrderId: (sysId || visualId) ? String(sysId || visualId) : undefined,
     customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode', '顧客コード']) || ''),
     taskDetails: findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '',
     status: (() => {
