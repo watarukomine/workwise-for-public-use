@@ -904,7 +904,7 @@ export function ScheduleView({
             // Recalculate trip event timings
             if (draggedEvent.tripId) {
               const tripEvents = previousSchedule.filter(e => e.tripId === draggedEvent.tripId);
-              const taskEvent = tripEvents.find(e => !e.id.endsWith('-travel')) || draggedEvent;
+              const taskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
               const travelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
 
               if (taskEvent) {
@@ -1064,7 +1064,7 @@ export function ScheduleView({
         };
         const taskEvent: WithId<ScheduleEvent> = {
           ...order,
-          id: order.id, tripId,
+          id: `${tripId}-task`, tripId,
           title: order.taskDetails,
           staffId: newStaffId, locationId: customer?.userCode || '',
           start: taskStart.toISOString(), end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
@@ -1104,7 +1104,7 @@ export function ScheduleView({
               if (res.eventId) {
                 const realId = res.eventId;
                 const derivedTripId = `trip-${realId}`;
-                const frontendTaskId = realId;
+                const frontendTaskId = `${derivedTripId}-task`;
                 const frontendTravelId = `${derivedTripId}-travel`;
 
                 if (isGenericAccompany) {
@@ -1120,7 +1120,7 @@ export function ScheduleView({
 
                     // 2. Create New Events with Real IDs
                     const travelEv = newEvents.find(e => e.id.endsWith('-travel') && e.tripId === oldTripId);
-                    const taskEv = newEvents.find(e => !e.id.endsWith('-travel') && e.tripId === oldTripId);
+                    const taskEv = newEvents.find(e => e.id.endsWith('-task') && e.tripId === oldTripId);
 
                     if (travelEv) {
                       const newTravel = { ...travelEv, id: frontendTravelId, tripId: derivedTripId };
@@ -1134,7 +1134,7 @@ export function ScheduleView({
                     // Update State
                     setScheduleEvents(prev => prev.map(e => {
                       if (e.tripId === oldTripId) {
-                        if (!e.id.endsWith('-travel')) return { ...e, id: frontendTaskId, tripId: derivedTripId };
+                        if (e.id.endsWith('-task')) return { ...e, id: frontendTaskId, tripId: derivedTripId };
                         if (e.id.endsWith('-travel')) return { ...e, id: frontendTravelId, tripId: derivedTripId };
                       }
                       return e;
@@ -1143,7 +1143,7 @@ export function ScheduleView({
                 } else {
                   // Normal Generic Task (Single)
                   const derivedTripId = `trip-${realId}`;
-                  const frontendId = realId;
+                  const frontendId = `${derivedTripId}-task`;
 
                   updatedEvents[i] = {
                     ...ev,
@@ -1307,7 +1307,7 @@ export function ScheduleView({
 
         if (res.eventId) {
           const derivedTripId = `trip-${res.eventId}`;
-          const frontendId = res.eventId;
+          const frontendId = `${derivedTripId}-task`;
           const newEvent: WithId<ScheduleEvent> = {
             id: frontendId,
             title: editedEventDetails.title,
