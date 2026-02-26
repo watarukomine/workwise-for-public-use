@@ -1226,7 +1226,9 @@ export function ScheduleView({
             // Updating Real Order
             const taskEvent = newEvents.find(e => e.id.endsWith('-task'));
             if (taskEvent) {
-              await updateSheetStatus({
+              const isNewlyAssigned = order.status === '未割当' || order.status === '入庫待ち' || !order.staffName;
+
+              const payload: any = {
                 gasUrl: ORDER_GAS_URL,
                 eventTitle: `(ID: ${order.rawOrderId})`,
                 staffName: staff.name,
@@ -1241,7 +1243,18 @@ export function ScheduleView({
                 "作業時間（分）": order.estimatedDuration,
                 timestamp: new Date().toISOString(),
                 systemId: order.id
-              });
+              };
+
+              // Clear any corrupted 1970 dates in action history upon initial assignment
+              if (isNewlyAssigned) {
+                payload.startTravelTime = "";
+                payload.arrivalTimestamp = "";
+                payload.actualStartTime = "";
+                payload.actualEndTime = "";
+                payload.actualDuration = "";
+              }
+
+              await updateSheetStatus(payload);
               await refetchOrders();
               toast({ title: "タスクを割り当てました。" });
             }
