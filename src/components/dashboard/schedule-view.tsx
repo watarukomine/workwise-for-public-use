@@ -1441,8 +1441,8 @@ export function ScheduleView({
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`,
             systemId: eventToUpdate.systemId,
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
-            scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
-            scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
+            scheduledTime: format(newStart, 'HH:mm'), // Changed to HH:mm for clarity against 1970 bugs
+            scheduledEndTime: format(finalEnd, 'HH:mm'),
             estimatedDuration: durationMinutes,
             timestamp: new Date().toISOString(),
             "チップ配置作業予定": format(newStart, 'yyyy/MM/dd HH:mm:ss'),
@@ -1450,6 +1450,7 @@ export function ScheduleView({
             "作業予定日": format(newStart, 'yyyy/MM/dd'),
             "作業時間（分）": durationMinutes,
             staffName: staff?.name,
+            ...editOrderForm, // CRITICAL FIX: Include form updates like startTravelTime, customerName, etc.
             shouldSendEmail: !!emailParams,
             emailParams: emailParams
           });
