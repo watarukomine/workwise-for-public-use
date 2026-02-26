@@ -533,6 +533,8 @@ function updateSheetWithOrderInfo(params) {
         const parseSafeDate = (dateString, isTimeOnly = false) => {
             if (!dateString) return "";
             try {
+                let resultDate = null;
+
                 // If it's just a time string HH:mm, combine it with the scheduled date or today
                 if (isTimeOnly) {
                     if (typeof dateString === 'string' && (dateString.match(/^\d{1,2}:\d{2}$/) || dateString.match(/^\d{1,2}:\d{2}:\d{2}$/))) {
@@ -544,50 +546,45 @@ function updateSheetWithOrderInfo(params) {
                         // Try combining with the master scheduled date
                         if (baseDateString) {
                             const d = new Date(baseDateString);
-                            if (!isNaN(d.getTime())) {
+                            // CRITICAL FIX: Ensure the BASE date itself isn't a 1970 bug
+                            if (!isNaN(d.getTime()) && d.getFullYear() > 1970) {
                                 d.setHours(h, m, s, 0);
-                                return d;
+                                resultDate = d;
                             }
                         }
-                        // Fallback to today but ensure it's a valid current date
-                        const dToday = new Date();
-                        dToday.setHours(h, m, s, 0);
-                        if (dToday.getFullYear() <= 1970) {
-                            // If somehow current system date is wrong or parsing failed
-                            dToday.setFullYear(new Date().getFullYear());
+
+                        // Fallback to today if still no valid resultDate
+                        if (!resultDate) {
+                            const dToday = new Date();
+                            dToday.setHours(h, m, s, 0);
+                            resultDate = dToday;
                         }
-                        return dToday;
                     }
                 }
 
-                // For Full ISO strings
-                if (typeof dateString === 'string' && dateString.includes('T')) {
-                    const d = new Date(dateString);
-                    if (!isNaN(d.getTime())) {
-                        // Prevent 1970 bugs from re-saving if they were just parsed from a bad string
-                        if (d.getFullYear() <= 1970) return "";
-                        return d;
+                // If not handled by isTimeOnly, parse as standard date string
+                if (!resultDate) {
+                    // For Full ISO strings
+                    if (typeof dateString === 'string' && dateString.includes('T')) {
+                        const d = new Date(dateString);
+                        if (!isNaN(d.getTime())) resultDate = d;
+                    } else if (typeof dateString === 'string' && dateString.includes('-') && dateString.length === 10) {
+                        // For Date only: YYYY-MM-DD
+                        const d = new Date(dateString);
+                        if (!isNaN(d.getTime())) resultDate = d;
+                    } else {
+                        const d = new Date(dateString);
+                        if (!isNaN(d.getTime())) resultDate = d;
                     }
                 }
 
-                // For JS Date standard strings (e.g. YYYY-MM-DD)
-                if (typeof dateString === 'string' && dateString.includes('-')) {
-                    // For Date only: YYYY-MM-DD
-                    if (dateString.length === 10) {
-                        const parts = dateString.split('-');
-                        if (parseInt(parts[0]) <= 1970) return "";
-                        return dateString;
-                    }
+                // FINAL GUARD: Apply 1970 check to whatever we found
+                if (resultDate && !isNaN(resultDate.getTime())) {
+                    if (resultDate.getFullYear() <= 1970) return "";
+                    return resultDate;
                 }
 
-                // General fallback
-                const d = new Date(dateString);
-                if (!isNaN(d.getTime())) {
-                    if (d.getFullYear() <= 1970) return "";
-                    return d;
-                }
-
-                return dateString; // Return original string if parsing fails
+                return dateString; // Return original string if we can't make a valid Date
             } catch (e) {
                 return dateString;
             }

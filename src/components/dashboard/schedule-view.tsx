@@ -1359,13 +1359,23 @@ export function ScheduleView({
     try {
       let newStart, newEnd;
 
+      const isValidDate = (dStr?: string) => {
+        if (!dStr) return false;
+        try {
+          const d = new Date(dStr.replace(/\//g, '-'));
+          return !isNaN(d.getTime()) && d.getFullYear() > 1970;
+        } catch { return false; }
+      };
+
       if (dialogState.mode === 'edit' || dialogState.mode === 'new') {
-        const dateStr = dialogState.mode === 'new' ? format(dialogState.start, 'yyyy-MM-dd') : (event?.scheduledDate?.replace(/\//g, '-') || format(currentDate, 'yyyy-MM-dd'));
+        const dateFromEvent = event?.scheduledDate;
+        const dateStr = dialogState.mode === 'new' ? format(dialogState.start, 'yyyy-MM-dd') : (isValidDate(dateFromEvent) ? dateFromEvent!.replace(/\//g, '-') : format(currentDate, 'yyyy-MM-dd'));
         newStart = new Date(`${dateStr}T${editedEventDetails.startTime}:00`);
         newEnd = new Date(`${dateStr}T${editedEventDetails.endTime}:00`);
       } else if (dialogState.mode === 'details') {
-        // Fallback to currentDate if editOrderForm and parsed event.scheduledDate are both stripped out (e.g. 1970 bugs)
-        const dateStr = editOrderForm.scheduledDate?.replace(/\//g, '-') || event?.scheduledDate?.replace(/\//g, '-') || format(currentDate, 'yyyy-MM-dd');
+        const dateFromForm = editOrderForm.scheduledDate;
+        const dateFromEvent = event?.scheduledDate;
+        const dateStr = isValidDate(dateFromForm) ? dateFromForm!.replace(/\//g, '-') : (isValidDate(dateFromEvent) ? dateFromEvent!.replace(/\//g, '-') : format(currentDate, 'yyyy-MM-dd'));
         newStart = new Date(`${dateStr}T${editedEventDetails.startTime}:00`);
         newEnd = new Date(`${dateStr}T${editedEventDetails.endTime}:00`);
       } else {
