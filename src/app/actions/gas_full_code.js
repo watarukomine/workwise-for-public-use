@@ -549,22 +549,43 @@ function updateSheetWithOrderInfo(params) {
                                 return d;
                             }
                         }
-                        // Fallback to today
+                        // Fallback to today but ensure it's a valid current date
                         const dToday = new Date();
                         dToday.setHours(h, m, s, 0);
+                        if (dToday.getFullYear() <= 1970) {
+                            // If somehow current system date is wrong or parsing failed
+                            dToday.setFullYear(new Date().getFullYear());
+                        }
                         return dToday;
+                    }
+                }
+
+                // For Full ISO strings
+                if (typeof dateString === 'string' && dateString.includes('T')) {
+                    const d = new Date(dateString);
+                    if (!isNaN(d.getTime())) {
+                        // Prevent 1970 bugs from re-saving if they were just parsed from a bad string
+                        if (d.getFullYear() <= 1970) return "";
+                        return d;
                     }
                 }
 
                 // For JS Date standard strings (e.g. YYYY-MM-DD)
                 if (typeof dateString === 'string' && dateString.includes('-')) {
-                    // For Date only: YYYY-MM-DD -> Sheets recognizes this natively.
-                    if (dateString.length === 10) return dateString;
+                    // For Date only: YYYY-MM-DD
+                    if (dateString.length === 10) {
+                        const parts = dateString.split('-');
+                        if (parseInt(parts[0]) <= 1970) return "";
+                        return dateString;
+                    }
                 }
 
-                // Fallback to JS Date object if it's a full timestamp
+                // General fallback
                 const d = new Date(dateString);
-                if (!isNaN(d.getTime())) return d;
+                if (!isNaN(d.getTime())) {
+                    if (d.getFullYear() <= 1970) return "";
+                    return d;
+                }
 
                 return dateString; // Return original string if parsing fails
             } catch (e) {

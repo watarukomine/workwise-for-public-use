@@ -1488,6 +1488,10 @@ export function ScheduleView({
             description: sheetResult.message
           });
 
+          setIsEditingOrderDetails(false);
+          await refetchOrders();
+          setDialogState({ mode: 'closed' });
+
         } else {
           // Legacy Local event
           const updatedEvent = { ...eventToUpdate, title, description, start: newStart.toISOString(), end: finalEnd.toISOString() };
@@ -1997,43 +2001,7 @@ export function ScheduleView({
                           キャンセル
                         </Button>
                         <Button
-                          onClick={async () => {
-                            // Get Order ID safely
-                            const rawValues = (event as any).raw || {};
-                            const orderId = findKey(rawValues, ['受注ID', 'SystemID', 'id']) || event.id;
-
-                            if (!orderId) {
-                              toast({ title: 'エラー', description: '受注IDが見つかりません', variant: 'destructive' });
-                              return;
-                            }
-
-                            setIsSaving(true);
-
-                            try {
-                              const result = await updateSheetStatus({
-                                gasUrl: ORDER_GAS_URL,
-                                eventTitle: `(ID: ${orderId})`,
-                                systemId: orderId,
-                                timestamp: new Date().toISOString(),
-                                ...editOrderForm,
-                                shouldSendEmail: false
-                              });
-
-                              if (result.status === 'success') {
-                                toast({ title: '保存しました', description: '詳細を更新しました' });
-                                setIsEditingOrderDetails(false);
-                                await refetchOrders();
-                                setDialogState({ mode: 'closed' });
-                              } else {
-                                toast({ title: 'エラー', description: result.message || '更新に失敗しました', variant: 'destructive' });
-                              }
-                            } catch (error) {
-                              console.error('Failed to update order schedule:', error);
-                              toast({ title: 'エラー', description: '更新に失敗しました', variant: 'destructive' });
-                            } finally {
-                              setIsSaving(false);
-                            }
-                          }}
+                          onClick={() => handleSaveEvent(false)}
                           disabled={isSaving}
                         >
                           {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : '保存'}
