@@ -39,6 +39,8 @@ export const formatDate = (dateString: string | undefined | null, formatString: 
     }
 
     if (isValid(date)) {
+      // Ignore 1970 and 1899 dates coming from GAS timestamp zero bugs
+      if (date.getFullYear() <= 1970) return '';
       return format(date, formatString);
     }
   } catch (e) {
@@ -72,6 +74,7 @@ export const formatTime = (date: Date | string) => {
     }
     return "";
   }
+  // Ignore 1970 bugs completely, return format time
   return format(d, 'HH:mm');
 };
 

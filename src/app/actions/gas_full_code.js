@@ -528,14 +528,31 @@ function updateSheetWithOrderInfo(params) {
         // Helper to safely parse dates coming from React client. React sends ISO strings or YYYY-MM-DD or HH:mm.
         // Google Sheets sometimes misinterprets standard JS Date objects created from time-only or date-only strings as 1899/1970.
         // We ensure a safe format is saved.
+        const baseDateString = params.scheduledDate || params["作業予定日"] || null;
+
         const parseSafeDate = (dateString, isTimeOnly = false) => {
             if (!dateString) return "";
             try {
-                // If it's just a time string HH:mm, we can save it directly as string or parse it to a specific date. 
-                // For Sheets, saving time as purely string or a clean time works better.
+                // If it's just a time string HH:mm, combine it with the scheduled date or today
                 if (isTimeOnly) {
-                    if (dateString.match(/^\d{1,2}:\d{2}$/) || dateString.match(/^\d{1,2}:\d{2}:\d{2}$/)) {
-                        return dateString; // Just save the time string to let Sheets auto-format it as time
+                    if (typeof dateString === 'string' && (dateString.match(/^\d{1,2}:\d{2}$/) || dateString.match(/^\d{1,2}:\d{2}:\d{2}$/))) {
+                        const parts = dateString.split(':');
+                        const h = parseInt(parts[0], 10) || 0;
+                        const m = parseInt(parts[1], 10) || 0;
+                        const s = parts[2] ? parseInt(parts[2], 10) : 0;
+
+                        // Try combining with the master scheduled date
+                        if (baseDateString) {
+                            const d = new Date(baseDateString);
+                            if (!isNaN(d.getTime())) {
+                                d.setHours(h, m, s, 0);
+                                return d;
+                            }
+                        }
+                        // Fallback to today
+                        const dToday = new Date();
+                        dToday.setHours(h, m, s, 0);
+                        return dToday;
                     }
                 }
 

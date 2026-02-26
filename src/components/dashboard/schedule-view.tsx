@@ -1344,8 +1344,21 @@ export function ScheduleView({
     setIsSaving(true);
 
     try {
-      const newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
-      const newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
+      let newStart, newEnd;
+
+      if (dialogState.mode === 'edit' || dialogState.mode === 'new') {
+        const dateStr = dialogState.mode === 'new' ? format(dialogState.start, 'yyyy-MM-dd') : (event?.scheduledDate?.replace(/\//g, '-') || format(currentDate, 'yyyy-MM-dd'));
+        newStart = new Date(`${dateStr}T${editedEventDetails.startTime}:00`);
+        newEnd = new Date(`${dateStr}T${editedEventDetails.endTime}:00`);
+      } else if (dialogState.mode === 'details') {
+        // Fallback to currentDate if editOrderForm and parsed event.scheduledDate are both stripped out (e.g. 1970 bugs)
+        const dateStr = editOrderForm.scheduledDate?.replace(/\//g, '-') || event?.scheduledDate?.replace(/\//g, '-') || format(currentDate, 'yyyy-MM-dd');
+        newStart = new Date(`${dateStr}T${editedEventDetails.startTime}:00`);
+        newEnd = new Date(`${dateStr}T${editedEventDetails.endTime}:00`);
+      } else {
+        newStart = timeStringToDate(editedEventDetails.startTime, currentDate);
+        newEnd = timeStringToDate(editedEventDetails.endTime, currentDate);
+      }
 
       if (isNaN(newStart.getTime()) || isNaN(newEnd.getTime())) {
         toast({ variant: 'destructive', title: 'エラー', description: '無効な時間形式です。' });
