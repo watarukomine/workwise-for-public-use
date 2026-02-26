@@ -1834,7 +1834,7 @@ export function ScheduleView({
           </div>
 
           <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
-            <DialogContent className={cn(dialogState.mode === 'details' && "max-w-xl")}>
+            <DialogContent className={cn((dialogState.mode === 'details' || dialogState.mode === 'order-details') ? "max-w-[95vw] md:max-w-3xl lg:max-w-5xl" : "max-w-lg")}>
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   {dialogState.mode === 'details' ? '受注詳細' : dialogState.mode === 'edit' ? '予定の編集' : dialogState.mode === 'order-details' ? '未割当オーダー詳細' : '新規予定の作成'}
@@ -1861,7 +1861,7 @@ export function ScheduleView({
                   <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
                     {/* Details section */}
                     {dialogState.mode === 'details' && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
                         {renderDetailItem('担当者', staff?.name)}
                         {renderDetailItem('フォーム入力者', event.submitter)}
                         {renderEditableItem('お取引先名', 'storeName')}
@@ -1873,14 +1873,14 @@ export function ScheduleView({
                         {renderEditableItem('タイヤ品番', 'tireNumber')}
                         {renderEditableItem('タイヤサイズ', 'tireSize')}
                         {renderEditableItem('品名', 'productName')}
-                        <div className="sm:col-span-2">
+                        <div className="col-span-full">
                           {renderEditableItem('作業内容', 'taskDetails', 'textarea')}
                         </div>
                         {renderEditableItem('本数', 'quantity')}
                         {renderEditableItem('空気圧センサーパッキン交換', 'sensor')}
                         {renderEditableItem('タイヤ手配状況', 'tireStatus')}
                         {renderEditableItem('廃タイヤ処分', 'disposal')}
-                        <div className="sm:col-span-2">
+                        <div className="col-span-full">
                           {renderEditableItem('特記事項', 'specialNotes', 'textarea')}
                         </div>
 
@@ -2098,8 +2098,8 @@ export function ScheduleView({
                 </>
               ) : (dialogState.mode === 'order-details') ? (
                 <>
-                  <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
+                  <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
                       {renderDetailItem('受注ID', dialogState.order.id)}
                       {renderEditableItem('お取引先名', 'storeName')}
                       {renderEditableItem('機材有無', 'equipmentStatus')}
@@ -2110,14 +2110,14 @@ export function ScheduleView({
                       {renderEditableItem('タイヤ品番', 'tireNumber')}
                       {renderEditableItem('タイヤサイズ', 'tireSize')}
                       {renderEditableItem('品名', 'productName')}
-                      <div className="sm:col-span-2">
+                      <div className="col-span-full">
                         {renderEditableItem('作業内容', 'taskDetails', 'textarea')}
                       </div>
                       {renderEditableItem('本数', 'quantity')}
                       {renderEditableItem('空気圧センサーパッキン交換', 'sensor')}
                       {renderEditableItem('タイヤ手配状況', 'tireStatus')}
                       {renderEditableItem('廃タイヤ処分', 'disposal')}
-                      <div className="sm:col-span-2">
+                      <div className="col-span-full">
                         {renderEditableItem('特記事項', 'specialNotes', 'textarea')}
                       </div>
 
