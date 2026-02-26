@@ -543,6 +543,28 @@ function updateSheetWithOrderInfo(params) {
         if (emergencyFlag !== undefined) updateColumn(["緊急フラグ", "緊急ステータス", "緊急", "フラグ"], emergencyFlag);
         if (adminReply !== undefined) updateColumn(["管理者返信", "返信", "管理者からの返信", "回答", "管理者回答", "コメント", "管理者コメント"], adminReply);
         if (specialNotes !== undefined) updateColumn(["特記事項", "備考", "メモ", "特記"], specialNotes);
+
+        // 新規追加: 詳細情報の全更新
+        if (params.storeName !== undefined) updateColumn(["お取引先名", "店舗", "店舗名", "名称", "店舗名称", "Customer", "お名前"], params.storeName);
+        if (params.equipmentStatus !== undefined) updateColumn(["機材有無"], params.equipmentStatus);
+        if (params.carName !== undefined) updateColumn(["車名", "車両", "車種"], params.carName);
+        if (params.regNo !== undefined) updateColumn(["登録ナンバー(下４桁)", "登録ナンバー", "ナンバー", "車番", "登録番号"], params.regNo);
+        if (params.arrivalStatus !== undefined) updateColumn(["入庫状況"], params.arrivalStatus);
+        if (params.tireNumber !== undefined) updateColumn(["タイヤ品番", "品番"], params.tireNumber);
+        if (params.tireSize !== undefined) updateColumn(["タイヤサイズ", "サイズ", "Size", "タイヤ名/サイズ"], params.tireSize);
+        if (params.productName !== undefined) updateColumn(["品名", "商品名"], params.productName);
+        if (params.taskDetails !== undefined) updateColumn(["作業内容", "業務内容", "taskDetails", "Description", "作業", "作業内容・商品詳細", "内容"], params.taskDetails);
+        if (params.quantity !== undefined) updateColumn(["本数", "honsu", "数量", "Qty", "Quantity", "本", "タイヤ本数"], params.quantity);
+        if (params.sensor !== undefined) updateColumn(["空気圧センサーパッキン交換", "センサー"], params.sensor);
+        if (params.tireStatus !== undefined) updateColumn(["タイヤ手配状況", "手配"], params.tireStatus);
+        if (params.disposal !== undefined) updateColumn(["廃タイヤ処分", "廃タイヤ"], params.disposal);
+
+        // 新規追加: 訪問履歴時間の保存・変更
+        if (params.startTravelTime !== undefined) updateColumn(["移動開始"], params.startTravelTime ? new Date(params.startTravelTime) : "");
+        if (params.arrivalTimestamp !== undefined) updateColumn(["現場到着"], params.arrivalTimestamp ? new Date(params.arrivalTimestamp) : "");
+        if (params.actualStartTime !== undefined) updateColumn(["作業開始", "実績開始"], params.actualStartTime ? new Date(params.actualStartTime) : "");
+        if (params.actualEndTime !== undefined) updateColumn(["作業完了", "実績完了", "実績終了"], params.actualEndTime ? new Date(params.actualEndTime) : "");
+        if (params.actualDuration !== undefined) updateColumn(["作業時間（分）", "所要時間"], params.actualDuration);
         if (actionType && actionTimestamp) {
             const dateValue = new Date(actionTimestamp);
             const actionColMap = {

@@ -466,10 +466,66 @@ export function ScheduleView({
   const [active, setActive] = React.useState<Active | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
 
-  // Order date/time editing state
-  const [isEditingOrderSchedule, setIsEditingOrderSchedule] = React.useState(false);
-  const [editedOrderDate, setEditedOrderDate] = React.useState('');
-  const [editedOrderTime, setEditedOrderTime] = React.useState('');
+  // Order date/time and full details editing state
+  const [isEditingOrderDetails, setIsEditingOrderDetails] = React.useState(false);
+  const [editOrderForm, setEditOrderForm] = React.useState<any>({});
+
+  React.useEffect(() => {
+    if (dialogState.mode === 'details' && dialogState.event) {
+      setEditOrderForm({
+        storeName: findKey(dialogState.event.raw, ['お取引先名', '店舗']) || '',
+        equipmentStatus: findKey(dialogState.event.raw, ['機材有無']) || '',
+        carName: findKey(dialogState.event.raw, ['車名']) || '',
+        regNo: findKey(dialogState.event.raw, ['登録ナンバー(下４桁)']) || '',
+        arrivalStatus: findKey(dialogState.event.raw, ['入庫状況']) || '',
+        tireNumber: findKey(dialogState.event.raw, ['タイヤ品番']) || '',
+        tireSize: findKey(dialogState.event.raw, ['タイヤサイズ']) || '',
+        productName: findKey(dialogState.event.raw, ['品名']) || '',
+        taskDetails: findKey(dialogState.event.raw, ['作業内容']) || '',
+        quantity: findKey(dialogState.event.raw, ['本数']) || '',
+        sensor: findKey(dialogState.event.raw, ['空気圧センサーパッキン交換']) || '',
+        tireStatus: findKey(dialogState.event.raw, ['タイヤ手配状況']) || '',
+        disposal: findKey(dialogState.event.raw, ['廃タイヤ処分']) || '',
+        specialNotes: findKey(dialogState.event.raw, ['特記事項', 'specialNotes']) || '',
+        startTravelTime: findKey(dialogState.event.raw, ['移動開始']) ? formatTime(findKey(dialogState.event.raw, ['移動開始'])) : '',
+        arrivalTimestamp: findKey(dialogState.event.raw, ['現場到着']) ? formatTime(findKey(dialogState.event.raw, ['現場到着'])) : '',
+        actualStartTime: findKey(dialogState.event.raw, ['作業開始', '実績開始']) ? formatTime(findKey(dialogState.event.raw, ['作業開始', '実績開始'])) : '',
+        actualEndTime: findKey(dialogState.event.raw, ['作業完了', '実績完了', '実績終了']) ? formatTime(findKey(dialogState.event.raw, ['作業完了', '実績完了', '実績終了'])) : '',
+        actualDuration: findKey(dialogState.event.raw, ['作業時間（分）', '所要時間']) || '',
+        scheduledDate: formatDate(findKey(dialogState.event.raw, ['作業予定日']), 'yyyy-MM-dd') || '',
+        scheduledTime: formatTime(findKey(dialogState.event.raw, ['予定時間', 'チップ配置作業予定'])) || ''
+      });
+      setIsEditingOrderDetails(false);
+    } else if (dialogState.mode === 'order-details' && dialogState.order) {
+      setEditOrderForm({
+        storeName: findKey(dialogState.order.raw, ['お取引先名', '店舗']) || '',
+        equipmentStatus: findKey(dialogState.order.raw, ['機材有無']) || '',
+        carName: findKey(dialogState.order.raw, ['車名']) || '',
+        regNo: findKey(dialogState.order.raw, ['登録ナンバー(下４桁)']) || '',
+        arrivalStatus: findKey(dialogState.order.raw, ['入庫状況']) || '',
+        tireNumber: findKey(dialogState.order.raw, ['タイヤ品番']) || '',
+        tireSize: findKey(dialogState.order.raw, ['タイヤサイズ']) || '',
+        productName: findKey(dialogState.order.raw, ['品名']) || '',
+        taskDetails: findKey(dialogState.order.raw, ['作業内容']) || '',
+        quantity: findKey(dialogState.order.raw, ['本数']) || '',
+        sensor: findKey(dialogState.order.raw, ['空気圧センサーパッキン交換']) || '',
+        tireStatus: findKey(dialogState.order.raw, ['タイヤ手配状況']) || '',
+        disposal: findKey(dialogState.order.raw, ['廃タイヤ処分']) || '',
+        specialNotes: findKey(dialogState.order.raw, ['特記事項', 'specialNotes']) || '',
+        startTravelTime: findKey(dialogState.order.raw, ['移動開始']) ? formatTime(findKey(dialogState.order.raw, ['移動開始'])) : '',
+        arrivalTimestamp: findKey(dialogState.order.raw, ['現場到着']) ? formatTime(findKey(dialogState.order.raw, ['現場到着'])) : '',
+        actualStartTime: findKey(dialogState.order.raw, ['作業開始', '実績開始']) ? formatTime(findKey(dialogState.order.raw, ['作業開始', '実績開始'])) : '',
+        actualEndTime: findKey(dialogState.order.raw, ['作業完了', '実績完了', '実績終了']) ? formatTime(findKey(dialogState.order.raw, ['作業完了', '実績完了', '実績終了'])) : '',
+        actualDuration: findKey(dialogState.order.raw, ['作業時間（分）', '所要時間']) || '',
+        scheduledDate: formatDate(findKey(dialogState.order.raw, ['作業予定日']), 'yyyy-MM-dd') || '',
+        scheduledTime: formatTime(findKey(dialogState.order.raw, ['予定時間', 'チップ配置作業予定'])) || ''
+      });
+      setIsEditingOrderDetails(false);
+    } else {
+      setIsEditingOrderDetails(false);
+      setEditOrderForm({});
+    }
+  }, [dialogState]);
 
   const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code);
   // Use allStaff instead of filtered staffData for lookup
@@ -1611,6 +1667,24 @@ export function ScheduleView({
     value ? <div className="text-sm"><span className="font-semibold text-muted-foreground">{label}:</span> {String(value)}</div> : null
   );
 
+  const renderEditableItem = (label: string, field: string, type: string = 'text') => {
+    if (!isEditingOrderDetails && !editOrderForm[field]) return null;
+    return (
+      <div className="flex flex-col gap-1 w-full">
+        <Label className="text-xs text-muted-foreground font-semibold">{label}</Label>
+        {isEditingOrderDetails ? (
+          type === 'textarea' ? (
+            <Textarea value={editOrderForm[field] || ''} onChange={(e) => setEditOrderForm((prev: any) => ({ ...prev, [field]: e.target.value }))} className="text-sm min-h-[80px]" />
+          ) : (
+            <Input type={type} value={editOrderForm[field] || ''} onChange={(e) => setEditOrderForm((prev: any) => ({ ...prev, [field]: e.target.value }))} className="h-8 text-sm" />
+          )
+        ) : (
+          <div className="text-sm pb-1 leading-relaxed whitespace-pre-wrap">{String(editOrderForm[field] || '')}</div>
+        )}
+      </div>
+    );
+  };
+
   const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1790,49 +1864,36 @@ export function ScheduleView({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
                         {renderDetailItem('担当者', staff?.name)}
                         {renderDetailItem('フォーム入力者', event.submitter)}
-                        {renderDetailItem('お取引先名', findKey(event.raw, ['お取引先名', '店舗']))}
-                        {renderDetailItem('機材有無', findKey(event.raw, ['機材有無']))}
-                        {isEditingOrderSchedule ? (
-                          <>
-                            <div className="sm:col-span-2">
-                              <Label htmlFor="edit-assigned-date" className="text-sm font-medium">作業予定日</Label>
-                              <Input
-                                id="edit-assigned-date"
-                                type="date"
-                                value={editedOrderDate}
-                                onChange={(e) => setEditedOrderDate(e.target.value)}
-                                className="mt-1"
-                              />
-                            </div>
-                            <div className="sm:col-span-2">
-                              <Label htmlFor="edit-assigned-time" className="text-sm font-medium">予定時間</Label>
-                              <Input
-                                id="edit-assigned-time"
-                                type="time"
-                                value={editedOrderTime}
-                                onChange={(e) => setEditedOrderTime(e.target.value)}
-                                className="mt-1"
-                              />
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            {renderDetailItem('作業予定日', formatDate(findKey(event.raw, ['作業予定日']), 'MM/dd'))}
-                            {renderDetailItem('予定時間', formatTime(findKey(event.raw, ['予定時間', 'チップ配置作業予定'])))}
-                          </>
-                        )}
-                        {renderDetailItem('車名', findKey(event.raw, ['車名']))}
-                        {renderDetailItem('登録ナンバー(下４桁)', findKey(event.raw, ['登録ナンバー(下４桁)']))}
-                        {renderDetailItem('入庫状況', findKey(event.raw, ['入庫状況']))}
-                        {renderDetailItem('タイヤ品番', findKey(event.raw, ['タイヤ品番']))}
-                        {renderDetailItem('タイヤサイズ', findKey(event.raw, ['タイヤサイズ']))}
-                        {renderDetailItem('品名', findKey(event.raw, ['品名']))}
-                        {renderDetailItem('作業内容', findKey(event.raw, ['作業内容']))}
-                        {renderDetailItem('本数', findKey(event.raw, ['本数']))}
-                        {renderDetailItem('空気圧センサーパッキン交換', findKey(event.raw, ['空気圧センサーパッキン交換']))}
-                        {renderDetailItem('タイヤ手配状況', findKey(event.raw, ['タイヤ手配状況']))}
-                        {renderDetailItem('廃タイヤ処分', findKey(event.raw, ['廃タイヤ処分']))}
-                        {renderDetailItem('特記事項', findKey(event.raw, ['特記事項', 'specialNotes']))}
+                        {renderEditableItem('お取引先名', 'storeName')}
+                        {renderEditableItem('機材有無', 'equipmentStatus')}
+
+                        {renderEditableItem('車名', 'carName')}
+                        {renderEditableItem('登録ナンバー(下４桁)', 'regNo')}
+                        {renderEditableItem('入庫状況', 'arrivalStatus')}
+                        {renderEditableItem('タイヤ品番', 'tireNumber')}
+                        {renderEditableItem('タイヤサイズ', 'tireSize')}
+                        {renderEditableItem('品名', 'productName')}
+                        <div className="sm:col-span-2">
+                          {renderEditableItem('作業内容', 'taskDetails', 'textarea')}
+                        </div>
+                        {renderEditableItem('本数', 'quantity')}
+                        {renderEditableItem('空気圧センサーパッキン交換', 'sensor')}
+                        {renderEditableItem('タイヤ手配状況', 'tireStatus')}
+                        {renderEditableItem('廃タイヤ処分', 'disposal')}
+                        <div className="sm:col-span-2">
+                          {renderEditableItem('特記事項', 'specialNotes', 'textarea')}
+                        </div>
+
+                        <div className="col-span-full border-t my-2 pt-2">
+                          <h4 className="text-sm font-semibold mb-2 text-muted-foreground">訪問履歴 ・ 実績</h4>
+                        </div>
+                        {renderEditableItem('作業予定日', 'scheduledDate', 'date')}
+                        {renderEditableItem('予定時間', 'scheduledTime', 'time')}
+                        {renderEditableItem('移動開始', 'startTravelTime', 'time')}
+                        {renderEditableItem('現場到着', 'arrivalTimestamp', 'time')}
+                        {renderEditableItem('作業開始', 'actualStartTime', 'time')}
+                        {renderEditableItem('作業完了', 'actualEndTime', 'time')}
+                        {renderEditableItem('所要時間（分）', 'actualDuration', 'number')}
                       </div>
                     )}
 
@@ -1868,14 +1929,12 @@ export function ScheduleView({
                   </div>
 
                   <DialogFooter className="sm:justify-between pt-4 border-t">
-                    {isEditingOrderSchedule ? (
+                    {isEditingOrderDetails ? (
                       <div className="flex justify-end w-full gap-2">
                         <Button
                           variant="outline"
                           onClick={() => {
-                            setIsEditingOrderSchedule(false);
-                            setEditedOrderDate('');
-                            setEditedOrderTime('');
+                            setIsEditingOrderDetails(false);
                           }}
                           disabled={isSaving}
                         >
@@ -1892,27 +1951,21 @@ export function ScheduleView({
                               return;
                             }
 
-                            // Validation
-                            if (!editedOrderDate || !editedOrderTime) {
-                              toast({ title: 'エラー', description: '日付と時間を入力してください', variant: 'destructive' });
-                              return;
-                            }
-
                             setIsSaving(true);
 
                             try {
-                              const result = await updateOrderDateTime({
+                              const result = await updateSheetStatus({
                                 gasUrl: ORDER_GAS_URL,
-                                orderId: orderId,
-                                scheduledDate: editedOrderDate,
-                                scheduledTime: editedOrderTime,
+                                eventTitle: `(ID: ${orderId})`,
+                                systemId: orderId,
+                                timestamp: new Date().toISOString(),
+                                ...editOrderForm,
+                                shouldSendEmail: false
                               });
 
                               if (result.status === 'success') {
-                                toast({ title: '保存しました', description: '日付・時間を更新しました' });
-                                setIsEditingOrderSchedule(false);
-                                setEditedOrderDate('');
-                                setEditedOrderTime('');
+                                toast({ title: '保存しました', description: '詳細を更新しました' });
+                                setIsEditingOrderDetails(false);
                                 await refetchOrders();
                                 setDialogState({ mode: 'closed' });
                               } else {
@@ -1944,29 +1997,12 @@ export function ScheduleView({
                                 <Button
                                   variant="outline"
                                   onClick={() => {
-                                    const rawDate = findKey(event.raw, ['作業予定日']);
-                                    const rawTime = findKey(event.raw, ['予定時間', 'チップ配置作業予定']);
-
-                                    // Init Date
-                                    if (rawDate) {
-                                      try {
-                                        const d = new Date(rawDate);
-                                        if (!isNaN(d.getTime())) setEditedOrderDate(format(d, 'yyyy-MM-dd'));
-                                        else setEditedOrderDate(String(rawDate));
-                                      } catch (e) { setEditedOrderDate(''); }
-                                    }
-
-                                    // Init Time
-                                    if (rawTime) {
-                                      setEditedOrderTime(formatTime(rawTime));
-                                    }
-
-                                    setIsEditingOrderSchedule(true);
+                                    setIsEditingOrderDetails(true);
                                   }}
                                   disabled={isSaving}
                                 >
                                   <Pencil className="mr-2 h-4 w-4" />
-                                  日時変更
+                                  編集する
                                 </Button>
                               )}
 
@@ -2065,63 +2101,41 @@ export function ScheduleView({
                   <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 p-1">
                       {renderDetailItem('受注ID', dialogState.order.id)}
-                      {renderDetailItem('お取引先名', findKey(dialogState.order.raw, ['お取引先名', '店舗']))}
-                      {renderDetailItem('機材有無', findKey(dialogState.order.raw, ['機材有無']))}
+                      {renderEditableItem('お取引先名', 'storeName')}
+                      {renderEditableItem('機材有無', 'equipmentStatus')}
 
-                      {/* Editable date/time fields */}
-                      {isEditingOrderSchedule ? (
-                        <>
-                          <div className="sm:col-span-2">
-                            <Label htmlFor="edit-order-date" className="text-sm font-medium">作業予定日</Label>
-                            <Input
-                              id="edit-order-date"
-                              type="date"
-                              value={editedOrderDate}
-                              onChange={(e) => setEditedOrderDate(e.target.value)}
-                              className="mt-1"
-                            />
-                          </div>
-                          <div className="sm:col-span-2">
-                            <Label htmlFor="edit-order-time" className="text-sm font-medium">予定時間</Label>
-                            <Input
-                              id="edit-order-time"
-                              type="time"
-                              value={editedOrderTime}
-                              onChange={(e) => setEditedOrderTime(e.target.value)}
-                              className="mt-1"
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          {renderDetailItem('作業予定日', formatDate(findKey(dialogState.order.raw, ['作業予定日']), 'MM/dd'))}
-                          {renderDetailItem('予定時間', formatTime(findKey(dialogState.order.raw, ['予定時間', 'チップ配置作業予定'])))}
-                        </>
-                      )}
+                      {renderEditableItem('車名', 'carName')}
+                      {renderEditableItem('登録ナンバー(下４桁)', 'regNo')}
+                      {renderEditableItem('入庫状況', 'arrivalStatus')}
+                      {renderEditableItem('タイヤ品番', 'tireNumber')}
+                      {renderEditableItem('タイヤサイズ', 'tireSize')}
+                      {renderEditableItem('品名', 'productName')}
+                      <div className="sm:col-span-2">
+                        {renderEditableItem('作業内容', 'taskDetails', 'textarea')}
+                      </div>
+                      {renderEditableItem('本数', 'quantity')}
+                      {renderEditableItem('空気圧センサーパッキン交換', 'sensor')}
+                      {renderEditableItem('タイヤ手配状況', 'tireStatus')}
+                      {renderEditableItem('廃タイヤ処分', 'disposal')}
+                      <div className="sm:col-span-2">
+                        {renderEditableItem('特記事項', 'specialNotes', 'textarea')}
+                      </div>
 
-                      {renderDetailItem('車名', findKey(dialogState.order.raw, ['車名']))}
-                      {renderDetailItem('登録ナンバー', findKey(dialogState.order.raw, ['登録ナンバー(下４桁)']))}
-                      {renderDetailItem('入庫状況', findKey(dialogState.order.raw, ['入庫状況']))}
-                      {renderDetailItem('タイヤ品番', findKey(dialogState.order.raw, ['タイヤ品番']))}
-                      {renderDetailItem('タイヤサイズ', findKey(dialogState.order.raw, ['タイヤサイズ']))}
-                      {renderDetailItem('品名', findKey(dialogState.order.raw, ['品名']))}
-                      {renderDetailItem('作業内容', findKey(dialogState.order.raw, ['作業内容']))}
-                      {renderDetailItem('本数', findKey(dialogState.order.raw, ['本数']))}
-                      {renderDetailItem('タイヤ手配状況', findKey(dialogState.order.raw, ['タイヤ手配状況']))}
-                      {renderDetailItem('廃タイヤ処分', findKey(dialogState.order.raw, ['廃タイヤ処分']))}
-                      {renderDetailItem('特記事項', findKey(dialogState.order.raw, ['特記事項', 'specialNotes']))}
+                      <div className="col-span-full border-t my-2 pt-2">
+                        <h4 className="text-sm font-semibold mb-2 text-muted-foreground">スケジュール</h4>
+                      </div>
+                      {renderEditableItem('作業予定日', 'scheduledDate', 'date')}
+                      {renderEditableItem('予定時間', 'scheduledTime', 'time')}
                     </div>
                   </div>
-                  <DialogFooter className="sm:justify-between">
+                  <DialogFooter className="sm:justify-between pt-4 border-t">
                     <div className="flex gap-2">
-                      {isEditingOrderSchedule ? (
+                      {isEditingOrderDetails ? (
                         <>
                           <Button
                             variant="outline"
                             onClick={() => {
-                              setIsEditingOrderSchedule(false);
-                              setEditedOrderDate('');
-                              setEditedOrderTime('');
+                              setIsEditingOrderDetails(false);
                             }}
                             disabled={isSaving}
                           >
@@ -2131,35 +2145,24 @@ export function ScheduleView({
                             onClick={async () => {
                               if (!dialogState.order) return;
 
-                              // Validation
-                              if (!editedOrderDate || !editedOrderTime) {
-                                toast({
-                                  title: 'エラー',
-                                  description: '日付と時間を入力してください',
-                                  variant: 'destructive'
-                                });
-                                return;
-                              }
-
                               setIsSaving(true);
 
                               try {
-                                const result = await updateOrderDateTime({
+                                const result = await updateSheetStatus({
                                   gasUrl: ORDER_GAS_URL,
-                                  orderId: dialogState.order.id,
-                                  scheduledDate: editedOrderDate,
-                                  scheduledTime: editedOrderTime,
+                                  eventTitle: `(ID: ${dialogState.order.id})`,
+                                  systemId: dialogState.order.id,
+                                  timestamp: new Date().toISOString(),
+                                  ...editOrderForm,
+                                  shouldSendEmail: false
                                 });
 
                                 if (result.status === 'success') {
                                   toast({
                                     title: '保存しました',
-                                    description: '日付・時間を更新しました'
+                                    description: 'オーダー詳細を更新しました'
                                   });
-                                  setIsEditingOrderSchedule(false);
-                                  setEditedOrderDate('');
-                                  setEditedOrderTime('');
-                                  // Refresh orders to show updated data
+                                  setIsEditingOrderDetails(false);
                                   await refetchOrders();
                                   setDialogState({ mode: 'closed' });
                                 } else {
@@ -2170,7 +2173,7 @@ export function ScheduleView({
                                   });
                                 }
                               } catch (error) {
-                                console.error('Failed to update order schedule:', error);
+                                console.error('Failed to update order details:', error);
                                 toast({
                                   title: 'エラー',
                                   description: '更新に失敗しました',
@@ -2193,34 +2196,11 @@ export function ScheduleView({
                       ) : (
                         <Button
                           onClick={() => {
-                            const rawDate = findKey(dialogState.order.raw, ['作業予定日']);
-                            const rawTime = findKey(dialogState.order.raw, ['予定時間', 'チップ配置作業予定']);
-
-                            // Initialize date
-                            if (rawDate) {
-                              try {
-                                const d = new Date(rawDate);
-                                if (!isNaN(d.getTime())) {
-                                  setEditedOrderDate(format(d, 'yyyy-MM-dd'));
-                                } else {
-                                  setEditedOrderDate(String(rawDate));
-                                }
-                              } catch (e) {
-                                setEditedOrderDate('');
-                              }
-                            }
-
-                            // Initialize time
-                            if (rawTime) {
-                              const tStr = formatTime(rawTime);
-                              setEditedOrderTime(tStr);
-                            }
-
-                            setIsEditingOrderSchedule(true);
+                            setIsEditingOrderDetails(true);
                           }}
                         >
                           <Pencil className="mr-2 h-4 w-4" />
-                          編集
+                          編集する
                         </Button>
                       )}
                     </div>
