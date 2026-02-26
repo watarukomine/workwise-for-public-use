@@ -525,17 +525,47 @@ function updateSheetWithOrderInfo(params) {
         updateColumn(["担当", "スタッフ名", "弊社担当"], staffName);
         updateColumn(["受注ステータス", "ステータス", "判定結果"], statusValue); // キャンセル等を反映
 
-        updateColumn(["最終更新日時", "更新日時", "timestamp"], timestamp ? new Date(timestamp) : undefined);
+        // Helper to safely parse dates coming from React client. React sends ISO strings or YYYY-MM-DD or HH:mm.
+        // Google Sheets sometimes misinterprets standard JS Date objects created from time-only or date-only strings as 1899/1970.
+        // We ensure a safe format is saved.
+        const parseSafeDate = (dateString, isTimeOnly = false) => {
+            if (!dateString) return "";
+            try {
+                // If it's just a time string HH:mm, we can save it directly as string or parse it to a specific date. 
+                // For Sheets, saving time as purely string or a clean time works better.
+                if (isTimeOnly) {
+                    if (dateString.match(/^\d{1,2}:\d{2}$/) || dateString.match(/^\d{1,2}:\d{2}:\d{2}$/)) {
+                        return dateString; // Just save the time string to let Sheets auto-format it as time
+                    }
+                }
+
+                // For JS Date standard strings (e.g. YYYY-MM-DD)
+                if (typeof dateString === 'string' && dateString.includes('-')) {
+                    // For Date only: YYYY-MM-DD -> Sheets recognizes this natively.
+                    if (dateString.length === 10) return dateString;
+                }
+
+                // Fallback to JS Date object if it's a full timestamp
+                const d = new Date(dateString);
+                if (!isNaN(d.getTime())) return d;
+
+                return dateString; // Return original string if parsing fails
+            } catch (e) {
+                return dateString;
+            }
+        };
+
+        updateColumn(["最終更新日時", "更新日時", "timestamp"], timestamp ? parseSafeDate(timestamp) : undefined);
         if (latitude !== undefined && longitude !== undefined) {
             updateColumn(["最終位置情報（緯度,経度）", "位置情報", "座標"], `${latitude}, ${longitude}`);
         }
         if (scheduledTime) {
-            updateColumn(["チップ配置作業予定", "予定時間", "開始時間"], new Date(scheduledTime));
+            updateColumn(["チップ配置作業予定", "予定時間", "開始時間"], parseSafeDate(scheduledTime, true));
         }
         if (scheduledEndTime) {
-            updateColumn(["チップ配置作業完了予定", "終了時間", "完了時間"], new Date(scheduledEndTime));
+            updateColumn(["チップ配置作業完了予定", "終了時間", "完了時間"], parseSafeDate(scheduledEndTime, true));
         }
-        if (scheduledDate) updateColumn(["作業予定日", "予定日"], new Date(scheduledDate));
+        if (scheduledDate) updateColumn(["作業予定日", "予定日"], parseSafeDate(scheduledDate));
         if (comment !== undefined) {
             // スタッフからの緊急連絡
             updateColumn(["緊急連絡", "任意コメント", "受注コメント", "スタッフ連絡", "連絡事項"], comment);
@@ -560,13 +590,13 @@ function updateSheetWithOrderInfo(params) {
         if (params.disposal !== undefined) updateColumn(["廃タイヤ処分", "廃タイヤ"], params.disposal);
 
         // 新規追加: 訪問履歴時間の保存・変更
-        if (params.startTravelTime !== undefined) updateColumn(["移動開始"], params.startTravelTime ? new Date(params.startTravelTime) : "");
-        if (params.arrivalTimestamp !== undefined) updateColumn(["現場到着"], params.arrivalTimestamp ? new Date(params.arrivalTimestamp) : "");
-        if (params.actualStartTime !== undefined) updateColumn(["作業開始", "実績開始"], params.actualStartTime ? new Date(params.actualStartTime) : "");
-        if (params.actualEndTime !== undefined) updateColumn(["作業完了", "実績完了", "実績終了"], params.actualEndTime ? new Date(params.actualEndTime) : "");
+        if (params.startTravelTime !== undefined) updateColumn(["移動開始"], params.startTravelTime ? parseSafeDate(params.startTravelTime, true) : "");
+        if (params.arrivalTimestamp !== undefined) updateColumn(["現場到着"], params.arrivalTimestamp ? parseSafeDate(params.arrivalTimestamp, true) : "");
+        if (params.actualStartTime !== undefined) updateColumn(["作業開始", "実績開始"], params.actualStartTime ? parseSafeDate(params.actualStartTime, true) : "");
+        if (params.actualEndTime !== undefined) updateColumn(["作業完了", "実績完了", "実績終了"], params.actualEndTime ? parseSafeDate(params.actualEndTime, true) : "");
         if (params.actualDuration !== undefined) updateColumn(["作業時間（分）", "所要時間"], params.actualDuration);
         if (actionType && actionTimestamp) {
-            const dateValue = new Date(actionTimestamp);
+            const dateValue = parseSafeDate(actionTimestamp, true);
             const actionColMap = {
                 'Start Travel': "移動開始",
                 'Arrive': "現場到着",

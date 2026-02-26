@@ -51,6 +51,13 @@ import { Checkbox } from '../ui/checkbox';
 import { useCustomer } from '../../contexts/customer-context';
 import { useToast } from '../../hooks/use-toast';
 import { Textarea } from '../ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { useOrder } from '../../contexts/order-context';
 import { updateSheetStatus, sendIcsEmail, createTask, updateOrderDateTime } from '../../app/actions/gas-actions';
 import { ORDER_GAS_URL } from '../../lib/settings';
@@ -1667,7 +1674,7 @@ export function ScheduleView({
     value ? <div className="text-sm"><span className="font-semibold text-muted-foreground">{label}:</span> {String(value)}</div> : null
   );
 
-  const renderEditableItem = (label: string, field: string, type: string = 'text') => {
+  const renderEditableItem = (label: string, field: string, type: 'text' | 'textarea' | 'date' | 'time' | 'number' | 'select' = 'text', options: string[] = []) => {
     if (!isEditingOrderDetails && !editOrderForm[field]) return null;
     return (
       <div className="flex flex-col gap-1 w-full">
@@ -1675,6 +1682,21 @@ export function ScheduleView({
         {isEditingOrderDetails ? (
           type === 'textarea' ? (
             <Textarea value={editOrderForm[field] || ''} onChange={(e) => setEditOrderForm((prev: any) => ({ ...prev, [field]: e.target.value }))} className="text-sm min-h-[80px]" />
+          ) : type === 'select' ? (
+            <Select
+              value={String(editOrderForm[field] || '')}
+              onValueChange={(val) => setEditOrderForm((prev: any) => ({ ...prev, [field]: val === '未選択' ? '' : val }))}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="選択してください" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="未選択">未選択</SelectItem>
+                {options.map(opt => (
+                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : (
             <Input type={type} value={editOrderForm[field] || ''} onChange={(e) => setEditOrderForm((prev: any) => ({ ...prev, [field]: e.target.value }))} className="h-8 text-sm" />
           )
@@ -1874,7 +1896,14 @@ export function ScheduleView({
                         {renderEditableItem('タイヤサイズ', 'tireSize')}
                         {renderEditableItem('品名', 'productName')}
                         <div className="col-span-full">
-                          {renderEditableItem('作業内容', 'taskDetails', 'textarea')}
+                          {renderEditableItem('作業内容', 'taskDetails', 'select', [
+                            '販売店店舗内作業',
+                            'TCC作業',
+                            '持ち帰り作業',
+                            'ホイールセット付替',
+                            '配送のみ',
+                            'その他'
+                          ])}
                         </div>
                         {renderEditableItem('本数', 'quantity')}
                         {renderEditableItem('空気圧センサーパッキン交換', 'sensor')}
@@ -2111,7 +2140,14 @@ export function ScheduleView({
                       {renderEditableItem('タイヤサイズ', 'tireSize')}
                       {renderEditableItem('品名', 'productName')}
                       <div className="col-span-full">
-                        {renderEditableItem('作業内容', 'taskDetails', 'textarea')}
+                        {renderEditableItem('作業内容', 'taskDetails', 'select', [
+                          '販売店店舗内作業',
+                          'TCC作業',
+                          '持ち帰り作業',
+                          'ホイールセット付替',
+                          '配送のみ',
+                          'その他'
+                        ])}
                       </div>
                       {renderEditableItem('本数', 'quantity')}
                       {renderEditableItem('空気圧センサーパッキン交換', 'sensor')}
