@@ -560,7 +560,7 @@ function updateSheetWithOrderInfo(params) {
             updateColumn(["最終位置情報（緯度,経度）", "位置情報", "座標"], `${latitude}, ${longitude}`);
         }
         if (scheduledTime) {
-            updateColumn(["チップ配置作業予定", "予定時間", "開始時間"], parseSafeDate(scheduledTime, true));
+            updateColumn(["チップ配置作業予定", "予定時間"], parseSafeDate(scheduledTime, true));
         }
         if (scheduledEndTime) {
             updateColumn(["チップ配置作業完了予定", "終了時間", "完了時間"], parseSafeDate(scheduledEndTime, true));
@@ -598,10 +598,10 @@ function updateSheetWithOrderInfo(params) {
         if (actionType && actionTimestamp) {
             const dateValue = parseSafeDate(actionTimestamp, true);
             const actionColMap = {
-                'Start Travel': "移動開始",
-                'Arrive': "現場到着",
-                'Begin Task': "作業開始",
-                'Finish Task': "作業完了",
+                'Start Travel': ["移動開始", "移動開始時間", "移動時間"],
+                'Arrive': ["現場到着", "到着時間", "現場到着時間"],
+                'Begin Task': ["作業開始", "実績開始", "開始時間"],
+                'Finish Task': ["作業完了", "実績完了", "実績終了", "終了時間"],
             };
             if (actionColMap[actionType]) {
                 updateColumn(actionColMap[actionType], dateValue);
