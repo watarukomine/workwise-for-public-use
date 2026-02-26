@@ -478,7 +478,7 @@ export function ScheduleView({
   const [editOrderForm, setEditOrderForm] = React.useState<any>({});
 
   React.useEffect(() => {
-    if (dialogState.mode === 'details' && dialogState.event) {
+    if ((dialogState.mode === 'details' || dialogState.mode === 'edit') && dialogState.event) {
       setEditOrderForm({
         storeName: findKey(dialogState.event.raw, ["お取引先名", "店舗", "店舗名", "名称", "店舗名称", "Customer", "お名前"]) || '',
         equipmentStatus: findKey(dialogState.event.raw, ["機材有無"]) || '',
@@ -1453,6 +1453,7 @@ export function ScheduleView({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`,
             systemId: eventToUpdate.systemId,
+            ...editOrderForm, // CRITICAL FIX: Spread first so explicit date/time below overrides raw form data
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             scheduledTime: format(newStart, 'HH:mm'), // Changed to HH:mm for clarity against 1970 bugs
             scheduledEndTime: format(finalEnd, 'HH:mm'),
@@ -1463,7 +1464,6 @@ export function ScheduleView({
             "作業予定日": format(newStart, 'yyyy/MM/dd'),
             "作業時間（分）": durationMinutes,
             staffName: staff?.name,
-            ...editOrderForm, // CRITICAL FIX: Include form updates like startTravelTime, customerName, etc.
             shouldSendEmail: !!emailParams,
             emailParams: emailParams
           });

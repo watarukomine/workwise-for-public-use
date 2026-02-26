@@ -74,7 +74,8 @@ export const formatTime = (date: Date | string) => {
     }
     return "";
   }
-  // Ignore 1970 bugs completely, return format time
+  // Ignore 1970 bugs completely, return empty string so it doesn't prefill 09:00
+  if (d.getFullYear() <= 1970) return '';
   return format(d, 'HH:mm');
 };
 
