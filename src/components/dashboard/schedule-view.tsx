@@ -2384,7 +2384,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const equipmentSymbol = getStatusSymbol(equipmentStatus);
   const tireSize = event.raw ? findKey(event.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
   const honsu = event.raw ? findKey(event.raw, ['本数', 'honsu']) : undefined;
-  const customerName = event.customerName || (event.raw ? findKey(event.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined) || customer?.storeName || event.title || line1;
+  const customerName = isTravelEvent ? '移動' : (event.customerName || (event.raw ? findKey(event.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined) || customer?.storeName || event.title || line1);
   const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(event.status || ''));
 
   const eventContent = (
