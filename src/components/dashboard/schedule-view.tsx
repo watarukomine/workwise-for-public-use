@@ -1076,7 +1076,7 @@ export function ScheduleView({
           const travelStart = subMinutes(taskStart, 30);
           const travelEvent: WithId<ScheduleEvent> = {
             id: `${derivedTripId}-travel`,
-            title: '移動: 同行',
+            title: '移動',
             description: '',
             staffId: newStaffId, locationId: '',
             start: travelStart.toISOString(),
@@ -1120,7 +1120,7 @@ export function ScheduleView({
         const travelEvent: WithId<ScheduleEvent> = {
           ...order,
           id: `${tripId}-travel`, tripId,
-          title: `移動: ${customer?.storeName || order.taskDetails.split('\n')[0]}`,
+          title: '移動',
           staffId: newStaffId, locationId: customer?.userCode || '',
           start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(), end: taskStart.toISOString(),
           rawOrderId: order.rawOrderId, raw: order.raw, systemId: order.id,

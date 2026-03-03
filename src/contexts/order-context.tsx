@@ -298,7 +298,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
             ...item.order,
             id: `${item.tripId}-travel`,
             tripId: item.tripId,
-            title: `移動: ${item.order.customerName || item.order.taskDetails.split('\n')[0]}`,
+            title: '移動',
             staffId: item.staffId,
             locationId: item.order.customerCode || '',
             start: subMinutes(item.start, TRAVEL_TIME_MINUTES).toISOString(),
