@@ -64,6 +64,7 @@ import { ORDER_GAS_URL } from '../../lib/settings';
 import { Mail, Pencil, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { createContext, useContext, useState } from 'react';
 import { STORE_COLORS } from '../../lib/constants';
+import { useUserProfile } from '../../hooks/use-user-profile';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -1352,7 +1353,22 @@ export function ScheduleView({
     }
   };
 
-  const handleSaveEvent = async (shouldSendEmail: boolean = false) => {
+  const handleForceComplete = async () => {
+    const target = (dialogState as any).event || (dialogState as any).order;
+    if (!target) return;
+    if (!confirm('この作業を強制的に「完了」（済マーク）にしますか？\n完了時刻は現在の時刻が自動入力されます。')) return;
+
+    const now = new Date();
+    const currentTimeStr = format(now, 'HH:mm');
+
+    // Force values directly into handleSaveEvent overrides
+    await handleSaveEvent(false, {
+      statusValue: '作業完了',
+      actualEndTime: currentTimeStr
+    });
+  };
+
+  const handleSaveEvent = async (shouldSendEmail: boolean = false, overrides: any = {}) => {
     if (dialogState.mode === 'closed') return;
     setIsSaving(true);
 
@@ -1439,9 +1455,12 @@ export function ScheduleView({
         }
         toast({ title: '予定を保存しました' });
 
-      } else if (dialogState.mode === 'edit' || dialogState.mode === 'details') {
-        // --- Mode 2: Edit/Details ---
-        const eventToUpdate = dialogState.event;
+      } else if (dialogState.mode === 'edit' || dialogState.mode === 'details' || (dialogState as any).mode === 'order-details') {
+        const eventToUpdate = (dialogState as any).event || (dialogState as any).order;
+        if (!eventToUpdate) {
+          setIsSaving(false);
+          return;
+        }
         const { title, description } = editedEventDetails;
 
         // Sheet-based event (Order OR Generic Task)
@@ -1476,7 +1495,8 @@ export function ScheduleView({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`,
             systemId: eventToUpdate.systemId,
-            ...editOrderForm, // CRITICAL FIX: Spread first so explicit date/time below overrides raw form data
+            ...editOrderForm,
+            ...overrides, // High-priority overrides (e.g., status/time from Force Complete)
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             scheduledTime: format(newStart, 'HH:mm'), // Changed to HH:mm for clarity against 1970 bugs
             scheduledEndTime: format(finalEnd, 'HH:mm'),
@@ -2037,6 +2057,18 @@ export function ScheduleView({
                                 >
                                   <Pencil className="mr-2 h-4 w-4" />
                                   編集する
+                                </Button>
+                              )}
+
+                              {isAdmin && dialogState.mode === 'details' && (
+                                <Button
+                                  variant="outline"
+                                  onClick={handleForceComplete}
+                                  disabled={isSaving}
+                                  className="border-green-600 text-green-600 hover:bg-green-50"
+                                >
+                                  <CheckCircle className="mr-2 h-4 w-4" />
+                                  強制完了
                                 </Button>
                               )}
 
