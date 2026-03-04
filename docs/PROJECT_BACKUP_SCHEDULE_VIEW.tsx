@@ -1475,6 +1475,7 @@ export function ScheduleView({
             end: finalEnd.toISOString(),
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             title: title || eventToUpdate.title,
+            status: overrides.statusValue || eventToUpdate.status,
             estimatedDuration: durationMinutes,
             taskDetails: description || eventToUpdate.taskDetails
           };
