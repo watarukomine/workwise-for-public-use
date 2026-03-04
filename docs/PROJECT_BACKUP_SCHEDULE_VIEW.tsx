@@ -461,6 +461,9 @@ export function ScheduleView({
   currentDate,
   statuses,
 }: ScheduleViewProps) {
+  const { profile } = useUserProfile();
+  const isAdmin = profile?.role === 'admin';
+
 
   const { customers: allCustomers } = useCustomer();
   const { allStaff } = useSelectedStaff(); // Get full list
