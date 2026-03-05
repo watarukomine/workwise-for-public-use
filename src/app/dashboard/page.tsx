@@ -390,6 +390,8 @@ export default function DashboardPage() {
           });
 
           if (activeEvent) {
+            // If the event has a completion time (済 mark), it's done — show 待機中
+            if (activeEvent.actualEndTime) return '待機中';
             const title = activeEvent.title || '';
             if (title.startsWith('移動')) return '移動中？';
             return '作業中？';
