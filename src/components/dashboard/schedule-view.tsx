@@ -2420,6 +2420,11 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const equipmentSymbol = getStatusSymbol(equipmentStatus);
   const tireSize = event.raw ? findKey(event.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
   const honsu = event.raw ? findKey(event.raw, ['本数', 'honsu']) : undefined;
+  const carName_val = event.raw ? findKey(event.raw, ["車名", "車両", "車種"]) : undefined;
+  const regNo = event.raw ? findKey(event.raw, ["登録ナンバー(下４桁)", "登録ナンバー", "ナンバー", "車番", "登録番号"]) : undefined;
+  const arrangement = event.raw ? findKey(event.raw, ["タイヤ手配状況", "手配"]) : undefined;
+  const disposal = event.raw ? findKey(event.raw, ["廃タイヤ処分", "廃タイヤ"]) : undefined;
+
   const customerName = isTravelEvent ? '移動' : (event.customerName || (event.raw ? findKey(event.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined) || customer?.storeName || event.title || line1);
   const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(event.status || ''));
 
@@ -2444,7 +2449,19 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
         </div>
       )}
       <p className="text-xs font-semibold truncate pointer-events-none pr-4">{customerName || event.title || line1}</p>
-      <p className="text-xs opacity-80 truncate pointer-events-none">{formatTime(event.start)}</p>
+      <div className="flex items-center justify-between pointer-events-none">
+        <p className="text-xs opacity-80 truncate">{formatTime(event.start)}</p>
+        {!isTravelEvent && (carName_val || regNo || tireSize || honsu || arrangement || disposal) && (
+          <div className="flex flex-wrap gap-x-1 gap-y-0 text-[10px] items-center justify-end flex-1 ml-2 overflow-hidden">
+            {carName_val && <span className="truncate max-w-[50px]">{carName_val}</span>}
+            {regNo && <span className="opacity-70">{regNo}</span>}
+            {tireSize && <span className="text-blue-600 font-medium">{tireSize}</span>}
+            {honsu && <span className="text-blue-600">{formatHonsu(honsu)}</span>}
+            {arrangement && <span className="text-orange-600">手:{arrangement}</span>}
+            {disposal && <span className="text-purple-600">廃:{disposal}</span>}
+          </div>
+        )}
+      </div>
     </div>
   );
 
