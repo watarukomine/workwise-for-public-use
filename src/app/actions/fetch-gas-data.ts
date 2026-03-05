@@ -59,9 +59,9 @@ export async function fetchGasData(url: string): Promise<{ data?: any; error?: s
   } catch (error: any) {
     console.error('Server-side fetch to GAS failed:', error.message);
     if (error.name === 'AbortError') {
-      return { error: 'Request timed out after 30 seconds.' };
+      return { error: 'データ取得がタイムアウト（30秒）しました。スプレッドシートのデータ量が多すぎるか、GAS側に問題がある可能性があります。' };
     }
-    return { error: error.message || 'An unknown error occurred during the server fetch.' };
+    return { error: error.message || 'データ取得中に原因不明のエラーが発生しました。' };
   }
 }
 

@@ -86,15 +86,26 @@ function doGet(e) {
     }
 }
 // シートデータをオブジェクト配列として取得するヘルパー
-function getSheetData(sheet) {
-    const dataRange = sheet.getDataRange();
-    const displayValues = dataRange.getDisplayValues(); // String representation (formatted)
-    const rawValues = dataRange.getValues(); // Raw objects (Date, number, boolean)
+function getSheetData(sheet, maxRows = 2000) {
+    const totalRows = sheet.getLastRow();
+    if (totalRows <= 1) return [];
 
-    if (displayValues.length < 1) return [];
+    let startRow = 1;
+    let numRows = totalRows;
 
-    const headers = displayValues.shift();
-    rawValues.shift(); // Remove buffer for headers from raw array matches
+    // 読み込み行数を制限（最新のデータを優先）
+    if (maxRows && totalRows > maxRows + 1) {
+        startRow = totalRows - maxRows + 1;
+        numRows = maxRows;
+    }
+
+    // ヘッダーは常に1行目から取得
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+    // データ範囲を取得
+    const dataRange = sheet.getRange(startRow > 1 ? startRow : 2, 1, startRow > 1 ? numRows : numRows - 1, headers.length);
+    const displayValues = dataRange.getDisplayValues();
+    const rawValues = dataRange.getValues();
 
     const sheetId = sheet.getSheetId();
     const spreadsheetId = sheet.getParent().getId();
@@ -102,28 +113,24 @@ function getSheetData(sheet) {
     return displayValues.map((row, rowIndex) => {
         const obj = {};
         const rawRow = rawValues[rowIndex];
+        const actualRowIndex = (startRow > 1 ? startRow : 2) + rowIndex;
 
         headers.forEach((header, index) => {
+            const h = String(header).trim();
+            if (!h) return;
             const displayValue = row[index];
             const rawValue = rawRow[index];
 
-            // CRITICAL FIX: If raw value is a Date object, use it (toISOString) to preserve full date info,
-            // even if the sheet formatting hides the date (e.g. "HH:mm").
             if (rawValue && rawValue instanceof Date && !isNaN(rawValue.getTime())) {
-                obj[header] = rawValue.toISOString();
+                obj[h] = rawValue.toISOString();
             } else {
-                obj[header] = displayValue;
+                obj[h] = displayValue;
             }
         });
-        // Order_URL (編集用リンク)
-        obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${rowIndex + 2}`;
 
-        // SystemIDがない古いデータへの互換性対応
-        // SystemIDが空なら、便宜的にRowIDを使う（ただしソート危険性は残るが、アプリが落ちないようにする）
-        if (!obj['SystemID']) {
-            // 下位互換用：SystemID列が無い、または空の場合は
-            // 既存ロジック(createOrderでSystemIDを埋めるまではここに来ないかもですが)
-        }
+        // Order_URL (編集用リンク) - 実際の行番号を使用
+        obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${actualRowIndex}`;
+
         return obj;
     });
 }

@@ -30,7 +30,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#ffffff" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png"></link>
       </head>
-      <body className="font-body antialiased">
+      <body className="font-body antialiased" suppressHydrationWarning>
         <FirebaseClientProvider>
           <UserProfileProvider>
             <SelectedStaffProvider>
