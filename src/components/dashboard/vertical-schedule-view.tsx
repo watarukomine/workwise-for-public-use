@@ -6,7 +6,7 @@ import type { WithId, Staff, Customer } from '../../lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { format, parseISO, isEqual, startOfDay, isValid } from 'date-fns';
 import { Clock, MapPin, Briefcase } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, findKey } from '../../lib/utils';
 import { useCustomer } from '../../contexts/customer-context';
 import Link from 'next/link';
 import { useOrder } from '../../contexts/order-context';
@@ -82,6 +82,16 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
 
         const staffColorStyle = { backgroundColor: staffMember?.color || 'gray' };
 
+        // Extract order details from raw data
+        const raw = (event as any).raw;
+        const carName = raw ? findKey(raw, ['車名', '車種', '車両']) : undefined;
+        const regNo = raw ? findKey(raw, ['登録ナンバー(下４桁)', '登録ナンバー', 'ナンバー', '車番', '登録番号']) : undefined;
+        const tireSize = raw ? findKey(raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
+        const tireNumber = raw ? findKey(raw, ['本数', 'honsu']) : undefined;
+        const arrangement = raw ? findKey(raw, ['タイヤ手配状況', '手配']) : undefined;
+        const disposal = raw ? findKey(raw, ['廃タイヤ処分', '廃タイヤ']) : undefined;
+        const hasOrderDetails = !isTravel && (carName || regNo || tireSize || tireNumber || arrangement || disposal);
+
         const eventCard = (
           <Card className={cn(
             "cursor-pointer hover:bg-muted/50",
@@ -113,6 +123,16 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
               {staffMember && (
                 <div className="flex items-center gap-2 mt-2 text-xs font-medium text-slate-600 dark:text-slate-400 bg-white/50 dark:bg-black/20 p-1 rounded inline-block">
                   <span>担当: {staffMember.name}</span>
+                </div>
+              )}
+              {hasOrderDetails && (
+                <div className="mt-3 pt-2 border-t border-muted flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                  {carName && <span><span className="font-semibold text-slate-500">車種:</span> {carName}</span>}
+                  {regNo && <span><span className="font-semibold text-slate-500">ナンバー:</span> {regNo}</span>}
+                  {tireSize && <span><span className="font-semibold text-blue-600">サイズ:</span> {tireSize}</span>}
+                  {tireNumber && <span><span className="font-semibold text-blue-600">本数:</span> {tireNumber}本</span>}
+                  {arrangement && <span><span className="font-semibold text-orange-600">手配:</span> {arrangement}</span>}
+                  {disposal && <span><span className="font-semibold text-purple-600">廃タイヤ:</span> {disposal}</span>}
                 </div>
               )}
             </CardContent>
