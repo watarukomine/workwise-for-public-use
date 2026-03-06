@@ -1,10 +1,13 @@
 import type { NextConfig } from 'next';
 import path from 'path';
 
+import packageJson from './package.json';
+
 const nextConfig: NextConfig = {
   /* config options here */
   env: {
     NEXT_PUBLIC_NODE_ENV: process.env.NODE_ENV,
+    NEXT_PUBLIC_APP_VERSION: packageJson.version,
   },
   images: {
     remotePatterns: [
