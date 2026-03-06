@@ -274,6 +274,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         ) : null}
                     </header>
                     <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+                    <div className="fixed bottom-1 right-2 text-[10px] text-muted-foreground/40 pointer-events-none z-50 font-mono">
+                        v1.1.6
+                    </div>
                 </SidebarInset>
             </SidebarProvider>
         )
@@ -333,6 +336,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
             </header>
             <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
+            <div className="fixed bottom-1 right-2 text-[10px] text-muted-foreground/40 pointer-events-none z-50 font-mono">
+                v1.1.6
+            </div>
         </div>
     )
 }
