@@ -111,12 +111,45 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
   const startOfTimelineDay = new Date(start);
   startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
 
-  const leftInMinutes = differenceInMinutes(start, startOfTimelineDay);
-  const widthInMinutes = differenceInMinutes(end, start);
+  const endOfTimelineDay = new Date(start);
+  endOfTimelineDay.setHours(timelineEndHour, 0, 0, 0);
+
+  // If the event starts after the timeline ends, clamp it to the very end
+  // to prevent it from disappearing completely.
+  let effectiveStart = start;
+  if (start > endOfTimelineDay) {
+    effectiveStart = endOfTimelineDay;
+  }
+
+  const leftInMinutes = differenceInMinutes(effectiveStart, startOfTimelineDay);
+  let widthInMinutes = differenceInMinutes(end, effectiveStart);
+
+  // Check if the event extends beyond the end of the timeline
+  if (addMinutes(effectiveStart, widthInMinutes) > endOfTimelineDay) {
+    const overflowMinutes = differenceInMinutes(addMinutes(effectiveStart, widthInMinutes), endOfTimelineDay);
+    widthInMinutes -= overflowMinutes;
+  }
+
+  // Ensure minimum width of 15 minutes if it was clipped, 
+  // or 30 minutes if it was normally short.
+  // But if the timeline itself has no more room, it might be 0, so clamp to min 15px maybe?
+  let widthPixels = minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30);
+
+  // Hard minimum width so the chip is always clickable even if pushed exactly to 19:00
+  if (widthPixels < 20) {
+    widthPixels = 20;
+  }
+
+  // If the event is pushed past the end, adjust left to make room for the minimum width
+  let leftPixels = minutesToPixels(leftInMinutes);
+  const maxLeftPixels = minutesToPixels(timelineTotalHours * 60) - widthPixels;
+  if (leftPixels > maxLeftPixels) {
+    leftPixels = maxLeftPixels;
+  }
 
   return {
-    left: minutesToPixels(leftInMinutes),
-    width: minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30),
+    left: leftPixels,
+    width: widthPixels,
   };
 };
 
