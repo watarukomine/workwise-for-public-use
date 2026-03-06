@@ -181,6 +181,7 @@ function onOpen() {
     const ui = SpreadsheetApp.getUi();
     ui.createMenu('WorkWise メニュー')
         .addItem('古い受注行を非表示にする（2日前以前）', 'hideOldOrderRows')
+        .addItem('すべての行を再表示する', 'unhideAllRows')
         .addToUi();
 }
 
@@ -252,6 +253,26 @@ function hideOldOrderRows() {
     }
 
     SpreadsheetApp.getUi().alert("完了", `${hideCount}行の古い受注データを非表示にしました。`, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+/**
+ * すべての非表示行を再表示します
+ */
+function unhideAllRows() {
+    const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
+    if (!sheet) {
+        SpreadsheetApp.getUi().alert("エラー", `シート「${ORDER_SHEET_NAME}」が見つかりません。`, SpreadsheetApp.getUi().ButtonSet.OK);
+        return;
+    }
+
+    const maxRows = sheet.getMaxRows();
+    if (maxRows > 1) {
+        sheet.showRows(2, maxRows - 1); // 2行目から最後まで再表示（1行目のヘッダーは除外）
+        SpreadsheetApp.getUi().alert("完了", "すべての行を再表示しました。", SpreadsheetApp.getUi().ButtonSet.OK);
+    } else {
+        SpreadsheetApp.getUi().alert("情報", "データがありません。", SpreadsheetApp.getUi().ButtonSet.OK);
+    }
 }
 function errorResponse(msg) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: msg })).setMimeType(ContentService.MimeType.JSON);
