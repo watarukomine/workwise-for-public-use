@@ -31,4 +31,4 @@ env:
   - variable: NEXT_PUBLIC_CUSTOMER_GAS_URL
     value: https://script.google.com/macros/s/AKfycbz9CFA3PdNTi5fQhnxz5Dm6-copXjMPpCKvJtSGB80Na5cVSsdYXfgO-g5EQPK66BrcCA/exec
   - variable: NEXT_PUBLIC_ORDER_GAS_URL
-    value: https://script.google.com/macros/s/AKfycbyFuint2nyAS92jeoy-dAdNHAHdZVQskmdVxmMjzUj0db54avg0zXGPOzJLzu-0hyxS/exec
+    value: https://script.google.com/macros/s/AKfycbxlWs0C3pjgZng_qugovO1P8wI4pbkcFMY40ViKn6oMQOGII8dyEh0GbIOXK8r4C00f/exec
