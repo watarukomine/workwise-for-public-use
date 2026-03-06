@@ -80,7 +80,14 @@ export function ShareOrderFormModal({ variant = 'default' }: { variant?: 'defaul
             )}
 
             <Dialog open={isOpen} onOpenChange={setIsOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent
+                    className="sm:max-w-md"
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+                            e.preventDefault();
+                        }
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>注文フォームを共有</DialogTitle>
                         <DialogDescription>

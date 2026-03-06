@@ -380,7 +380,14 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
           <CardTitle>ルート詳細</CardTitle>
           <CardDescription>出発地、目的地、経由地、最適化の基準を選択してください。</CardDescription>
         </CardHeader>
-        <form action={formActionWithState}>
+        <form
+          action={formActionWithState}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+              e.preventDefault();
+            }
+          }}
+        >
           <CardContent className="space-y-6">
             <input type="hidden" name="startLocation" value={startLocation ? JSON.stringify(startLocation) : ''} />
             <input type="hidden" name="endLocation" value={endLocation ? JSON.stringify(endLocation) : ''} />

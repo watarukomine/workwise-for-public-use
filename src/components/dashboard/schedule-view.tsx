@@ -1954,7 +1954,14 @@ export function ScheduleView({
           </div>
 
           <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
-            <DialogContent className={cn((dialogState.mode === 'details' || dialogState.mode === 'order-details') ? "max-w-[95vw] md:max-w-3xl lg:max-w-5xl" : "max-w-lg")}>
+            <DialogContent
+              className={cn((dialogState.mode === 'details' || dialogState.mode === 'order-details') ? "max-w-[95vw] md:max-w-3xl lg:max-w-5xl" : "max-w-lg")}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+                  e.preventDefault();
+                }
+              }}
+            >
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   {dialogState.mode === 'details' ? '受注詳細' : dialogState.mode === 'edit' ? '予定の編集' : dialogState.mode === 'order-details' ? '未割当オーダー詳細' : '新規予定の作成'}
