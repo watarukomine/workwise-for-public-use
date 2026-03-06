@@ -122,7 +122,13 @@ function getSheetData(sheet, maxRows = 2000) {
             const rawValue = rawRow[index];
 
             if (rawValue && rawValue instanceof Date && !isNaN(rawValue.getTime())) {
-                obj[h] = rawValue.toISOString();
+                // 1899年/1900年など「時間だけ」のセルの場合は、タイムゾーン（9時間ズレ）の影響を
+                // 受けないように、スプレッドシートの見た目通りの文字列（12:00 等）をそのまま送る
+                if (rawValue.getFullYear() < 1970) {
+                    obj[h] = displayValue;
+                } else {
+                    obj[h] = rawValue.toISOString();
+                }
             } else {
                 obj[h] = displayValue;
             }
@@ -166,6 +172,86 @@ function doPost(e) {
     } catch (error) {
         return errorResponse("エラーが発生しました: " + error.message);
     }
+}
+
+/**
+ * スプレッドシートを開いたときにカスタムメニューを追加します
+ */
+function onOpen() {
+    const ui = SpreadsheetApp.getUi();
+    ui.createMenu('WorkWise メニュー')
+        .addItem('古い受注行を非表示にする（2日前以前）', 'hideOldOrderRows')
+        .addToUi();
+}
+
+/**
+ * 「作業予定日」が2日前以前（今日から見て2日前より過去）の行を非表示にします
+ */
+function hideOldOrderRows() {
+    const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+    const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
+    if (!sheet) {
+        SpreadsheetApp.getUi().alert("エラー", `シート「${ORDER_SHEET_NAME}」が見つかりません。`, SpreadsheetApp.getUi().ButtonSet.OK);
+        return;
+    }
+
+    const dataRange = sheet.getDataRange();
+    const values = dataRange.getValues();
+    if (values.length <= 1) {
+        SpreadsheetApp.getUi().alert("情報", "データがありません。", SpreadsheetApp.getUi().ButtonSet.OK);
+        return;
+    }
+
+    const headers = values[0];
+    const dateColIndex = headers.indexOf('作業予定日');
+
+    if (dateColIndex === -1) {
+        SpreadsheetApp.getUi().alert("エラー", "「作業予定日」の列が見つかりません。", SpreadsheetApp.getUi().ButtonSet.OK);
+        return;
+    }
+
+    // 基準日（今日から2日前）の計算
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const thresholdDate = new Date(today);
+    thresholdDate.setDate(thresholdDate.getDate() - 2);
+
+    let hideCount = 0;
+
+    // 2行目からループしてチェック
+    for (let i = 1; i < values.length; i++) {
+        const rowNum = i + 1;
+        const dateVal = values[i][dateColIndex];
+
+        // 指定の行がすでにユーザーによって非表示にされているかチェック
+        // ※ 毎回チェックすると遅くなる可能性があるので、API呼び出し回数を抑える配慮もできるが
+        // 今回は数千行レベルを想定してそのまま実行
+
+        if (dateVal) {
+            let rowDate = null;
+            if (dateVal instanceof Date) {
+                rowDate = dateVal;
+            } else if (typeof dateVal === 'string' || typeof dateVal === 'number') {
+                const parsed = new Date(dateVal);
+                if (!isNaN(parsed.getTime())) {
+                    rowDate = parsed;
+                }
+            }
+
+            if (rowDate) {
+                rowDate.setHours(0, 0, 0, 0);
+                // 2日前「以前」の行を非表示にする
+                if (rowDate.getTime() <= thresholdDate.getTime()) {
+                    if (!sheet.isRowHiddenByUser(rowNum)) {
+                        sheet.hideRows(rowNum);
+                        hideCount++;
+                    }
+                }
+            }
+        }
+    }
+
+    SpreadsheetApp.getUi().alert("完了", `${hideCount}行の古い受注データを非表示にしました。`, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 function errorResponse(msg) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: msg })).setMimeType(ContentService.MimeType.JSON);
