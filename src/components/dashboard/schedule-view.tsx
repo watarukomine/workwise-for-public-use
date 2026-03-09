@@ -2491,16 +2491,6 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
       <p className="text-xs font-semibold truncate pointer-events-none pr-4">{customerName || event.title || line1}</p>
       <div className="flex items-center justify-between pointer-events-none">
         <p className="text-xs opacity-80 truncate">{formatTime(event.start)}</p>
-        {!isTravelEvent && (carName_val || regNo || tireSize || honsu || arrangement || disposal) && (
-          <div className="flex md:hidden flex-wrap gap-x-1 gap-y-0 text-[10px] items-center justify-end flex-1 ml-2 overflow-hidden">
-            {carName_val && <span className="truncate max-w-[50px]">{carName_val}</span>}
-            {regNo && <span className="opacity-70">{regNo}</span>}
-            {tireSize && <span className="text-blue-600 font-medium">{tireSize}</span>}
-            {honsu && <span className="text-blue-600">{formatHonsu(honsu)}</span>}
-            {arrangement && <span className="text-orange-600">手:{arrangement}</span>}
-            {disposal && <span className="text-purple-600">廃:{disposal}</span>}
-          </div>
-        )}
       </div>
     </div>
   );
