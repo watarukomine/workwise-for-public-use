@@ -42,11 +42,14 @@ export function useFcm() {
 
         if (token) {
           console.log('[FCM] Token acquired:', token);
-          // Save token to Realtime Database
-          const tokenRef = ref(database, `admin_fcm_tokens/${profile.id}`);
+          // Save token to Realtime Database using a hash of the token as the key
+          // This allows multiple devices (PC, Mobile) to have their own tokens
+          const tokenKey = btoa(token).replace(/[=/+]/g, '').substring(0, 20);
+          const tokenRef = ref(database, `admin_fcm_tokens/${profile.id}/${tokenKey}`);
           await set(tokenRef, {
             token,
             updatedAt: new Date().toISOString(),
+            platform: typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop'
           });
           console.log('[FCM] Token saved to DB');
         } else {

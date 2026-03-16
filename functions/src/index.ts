@@ -33,9 +33,26 @@ export const sendEmergencyNotification = onValueUpdated({
     return;
   }
 
-  const tokens: string[] = Object.values(tokensData).map((v: any) => v.token);
+  const tokens: string[] = [];
+  // 構造: admin_fcm_tokens -> {userId} -> {tokenObj OR deviceId: {tokenObj}}
+  Object.values(tokensData).forEach((userTokens: any) => {
+    if (userTokens.token) {
+      // 旧フォーマット (直接 token を持っている場合)
+      tokens.push(userTokens.token);
+    } else if (typeof userTokens === 'object') {
+      // 新フォーマット (デバイスIDの下に token を持っている場合)
+      Object.values(userTokens).forEach((deviceData: any) => {
+        if (deviceData.token) {
+          tokens.push(deviceData.token);
+        }
+      });
+    }
+  });
 
-  if (tokens.length === 0) return;
+  if (tokens.length === 0) {
+    logger.log("No valid FCM tokens found.");
+    return;
+  }
 
   // 2. 通知を送信
   // 注: 実際のプロジェクトでは、ここでどのスタッフからの緊急連絡か等の詳細を含めるのが理想的です。
