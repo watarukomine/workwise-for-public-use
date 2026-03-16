@@ -1,13 +1,15 @@
 steps:
+  # 1. 依存関係のインストール
   - name: 'gcr.io/cloud-builders/npm'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        echo "Starting build process..."
-        npm install --quiet
-        echo "Dependencies installed. Running build..."
-        ./node_modules/.bin/next build
+    id: 'Install'
+    args: ['install', '--quiet']
+
+  # 2. Next.js のビルド
+  - name: 'gcr.io/cloud-builders/npm'
+    id: 'Build'
+    args: ['run', 'build']
+
 timeout: '1200s'
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8' # メモリ不足対策
