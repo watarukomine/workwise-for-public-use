@@ -23,7 +23,7 @@ export function useFcm() {
       notificationPermission: typeof Notification !== 'undefined' ? Notification.permission : 'not supported'
     });
 
-    if (!messaging || !profile?.id || profile.role !== 'admin') {
+    if (!messaging || !database || !profile?.id || profile.role !== 'admin') {
       console.log('[FCM] Skipping permission request (not admin or not initialized)');
       return;
     }
