@@ -1,9 +1,13 @@
 steps:
-  # フロントエンドのビルド
   - name: 'gcr.io/cloud-builders/npm'
-    args: ['install']
-  - name: 'gcr.io/cloud-builders/npm'
-    args: ['run', 'build']
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Starting build process..."
+        npm install --quiet
+        echo "Dependencies installed. Running build..."
+        ./node_modules/.bin/next build
 timeout: '1200s'
 options:
   logging: CLOUD_LOGGING_ONLY
