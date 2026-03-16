@@ -11,6 +11,7 @@ import { OrderProvider } from '@/contexts/order-context';
 import { UserProfileProvider } from '@/contexts/user-profile-provider';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { useRouter } from 'next/navigation';
+import { FcmHandler } from '@/components/fcm-handler';
 
 export default function RootLayout({
   children,
@@ -37,6 +38,7 @@ export default function RootLayout({
               <CustomerProvider>
                 <OrderProvider>
                   <AppShellProvider>
+                    <FcmHandler />
                     <AppShell>
                       {children}
                     </AppShell>

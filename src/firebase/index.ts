@@ -6,6 +6,7 @@ import { getFirestore, initializeFirestore, memoryLocalCache, Firestore } from '
 import { getFunctions, Functions } from 'firebase/functions';
 import { getDatabase, Database } from 'firebase/database';
 import { Auth, getAuth } from 'firebase/auth';
+import { getMessaging, Messaging } from 'firebase/messaging';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
@@ -77,12 +78,23 @@ export function getSdks(firebaseApp: FirebaseApp) {
     firestore = getFirestore(firebaseApp, 'workwise');
   }
 
+  // Messaging is client-side only, so check for window
+  let messaging: Messaging | undefined;
+  if (typeof window !== 'undefined') {
+    try {
+      messaging = getMessaging(firebaseApp);
+    } catch (e) {
+      console.warn('[Firebase] Messaging initialization failed:', e);
+    }
+  }
+
   return {
     firebaseApp,
     auth: getAuth(firebaseApp),
     firestore,
     functions: getFunctions(firebaseApp, region),
     database: getDatabase(firebaseApp),
+    messaging,
   };
 }
 
@@ -92,6 +104,7 @@ export type FirebaseSdks = {
   firestore: Firestore;
   functions: Functions;
   database: Database;
+  messaging?: Messaging;
 };
 
 export * from './provider';

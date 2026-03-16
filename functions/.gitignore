@@ -1,0 +1,9 @@
+# node_modules
+node_modules/
+
+# Compiled JS
+lib/
+
+# Firebase debug logs
+firebase-debug.log
+firebase-debug.*.log
