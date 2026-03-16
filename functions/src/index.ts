@@ -10,7 +10,7 @@ initializeApp();
  * Realtime Database の更新をトリガーに、管理者へプッシュ通知を送信する
  */
 export const sendEmergencyNotification = onValueUpdated({
-  ref: "/signals/orders_updated",
+  ref: "/signals/emergency_active",
   region: "us-central1"
 }, async (event) => {
   const data = event.data.after.val();

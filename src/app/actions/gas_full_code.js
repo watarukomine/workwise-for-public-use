@@ -311,7 +311,7 @@ function createTask(params) {
         // 信号を送信
         SpreadsheetApp.flush();
         // 信号を送信
-        sendFirebaseSignal();
+        sendFirebaseSignal('update');
         return successResponse("タスクを作成しました", { eventId: id });
     } catch (e) {
         console.error("createTask Error:", e);
@@ -451,7 +451,7 @@ function createOrder(params) {
         // 書き込み
         sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
         // 信号を送信
-        sendFirebaseSignal();
+        sendFirebaseSignal('update');
         // SystemIDを返す (Frontendはこれを使って管理する)
         return successResponse("注文を登録しました。", { orderId: newSystemId, displayId: targetRow - 1 });
     } catch (error) {
@@ -764,7 +764,7 @@ function updateSheetWithOrderInfo(params) {
         }
         SpreadsheetApp.flush(); // Ensure immediate write
         // 信号を送信
-        sendFirebaseSignal();
+        sendFirebaseSignal('update');
 
         // --- パフォーマンス改善: メール送信の統合 ---
         let emailResultMsg = "";
@@ -866,7 +866,7 @@ function updateTaskSheet(taskId, params) {
         sheet.deleteRow(rowNum);
         SpreadsheetApp.flush(); // 即時反映
         // 信号を送信
-        sendFirebaseSignal();
+        sendFirebaseSignal('update');
         return successResponse(`タスクID: ${taskId} を削除しました。`, {
             debug: {
                 action: 'deleteRow',
@@ -894,26 +894,36 @@ function updateTaskSheet(taskId, params) {
     });
 
     // 信号を送信
-    sendFirebaseSignal();
+    sendFirebaseSignal('update');
     return successResponse(`タスクID: ${taskId} を更新しました。`);
 }
 /**
  * Firebase Realtime Database にデータ更新の信号を送る
  */
-function sendFirebaseSignal() {
+function sendFirebaseSignal(type) {
     try {
         if (!FIREBASE_DB_URL) return;
-        const url = FIREBASE_DB_URL + "/signals/orders_updated.json";
-        const payload = JSON.stringify({
-            timestamp: new Date().getTime()
-        });
-        const options = {
+        const timestamp = new Date().getTime();
+        
+        // 通常の更新信号
+        const urlUpdate = FIREBASE_DB_URL + "/signals/orders_updated.json";
+        UrlFetchApp.fetch(urlUpdate, {
             method: "put",
             contentType: "application/json",
-            payload: payload,
+            payload: JSON.stringify({ timestamp: timestamp }),
             muteHttpExceptions: true
-        };
-        UrlFetchApp.fetch(url, options);
+        });
+
+        // 緊急連絡専用の信号（トリガー用）
+        if (type === 'emergency') {
+            const urlEmergency = FIREBASE_DB_URL + "/signals/emergency_active.json";
+            UrlFetchApp.fetch(urlEmergency, {
+                method: "put",
+                contentType: "application/json",
+                payload: JSON.stringify({ timestamp: timestamp }),
+                muteHttpExceptions: true
+            });
+        }
     } catch (e) {
         console.error("Firebase Signal Error:", e);
     }
@@ -1122,6 +1132,9 @@ function updateOrderSchedule(params) {
         if (updatedFields.length === 0) {
             return errorResponse("更新するフィールドがありません");
         }
+
+        // 信号を送信
+        sendFirebaseSignal('update');
 
         return successResponse(`受注の${updatedFields.join('、')}を更新しました`, {
             orderId: orderId,

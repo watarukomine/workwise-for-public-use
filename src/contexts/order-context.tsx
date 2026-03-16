@@ -494,10 +494,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       const data = snapshot.val();
       if (data) {
         console.log('[OrderProvider] Real-time signal received:', data);
-        // Trigger immediate background fetch
-        fetchAndProcessData(true);
-        // Also fetch again after 10s to ensure GAS has finished writing
-        setTimeout(() => fetchAndProcessData(true), 10000);
+        // Trigger multi-stage background fetch for better responsiveness
+        fetchAndProcessData(true); // Immediate
+        setTimeout(() => fetchAndProcessData(true), 3000); // 3s later (GAS usually writes fast)
+        setTimeout(() => fetchAndProcessData(true), 8000); // 8s later (Safety margin)
       }
     });
 
@@ -507,7 +507,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   // 2. Fetch data on mount and interval
   useEffect(() => {
     fetchAndProcessData();
-    const interval = setInterval(() => fetchAndProcessData(true), 30000); // Poll every 30s
+    const interval = setInterval(() => fetchAndProcessData(true), 15000); // Poll every 15s
     return () => clearInterval(interval);
   }, [fetchAndProcessData]);
 
