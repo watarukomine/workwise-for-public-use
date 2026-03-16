@@ -764,7 +764,7 @@ function updateSheetWithOrderInfo(params) {
         }
         SpreadsheetApp.flush(); // Ensure immediate write
         // 信号を送信
-        sendFirebaseSignal('update');
+        sendFirebaseSignal(emergencyFlag ? 'emergency' : 'update');
 
         // --- パフォーマンス改善: メール送信の統合 ---
         let emailResultMsg = "";
