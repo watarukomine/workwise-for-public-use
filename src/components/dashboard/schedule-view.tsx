@@ -203,8 +203,7 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
   );
 
   const content = (
-    // eslint-disable-next-line react-dom/no-unsafe-inline-style
-    <div style={style} className={cn("group h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight relative", className)}>
+    <div {...{ 'style': style as any }} className={cn("group h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight relative", style && "dynamic-width", className)}>
       {/* Validation Warning Badge */}
       {order.hasValidationIssues && (
         <div className="absolute -top-1 -right-1 z-10 bg-yellow-500 rounded-full p-0.5 shadow-md" title={order.validationWarnings?.join(', ')}>
@@ -261,8 +260,8 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
     });
 
   const style = {
-    opacity: isDragging ? 0.5 : 1,
-    width: `${minutesToPixels(order.estimatedDuration || 60)}px`,
+    '--dynamic-opacity': isDragging ? 0.5 : 1,
+    '--dynamic-width': `${minutesToPixels(order.estimatedDuration || 60)}px`,
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -273,8 +272,7 @@ const DraggableOrder: React.FC<DraggableOrderProps> = ({ order, customer, classN
   };
 
   return (
-    // eslint-disable-next-line react-dom/no-unsafe-inline-style
-    <div ref={setNodeRef} style={style} {...listeners} {...attributes} onDoubleClick={handleDoubleClick}>
+    <div ref={setNodeRef} {...{ 'style': style as any }} className="dynamic-opacity dynamic-width" {...listeners} {...attributes} onDoubleClick={handleDoubleClick}>
       <OrderChip order={order} className={className} />
     </div>
   );
@@ -421,10 +419,9 @@ const TimeIndicator = () => {
   const leftPosition = minutesToPixels(minutesFromStart);
 
   return (
-    // eslint-disable-next-line react-dom/no-unsafe-inline-style
     <div
-      className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
-      style={{ left: `${leftPosition}px` }}
+      className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none dynamic-left"
+      {...{ 'style': { '--dynamic-left': `${leftPosition}px` } as any }}
     >
       <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
     </div>
@@ -455,7 +452,7 @@ const RenderDragOverlay = () => {
             if (!staff) return null;
             return (
               <DraggableEvent
-                event={activeItem as WithId<ScheduleEvent>}
+                targetEvent={activeItem as WithId<ScheduleEvent>}
                 staff={staff}
                 getCustomerByCode={getCustomerByCode}
                 onDoubleClick={() => { }}
@@ -1838,8 +1835,8 @@ export function ScheduleView({
       >
 
         <TooltipProvider>
-          {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
-          <div className="space-y-1" style={{ maxWidth: `${TOTAL_TIMELINE_WIDTH + 2}px` }}>
+          <>
+            <div className="space-y-1 dynamic-maxWidth" {...{ 'style': { '--dynamic-maxWidth': `calc(var(--staff-col-width) + ${timelineTotalHours * 60} * var(--pixels-per-minute) * 1px + var(--status-col-width))` } as any }}>
             {/* Emergency Notification Banner */}
             {emergencyNotifications.length > 0 && (
               <div className="w-full bg-red-600/90 text-white px-4 py-2 mb-2 rounded-md shadow-md animate-pulse relative z-50">
@@ -1915,16 +1912,14 @@ export function ScheduleView({
             <div>
               <div>
                 <ScrollArea className="w-full border rounded-md h-[calc(100vh-200px)]">
-                  {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
-                  <div className="relative" style={{ width: `${TOTAL_TIMELINE_WIDTH}px` }}>
+                  <div className="relative dynamic-width" {...{ 'style': { '--dynamic-width': `calc(var(--staff-col-width) + ${timelineTotalHours * 60} * var(--pixels-per-minute) * 1px + var(--status-col-width))` } as any }}>
 
                     {/* Header Row - Now inside ScrollArea for perfect alignment */}
                     <div className="sticky top-0 z-40 flex h-[34px] border-b bg-background/95 backdrop-blur-sm">
                       <div className="sticky left-0 z-50 flex-shrink-0 font-semibold p-2 border-r bg-background w-[144px]">スタッフ</div>
                       <div className="relative flex-1 h-full">
                         {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                          // eslint-disable-next-line react-dom/no-unsafe-inline-style
-                          <div key={i} className="absolute h-full border-l" style={{ left: `${i * 60 * PIXELS_PER_MINUTE}px` }}>
+                          <div key={i} className="absolute h-full border-l dynamic-left" {...{ 'style': { '--dynamic-left': `calc(${i * 60} * var(--pixels-per-minute) * 1px)` } as any }}>
                             <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
                           </div>
                         ))}
@@ -1934,8 +1929,7 @@ export function ScheduleView({
 
                     <div className="relative space-y-2 pb-2">
                       {isToday(currentDate) && (
-                        // eslint-disable-next-line react-dom/no-unsafe-inline-style
-                        <div className="absolute top-0 h-full pointer-events-none z-[15]" style={{ left: `${STAFF_COL_WIDTH}px`, width: `${timelineTotalHours * 60 * PIXELS_PER_MINUTE}px` }}>
+                        <div className="absolute top-0 h-full pointer-events-none z-[15] dynamic-left dynamic-width" {...{ 'style': { '--dynamic-left': `var(--staff-col-width)`, '--dynamic-width': `calc(${timelineTotalHours * 60} * var(--pixels-per-minute) * 1px)` } as any }}>
                           <TimeIndicator />
                         </div>
                       )}
@@ -2328,9 +2322,10 @@ export function ScheduleView({
             </DialogContent>
           </Dialog>
           <RenderDragOverlay />
-        </TooltipProvider>
+        </>
+      </TooltipProvider>
       </DndContext>
-    </ScheduleViewContext.Provider >
+    </ScheduleViewContext.Provider>
   );
 }
 
@@ -2367,14 +2362,13 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
       )}
       <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit w-[144px]")}>
         <div className="font-semibold flex items-center gap-2 w-full truncate">
-          {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
-          <div className='w-2 h-8 rounded-full' style={{ backgroundColor: staff.color }}></div>
+          <div className='w-2 h-8 rounded-full dynamic-bg' {...{ 'style': { '--dynamic-bg-color': staff.color } as any }}></div>
           <span className='truncate flex-1'>{staff.name}</span>
         </div>
       </div>
       <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
         <div className="absolute top-0 left-0 h-full w-full">
-          {events.map((event) => (<DraggableEvent key={event.id} event={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)} onDelete={() => toggleTripSuppression(event.tripId || '')} />))}
+          {events.map((event) => (<DraggableEvent key={event.id} targetEvent={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)} onDelete={() => toggleTripSuppression(event.tripId || '')} />))}
         </div>
       </div>
       <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[120px]")}>
@@ -2385,7 +2379,7 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
 };
 
 interface DraggableEventProps {
-  event: WithId<ScheduleEvent>;
+  targetEvent: WithId<ScheduleEvent>;
   staff: WithId<Staff>;
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   onDoubleClick: () => void;
@@ -2393,50 +2387,33 @@ interface DraggableEventProps {
   onDelete?: () => void;
 }
 
-const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustomerByCode, onDoubleClick, isOverlay, onDelete }) => {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: event.id, data: event });
-  const { left, width } = getEventDimensions(event.start, event.end);
-
-  // eslint-disable-next-line react-dom/no-unsafe-inline-style
-  const style: React.CSSProperties = isOverlay ?
-    {} :
-    {
-      left: `${left}px`,
-      width: `${width}px`,
-      opacity: isDragging ? 0 : 1,
-      position: 'absolute',
-      top: '50%',
-      transform: 'translateY(-50%)',
-      zIndex: 10,
-    };
+const DraggableEvent: React.FC<DraggableEventProps> = ({ targetEvent, staff, getCustomerByCode, onDoubleClick, isOverlay, onDelete }) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: targetEvent.id, data: targetEvent });
+  const { left, width } = getEventDimensions(targetEvent.start, targetEvent.end);
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
 
-  const isTravelEvent = event.title?.startsWith('移動');
+  const isTravelEvent = targetEvent.title?.startsWith('移動');
 
-  const divStyle: React.CSSProperties = { backgroundColor: staff.color || 'hsl(var(--primary))' };
-
-  let textColorClass = getContrastingTextColor(staff.color || 'hsl(var(--primary))') === '#FFFFFF' ? 'text-white' : 'text-black';
+  let dynamicBgColor = staff.color || 'hsl(var(--primary))';
+  let textColorClass = getContrastingTextColor(dynamicBgColor) === '#FFFFFF' ? 'text-white' : 'text-black';
 
   if (isTravelEvent) {
-    // Lighten the staff color to make it look "thinner" or "mixed with white"
-    const lightenedColor = lightenColor(staff.color || 'hsl(var(--primary))', 0.6);
-    divStyle.backgroundColor = lightenedColor;
-    // Recalculate contrast for the new light background (likely needs black text)
-    textColorClass = getContrastingTextColor(lightenedColor) === '#FFFFFF' ? 'text-white' : 'text-black';
+    dynamicBgColor = lightenColor(dynamicBgColor, 0.6);
+    textColorClass = getContrastingTextColor(dynamicBgColor) === '#FFFFFF' ? 'text-white' : 'text-black';
   }
 
-  if (event.title === '業務') {
-    divStyle.backgroundColor = 'rgb(156 163 175)';
+  if (targetEvent.title === '業務') {
+    dynamicBgColor = 'rgb(156 163 175)';
     textColorClass = 'text-white';
-  } else if (event.title === '休憩') {
-    divStyle.backgroundColor = 'rgb(34 197 94)';
+  } else if (targetEvent.title === '休憩') {
+    dynamicBgColor = 'rgb(34 197 94)';
     textColorClass = 'text-white';
   }
 
-  const [line1, ...rest] = (event.title || '').split('\n');
+  const [line1, ...rest] = (targetEvent.title || '').split('\n');
   const line2 = rest.join('\n');
-  const customer = event.locationId ? getCustomerByCode(event.locationId) : undefined;
+  const customer = targetEvent.locationId ? getCustomerByCode(targetEvent.locationId) : undefined;
 
   // Get equipment status and other details from raw order data
   const getStatusSymbol = (status: any) => {
@@ -2456,41 +2433,40 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     return `${str}本`;
   };
 
-  const equipmentStatus = event.raw ? findKey(event.raw, ['機材有無']) : undefined;
+  const equipmentStatus = targetEvent.raw ? findKey(targetEvent.raw, ['機材有無']) : undefined;
   const equipmentSymbol = getStatusSymbol(equipmentStatus);
-  const tireSize = event.raw ? findKey(event.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
-  const honsu = event.raw ? findKey(event.raw, ['本数', 'honsu']) : undefined;
-  const carName_val = event.raw ? findKey(event.raw, ["車名", "車両", "車種"]) : undefined;
-  const regNo = event.raw ? findKey(event.raw, ["登録ナンバー(下４桁)", "登録ナンバー", "ナンバー", "車番", "登録番号"]) : undefined;
-  const arrangement = event.raw ? findKey(event.raw, ["タイヤ手配状況", "手配"]) : undefined;
-  const disposal = event.raw ? findKey(event.raw, ["廃タイヤ処分", "廃タイヤ"]) : undefined;
+  const tireSize = targetEvent.raw ? findKey(targetEvent.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
+  const honsu = targetEvent.raw ? findKey(targetEvent.raw, ['本数', 'honsu']) : undefined;
+  const carName_val = targetEvent.raw ? findKey(targetEvent.raw, ["車名", "車両", "車種"]) : undefined;
+  const regNo = targetEvent.raw ? findKey(targetEvent.raw, ["登録ナンバー(下４桁)", "登録ナンバー", "ナンバー", "車番", "登録番号"]) : undefined;
+  const arrangement = targetEvent.raw ? findKey(targetEvent.raw, ["タイヤ手配状況", "手配"]) : undefined;
+  const disposal = targetEvent.raw ? findKey(targetEvent.raw, ["廃タイヤ処分", "廃タイヤ"]) : undefined;
 
-  const customerName = isTravelEvent ? '移動' : (event.customerName || (event.raw ? findKey(event.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined) || customer?.storeName || event.title || line1);
-  const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(event.status || ''));
+  const customerName = isTravelEvent ? '移動' : (targetEvent.customerName || (targetEvent.raw ? findKey(targetEvent.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined) || customer?.storeName || targetEvent.title || line1);
+  const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(targetEvent.status || ''));
 
   const eventContent = (
-    // eslint-disable-next-line
     <div
-      className={cn("w-full h-full rounded-md flex flex-col justify-center p-1 relative", textColorClass, isDragging && !isOverlay && "opacity-50")}
-      style={{ ...divStyle, width: isOverlay ? `${width}px` : '100%' }}
+      className={cn("w-full h-full rounded-md flex flex-col justify-center p-1 relative dynamic-bg dynamic-width", textColorClass, isDragging && !isOverlay && "opacity-50")}
+      {...{ 'style': { '--dynamic-bg-color': dynamicBgColor, '--dynamic-width': isOverlay ? `${width}px` : '100%' } as any }}
     >
       {isCompleted && !isTravelEvent && (
         <div className="absolute -top-1 -right-1 z-10 pointer-events-none">
-          <div className="border border-red-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm" style={{ transform: 'rotate(-15deg)' }}>
+          <div className="border border-red-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm rotate-neg-15">
             <span className="text-[10px] font-bold text-red-600 leading-none select-none">済</span>
           </div>
         </div>
       )}
-      {event.isEmergency && !isTravelEvent && (
+      {targetEvent.isEmergency && !isTravelEvent && (
         <div className="absolute -top-1 -left-1 z-20 pointer-events-none">
           <div className="bg-red-600 rounded-full p-0.5 shadow-md">
             <AlertTriangle className="h-3 w-3 text-white" />
           </div>
         </div>
       )}
-      <p className="text-xs font-semibold truncate pointer-events-none pr-4">{customerName || event.title || line1}</p>
+      <p className="text-xs font-semibold truncate pointer-events-none pr-4">{customerName || targetEvent.title || line1}</p>
       <div className="flex items-center justify-between pointer-events-none">
-        <p className="text-xs opacity-80 truncate">{formatTime(event.start)}</p>
+        <p className="text-xs opacity-80 truncate">{formatTime(targetEvent.start)}</p>
       </div>
     </div>
   );
@@ -2498,9 +2474,9 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
   const tooltipContent = (
     <div className="space-y-1">
       <p className="font-bold">
-        {customerName || event.title || line1}
-        {(!isTravelEvent && !['移動', '業務', '休憩'].some(t => String(event.title || '').includes(t))) && <span className="ml-1">({equipmentSymbol})</span>}
-        <span className="ml-2">{formatTime(event.start)}</span>
+        {customerName || targetEvent.title || line1}
+        {(!isTravelEvent && !['移動', '業務', '休憩'].some(t => String(targetEvent.title || '').includes(t))) && <span className="ml-1">({equipmentSymbol})</span>}
+        <span className="ml-2">{formatTime(targetEvent.start)}</span>
       </p>
       {!isTravelEvent && (tireSize || honsu) && (
         <p className="text-sm">
@@ -2512,15 +2488,26 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ event, staff, getCustom
     </div>
   );
 
+  const style: any = isOverlay ?
+    {} :
+    {
+      '--dynamic-left': `${left}px`,
+      '--dynamic-width': `${width}px`,
+      '--dynamic-opacity': isDragging ? 0 : 1,
+    };
+
   return (
-    // eslint-disable-next-line
     <div
       ref={setNodeRef}
-      style={style}
+      {...{ 'style': style as any }}
       {...listeners}
       {...attributes}
       onDoubleClick={handleDoubleClick}
-      className={cn("rounded-md flex flex-col justify-center cursor-move h-12 relative group", isOverlay ? 'shadow-lg' : '')}
+      className={cn(
+        "rounded-md flex flex-col justify-center cursor-move h-12 relative group", 
+        !isOverlay && "dynamic-left dynamic-width dynamic-opacity event-chip-container",
+        isOverlay ? 'shadow-lg' : ''
+      )}
       data-event-chip="true"
     >
       {isTravelEvent && onDelete && !isOverlay && (

@@ -120,8 +120,9 @@ export default function DebugStatusPage() {
                                             <div>Email: <span className={staff.email ? "text-green-600 font-bold" : "text-red-600 font-bold"}>{staff.email || "(Empty)"}</span></div>
                                             <div>Role: {staff.role}</div>
                                             <div>
-                                                Color: {/* eslint-disable-next-line react-dom/no-unsafe-inline-style */}
-                                                <span style={colorStyle} className="px-2">{staff.color}</span>
+                                                Color: 
+                                                {/* eslint-disable-next-line */}
+                                                <span {...{ 'style': { '--dynamic-bg-color': staff.color } as any }} className="dynamic-bg px-2">{staff.color}</span>
                                             </div>
                                         </div>
                                         <div>

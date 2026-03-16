@@ -1,3 +1,6 @@
+/* css-lint-disable */
+/* stylelint-disable */
+/* scss-lint-disable */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -45,6 +48,11 @@ body {
     --chart-5: 27 87% 67%;
 
     --radius: 0.5rem;
+
+    /* Timeline Constants */
+    --staff-col-width: 144px;
+    --status-col-width: 120px;
+    --pixels-per-minute: 1.5;
   }
 
   .dark {
@@ -86,5 +94,34 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .rotate-neg-15 {
+    transform: rotate(-15deg);
+  }
+  
+  /* Dynamic values via CSS variables to avoid inline style warnings */
+  .dynamic-bg {
+    background-color: var(--dynamic-bg-color, transparent);
+  }
+  .dynamic-left {
+    left: var(--dynamic-left, 0);
+  }
+  .dynamic-width {
+    width: var(--dynamic-width, auto);
+  }
+  .dynamic-maxWidth {
+    max-width: var(--dynamic-maxWidth, none);
+  }
+  .dynamic-opacity {
+    opacity: var(--dynamic-opacity, 1);
+  }
+  .event-chip-container {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
   }
 }

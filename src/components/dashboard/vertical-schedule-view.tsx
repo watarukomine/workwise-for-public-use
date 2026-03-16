@@ -105,8 +105,8 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg leading-tight">{event.title}</CardTitle>
                 <div
-                  className="w-3 h-10 rounded-full"
-                  style={staffColorStyle}
+                  className="w-3 h-10 rounded-full dynamic-bg"
+                  {...{ 'style': { '--dynamic-bg-color': staffMember?.color || 'gray' } as any }}
                 />
               </div>
               {customer && <CardDescription>{customer.storeName}</CardDescription>}

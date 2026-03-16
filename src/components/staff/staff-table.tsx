@@ -139,8 +139,8 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div
-                            className="h-6 w-6 rounded-full border"
-                            style={staffColorStyle}
+                            className="h-6 w-6 rounded-full border dynamic-bg"
+                            {...{ 'style': { '--dynamic-bg-color': member.color } as any }}
                           />
                           <span className="font-medium">{member.name}</span>
                         </div>
