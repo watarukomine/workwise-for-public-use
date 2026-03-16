@@ -41,6 +41,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
       firestore={firebaseServices.firestore}
       functions={firebaseServices.functions}
       database={firebaseServices.database}
+      messaging={firebaseServices.messaging}
     >
       {children}
     </FirebaseProvider>
