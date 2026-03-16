@@ -16,13 +16,7 @@ export function useFcm() {
 
   const requestPermission = useCallback(async () => {
     console.log('[FCM] requestPermission called');
-    console.log('[FCM] Status:', {
-      hasMessaging: !!messaging,
-      profileId: profile?.id,
-      role: profile?.role,
-      notificationPermission: typeof Notification !== 'undefined' ? Notification.permission : 'not supported'
-    });
-
+    
     if (!messaging || !database || !profile?.id || profile.role !== 'admin') {
       console.log('[FCM] Skipping permission request (not admin or not initialized)');
       return;
@@ -34,8 +28,16 @@ export function useFcm() {
       console.log('[FCM] Permission result:', permission);
 
       if (permission === 'granted') {
+        // Explicitly register Service Worker for background notifications
+        let registration;
+        if ('serviceWorker' in navigator) {
+          registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+          console.log('[FCM] Service Worker registered:', registration);
+        }
+
         const token = await getToken(messaging, {
           vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: registration,
         });
 
         if (token) {
