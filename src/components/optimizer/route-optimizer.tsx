@@ -64,25 +64,15 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
   const endLocation = parseLocation(endLocationString);
   const waypoints = waypointStrings.map(parseLocation).filter((loc: Location | null): loc is Location => !!loc);
 
-  console.log("Client-side formAction: input summary", {
-    start: startLocation?.name,
-    end: endLocation?.name,
-    waypointsCount: waypoints.length,
-    optimizeFor,
-    avoidsHighways
-  });
-
   if (!startLocation || !endLocation) {
     return { data: null, error: '出発地と目的地を選択または入力してください。', options: { avoidHighways: avoidsHighways } };
   }
 
-  if (typeof startLocation.latitude !== 'number' || typeof startLocation.longitude !== 'number' || 
-      typeof endLocation.latitude !== 'number' || typeof endLocation.longitude !== 'number') {
-    return { data: null, error: '出発地または目的地の座標が正しくありません。', options: { avoidHighways: avoidsHighways } };
+  if (!startLocation.latitude || !startLocation.longitude || !endLocation.latitude || !endLocation.longitude) {
+    return { data: null, error: '出発地または目的地の座標が取得できませんでした。', options: { avoidHighways: avoidsHighways } };
   }
 
   try {
-    console.log("Calling optimizeRoute server action...");
     const result = await optimizeRoute({
       startLocation,
       endLocation,
@@ -90,10 +80,9 @@ async function formAction(_prevState: State, formData: FormData): Promise<State>
       optimizeFor: optimizeFor,
       avoidHighways: avoidsHighways,
     });
-    console.log("optimizeRoute server action success", result);
     return { data: result, error: null, options: { avoidHighways: avoidsHighways } };
   } catch (e) {
-    console.error("optimizeRoute server action FAILED", e);
+    console.error(e);
     return { data: null, error: 'ルートの最適化に失敗しました。もう一度お試しください。', options: { avoidHighways: avoidsHighways } };
   }
 }
