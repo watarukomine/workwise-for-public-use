@@ -12,6 +12,10 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
+// MODULE LOAD LOGGING
+const fs_module = require('fs');
+fs_module.appendFileSync('/Users/tmpmarketingsectionofkanagawa/WorkWise/ULTIMATE_DEBUG.log', `\n[${new Date().toISOString()}] Module optimize-route-for-efficiency.ts loaded\n`);
+
 const LocationSchema = z.object({
   id: z.string().describe('The unique identifier for the location.'),
   name: z.string().describe('The name of the location.'),
@@ -97,8 +101,38 @@ const optimizeRouteFlow = ai.defineFlow(
     inputSchema: OptimizeRouteInputSchema,
     outputSchema: OptimizeRouteOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input) => {
+    const fs = require('fs');
+    const logPath = '/Users/tmpmarketingsectionofkanagawa/WorkWise/ULTIMATE_DEBUG.log';
+    const timestamp = new Date().toISOString();
+    
+    try {
+      fs.appendFileSync(logPath, `\n[${timestamp}] Flow started with input: ${JSON.stringify(input).substring(0, 500)}...\n`);
+      
+      const { output } = await prompt(input);
+      
+      if (!output) {
+        fs.appendFileSync(logPath, `[${timestamp}] Flow Error: Output was null\n`);
+        throw new Error('AI output was null');
+      }
+      
+      fs.appendFileSync(logPath, `[${timestamp}] Flow Success: Output keys: ${Object.keys(output).join(', ')}\n`);
+      return output;
+    } catch (error: any) {
+      const errorDetail = {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        status: error.status,
+        code: error.code,
+        details: error.details,
+        originalMessage: error.originalMessage
+      };
+      
+      fs.appendFileSync(logPath, `[${timestamp}] Flow FATAL ERROR: ${JSON.stringify(errorDetail, null, 2)}\n`);
+      
+      console.error('Optimize Route Flow Error:', error);
+      throw error;
+    }
   }
 );
