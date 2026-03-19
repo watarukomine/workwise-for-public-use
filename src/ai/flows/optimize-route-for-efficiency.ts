@@ -97,7 +97,13 @@ const optimizeRouteFlow = ai.defineFlow(
     outputSchema: OptimizeRouteOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    try {
+      const {output} = await prompt(input);
+      if (!output) throw new Error('AI output was empty');
+      return output;
+    } catch (e: any) {
+      console.error('[OPTIMIZE_ROUTE_ERROR]', e);
+      throw e;
+    }
   }
 );
