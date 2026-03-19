@@ -1,5 +1,5 @@
 export const firebaseConfig = {
-  apiKey: "AIzaSyDoWLRBcQyzkItN9jvXqu1naadp8P8YFDI",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyDoWLRBcQyzkItN9jvXqu1naadp8P8YFDI",
   authDomain: "workwisebu2-31559534-cd9ee.firebaseapp.com",
   databaseURL: "https://workwisebu2-31559534-cd9ee-default-rtdb.firebaseio.com",
   projectId: "workwisebu2-31559534-cd9ee",
