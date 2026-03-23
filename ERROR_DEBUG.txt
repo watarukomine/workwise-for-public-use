@@ -1,0 +1,268 @@
+
+[2026-03-18T09:15:00.518Z] ENTERING optimizeRoute server action
+
+[2026-03-18T09:17:04.220Z] ENTERING optimizeRoute server action
+
+[2026-03-19T00:52:49.024Z] ENTERING optimizeRoute
+INPUT: {
+  "startLocation": {
+    "id": "s1",
+    "name": "Start",
+    "address": "A1",
+    "latitude": 35.681236,
+    "longitude": 139.767125,
+    "type": "staff"
+  },
+  "endLocation": {
+    "id": "e1",
+    "name": "End",
+    "address": "A2",
+    "latitude": 35.658581,
+    "longitude": 139.745433,
+    "type": "customer"
+  },
+  "waypoints": [],
+  "optimizeFor": "time",
+  "avoidHighways": false
+}
+
+[2026-03-19T00:52:49.061Z] BEFORE PROMPT CALL
+
+[2026-03-19T00:53:03.004Z] AFTER PROMPT CALL SUCCESS
+
+[2026-03-19T01:34:51.542Z] ENTERING optimizeRoute
+INPUT: {
+  "startLocation": {
+    "id": "STAFF006",
+    "name": "日下　聡",
+    "address": "[20260319_42708_b76] 作業中",
+    "latitude": 35.49457399495913,
+    "longitude": 139.50691126107088,
+    "type": "staff"
+  },
+  "endLocation": {
+    "id": "STAFF014",
+    "name": "小堀健太",
+    "address": "[20260320_24116_f7f] 割当済",
+    "latitude": 35.6007482118004,
+    "longitude": 139.60475964391048,
+    "type": "staff"
+  },
+  "waypoints": [
+    {
+      "id": "STAFF009",
+      "name": "杉山恭平",
+      "address": "[20260319_36005_10d] 作業待ち",
+      "latitude": 35.36640660840586,
+      "longitude": 139.4998585806596,
+      "type": "staff"
+    }
+  ],
+  "optimizeFor": "time",
+  "avoidHighways": false
+}
+
+[2026-03-19T01:41:35.702Z] ENTERING optimizeRoute
+INPUT: {
+  "startLocation": {
+    "id": "STAFF006",
+    "name": "日下　聡",
+    "address": "[20260319_42708_b76] 作業中",
+    "latitude": 35.49457399495913,
+    "longitude": 139.50691126107088,
+    "type": "staff"
+  },
+  "endLocation": {
+    "id": "STAFF014",
+    "name": "小堀健太",
+    "address": "[20260320_24116_f7f] 割当済",
+    "latitude": 35.6007482118004,
+    "longitude": 139.60475964391048,
+    "type": "staff"
+  },
+  "waypoints": [
+    {
+      "id": "STAFF009",
+      "name": "杉山恭平",
+      "address": "[20260319_36005_10d] 作業待ち",
+      "latitude": 35.36640660840586,
+      "longitude": 139.4998585806596,
+      "type": "staff"
+    },
+    {
+      "id": "STAFF015",
+      "name": "湯川浩道",
+      "address": "[20260321_34043_5a0] 割当済",
+      "latitude": 35.50290820470651,
+      "longitude": 139.42358092040723,
+      "type": "staff"
+    }
+  ],
+  "optimizeFor": "time",
+  "avoidHighways": false
+}
+
+[2026-03-19T02:14:26.884Z] ENTERING optimizeRoute
+INPUT: {
+  "startLocation": {
+    "id": "STAFF006",
+    "name": "日下　聡",
+    "address": "[20260319_42708_b76] 作業中",
+    "latitude": 35.49457399495913,
+    "longitude": 139.50691126107088,
+    "type": "staff"
+  },
+  "endLocation": {
+    "id": "STAFF009",
+    "name": "杉山恭平",
+    "address": "[20260319_36005_10d] 作業待ち",
+    "latitude": 35.36640660840586,
+    "longitude": 139.4998585806596,
+    "type": "staff"
+  },
+  "waypoints": [
+    {
+      "id": "STAFF007",
+      "name": "水野一也",
+      "address": "[20260319_23906_1a9] 移動中",
+      "latitude": 35.44571834826938,
+      "longitude": 139.56598596762836,
+      "type": "staff"
+    }
+  ],
+  "optimizeFor": "time",
+  "avoidHighways": false
+}
+
+[2026-03-19T02:15:08.120Z] ENTERING optimizeRoute
+INPUT: {
+  "startLocation": {
+    "id": "STAFF006",
+    "name": "日下　聡",
+    "address": "[20260319_42708_b76] 作業中",
+    "latitude": 35.49457399495913,
+    "longitude": 139.50691126107088,
+    "type": "staff"
+  },
+  "endLocation": {
+    "id": "STAFF009",
+    "name": "杉山恭平",
+    "address": "[20260319_36005_10d] 作業待ち",
+    "latitude": 35.36640660840586,
+    "longitude": 139.4998585806596,
+    "type": "staff"
+  },
+  "waypoints": [
+    {
+      "id": "STAFF007",
+      "name": "水野一也",
+      "address": "[20260319_23906_1a9] 移動中",
+      "latitude": 35.44571834826938,
+      "longitude": 139.56598596762836,
+      "type": "staff"
+    }
+  ],
+  "optimizeFor": "time",
+  "avoidHighways": false
+}
+
+[2026-03-19T02:18:00.365Z] ENTERING optimizeRoute
+INPUT: {
+  "startLocation": {
+    "id": "STAFF005",
+    "name": "福原泰弘",
+    "address": "[20260328_41834_284] 割当済",
+    "latitude": 35.4458309155438,
+    "longitude": 139.5658934660652,
+    "type": "staff"
+  },
+  "endLocation": {
+    "id": "STAFF006",
+    "name": "日下　聡",
+    "address": "[20260328_27402_d47] 割当済",
+    "latitude": 35.24145391404763,
+    "longitude": 139.67738886687164,
+    "type": "staff"
+  },
+  "waypoints": [],
+  "optimizeFor": "time",
+  "avoidHighways": false
+}
+
+[2026-03-19T02:46:57.014Z] ENTERING optimizeRoute
+INPUT: {
+  "startLocation": {
+    "id": "STAFF005",
+    "name": "福原泰弘",
+    "address": "[20260320_24123_bfc] 割当済",
+    "latitude": 35.4458309155438,
+    "longitude": 139.5658934660652,
+    "type": "staff"
+  },
+  "endLocation": {
+    "id": "STAFF006",
+    "name": "日下　聡",
+    "address": "[20260328_27402_d47] 割当済",
+    "latitude": 35.24145391404763,
+    "longitude": 139.67738886687164,
+    "type": "staff"
+  },
+  "waypoints": [
+    {
+      "id": "STAFF007",
+      "name": "水野一也",
+      "address": "[20260319_23906_1a9] 作業中",
+      "latitude": 35.52343670282096,
+      "longitude": 139.6971363109906,
+      "type": "staff"
+    }
+  ],
+  "optimizeFor": "time",
+  "avoidHighways": false
+}
+
+[2026-03-19T02:54:10.576Z] ENTERING optimizeRoute
+INPUT: {
+  "startLocation": {
+    "id": "STAFF005",
+    "name": "福原泰弘",
+    "address": "[20260320_24123_bfc] 割当済",
+    "latitude": 35.4458309155438,
+    "longitude": 139.5658934660652,
+    "type": "staff"
+  },
+  "endLocation": {
+    "id": "STAFF007",
+    "name": "水野一也",
+    "address": "[20260319_23906_1a9] 作業中",
+    "latitude": 35.52343670282096,
+    "longitude": 139.6971363109906,
+    "type": "staff"
+  },
+  "waypoints": [],
+  "optimizeFor": "time",
+  "avoidHighways": false
+}
+
+[2026-03-19T02:58:22.819Z] ENTERING optimizeRoute
+INPUT: {
+  "startLocation": {
+    "id": "STAFF005",
+    "name": "福原泰弘",
+    "address": "[20260320_24123_bfc] 割当済",
+    "latitude": 35.4458309155438,
+    "longitude": 139.5658934660652,
+    "type": "staff"
+  },
+  "endLocation": {
+    "id": "14493",
+    "name": "希望ヶ丘",
+    "address": "横浜市旭区東希望ヶ丘 １４６－１",
+    "latitude": 35.46208886618812,
+    "longitude": 139.51123389436222,
+    "type": "customer"
+  },
+  "waypoints": [],
+  "optimizeFor": "time",
+  "avoidHighways": false
+}

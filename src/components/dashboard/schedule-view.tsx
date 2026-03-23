@@ -1990,7 +1990,7 @@ export function ScheduleView({
 
                         {renderEditableItem('車名', 'carName')}
                         {renderEditableItem('登録ナンバー(下４桁)', 'regNo')}
-                        {renderEditableItem('入庫状況', 'arrivalStatus')}
+                        {renderEditableItem('入庫状況', 'arrivalStatus', 'select', ['点検', 'お預かり済', 'お客待ち'])}
                         {renderEditableItem('タイヤ品番', 'tireNumber')}
                         {renderEditableItem('タイヤサイズ', 'tireSize')}
                         {renderEditableItem('品名', 'productName')}
@@ -2004,10 +2004,10 @@ export function ScheduleView({
                             'その他'
                           ])}
                         </div>
-                        {renderEditableItem('本数', 'quantity')}
-                        {renderEditableItem('空気圧センサーパッキン交換', 'sensor')}
-                        {renderEditableItem('タイヤ手配状況', 'tireStatus')}
-                        {renderEditableItem('廃タイヤ処分', 'disposal')}
+                        {renderEditableItem('本数', 'quantity', 'select', ['1', '2', '4', 'その他'])}
+                        {renderEditableItem('空気圧センサーパッキン交換', 'sensor', 'select', ['有', '無'])}
+                        {renderEditableItem('タイヤ手配状況', 'tireStatus', 'select', ['定期便で配送手配済', 'タイヤ持込み'])}
+                        {renderEditableItem('廃タイヤ処分', 'disposal', 'select', ['回収有り：廃タイヤラベル在庫有り', '回収有り：廃タイヤラベル未手配(TMP手配）', '回収なし'])}
                         <div className="col-span-full">
                           {renderEditableItem('特記事項', 'specialNotes', 'textarea')}
                         </div>
