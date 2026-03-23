@@ -106,6 +106,7 @@ function getSheetData(sheet, maxRows = 2000) {
     const dataRange = sheet.getRange(startRow > 1 ? startRow : 2, 1, startRow > 1 ? numRows : numRows - 1, headers.length);
     const displayValues = dataRange.getDisplayValues();
     const rawValues = dataRange.getValues();
+    const backgrounds = dataRange.getBackgrounds(); // 背景色プロパティも一括取得
 
     const sheetId = sheet.getSheetId();
     const spreadsheetId = sheet.getParent().getId();
@@ -113,6 +114,7 @@ function getSheetData(sheet, maxRows = 2000) {
     return displayValues.map((row, rowIndex) => {
         const obj = {};
         const rawRow = rawValues[rowIndex];
+        const bgRow = backgrounds[rowIndex];
         const actualRowIndex = (startRow > 1 ? startRow : 2) + rowIndex;
 
         headers.forEach((header, index) => {
@@ -120,6 +122,16 @@ function getSheetData(sheet, maxRows = 2000) {
             if (!h) return;
             const displayValue = row[index];
             const rawValue = rawRow[index];
+            const bgValue = bgRow[index];
+
+            // color（カラー）列の場合は、文字データではなくセルの「背景色」を優先して取得する
+            if (h.toLowerCase() === 'color' || h === 'カラー') {
+                // 背景色が初期値(#ffffff)でなければ採用、そうでなければ文字データを使う
+                if (bgValue && bgValue !== '#ffffff') {
+                    obj[h] = bgValue;
+                    return;
+                }
+            }
 
             if (rawValue && rawValue instanceof Date && !isNaN(rawValue.getTime())) {
                 // 1899年/1900年など「時間だけ」のセルの場合は、タイムゾーン（9時間ズレ）の影響を
