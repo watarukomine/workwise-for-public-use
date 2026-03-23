@@ -64,7 +64,7 @@ export const fetchStaffDataFromGAS = async (url: string = STAFF_GAS_URL): Promis
       return { error: result.error };
     }
 
-    const dataToProcess = result.data || [];
+    const dataToProcess = result.staff || result.data || [];
 
     if (dataToProcess.length === 0) {
       console.warn("GASから取得したスタッフデータが空です。");

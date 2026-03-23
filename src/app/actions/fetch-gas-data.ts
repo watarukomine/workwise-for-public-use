@@ -9,7 +9,7 @@ import { unstable_noStore as noStore } from 'next/cache';
  * @param url The full URL of the Google Apps Script web app.
  * @returns A promise that resolves to an object with either 'data' or 'error' property.
  */
-export async function fetchGasData(url: string): Promise<{ data?: any; error?: string; message?: string }> {
+export async function fetchGasData(url: string): Promise<{ data?: any; staff?: any; orders?: any; error?: string; message?: string }> {
   // This function will always be dynamically rendered, disabling caching.
   noStore();
 
@@ -54,7 +54,11 @@ export async function fetchGasData(url: string): Promise<{ data?: any; error?: s
       return { error: `GAS script returned an error: ${result.message}` };
     }
 
-    return { data: result.data || (Array.isArray(result) ? result : []) };
+    return { 
+      data: result.data || (Array.isArray(result) ? result : []),
+      staff: result.staff,
+      orders: result.orders
+    };
 
   } catch (error: any) {
     console.error('Server-side fetch to GAS failed:', error.message);
