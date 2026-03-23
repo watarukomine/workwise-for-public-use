@@ -628,6 +628,69 @@ export function ScheduleView({
     return notifications;
   }, [scheduleEvents, staffData]);
 
+  // 新しい緊急連絡があった場合にトーストと音で知らせる
+  const prevEmergenciesRef = React.useRef<string[]>([]);
+  React.useEffect(() => {
+    if (!emergencyNotifications || emergencyNotifications.length === 0) {
+      prevEmergenciesRef.current = [];
+      return;
+    }
+
+    const currentIds = emergencyNotifications.map(n => n.systemId);
+    
+    // 初回マウント時以降に増えたものを検出
+    if (prevEmergenciesRef.current.length > 0) {
+      const newEmergencies = emergencyNotifications.filter(n => !prevEmergenciesRef.current.includes(n.systemId));
+      
+      if (newEmergencies.length > 0) {
+        newEmergencies.forEach(n => {
+          toast({
+            variant: "destructive",
+            title: `⚠️ 【緊急】${n.staffName} からの連絡`,
+            description: n.message ? `コメント: ${n.message}` : "詳細を確認してください",
+            duration: 15000,
+          });
+        });
+
+        // ピープ音を鳴らす（ブラウザの操作状態によっては再生ブロックされる場合あり）
+        try {
+          const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioContext) {
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(800, ctx.currentTime); // 800Hz
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+            
+            // ピ・ピッと2回鳴らす
+            setTimeout(() => {
+              if (ctx.state === 'running') {
+                const osc2 = ctx.createOscillator();
+                const gain2 = ctx.createGain();
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.type = "sine";
+                osc2.frequency.setValueAtTime(800, ctx.currentTime);
+                gain2.gain.setValueAtTime(0.1, ctx.currentTime);
+                osc2.start();
+                osc2.stop(ctx.currentTime + 0.3);
+              }
+            }, 400);
+          }
+        } catch (e) {
+          console.error("Audio beep failed", e);
+        }
+      }
+    }
+
+    prevEmergenciesRef.current = currentIds;
+  }, [emergencyNotifications, toast]);
+
   const handleClearEmergency = async (event: { rawOrderId: string, message: string, staffName: string, systemId: string, raw?: any }) => {
     try {
       if (!event.rawOrderId && !event.systemId) {

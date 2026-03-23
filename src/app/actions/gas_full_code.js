@@ -894,13 +894,20 @@ function updateTaskSheet(taskId, params) {
     });
 
     // 信号を送信
-    sendFirebaseSignal('update');
+    sendFirebaseSignal();
+    
+    // 緊急フラグ等の更新があれば緊急シグナルも送信
+    if (params.emergencyFlag === true || (params.comment && typeof params.comment === "string" && params.comment.trim() !== "")) {
+        sendFirebaseEmergencySignal();
+    }
+    
     return successResponse(`タスクID: ${taskId} を更新しました。`);
 }
 /**
  * Firebase Realtime Database にデータ更新の信号を送る
+ * @param {string} type 'update' | 'emergency'
  */
-function sendFirebaseSignal(type) {
+function sendFirebaseSignal(type = 'update') {
     try {
         if (!FIREBASE_DB_URL) return;
         const timestamp = new Date().getTime();
@@ -927,6 +934,13 @@ function sendFirebaseSignal(type) {
     } catch (e) {
         console.error("Firebase Signal Error:", e);
     }
+}
+
+/**
+ * Firebase Realtime Database に緊急通知の信号を送る（後方互換トリガー用）
+ */
+function sendFirebaseEmergencySignal() {
+    sendFirebaseSignal('emergency');
 }
 function sendIcsEmail(params) {
     const res = sendIcsEmailInternal(params);
@@ -1144,5 +1158,44 @@ function updateOrderSchedule(params) {
     } catch (error) {
         console.error("updateOrderSchedule Error:", error);
         return errorResponse(`受注の更新中にエラーが発生しました: ${error.message}`);
+    }
+}
+
+/**
+ * 手動でスプレッドシートが編集された際のトリガー
+ */
+function onEdit(e) {
+    if (!e || !e.range) return;
+    try {
+        const sheet = e.range.getSheet();
+        const sheetName = sheet.getName();
+        
+        if (sheetName === ORDER_SHEET_NAME || sheetName === ACTION_LOG_SHEET_NAME) {
+            const row = e.range.getRow();
+            const col = e.range.getColumn();
+            
+            // ヘッダー行の編集は無視
+            if (row === 1) return;
+            
+            const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+            const editedHeader = headers[col - 1] ? String(headers[col - 1]).trim() : "";
+            
+            // 緊急関連の列が編集されたか判定
+            const isEmergencyCol = ["緊急フラグ", "緊急ステータス", "緊急", "フラグ", "緊急連絡", "任意コメント", "受注コメント", "スタッフ連絡", "連絡事項"].includes(editedHeader);
+            
+            if (isEmergencyCol) {
+                // セルの値が何かチェック
+                const val = String(e.value || "");
+                if (val === "TRUE" || val === "true" || val.trim() !== "") {
+                    sendFirebaseSignal('emergency');
+                    return;
+                }
+            }
+            
+            // それ以外は通常のダッシュボード更新シグナル
+            sendFirebaseSignal('update');
+        }
+    } catch (err) {
+        console.error("onEdit error:", err);
     }
 }
