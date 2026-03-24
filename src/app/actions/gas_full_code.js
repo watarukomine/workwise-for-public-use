@@ -5,6 +5,11 @@ const ORDER_SHEET_NAME = "受注管理";
 // 「スタッフマスタ」シートがあるスプレッドシートのIDを貼り付けてください
 const STAFF_SPREADSHEET_ID = "18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo";
 const STAFF_SHEET_NAME = "スタッフマスタ";
+
+// 「販売店情報」シートがあるスプレッドシートのIDを貼り付けてください
+const CUSTOMER_SPREADSHEET_ID = "1jZdToM75DunESxVU07QjSCbYEsqd_nSwxzjr09a52CA";
+const CUSTOMER_SHEET_NAME = "販売店情報";
+
 const ACTION_LOG_SHEET_NAME = "行動予定"; // 汎用タスク（休憩・移動等）の保存先
 
 // Firebase Realtime Database URL (シグナル用)
@@ -18,6 +23,7 @@ function doGet(e) {
     try {
         const orderDataResult = [];
         let staffDataResult = [];
+        let customerDataResult = []; // 追加
 
         // 1. 受注データの取得
         try {
@@ -67,11 +73,23 @@ function doGet(e) {
             console.error("Staff Sheet Read Error:", err);
         }
 
+        // 4. 販売店情報の取得 (追加)
+        try {
+            const customerSpreadsheet = SpreadsheetApp.openById(CUSTOMER_SPREADSHEET_ID);
+            const customerSheet = customerSpreadsheet.getSheetByName(CUSTOMER_SHEET_NAME);
+            if (customerSheet) {
+                customerDataResult = getSheetData(customerSheet);
+            }
+        } catch (err) {
+            console.error("Customer Sheet Read Error:", err);
+        }
+
         // 統合されたレスポンスを返す
         const response = {
             status: "success",
             orders: orderDataResult,
             staff: staffDataResult,
+            customers: customerDataResult, // 追加
             // 互換性維持のための data フィールド（旧バージョン対応）
             data: orderDataResult
         };

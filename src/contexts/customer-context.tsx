@@ -103,7 +103,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        const customerData = result.data || [];
+        const customerData = result.customers || result.data || [];
         if (customerData.length > 0) {
           // Normalize data: Ensure userCode is 5 digits (zero-padded)
           const normalizedData = customerData.map((customer: any) => {
