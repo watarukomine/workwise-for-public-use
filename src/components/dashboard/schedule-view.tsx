@@ -229,6 +229,15 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
           <span className="shrink-0">{formatHonsu(order['本数'])}</span>
         </div>
       )}
+
+      {/* Done Mark (Consistency with timeline chips) */}
+      {(['Finish Task', '作業完了', '完了'].includes(String(order.status || '')) || !!order.actualEndTime) && (
+        <div className="absolute -top-1 -right-1 z-10 pointer-events-none">
+          <div className="border border-red-600 rounded-full w-4 h-4 flex items-center justify-center bg-white/90 shadow-sm rotate-neg-15">
+            <span className="text-[8px] font-bold text-red-600 leading-none select-none">済</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -2515,7 +2524,7 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ targetEvent, staff, get
   const disposal = targetEvent.raw ? findKey(targetEvent.raw, ["廃タイヤ処分", "廃タイヤ"]) : undefined;
 
   const customerName = isTravelEvent ? '移動' : (targetEvent.customerName || (targetEvent.raw ? findKey(targetEvent.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined) || customer?.storeName || targetEvent.title || line1);
-  const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(targetEvent.status || ''));
+  const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(targetEvent.status || '')) || !!targetEvent.actualEndTime;
 
   const eventContent = (
     <div
