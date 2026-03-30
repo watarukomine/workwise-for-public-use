@@ -27,8 +27,8 @@ env:
   - variable: GEMINI_API_KEY
     value: AIzaSyDfAmBI1EdkkioSggCVhsUTi-oSQBIWdHw
   - variable: NEXT_PUBLIC_STAFF_GAS_URL
-    value: https://script.google.com/macros/s/AKfycbwwTKebqlv7jBggRclXSGwp6BJCAgMVv2MRJxDORnqywA3b_GRDwHodGeOjJXLoE6oL/exec
+    value: https://script.google.com/macros/s/AKfycbzkLFOSo0Oz_5VjQipsdKewkXZoTkxlXW1C2hO0Tc9W1jDzAyVbIogPEHtVEfukAnWe/exec
   - variable: NEXT_PUBLIC_CUSTOMER_GAS_URL
-    value: https://script.google.com/macros/s/AKfycbwwTKebqlv7jBggRclXSGwp6BJCAgMVv2MRJxDORnqywA3b_GRDwHodGeOjJXLoE6oL/exec
+    value: https://script.google.com/macros/s/AKfycbzkLFOSo0Oz_5VjQipsdKewkXZoTkxlXW1C2hO0Tc9W1jDzAyVbIogPEHtVEfukAnWe/exec
   - variable: NEXT_PUBLIC_ORDER_GAS_URL
-    value: https://script.google.com/macros/s/AKfycbwwTKebqlv7jBggRclXSGwp6BJCAgMVv2MRJxDORnqywA3b_GRDwHodGeOjJXLoE6oL/exec
+    value: https://script.google.com/macros/s/AKfycbzkLFOSo0Oz_5VjQipsdKewkXZoTkxlXW1C2hO0Tc9W1jDzAyVbIogPEHtVEfukAnWe/exec

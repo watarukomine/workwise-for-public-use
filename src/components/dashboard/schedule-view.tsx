@@ -2111,6 +2111,7 @@ export function ScheduleView({
                         {renderEditableItem('現場到着', 'arrivalTimestamp', 'time')}
                         {renderEditableItem('作業開始', 'actualStartTime', 'time')}
                         {renderEditableItem('作業完了', 'actualEndTime', 'time')}
+                        {renderDetailItem('既読確認日時', event.confirmedAt)}
                         {renderEditableItem('所要時間（分）', 'actualDuration', 'number')}
                       </div>
                     )}

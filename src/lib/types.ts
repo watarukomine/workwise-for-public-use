@@ -89,6 +89,7 @@ export type Order = {
   adminReply?: string;
   isConfirmed?: boolean;
   submitter?: string;
+  confirmedAt?: string;
   description?: string;
 };
 
