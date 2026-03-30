@@ -440,7 +440,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   const fetchAndProcessData = useCallback(async (isBackground = false, params?: { date?: string; range?: number }) => {
     // Only show loader if we have NO data yet AND it's not a background fetch
-    const isInitialLoad = rawOrdersData.length === 0 && !params;
+    const isInitialLoad = rawOrdersData.length === 0;
     if (!isBackground && isInitialLoad) setIsLoading(true);
     setErrorState(null);
 
