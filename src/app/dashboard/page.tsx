@@ -6,7 +6,7 @@ import { Staff, StaffStatus, WithId } from '../../lib/types';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';
 import { useUserProfile } from '../../hooks/use-user-profile';
 import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
-import { AlertCircle, Loader2, ChevronLeft, ChevronRight, Smartphone, RefreshCw, Database, LayoutList, Monitor } from 'lucide-react';
+import { AlertCircle, Loader2, ChevronLeft, ChevronRight, Smartphone, RefreshCw, Database } from 'lucide-react';
 import { useCustomer } from '../../contexts/customer-context';
 import { Button } from '../../components/ui/button';
 import { useOrder } from '../../contexts/order-context';
@@ -39,7 +39,7 @@ export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
   const router = useRouter();
   const isMobile = useIsMobile();
-  const { forceMobileView, setForceMobileView } = useAppShell();
+  const { forceMobileView, setForceMobileView, adminWantsTimelineView } = useAppShell();
 
   const {
     statuses,
@@ -426,7 +426,7 @@ export default function DashboardPage() {
   }, [filteredStaff, statuses, scheduleEvents, checkedOutStaffIds, presentStaffIds, scheduledStaffIds, profile, currentTime]);
 
 
-  const showVerticalView = forceMobileView || isMobile;
+  const showVerticalView = !adminWantsTimelineView && (forceMobileView || isMobile);
 
   if (isLoading || !profile) {
     return (
@@ -516,22 +516,6 @@ export default function DashboardPage() {
                 </Link>
               </Button>
               <AttendanceControls variant="compact" />
-              {/* Mobile view toggle for admin */}
-              {profile?.role === 'admin' && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={() => setForceMobileView(prev => !prev)}
-                  title={forceMobileView || isMobile ? 'PC表示に切り替え' : 'カード表示に切り替え'}
-                >
-                  {(forceMobileView || isMobile) ? (
-                    <Monitor className="h-5 w-5" />
-                  ) : (
-                    <LayoutList className="h-5 w-5" />
-                  )}
-                </Button>
-              )}
             </div>
           </div>
 

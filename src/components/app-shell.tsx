@@ -16,6 +16,8 @@ import {
     CalendarDays,
     BarChart,
     BookOpen,
+    LayoutList,
+    Monitor,
 } from 'lucide-react';
 
 import {
@@ -64,15 +66,18 @@ const allNavItems = [
 interface AppShellContextType {
     forceMobileView: boolean;
     setForceMobileView: React.Dispatch<React.SetStateAction<boolean>>;
+    adminWantsTimelineView: boolean;
+    setAdminWantsTimelineView: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 const AppShellContext = createContext<AppShellContextType | undefined>(undefined);
 
 export function AppShellProvider({ children }: { children: React.ReactNode }) {
     const [forceMobileView, setForceMobileView] = useState(false);
+    const [adminWantsTimelineView, setAdminWantsTimelineView] = useState(false);
 
     return (
-        <AppShellContext.Provider value={{ forceMobileView, setForceMobileView }}>
+        <AppShellContext.Provider value={{ forceMobileView, setForceMobileView, adminWantsTimelineView, setAdminWantsTimelineView }}>
             {children}
         </AppShellContext.Provider>
     );
@@ -168,6 +173,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         const { profile, isLoading } = useUserProfile();
         const userRole = profile?.role;
         const { isMobile, setOpenMobile } = useSidebar();
+        const { adminWantsTimelineView, setAdminWantsTimelineView } = useAppShell();
 
         const navItems = React.useMemo(() => {
             if (isLoading || !profile) return [];
@@ -206,6 +212,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 ))}
+                {/* Admin-only view toggle button */}
+                {profile?.role === 'admin' && (
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            tooltip={adminWantsTimelineView ? 'カード表示に切り替え' : 'PC表示（タイムライン）に切り替え'}
+                            className="!font-bold h-16 text-lg"
+                            onClick={() => {
+                                setAdminWantsTimelineView(prev => !prev);
+                                if (isMobile) setOpenMobile(false);
+                            }}
+                        >
+                            {adminWantsTimelineView ? (
+                                <><LayoutList className="!h-6 !w-6" /><span>カード表示に切替</span></>
+                            ) : (
+                                <><Monitor className="!h-6 !w-6" /><span>PC表示に切替</span></>
+                            )}
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                )}
             </SidebarMenu>
         )
     }
