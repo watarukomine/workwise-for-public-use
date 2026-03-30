@@ -329,10 +329,12 @@ function confirmReadOrder(params) {
         const data = sheet.getDataRange().getValues();
         const headers = data[0].map(h => String(h).trim().toLowerCase());
 
-        // 「既読確認」列を探す
-        const confirmedColIndex = headers.indexOf('既読確認');
+        // 「既読確認」または「既読」列を探す
+        let confirmedColIndex = headers.indexOf('既読確認');
+        if (confirmedColIndex === -1) confirmedColIndex = headers.indexOf('既読');
+        
         if (confirmedColIndex === -1) {
-            return errorResponse("「既読確認」列が見つかりません。スプレッドシートに「既読確認」という列名を追加してください。");
+            return errorResponse("「既読確認」または「既読」列が見つかりません。スプレッドシートにいずれかの列名を追加してください。");
         }
 
         // SystemID 列を探す
