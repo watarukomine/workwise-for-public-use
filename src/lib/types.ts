@@ -87,6 +87,7 @@ export type Order = {
   isEmergency?: boolean;
   emergencyMessage?: string;
   adminReply?: string;
+  isConfirmed?: boolean;
   submitter?: string;
   description?: string;
 };

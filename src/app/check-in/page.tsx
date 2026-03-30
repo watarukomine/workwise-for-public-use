@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw, BadgeCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -27,7 +27,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type ActionType = 'Clock In' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Emergency';
+type ActionType = 'Confirm Read' | 'Clock Out' | 'Start Travel' | 'Arrive' | 'Begin Task' | 'Finish Task' | 'Wait' | 'Emergency';
 type StatusValue = StaffStatus['status'];
 
 function CheckInClient() {
@@ -47,6 +47,7 @@ function CheckInClient() {
 
   const [optimisticStatus, setOptimisticStatus] = React.useState<string | null>(null);
   const [emergencyMessage, setEmergencyMessage] = React.useState('');
+  const [isConfirmedOptimistic, setIsConfirmedOptimistic] = React.useState<boolean | null>(null);
 
   const currentOrder = React.useMemo(() => {
     if (!orderId) return null;
@@ -152,36 +153,37 @@ function CheckInClient() {
 
     const now = manualDate || new Date();
     const isManual = !!manualDate;
-    const bypassGeolocation = isManual || action === 'Emergency'; // Always bypass for manual or emergency logic if needed? 
-    // Actually Emergency usually wants location, but let's keep it robust.
 
-    if (action === 'Clock In' || action === 'Clock Out') {
+    // Handle Confirm Read action
+    if (action === 'Confirm Read') {
       try {
-        if (!profile?.id) {
-          throw new Error("ユーザー情報を取得できませんでした。");
-        }
-        const status = action === 'Clock In' ? 'present' : 'checked_out';
+        const sysId = (currentOrder as any)?.systemId ||
+          currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') ||
+          orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
+        if (!sysId || !profile?.name) throw new Error('受注IDまたはユーザー情報が取得できません');
 
-        await updateStaffStatus(now, profile.id, status);
+        const { updateSheetStatus } = await import('@/app/actions/gas-actions');
+        const result = await updateSheetStatus({
+          gasUrl: ORDER_GAS_URL,
+          action: 'confirmRead',
+          systemId: sysId,
+          staffName: profile.name,
+          timestamp: now.toISOString(),
+        } as any);
+        if (result.status === 'error') throw new Error(result.message);
 
-        const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-        setLastAction({ action, time: currentTime });
-        toast({
-          title: isManual ? `${action === 'Clock In' ? '出勤' : '退勤'}時間を修正しました` : (action === 'Clock In' ? '出勤しました' : '退勤しました'),
-          description: `${currentTime}に記録しました。`,
-        });
+        setIsConfirmedOptimistic(true);
+        toast({ title: '確認済にしました', description: `${profile.name}として記録しました。` });
+        refetchOrders().catch(e => console.error(e));
       } catch (e: any) {
-        console.error("Clock In/Out failed:", e);
-        toast({
-          variant: 'destructive',
-          title: 'エラー',
-          description: `記録に失敗しました: ${e.message}`
-        });
+        toast({ variant: 'destructive', title: 'エラー', description: e.message });
       } finally {
         setIsLoading(null);
       }
       return;
     }
+
+    const bypassGeolocation = isManual || action === 'Emergency';
 
     const statusMap: Partial<Record<string, string>> = {
       'Start Travel': '移動中',
@@ -219,8 +221,8 @@ function CheckInClient() {
           longitude: longitude,
           actionType: action as any,
           actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
-          comment: action === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
-          emergencyFlag: action === 'Emergency' ? true : undefined,
+          comment: (action as string) === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
+          emergencyFlag: (action as string) === 'Emergency' ? true : undefined,
           systemId: (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '')
         });
 
@@ -235,15 +237,15 @@ function CheckInClient() {
         setIsLoading(null);
 
         toast({
-          title: action === 'Emergency' ? '緊急連絡を送信しました' : (isManual ? 'ステータス時間を修正しました' : 'ステータスを更新しました'),
+          title: (action as string) === 'Emergency' ? '緊急連絡を送信しました' : (isManual ? 'ステータス時間を修正しました' : 'ステータスを更新しました'),
           description: result.message,
-          variant: action === 'Emergency' ? 'destructive' : 'default',
+          variant: (action as string) === 'Emergency' ? 'destructive' : 'default',
         });
 
         const currentTime = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
         setLastAction({ action: action as ActionType, time: currentTime });
 
-        if (action === 'Emergency') setEmergencyMessage('');
+        if ((action as string) === 'Emergency') setEmergencyMessage('');
 
         if (isManual && isCorrectionMode) {
           setIsCorrectionMode(false);
@@ -304,7 +306,7 @@ function CheckInClient() {
 
   const isButtonDisabled = (action: ActionType | 'Emergency') => {
     if ((action as string) === 'Emergency') return !!isLoading;
-    if (['Clock In', 'Clock Out', 'Wait'].includes(action)) return false;
+    if (['Confirm Read', 'Clock Out', 'Wait'].includes(action)) return false;
     if (!orderId) return true;
 
     // Explicitly disable workflow buttons if the task is already finished
@@ -327,8 +329,10 @@ function CheckInClient() {
     }
   };
 
+  const isAlreadyConfirmed = isConfirmedOptimistic ?? currentOrder?.isConfirmed ?? false;
+
   const actionButtons: { action: ActionType; label: string; icon: React.ElementType }[] = [
-    { action: 'Clock In', label: '出勤', icon: LogIn },
+    { action: 'Confirm Read', label: isAlreadyConfirmed ? '確認済み ✓' : 'タスク確認', icon: BadgeCheck },
     { action: 'Start Travel', label: '移動開始', icon: PlayCircle },
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },

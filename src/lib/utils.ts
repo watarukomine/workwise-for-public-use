@@ -323,6 +323,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     serviceType: findKey(rawOrder, ['サービス種別', 'サービス区分']) || '',
     emergencyMessage: findKey(rawOrder, ['緊急連絡']) || '',
     adminReply: findKey(rawOrder, ['管理者返信']) || '',
+    isConfirmed: !!(findKey(rawOrder, ['既読確認', 'confirmedAt', 'readAt'])),
     raw: rawOrder, // Preserve raw data for context processing
     // Validation metadata - check if this order has any logged issues
     hasValidationIssues: (() => {

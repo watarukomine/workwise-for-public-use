@@ -230,11 +230,20 @@ const OrderChip: React.FC<OrderChipProps> = ({ order, className, style, isOverla
         </div>
       )}
 
-      {/* Done Mark (Consistency with timeline chips) */}
+      {/* Done Mark */}
       {(['Finish Task', '作業完了', '完了'].includes(String(order.status || '')) || !!order.actualEndTime) && (
         <div className="absolute -top-1 -right-1 z-10 pointer-events-none">
           <div className="border border-red-600 rounded-full w-4 h-4 flex items-center justify-center bg-white/90 shadow-sm rotate-neg-15">
             <span className="text-[8px] font-bold text-red-600 leading-none select-none">済</span>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmed Mark - shown when staff has acknowledged the order */}
+      {order.isConfirmed && (
+        <div className="absolute -top-1 -left-1 z-10 pointer-events-none">
+          <div className="border border-blue-600 rounded-full w-4 h-4 flex items-center justify-center bg-white/90 shadow-sm">
+            <span className="text-[8px] font-bold text-blue-600 leading-none select-none">確</span>
           </div>
         </div>
       )}

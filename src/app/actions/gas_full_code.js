@@ -192,6 +192,8 @@ function doPost(e) {
             return createTask(params);
         } else if (params.action === 'updateOrderSchedule') { // 新規: 受注の日時更新
             return updateOrderSchedule(params);
+        } else if (params.action === 'confirmRead') { // 既読確認
+            return confirmReadOrder(params);
         } else if (params.eventTitle || params.systemId || params.orderId) { // 既存更新
             return updateSheetWithOrderInfo(params);
         } else if (params.action === 'createOrder') { // 新規注文
@@ -309,6 +311,62 @@ function errorResponse(msg) {
 }
 function successResponse(msg, data) {
     return ContentService.createTextOutput(JSON.stringify({ status: "success", message: msg, ...data })).setMimeType(ContentService.MimeType.JSON);
+}
+/**
+ * 受注シートの「既読確認」列を更新する
+ * スタッフが「確認済」ボタンを押したときに呼ばれる
+ */
+function confirmReadOrder(params) {
+    const { systemId, staffName, timestamp } = params;
+    if (!systemId) return errorResponse("systemId が指定されていません");
+    if (!staffName) return errorResponse("staffName が指定されていません");
+
+    try {
+        const orderSpreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+        const sheet = orderSpreadsheet.getSheetByName(ORDER_SHEET_NAME);
+        if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
+
+        const data = sheet.getDataRange().getValues();
+        const headers = data[0].map(h => String(h).trim().toLowerCase());
+
+        // 「既読確認」列を探す
+        const confirmedColIndex = headers.indexOf('既読確認');
+        if (confirmedColIndex === -1) {
+            return errorResponse("「既読確認」列が見つかりません。スプレッドシートに「既読確認」という列名を追加してください。");
+        }
+
+        // SystemID 列を探す
+        const sysIdColIndex = headers.reduce((found, h, i) => {
+            if (found !== -1) return found;
+            if (h === 'systemid' || h === 'システムid' || h === 'sid') return i;
+            return -1;
+        }, -1);
+        if (sysIdColIndex === -1) return errorResponse("SystemID 列が見つかりません");
+
+        // 対象行を検索
+        let targetRowNum = -1;
+        for (let i = 1; i < data.length; i++) {
+            const cellVal = String(data[i][sysIdColIndex]).trim();
+            if (cellVal === String(systemId).trim()) {
+                targetRowNum = i + 1;
+                break;
+            }
+        }
+        if (targetRowNum === -1) return errorResponse(`受注 ID: ${systemId} が見つかりませんでした`);
+
+        // 既読確認列に「スタッフ名 日時」を書き込む
+        const now = timestamp ? new Date(timestamp) : new Date();
+        const jstStr = Utilities.formatDate(now, "Asia/Tokyo", "yyyy/MM/dd HH:mm");
+        const confirmValue = `${staffName} ${jstStr}`;
+        sheet.getRange(targetRowNum, confirmedColIndex + 1).setValue(confirmValue);
+        SpreadsheetApp.flush();
+        sendFirebaseSignal('update');
+
+        return successResponse(`既読確認を記録しました: ${confirmValue}`, { confirmed: true });
+    } catch (e) {
+        console.error("confirmReadOrder Error:", e);
+        return errorResponse("既読確認の記録に失敗しました: " + e.message);
+    }
 }
 /**
  * 汎用タスク（行動記録）を新規作成する機能
