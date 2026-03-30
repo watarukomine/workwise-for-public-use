@@ -18,13 +18,13 @@
 // Ensure your GAS project is deployed with "Execute as: Me" and "Who has access: Anyone".
 
 // Staff Data Script (Unified)
-export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbzkLFOSo0Oz_5VjQipsdKewkXZoTkxlXW1C2hO0Tc9W1jDzAyVbIogPEHtVEfukAnWe/exec';
+export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec';
 
 // Customer Data Script (Unified)
-export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbzkLFOSo0Oz_5VjQipsdKewkXZoTkxlXW1C2hO0Tc9W1jDzAyVbIogPEHtVEfukAnWe/exec';
+export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec';
 
 // Order & Task Management Script (Unified)
-export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbzkLFOSo0Oz_5VjQipsdKewkXZoTkxlXW1C2hO0Tc9W1jDzAyVbIogPEHtVEfukAnWe/exec';
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec';
 
 
 // --- スプレッドシート本体のURL ---
