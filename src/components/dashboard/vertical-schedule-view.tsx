@@ -96,13 +96,31 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
 
         const eventCard = (
           <Card className={cn(
-            "cursor-pointer hover:bg-muted/50",
+            "cursor-pointer hover:bg-muted/50 relative overflow-hidden",
             areaBgClass, // Apply store background color
             isTravel && "bg-secondary/50 border-dashed",
             checkedOutStaffIds?.has(event.staffId || '') && "opacity-50 grayscale bg-gray-100 dark:bg-gray-800",
             // Dim tasks assigned to other staff members
             profile && event.staffId !== profile.id && "opacity-40 grayscale-[0.8]"
           )}>
+            {/* 完了(済)マーク */}
+            {event.status === '完了' && (
+              <div className="absolute top-1 right-1 z-10 pointer-events-none">
+                <div className="border border-red-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm rotate-neg-15">
+                  <span className="text-[10px] font-bold text-red-600 leading-none select-none">済</span>
+                </div>
+              </div>
+            )}
+            
+            {/* 既読(確)マーク */}
+            {event.isConfirmed && (
+              <div className="absolute top-1 left-1 z-10 pointer-events-none">
+                <div className="border border-blue-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm">
+                  <span className="text-[10px] font-bold text-blue-600 leading-none select-none">確</span>
+                </div>
+              </div>
+            )}
+
             <CardHeader className="p-4">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg leading-tight">{event.title}</CardTitle>
