@@ -196,6 +196,13 @@ export default function TroubleshootingPage() {
                                     <TableCell>ブラウザのキャッシュクリアを試すか、シークレットウィンドウでアクセスしてください。解消しない場合は開発者に問い合わせてください。</TableCell>
                                 </TableRow>
                                 <TableRow>
+                                    <TableCell className="font-medium">「データを読み込み中...」のまま進まない (v1.1.25〜)</TableCell>
+                                    <TableCell>
+                                        通信環境の影響によりGASからのレスポンスが遅延している可能性があります。<br />
+                                        <strong>対策:</strong> 30秒経過すると自動的に読み込みが解除されます。また、途中で表示される「キャンセル」ボタンを押して手動で中断し、電波の良い場所で再試行してください。
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow>
                                     <TableCell className="font-medium">「接続テスト失敗」</TableCell>
                                     <TableCell>シフトインポート画面の「接続テスト」で失敗する場合、Firebaseへの書き込み権限がない可能性があります。管理者に確認してください。</TableCell>
                                 </TableRow>
