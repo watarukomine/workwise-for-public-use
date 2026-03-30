@@ -18,10 +18,10 @@
 // Ensure your GAS project is deployed with "Execute as: Me" and "Who has access: Anyone".
 
 // Staff Data Script
-export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxN0xxsMnhJeiy5uWWZIYB8d1E3s6UFTd1b57UttH-o1i-e0EQmRbYzC0SbJqnLJd5a/exec';
+export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycby4q1cejt8p22SOYix2tpaUpFSMVwFYxHFdTaeuoENJvaEKTTrIEWhgrzdQCmyL4L9G/exec';
 
 // Customer Data Script
-export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbxN0xxsMnhJeiy5uWWZIYB8d1E3s6UFTd1b57UttH-o1i-e0EQmRbYzC0SbJqnLJd5a/exec';
+export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycby4q1cejt8p22SOYix2tpaUpFSMVwFYxHFdTaeuoENJvaEKTTrIEWhgrzdQCmyL4L9G/exec';
 
 // Order & Task Management Script (Unified)
 export const ORDER_GAS_URL = "https://script.google.com/macros/s/AKfycbxN0xxsMnhJeiy5uWWZIYB8d1E3s6UFTd1b57UttH-o1i-e0EQmRbYzC0SbJqnLJd5a/exec";
