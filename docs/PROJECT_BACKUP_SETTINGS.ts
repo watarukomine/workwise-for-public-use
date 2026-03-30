@@ -17,14 +17,14 @@
 // Note: These URLs point to the deployed Web App URL of your GAS project.
 // Ensure your GAS project is deployed with "Execute as: Me" and "Who has access: Anyone".
 
-// Staff Data Script
-export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxGeXICGCJIbu-EuaRINfiVp1UTEz3IO9A2bGP-monXgwIHIv7PRomaFaM-s10KppDWzA/exec';
+// Staff Data Script (Unified)
+export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbzkLFOSo0Oz_5VjQipsdKewkXZoTkxlXW1C2hO0Tc9W1jDzAyVbIogPEHtVEfukAnWe/exec';
 
-// Customer Data Script
-export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbz9CFA3PdNTi5fQhnxz5Dm6-copXjMPpCKvJtSGB80Na5cVSsdYXfgO-g5EQPK66BrcCA/exec';
+// Customer Data Script (Unified)
+export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbzkLFOSo0Oz_5VjQipsdKewkXZoTkxlXW1C2hO0Tc9W1jDzAyVbIogPEHtVEfukAnWe/exec';
 
 // Order & Task Management Script (Unified)
-export const ORDER_GAS_URL = "https://script.google.com/macros/s/AKfycbxnK2TdO_90kT1OzOLjhhXlV4GUot2r36Nsel-e8_Tqhd9t8f7TPtUEh0L9CBQBldPI/exec";
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbzkLFOSo0Oz_5VjQipsdKewkXZoTkxlXW1C2hO0Tc9W1jDzAyVbIogPEHtVEfukAnWe/exec';
 
 
 // --- スプレッドシート本体のURL ---
