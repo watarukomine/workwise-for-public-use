@@ -77,6 +77,18 @@ function CheckInClient() {
     setOptimisticStatus(null);
   }, [orderId]);
 
+  // Safety timeout for isLoading
+  React.useEffect(() => {
+    if (isLoading) {
+      const timer = setTimeout(() => {
+        console.warn(`[CheckIn] Action ${isLoading} timed out, resetting loading state.`);
+        setIsLoading(null);
+        setError('操作がタイムアウトしました。通信環境を確認して、もう一度お試しください。');
+      }, 30000); // 30s safety timeout
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
+
   // Visibility API: Sync whenever tab/app becomes visible
   React.useEffect(() => {
     const handleVisibilityChange = () => {
@@ -296,7 +308,7 @@ function CheckInClient() {
             setIsLoading(null);
           }
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 }
       );
     } else {
       await executeUpdate(null, null);
@@ -352,6 +364,19 @@ function CheckInClient() {
               {orderId && <div className="text-sm font-medium mt-1 text-slate-600">現在のステータス: <span className="text-blue-600">{currentStatus}</span></div>}
             </div>
             <div className="flex gap-2">
+              {isLoading && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground animate-pulse"
+                  onClick={() => {
+                    setIsLoading(null);
+                    setError('操作をキャンセルしました。');
+                  }}
+                >
+                  キャンセル
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
