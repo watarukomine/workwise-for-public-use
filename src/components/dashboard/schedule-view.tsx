@@ -2548,6 +2548,13 @@ const DraggableEvent: React.FC<DraggableEventProps> = ({ targetEvent, staff, get
           </div>
         </div>
       )}
+      {targetEvent.isConfirmed && !isTravelEvent && (
+        <div className="absolute -top-1 -left-1 z-10 pointer-events-none">
+          <div className="border border-blue-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm">
+            <span className="text-[10px] font-bold text-blue-600 leading-none select-none">確</span>
+          </div>
+        </div>
+      )}
       {targetEvent.isEmergency && !isTravelEvent && (
         <div className="absolute -top-1 -left-1 z-20 pointer-events-none">
           <div className="bg-red-600 rounded-full p-0.5 shadow-md">
