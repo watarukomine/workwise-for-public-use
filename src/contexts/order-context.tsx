@@ -377,6 +377,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const { allStaff, isStaffLoading, setAllStaff } = useSelectedStaff();
   const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
+  const [fetchedDateRanges, setFetchedDateRanges] = useState<Set<string>>(new Set()); // トラフィック削減用
   const ORDERS_CACHE_KEY = 'cached_orders_results';
 
   useEffect(() => {
@@ -437,31 +438,65 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const fetchAndProcessData = useCallback(async (isBackground = false) => {
-    // Only show loader if we have NO data yet
-    if (!isBackground && rawOrdersData.length === 0) setIsLoading(true);
+  const fetchAndProcessData = useCallback(async (isBackground = false, params?: { date?: string; range?: number }) => {
+    // Only show loader if we have NO data yet AND it's not a background fetch
+    const isInitialLoad = rawOrdersData.length === 0 && !params;
+    if (!isBackground && isInitialLoad) setIsLoading(true);
     setErrorState(null);
 
     try {
-      const result = await fetchGasData(orderGasUrl) as any;
+      console.log(`[OrderProvider] Fetching data: date=${params?.date || 'Today'}, range=${params?.range ?? 3}`);
+      const result = await fetchGasData(orderGasUrl, params) as any;
       if (result.error) throw new Error(result.error);
 
       // Support consolidated response format: { orders, staff } OR legacy array
-      const orders = result.orders || result.data || result;
+      const newRawOrders = result.orders || result.data || result;
 
-      if (Array.isArray(orders)) {
-        setRawOrdersData(orders);
+      if (Array.isArray(newRawOrders)) {
+        setRawOrdersData(prev => {
+          // Merge based on a unique key to prevent duplicates
+          const orderMap = new Map();
+          
+          // Helper to get a stable ID from raw GAS data
+          const getRawId = (o: any) => {
+            return o.SystemID || o.systemId || o['受注ID'] || (o.id && !String(o.id).startsWith('task') ? o.id : null);
+          };
 
-        // Cache data
-        try {
-          localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify({
-            orders: orders,
-            timestamp: Date.now()
-          }));
-        } catch (e) {
-          console.warn("Failed to cache orders results", e);
+          // Populate with existing data
+          prev.forEach(o => {
+            const id = getRawId(o);
+            if (id) orderMap.set(String(id), o);
+          });
+
+          // Update/Add with new data
+          newRawOrders.forEach(o => {
+            const id = getRawId(o);
+            if (id) {
+              orderMap.set(String(id), o);
+            } else if (o._type === 'task') {
+              // Task items usually have an ID field
+              const taskId = o.id || o.ID || JSON.stringify(o);
+              orderMap.set(String(taskId), o);
+            }
+          });
+
+          const merged = Array.from(orderMap.values());
+          console.log(`[OrderProvider] Data merged: ${prev.length} -> ${merged.length} items`);
+          return merged;
+        });
+
+        // Record this date range as fetched
+        if (params?.date) {
+          setFetchedDateRanges(prev => {
+            const next = new Set(prev);
+            next.add(params.date!);
+            return next;
+          });
         }
 
+        // Cache data (Optional: only if it's the main payload or after merging)
+        // Note: Full cache might get large, consider only caching a subset
+        
         // 統合されたスタッフデータがあれば更新
         if (result.staff && Array.isArray(result.staff)) {
           console.log(`[OrderProvider] Consolidated staff data received: ${result.staff.length} items`);
@@ -504,10 +539,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, [database, fetchAndProcessData]);
 
-  // 2. Fetch data on mount and interval
+  // 2. Fetch data on mount (Init with today range)
   useEffect(() => {
-    fetchAndProcessData();
-    const interval = setInterval(() => fetchAndProcessData(true), 15000); // Poll every 15s
+    // Initial fetch for today +/- 3 days
+    const today = new Date().toISOString().split('T')[0];
+    fetchAndProcessData(false, { date: today, range: 3 });
+    
+    // Background polling every 30s (increased from 15s to be more polite since we have dynamic loading)
+    const interval = setInterval(() => fetchAndProcessData(true, { date: today, range: 3 }), 30000); 
     return () => clearInterval(interval);
   }, [fetchAndProcessData]);
 
@@ -588,7 +627,15 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     scheduleEvents,
     setScheduleEvents,
     statuses,
-    loadOrders: async () => { },
+    loadOrders: async (date: Date) => {
+      const dateStr = date.toISOString().split('T')[0];
+      if (fetchedDateRanges.has(dateStr)) {
+        console.log(`[OrderProvider] Date ${dateStr} already fetched, skipping loadOrders`);
+        return;
+      }
+      console.log(`[OrderProvider] Loading additional data for: ${dateStr}`);
+      await fetchAndProcessData(true, { date: dateStr, range: 1 });
+    },
     syncOrders: async () => { await fetchAndProcessData(false); },
     isLoading,
     isSyncingOrders: isLoading,

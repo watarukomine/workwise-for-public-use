@@ -7,9 +7,10 @@ import { unstable_noStore as noStore } from 'next/cache';
  * Fetches data from a given Google Apps Script URL.
  * This server action acts as a proxy to bypass client-side CORS issues.
  * @param url The full URL of the Google Apps Script web app.
+ * @param params Optional query parameters (e.g., { date: '2024-03-30', range: 3 })
  * @returns A promise that resolves to an object with either 'data' or 'error' property.
  */
-export async function fetchGasData(url: string): Promise<{ data?: any; staff?: any; orders?: any; customers?: any; error?: string; message?: string }> {
+export async function fetchGasData(url: string, params?: { date?: string; range?: number }): Promise<{ data?: any; staff?: any; orders?: any; customers?: any; error?: string; message?: string }> {
   // This function will always be dynamically rendered, disabling caching.
   noStore();
 
@@ -21,7 +22,16 @@ export async function fetchGasData(url: string): Promise<{ data?: any; staff?: a
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-    const response = await fetch(url, {
+    // Construct URL with query parameters if provided
+    let finalUrl = url;
+    if (params) {
+      const urlObj = new URL(url);
+      if (params.date) urlObj.searchParams.set('date', params.date);
+      if (params.range !== undefined) urlObj.searchParams.set('range', String(params.range));
+      finalUrl = urlObj.toString();
+    }
+
+    const response = await fetch(finalUrl, {
       method: 'GET',
       cache: 'no-store',
       redirect: 'follow',

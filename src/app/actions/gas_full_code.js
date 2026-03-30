@@ -23,14 +23,46 @@ function doGet(e) {
     try {
         const orderDataResult = [];
         let staffDataResult = [];
-        let customerDataResult = []; // 追加
+        let customerDataResult = [];
 
-        // 1. 受注データの取得
+        // パラメータの取得
+        const targetDateStr = e.parameter.date; // "YYYY-MM-DD"
+        const rangeDays = parseInt(e.parameter.range || "3"); // 前後何日分か（デフォルト3）
+
+        let startDate = null;
+        let endDate = null;
+
+        if (targetDateStr) {
+            const baseDate = new Date(targetDateStr);
+            if (!isNaN(baseDate.getTime())) {
+                startDate = new Date(baseDate);
+                startDate.setDate(startDate.getDate() - rangeDays);
+                startDate.setHours(0, 0, 0, 0);
+
+                endDate = new Date(baseDate);
+                endDate.setDate(endDate.getDate() + rangeDays);
+                endDate.setHours(23, 59, 59, 999);
+            }
+        } else {
+            // パラメータがない場合は「今日」を中心に前後3日分に制限（初期ロード高速化）
+            const baseDate = new Date();
+            startDate = new Date(baseDate);
+            startDate.setDate(startDate.getDate() - rangeDays);
+            startDate.setHours(0, 0, 0, 0);
+
+            endDate = new Date(baseDate);
+            endDate.setDate(endDate.getDate() + rangeDays);
+            endDate.setHours(23, 59, 59, 999);
+        }
+
+        console.log(`Filtering data from ${startDate ? startDate.toISOString() : 'N/A'} to ${endDate ? endDate.toISOString() : 'N/A'}`);
+
+        // 1. 受注データの取得 (日付フィルター適用)
         try {
             const orderSpreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
             const orderSheet = orderSpreadsheet.getSheetByName(ORDER_SHEET_NAME);
             if (orderSheet) {
-                const orderData = getSheetData(orderSheet);
+                const orderData = getSheetData(orderSheet, 3000, "作業予定日", startDate, endDate);
                 orderData.forEach(row => {
                     row._type = 'order'; // 識別子
                     orderDataResult.push(row);
@@ -40,12 +72,12 @@ function doGet(e) {
             console.error("Order Sheet Read Error:", err);
         }
 
-        // 2. 行動予定データの取得
+        // 2. 行動予定データの取得 (日付フィルター適用)
         try {
             const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
             let actionSheet = staffSpreadsheet.getSheetByName(ACTION_LOG_SHEET_NAME);
             if (actionSheet) {
-                const actionData = getSheetData(actionSheet);
+                const actionData = getSheetData(actionSheet, 1000, "開始日時", startDate, endDate);
                 actionData.forEach(row => {
                     row._type = 'task'; // 識別子
                     row.id = row['ID'];
@@ -62,7 +94,7 @@ function doGet(e) {
             console.error("Action Log Sheet Read Error:", err);
         }
 
-        // 3. スタッフマスタの取得 (高速化のための統合)
+        // 3. スタッフマスタの取得 (マスタは全件取得)
         try {
             const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
             const staffSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
@@ -73,7 +105,7 @@ function doGet(e) {
             console.error("Staff Sheet Read Error:", err);
         }
 
-        // 4. 販売店情報の取得 (追加)
+        // 4. 販売店情報の取得 (マスタは全件取得)
         try {
             const customerSpreadsheet = SpreadsheetApp.openById(CUSTOMER_SPREADSHEET_ID);
             const customerSheet = customerSpreadsheet.getSheetByName(CUSTOMER_SHEET_NAME);
@@ -89,8 +121,11 @@ function doGet(e) {
             status: "success",
             orders: orderDataResult,
             staff: staffDataResult,
-            customers: customerDataResult, // 追加
-            // 互換性維持のための data フィールド（旧バージョン対応）
+            customers: customerDataResult,
+            dateRange: {
+                start: startDate ? startDate.toISOString() : null,
+                end: endDate ? endDate.toISOString() : null
+            },
             data: orderDataResult
         };
 
@@ -104,12 +139,16 @@ function doGet(e) {
     }
 }
 // シートデータをオブジェクト配列として取得するヘルパー
-function getSheetData(sheet, maxRows = 2000) {
+function getSheetData(sheet, maxRows = 2000, filterColumnName = null, startDate = null, endDate = null) {
     const totalRows = sheet.getLastRow();
     if (totalRows <= 1) return [];
 
     let startRow = 1;
     let numRows = totalRows;
+
+    // ヘッダーは常に1行目から取得
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const filterColIdx = filterColumnName ? headers.map(h => String(h).trim()).indexOf(filterColumnName) : -1;
 
     // 読み込み行数を制限（最新のデータを優先）
     if (maxRows && totalRows > maxRows + 1) {
@@ -117,23 +156,46 @@ function getSheetData(sheet, maxRows = 2000) {
         numRows = maxRows;
     }
 
-    // ヘッダーは常に1行目から取得
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const startIdx = startRow > 1 ? startRow : 2;
+    const actualNumRows = startRow > 1 ? numRows : numRows - 1;
 
     // データ範囲を取得
-    const dataRange = sheet.getRange(startRow > 1 ? startRow : 2, 1, startRow > 1 ? numRows : numRows - 1, headers.length);
+    const dataRange = sheet.getRange(startIdx, 1, actualNumRows, headers.length);
     const displayValues = dataRange.getDisplayValues();
     const rawValues = dataRange.getValues();
-    const backgrounds = dataRange.getBackgrounds(); // 背景色プロパティも一括取得
+    const backgrounds = dataRange.getBackgrounds();
 
     const sheetId = sheet.getSheetId();
     const spreadsheetId = sheet.getParent().getId();
 
-    return displayValues.map((row, rowIndex) => {
-        const obj = {};
+    const result = [];
+    displayValues.forEach((row, rowIndex) => {
         const rawRow = rawValues[rowIndex];
+        
+        // 日付フィルタリング
+        if (filterColIdx !== -1 && startDate && endDate) {
+            const dateVal = rawRow[filterColIdx];
+            let rowDate = null;
+            if (dateVal instanceof Date) {
+                rowDate = dateVal;
+            } else if (dateVal) {
+                rowDate = new Date(dateVal);
+            }
+
+            if (rowDate && !isNaN(rowDate.getTime())) {
+                // 範囲外ならスキップ
+                if (rowDate < startDate || rowDate > endDate) {
+                    return;
+                }
+            } else {
+              // 日付が入っていないデータは、マスタデータ等の可能性や未設定受注なので含める
+              // ただし受注管理や行動予定の場合は日付必須なので、日付がないものは古い/未設定として弾くことも検討
+            }
+        }
+
+        const obj = {};
         const bgRow = backgrounds[rowIndex];
-        const actualRowIndex = (startRow > 1 ? startRow : 2) + rowIndex;
+        const actualRowIndex = startIdx + rowIndex;
 
         headers.forEach((header, index) => {
             const h = String(header).trim();
@@ -142,9 +204,7 @@ function getSheetData(sheet, maxRows = 2000) {
             const rawValue = rawRow[index];
             const bgValue = bgRow[index];
 
-            // color（カラー）列の場合は、文字データではなくセルの「背景色」を優先して取得する
             if (h.toLowerCase() === 'color' || h === 'カラー') {
-                // 背景色が初期値(#ffffff)でなければ採用、そうでなければ文字データを使う
                 if (bgValue && bgValue !== '#ffffff') {
                     obj[h] = bgValue;
                     return;
@@ -152,8 +212,6 @@ function getSheetData(sheet, maxRows = 2000) {
             }
 
             if (rawValue && rawValue instanceof Date && !isNaN(rawValue.getTime())) {
-                // 1899年/1900年など「時間だけ」のセルの場合は、タイムゾーン（9時間ズレ）の影響を
-                // 受けないように、スプレッドシートの見た目通りの文字列（12:00 等）をそのまま送る
                 if (rawValue.getFullYear() < 1970) {
                     obj[h] = displayValue;
                 } else {
@@ -164,11 +222,11 @@ function getSheetData(sheet, maxRows = 2000) {
             }
         });
 
-        // Order_URL (編集用リンク) - 実際の行番号を使用
         obj["Order_URL"] = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit#gid=${sheetId}&range=A${actualRowIndex}`;
-
-        return obj;
+        result.push(obj);
     });
+
+    return result;
 }
 /**
  * POST リクエストを処理し、スプレッドシートを更新します

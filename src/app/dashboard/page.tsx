@@ -268,11 +268,15 @@ export default function DashboardPage() {
         if (isDateChange) {
           isDateLoading.current = false;
           setIsSyncing(false);
+          
+          // CRITICAL: Fetch additional data for this date if not already in context
+          // This enables lazy-loading for PC dashboard speed-up
+          loadOrders(currentDate);
         }
       }
     };
     syncAttendance();
-  }, [currentDate, setSelectedStaffIds, scheduleEvents]);
+  }, [currentDate, setSelectedStaffIds, scheduleEvents, loadOrders]);
 
   // Selection state is persisted in localStorage via SelectedStaffContext.
   // We NO LONGER auto-save selection to "saveDailyAttendance" (Database) 
