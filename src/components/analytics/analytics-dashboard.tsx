@@ -3,7 +3,7 @@
 import { findKey } from '@/lib/utils';
 
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useOrder } from '@/contexts/order-context';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -30,24 +30,74 @@ export function AnalyticsDashboard() {
     const { orders: allOrders = [], isLoading: isOrdersLoading } = useOrder();
     const { allStaff = [], isLoading: isStaffLoading } = useSelectedStaff();
     const { profile, isLoading: isProfileLoading } = useUserProfile();
+    const { loadRange } = useOrder();
     const [dateRange, setDateRange] = useState('this-month');
     const [selectedStaffId, setSelectedStaffId] = useState<string>('all');
+    const [isFetchingHistory, setIsFetchingHistory] = useState(false);
+    const [loadedRanges, setLoadedRanges] = useState<Set<string>>(new Set());
+
+    // Auto-load historical data when needed
+    useEffect(() => {
+        const fetchHistory = async () => {
+            // If already loading or already fetched this session, skip
+            if (isFetchingHistory || loadedRanges.has(dateRange)) return;
+
+            const now = new Date();
+            let start = startOfMonth(now);
+            let range = 31; // Default month range
+
+            if (dateRange === 'last-month') {
+                start = startOfMonth(subMonths(now, 1));
+                range = 60; // 2 months to be safe
+            } else if (dateRange === 'all-time') {
+                // For "All time", fetch a large range (e.g., last 3 years) around current date or specific base
+                range = 1000; 
+            } else if (dateRange === 'this-month') {
+                // Even for "this-month", we want at least 31 days to cover the whole month
+                range = 31;
+            } else {
+                return; // Nothing to fetch for other types if any
+            }
+
+            setIsFetchingHistory(true);
+            try {
+                await loadRange(start, range);
+                setLoadedRanges(prev => {
+                    const next = new Set(prev);
+                    next.add(dateRange);
+                    return next;
+                });
+            } catch (error) {
+                console.error("Failed to load historical analytics data:", error);
+            } finally {
+                setIsFetchingHistory(false);
+            }
+        };
+
+        fetchHistory();
+    }, [dateRange, loadRange, isFetchingHistory, loadedRanges]);
 
     // Filter Logic
     const filteredData = useMemo(() => {
         const now = new Date();
         let start = startOfMonth(now);
         let end = endOfMonth(now);
+        let isFullRange = false;
 
         if (dateRange === 'last-month') {
             start = startOfMonth(subMonths(now, 1));
             end = endOfMonth(subMonths(now, 1));
+        } else if (dateRange === 'all-time') {
+            start = new Date(2000, 0, 1); // Way in the past
+            end = new Date(2099, 11, 31); // Way in the future
+            isFullRange = true;
         }
 
         let relevantOrders = allOrders.filter((order: Order) => {
             if (!order.scheduledDate) return false;
             // scheduledDate is YYYY-MM-DD string
             const orderDate = new Date(order.scheduledDate);
+            if (isFullRange) return true; // Show all if all-time
             return isWithinInterval(orderDate, { start, end });
         });
 
@@ -590,6 +640,7 @@ export function AnalyticsDashboard() {
                         <SelectContent>
                             <SelectItem value="this-month">今月</SelectItem>
                             <SelectItem value="last-month">先月</SelectItem>
+                            <SelectItem value="all-time">全期間</SelectItem>
                         </SelectContent>
                     </Select>
                     <Button variant="outline" onClick={handleExportExcel}>
@@ -600,6 +651,12 @@ export function AnalyticsDashboard() {
                     </Button>
                 </div>
             </div>
+
+            {isFetchingHistory && (
+                <div className="bg-muted p-2 rounded-md text-sm text-center animate-pulse">
+                    過去のデータをロードしています... しばらくお待ちください。
+                </div>
+            )}
 
             <div className="space-y-6">
                 {/* Full Width Charts */}

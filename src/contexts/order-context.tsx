@@ -22,6 +22,7 @@ interface OrderContextType {
   setScheduleEvents: React.Dispatch<React.SetStateAction<WithId<ScheduleEvent>[]>>;
   statuses: StaffStatus[];
   loadOrders: (date: Date) => Promise<void>;
+  loadRange: (date: Date, range: number) => Promise<void>;
   syncOrders: () => Promise<void>;
   isLoading: boolean;
   isSyncingOrders: boolean;
@@ -643,6 +644,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     saveLocalEvent,
     deleteLocalEvent,
     refetchOrders: async () => { await fetchAndProcessData(true); },
+    loadRange: async (date: Date, range: number) => {
+      const dateStr = date.toISOString().split('T')[0];
+      console.log(`[OrderProvider] Loading wider range data for: ${dateStr}, range: ${range}`);
+      await fetchAndProcessData(true, { date: dateStr, range });
+    },
     rawOrdersData,
     orderGasUrl,
     setOrderGasUrl,
