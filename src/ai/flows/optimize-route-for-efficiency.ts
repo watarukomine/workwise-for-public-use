@@ -1,12 +1,8 @@
 'use server';
 
 /**
- * @fileOverview A high-performance programmatic route optimizer for staff work locations.
- * Uses a TSP (Traveling Salesman Problem) solver based on Haversine distance.
- * 
- * - optimizeRoute - A function that handles the route optimization process.
- * - OptimizeRouteInput - The input type for the optimizeRoute function.
- * - OptimizeRouteOutput - The return type for the optimizeRoute function.
+ * @fileOverview Google Maps Routes API for high-precision route optimization.
+ * Falling back to programmatic TSP solver for >25 waypoints or API errors.
  */
 
 import { ai } from '@/ai/genkit';
@@ -58,9 +54,9 @@ const OptimizeRouteOutputSchema = z.object({
 export type OptimizeRouteOutput = z.infer<typeof OptimizeRouteOutputSchema>;
 
 /**
- * Calculates the Haversine distance between two points on Earth in km.
+ * Fallback: Calculates the Haversine distance between two points on Earth in km.
  */
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+function calculateDistanceFallback(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371; // Earth's radius in kilometers
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -73,52 +69,10 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 /**
- * Solves the Traveling Salesman Problem (TSP) with fixed start and end points.
+ * Fallback TSP solver (Greedy Nearest Neighbor).
  */
-function solveTSP(start: any, end: any, waypoints: any[]): any[] {
+function solveTSPFallback(start: any, end: any, waypoints: any[]): any[] {
   if (waypoints.length === 0) return [start, end];
-
-  // For small number of waypoints (<= 8), use brute force for exact shortest path
-  // 8! = 40,320 permutations, which is fast in modern JS.
-  if (waypoints.length <= 8) {
-    let minDistance = Infinity;
-    let bestWaypoints: any[] = [];
-
-    const getPermutations = (arr: any[]): any[][] => {
-      if (arr.length <= 1) return [arr];
-      const result: any[][] = [];
-      for (let i = 0; i < arr.length; i++) {
-        const current = arr[i];
-        const remaining = arr.slice(0, i).concat(arr.slice(i + 1));
-        for (const p of getPermutations(remaining)) {
-          result.push([current, ...p]);
-        }
-      }
-      return result;
-    };
-
-    const allPermutations = getPermutations(waypoints);
-    
-    for (const p of allPermutations) {
-      let currentDist = 0;
-      let prevLoc = start;
-      
-      for (const loc of p) {
-        currentDist += calculateDistance(prevLoc.latitude, prevLoc.longitude, loc.latitude, loc.longitude);
-        prevLoc = loc;
-      }
-      currentDist += calculateDistance(prevLoc.latitude, prevLoc.longitude, end.latitude, end.longitude);
-      
-      if (currentDist < minDistance) {
-        minDistance = currentDist;
-        bestWaypoints = p;
-      }
-    }
-    
-    return [start, ...bestWaypoints, end];
-  }
-
-  // For larger sets, use Greedy (Nearest Neighbor) heuristic
   const result = [start];
   const remaining = [...waypoints];
   let currentLoc = start;
@@ -126,30 +80,23 @@ function solveTSP(start: any, end: any, waypoints: any[]): any[] {
   while (remaining.length > 0) {
     let nearestIdx = -1;
     let minDist = Infinity;
-
     for (let i = 0; i < remaining.length; i++) {
-      const d = calculateDistance(currentLoc.latitude, currentLoc.longitude, remaining[i].latitude, remaining[i].longitude);
-      if (d < minDist) {
-        minDist = d;
-        nearestIdx = i;
-      }
+        const d = calculateDistanceFallback(currentLoc.latitude, currentLoc.longitude, remaining[i].latitude, remaining[i].longitude);
+        if (d < minDist) {
+            minDist = d;
+            nearestIdx = i;
+        }
     }
-
     currentLoc = remaining.splice(nearestIdx, 1)[0];
     result.push(currentLoc);
   }
-
   result.push(end);
   return result;
 }
 
-export async function optimizeRoute(input: OptimizeRouteInput): Promise<OptimizeRouteOutput> {
-  return optimizeRouteFlow(input);
-}
-
 /**
- * Programmatic Flow for Route Optimization.
- * Replaces the AI-based prompt with a deterministic algorithm for speed and accuracy.
+ * Main Flow for Route Optimization.
+ * Calls Google Maps Routes API to get the same logic as Google Maps.
  */
 const optimizeRouteFlow = ai.defineFlow(
   {
@@ -157,47 +104,123 @@ const optimizeRouteFlow = ai.defineFlow(
     inputSchema: OptimizeRouteInputSchema,
     outputSchema: OptimizeRouteOutputSchema,
   },
-  async input => {
-    try {
-      // 1. Solve TSP programmatically (Instant!)
-      const optimizedRoute = solveTSP(input.startLocation, input.endLocation, input.waypoints);
+  async (input) => {
+    const API_KEY = process.env.GOOGLE_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    
+    // API LIMIT: Up to 25 intermediate waypoints.
+    const canUseAPI = !!API_KEY && input.waypoints.length <= 25;
 
-      // 2. Calculate Total Distance (Haversine)
-      let totalDistanceKm = 0;
-      for (let i = 0; i < optimizedRoute.length - 1; i++) {
-        totalDistanceKm += calculateDistance(
-          optimizedRoute[i].latitude, optimizedRoute[i].longitude,
-          optimizedRoute[i + 1].latitude, optimizedRoute[i + 1].longitude
-        );
+    if (canUseAPI) {
+      try {
+        const body = {
+          origin: {
+            location: {
+              latLng: {
+                latitude: input.startLocation.latitude,
+                longitude: input.startLocation.longitude,
+              },
+            },
+          },
+          destination: {
+            location: {
+              latLng: {
+                latitude: input.endLocation.latitude,
+                longitude: input.endLocation.longitude,
+              },
+            },
+          },
+          intermediates: input.waypoints.map((wp) => ({
+            location: {
+              latLng: {
+                latitude: wp.latitude,
+                longitude: wp.longitude,
+              },
+            },
+          })),
+          travelMode: 'DRIVE',
+          routingPreference: 'TRAFFIC_AWARE',
+          optimizeWaypointOrder: true,
+          routeModifiers: {
+            avoidHighways: input.avoidHighways || false,
+          },
+          languageCode: 'ja-JP',
+          units: 'METRIC',
+        };
+
+        const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': API_KEY!,
+            'X-Goog-FieldMask': 'routes.optimizedIntermediateWaypointIndex,routes.duration,routes.distanceMeters',
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.warn('[ROUTES_API_WARNING] Response not OK:', errorData);
+          throw new Error('API request failed');
+        }
+
+        const data = await response.json();
+        const route = data.routes?.[0];
+
+        if (route) {
+          // Reorder waypoints based on optimized index
+          const optimizedIdx = route.optimizedIntermediateWaypointIndex || [];
+          const optimizedWaypoints = optimizedIdx.map((idx: number) => input.waypoints[idx]);
+          
+          // Handle cases where some indexes might be missing if no optimization was needed or error
+          const resultRoute = [input.startLocation, ...optimizedWaypoints, input.endLocation];
+
+          // Format distance
+          const distanceKm = (route.distanceMeters / 1000).toFixed(1);
+          
+          // Format duration (e.g. "3600s" -> "1時間0分")
+          const durationSeconds = parseInt(route.duration.replace('s', ''));
+          const totalMinutes = Math.round(durationSeconds / 60);
+          const hours = Math.floor(totalMinutes / 60);
+          const mins = totalMinutes % 60;
+          
+          const estimatedTravelTime = hours > 0 ? `${hours}時間${mins}分` : `${mins}分`;
+          const estimatedTravelDistance = `${distanceKm} km`;
+
+          return {
+            optimizedRoute: resultRoute,
+            estimatedTravelTime,
+            estimatedTravelDistance,
+          };
+        }
+      } catch (e) {
+        console.error('[ROUTES_API_ERROR] Falling back to manual calculation:', e);
       }
-
-      // Add a factor for real-road distance (typically 1.2x - 1.4x of air distance)
-      const roadDistanceMultiplier = 1.3;
-      const estimatedRoadDistance = totalDistanceKm * roadDistanceMultiplier;
-
-      // 3. Estimate Travel Time
-      // Base speed: 30km/h for local roads, adjusted if avoiding highways
-      const averageSpeedKmh = input.avoidHighways ? 25 : 35;
-      const totalMinutes = Math.round((estimatedRoadDistance / averageSpeedKmh) * 60);
-      
-      const hours = Math.floor(totalMinutes / 60);
-      const mins = totalMinutes % 60;
-      
-      const estimatedTravelTime = hours > 0 
-        ? `${hours}時間${mins}分` 
-        : `${mins}分`;
-      
-      const estimatedTravelDistance = `${estimatedRoadDistance.toFixed(1)} km`;
-
-      return {
-        optimizedRoute,
-        estimatedTravelTime,
-        estimatedTravelDistance,
-      };
-    } catch (e: any) {
-      console.error('[OPTIMIZE_ROUTE_ERROR]', e);
-      throw e;
     }
+
+    // FALLBACK LOGIC: 物理計算によるTSP
+    const optimizedRoute = solveTSPFallback(input.startLocation, input.endLocation, input.waypoints);
+    let totalDistanceKm = 0;
+    for (let i = 0; i < optimizedRoute.length - 1; i++) {
+      totalDistanceKm += calculateDistanceFallback(
+        optimizedRoute[i].latitude, optimizedRoute[i].longitude,
+        optimizedRoute[i + 1].latitude, optimizedRoute[i + 1].longitude
+      );
+    }
+    const estimatedRoadDistance = totalDistanceKm * 1.3;
+    const averageSpeedKmh = input.avoidHighways ? 25 : 35;
+    const totalMinutes = Math.round((estimatedRoadDistance / averageSpeedKmh) * 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    
+    return {
+      optimizedRoute,
+      estimatedTravelTime: hours > 0 ? `${hours}時間${mins}分` : `${mins}分`,
+      estimatedTravelDistance: `${estimatedRoadDistance.toFixed(1)} km`,
+    };
   }
 );
+
+export async function optimizeRoute(input: OptimizeRouteInput): Promise<OptimizeRouteOutput> {
+  return optimizeRouteFlow(input);
+}
 
