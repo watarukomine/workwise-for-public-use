@@ -1,15 +1,16 @@
 'use server';
 
 /**
- * @fileOverview An AI agent that optimizes routes between work locations for staff.
- *
+ * @fileOverview A high-performance programmatic route optimizer for staff work locations.
+ * Uses a TSP (Traveling Salesman Problem) solver based on Haversine distance.
+ * 
  * - optimizeRoute - A function that handles the route optimization process.
  * - OptimizeRouteInput - The input type for the optimizeRoute function.
  * - OptimizeRouteOutput - The return type for the optimizeRoute function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { ai } from '@/ai/genkit';
+import { z } from 'genkit';
 
 const LocationSchema = z.object({
   id: z.string().describe('The unique identifier for the location.'),
@@ -56,40 +57,100 @@ const OptimizeRouteOutputSchema = z.object({
 });
 export type OptimizeRouteOutput = z.infer<typeof OptimizeRouteOutputSchema>;
 
+/**
+ * Calculates the Haversine distance between two points on Earth in km.
+ */
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+/**
+ * Solves the Traveling Salesman Problem (TSP) with fixed start and end points.
+ */
+function solveTSP(start: any, end: any, waypoints: any[]): any[] {
+  if (waypoints.length === 0) return [start, end];
+
+  // For small number of waypoints (<= 8), use brute force for exact shortest path
+  // 8! = 40,320 permutations, which is fast in modern JS.
+  if (waypoints.length <= 8) {
+    let minDistance = Infinity;
+    let bestWaypoints: any[] = [];
+
+    const getPermutations = (arr: any[]): any[][] => {
+      if (arr.length <= 1) return [arr];
+      const result: any[][] = [];
+      for (let i = 0; i < arr.length; i++) {
+        const current = arr[i];
+        const remaining = arr.slice(0, i).concat(arr.slice(i + 1));
+        for (const p of getPermutations(remaining)) {
+          result.push([current, ...p]);
+        }
+      }
+      return result;
+    };
+
+    const allPermutations = getPermutations(waypoints);
+    
+    for (const p of allPermutations) {
+      let currentDist = 0;
+      let prevLoc = start;
+      
+      for (const loc of p) {
+        currentDist += calculateDistance(prevLoc.latitude, prevLoc.longitude, loc.latitude, loc.longitude);
+        prevLoc = loc;
+      }
+      currentDist += calculateDistance(prevLoc.latitude, prevLoc.longitude, end.latitude, end.longitude);
+      
+      if (currentDist < minDistance) {
+        minDistance = currentDist;
+        bestWaypoints = p;
+      }
+    }
+    
+    return [start, ...bestWaypoints, end];
+  }
+
+  // For larger sets, use Greedy (Nearest Neighbor) heuristic
+  const result = [start];
+  const remaining = [...waypoints];
+  let currentLoc = start;
+
+  while (remaining.length > 0) {
+    let nearestIdx = -1;
+    let minDist = Infinity;
+
+    for (let i = 0; i < remaining.length; i++) {
+      const d = calculateDistance(currentLoc.latitude, currentLoc.longitude, remaining[i].latitude, remaining[i].longitude);
+      if (d < minDist) {
+        minDist = d;
+        nearestIdx = i;
+      }
+    }
+
+    currentLoc = remaining.splice(nearestIdx, 1)[0];
+    result.push(currentLoc);
+  }
+
+  result.push(end);
+  return result;
+}
+
 export async function optimizeRoute(input: OptimizeRouteInput): Promise<OptimizeRouteOutput> {
   return optimizeRouteFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'optimizeRoutePrompt',
-  input: {schema: OptimizeRouteInputSchema},
-  output: {schema: OptimizeRouteOutputSchema},
-  prompt: `あなたは、複数の地点間の最も効率的なルートを見つけ出す、熟練したルート最適化のエキスパートです。
-
-出発地、目的地、そして中間地点のリストが与えられます。あなたのタスクは、出発地から始まり、すべての中間地点を巡り、目的地で終わる最適なルートを決定することです。目的は、移動時間と燃料コストを最小限に抑えることです。
-最適化の基準は「{{{optimizeFor}}}」です。
-{{#if avoidHighways}}
-ルートは高速道路を避ける必要があります。
-{{/if}}
-
-出発地:
-- ID: {{startLocation.id}}, 名称: {{startLocation.name}}, 住所: {{startLocation.address}}, 緯度: {{startLocation.latitude}}, 経度: {{startLocation.longitude}}
-
-中間地点:
-{{#each waypoints}}
-- ID: {{this.id}}, 名称: {{this.name}}, 住所: {{this.address}}, 緯度: {{this.latitude}}, 経度: {{this.longitude}}
-{{else}}
-中間地点はありません。
-{{/each}}
-  
-目的地:
-- ID: {{endLocation.id}}, 名称: {{endLocation.name}}, 住所: {{endLocation.address}}, 緯度: {{endLocation.latitude}}, 経度: {{endLocation.longitude}}
-
-最適化されたルートを、全地点（出発地、中間地点、目的地）の順序付きリストとして提供してください。また、推定所要時間と推定移動距離も日本語で含めてください（例：1時間15分、75.0 km）。
-optimizedRoute配列内の各地点には、入力から受け取った元のフィールド（id, name, address, latitude, longitude, type）がすべて含まれていることを確認してください。最終的なoptimizedRoute配列には、計算された最適な順序で、出発地、すべての中間地点、および目的地が含まれている必要があります。
-`,
-});
-
+/**
+ * Programmatic Flow for Route Optimization.
+ * Replaces the AI-based prompt with a deterministic algorithm for speed and accuracy.
+ */
 const optimizeRouteFlow = ai.defineFlow(
   {
     name: 'optimizeRouteFlow',
@@ -98,12 +159,45 @@ const optimizeRouteFlow = ai.defineFlow(
   },
   async input => {
     try {
-      const {output} = await prompt(input);
-      if (!output) throw new Error('AI output was empty');
-      return output;
+      // 1. Solve TSP programmatically (Instant!)
+      const optimizedRoute = solveTSP(input.startLocation, input.endLocation, input.waypoints);
+
+      // 2. Calculate Total Distance (Haversine)
+      let totalDistanceKm = 0;
+      for (let i = 0; i < optimizedRoute.length - 1; i++) {
+        totalDistanceKm += calculateDistance(
+          optimizedRoute[i].latitude, optimizedRoute[i].longitude,
+          optimizedRoute[i + 1].latitude, optimizedRoute[i + 1].longitude
+        );
+      }
+
+      // Add a factor for real-road distance (typically 1.2x - 1.4x of air distance)
+      const roadDistanceMultiplier = 1.3;
+      const estimatedRoadDistance = totalDistanceKm * roadDistanceMultiplier;
+
+      // 3. Estimate Travel Time
+      // Base speed: 30km/h for local roads, adjusted if avoiding highways
+      const averageSpeedKmh = input.avoidHighways ? 25 : 35;
+      const totalMinutes = Math.round((estimatedRoadDistance / averageSpeedKmh) * 60);
+      
+      const hours = Math.floor(totalMinutes / 60);
+      const mins = totalMinutes % 60;
+      
+      const estimatedTravelTime = hours > 0 
+        ? `${hours}時間${mins}分` 
+        : `${mins}分`;
+      
+      const estimatedTravelDistance = `${estimatedRoadDistance.toFixed(1)} km`;
+
+      return {
+        optimizedRoute,
+        estimatedTravelTime,
+        estimatedTravelDistance,
+      };
     } catch (e: any) {
       console.error('[OPTIMIZE_ROUTE_ERROR]', e);
       throw e;
     }
   }
 );
+
