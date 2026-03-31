@@ -5,7 +5,7 @@ import { RouteOptimizer, type Location } from "@/components/optimizer/route-opti
 import { RouteMap } from "@/components/optimizer/route-map";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, MapPinned } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import type { Customer, Staff, StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
@@ -14,6 +14,9 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
+import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { ORDER_GAS_URL } from '@/lib/settings';
+import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { isToday } from 'date-fns';
@@ -28,6 +31,9 @@ function OptimizerPageContent() {
 
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
   const [avoidHighways, setAvoidHighways] = React.useState(false);
+  const [isApplying, setIsApplying] = React.useState(false);
+  const { toast } = useToast();
+  const { orders, refetchOrders } = useOrder(); 
   const placesLibrary = useMapsLibrary("places");
 
   useEffect(() => {
@@ -87,6 +93,39 @@ function OptimizerPageContent() {
     setOptimizedRoute(data);
     setAvoidHighways(options.avoidHighways);
   }
+
+  const handleApplyToSchedule = async () => {
+    if (!optimizedRoute || !optimizedRoute.optimizedRoute) return;
+    
+    setIsApplying(true);
+    try {
+      let updateCount = 0;
+      // Only process entries that have an orderId and associated travel time
+      for (const loc of optimizedRoute.optimizedRoute) {
+        if (loc.orderId && typeof loc.travelTimeFromPrevious === 'number') {
+          await updateSheetStatus({
+             gasUrl: ORDER_GAS_URL,
+             systemId: loc.orderId,
+             travelTime: loc.travelTimeFromPrevious,
+             travelDistance: loc.travelDistanceFromPrevious
+          });
+          updateCount++;
+        }
+      }
+      
+      if (updateCount > 0) {
+        await refetchOrders();
+        toast({ title: "スケジュールに適用しました", description: `${updateCount}件の移動時間を更新しました。` });
+      } else {
+        toast({ title: "更新対象がありません", description: "受注に関連付けられた経由地が見つかりませんでした。" });
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast({ variant: 'destructive', title: "適用に失敗しました", description: e.message });
+    } finally {
+      setIsApplying(false);
+    }
+  };
 
   const baseIsLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
 
@@ -153,6 +192,7 @@ function OptimizerPageContent() {
               staff={staffWithLocation}
               staffStatus={statuses}
               allCustomers={allCustomers || []}
+              orders={orders}
               placesLibraryReady={!!placesLibrary}
             />
           )}

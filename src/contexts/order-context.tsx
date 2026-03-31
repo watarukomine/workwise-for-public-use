@@ -10,6 +10,7 @@ import { useSelectedStaff, processStaffData } from './selected-staff-context';
 import { logStaffNotFound, logOldDateDetected, logInvalidDate } from '@/lib/order-validation-logger';
 import { useDatabase } from '@/firebase';
 import { ref, onValue } from 'firebase/database';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 
 const TRAVEL_TIME_MINUTES = 30;
@@ -541,7 +542,12 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, [database, fetchAndProcessData]);
 
   // 2. Fetch data on mount (Init with today range)
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
+
   useEffect(() => {
+    // Only fetch if user is logged in
+    if (isProfileLoading || !profile) return;
+
     // Initial fetch for today +/- 3 days
     const today = new Date().toISOString().split('T')[0];
     fetchAndProcessData(false, { date: today, range: 3 });
@@ -549,7 +555,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     // Background polling every 30s (increased from 15s to be more polite since we have dynamic loading)
     const interval = setInterval(() => fetchAndProcessData(true, { date: today, range: 3 }), 30000); 
     return () => clearInterval(interval);
-  }, [fetchAndProcessData]);
+  }, [fetchAndProcessData, profile, isProfileLoading]);
 
   const saveLocalEvent = (event: WithId<ScheduleEvent>) => {
     setLocalScheduleEvents(prev => {

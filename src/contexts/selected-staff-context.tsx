@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
+import { useUserProfile } from '@/hooks/use-user-profile';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { STAFF_GAS_URL } from '@/lib/settings';
 import { findKey } from '@/lib/utils';
@@ -169,7 +170,12 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
+
   useEffect(() => {
+    // Only load if user is logged in
+    if (isProfileLoading || !profile) return;
+
     // Rely on effect dependency to reload when staffGasUrl changes
     // But verify if we need to reset initialLoadDone or just call loadStaff directly
 
@@ -265,7 +271,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
       }
     };
     loadStaff();
-  }, [staffGasUrl]); // Re-run when URL changes
+  }, [staffGasUrl, profile, isProfileLoading]); // Re-run when URL or auth changes
 
 
   const setAllStaff = React.useCallback((staff: WithId<Staff>[]) => {

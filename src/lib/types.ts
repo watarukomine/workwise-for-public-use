@@ -60,6 +60,8 @@ export type Order = {
   scheduledTime?: string;
   scheduledEndTime?: string; // Added field
   estimatedDuration: number;
+  travelTime?: number; // Accurate travel time in minutes from Google Maps
+  travelDistance?: string; // Accurate travel distance string (e.g. "12.5 km")
   value: number;
   staffName?: string;
   staffId?: string; // Added field

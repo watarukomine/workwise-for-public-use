@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useFormStatus } from 'react-dom';
 import { useActionState } from 'react';
 
-import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
+import type { Customer, Order, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,7 @@ export type Location = {
   latitude: number;
   longitude: number;
   type: 'customer' | 'staff' | 'custom';
+  orderId?: string; // Optional link to a specific order
 };
 
 interface RouteOptimizerProps {
@@ -41,6 +42,7 @@ interface RouteOptimizerProps {
   staff: WithId<Staff>[];
   staffStatus: StaffStatus[];
   allCustomers: WithId<Customer>[];
+  orders?: WithId<Order>[]; // Added to link locations to actual orders
   placesLibraryReady: boolean;
 }
 
@@ -277,7 +279,7 @@ const PlacesAutocompleteSelector: React.FC<{
 };
 
 
-export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustomers, placesLibraryReady }: RouteOptimizerProps) {
+export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustomers, orders = [], placesLibraryReady }: RouteOptimizerProps) {
 
   const [startLocation, setStartLocation] = React.useState<Location | null>(null);
   const [endLocation, setEndLocation] = React.useState<Location | null>(null);
@@ -331,6 +333,9 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
       // Safe ID generation: prefer userCode, then id, then random fallback
       const safeId = c.userCode || c.id || `customer-${Math.random().toString(36).substr(2, 9)}`;
 
+      // Check if this customer has an order today/selected date
+      const linkedOrder = orders.find(o => o.customerCode === c.userCode);
+
       return {
         id: String(safeId),
         name: String(findKey(c, ['店舗', 'storeName']) || c.name || '名称未設定'),
@@ -338,6 +343,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
         latitude: latitude,
         longitude: longitude,
         type: 'customer' as const,
+        orderId: linkedOrder?.id,
       };
     }).filter((l) => l !== null);
 

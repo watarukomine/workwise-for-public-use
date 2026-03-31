@@ -39,6 +39,9 @@ const OptimizeRouteOutputSchema = z.object({
         latitude: z.number().describe('The latitude of the location.'),
         longitude: z.number().describe('The longitude of the location.'),
         type: z.enum(['customer', 'staff', 'custom']).optional().describe('The type of location.'),
+        travelTimeFromPrevious: z.number().optional().describe('Travel time from the previous location in minutes.'),
+        travelDistanceFromPrevious: z.string().optional().describe('Travel distance from the previous location.'),
+        orderId: z.string().optional().describe('The order ID associated with this location.'),
       })
     )
     .describe('An array of work locations in the optimized order, starting with the start location and ending with the end location.'),
@@ -138,7 +141,8 @@ const optimizeRouteFlow = ai.defineFlow(
             },
           })),
           travelMode: 'DRIVE',
-          routingPreference: 'TRAFFIC_AWARE',
+          routingPreference: 'TRAFFIC_AWARE_OPTIMAL',
+          departureTime: new Date().toISOString(),
           optimizeWaypointOrder: true,
           routeModifiers: {
             avoidHighways: input.avoidHighways || false,
@@ -152,7 +156,7 @@ const optimizeRouteFlow = ai.defineFlow(
           headers: {
             'Content-Type': 'application/json',
             'X-Goog-Api-Key': API_KEY!,
-            'X-Goog-FieldMask': 'routes.optimizedIntermediateWaypointIndex,routes.duration,routes.distanceMeters',
+            'X-Goog-FieldMask': 'routes.optimizedIntermediateWaypointIndex,routes.duration,routes.distanceMeters,routes.legs.duration,routes.legs.distanceMeters',
           },
           body: JSON.stringify(body),
         });
@@ -172,7 +176,34 @@ const optimizeRouteFlow = ai.defineFlow(
           const optimizedWaypoints = optimizedIdx.map((idx: number) => input.waypoints[idx]);
           
           // Handle cases where some indexes might be missing if no optimization was needed or error
-          const resultRoute = [input.startLocation, ...optimizedWaypoints, input.endLocation];
+          const resultWaypoints = optimizedWaypoints.map((wp: any, i: number) => {
+            const leg = route.legs?.[i]; // Leg i goes from waypoint i to i+1 (or origin to waypoint 0)
+            if (!leg) return wp;
+            
+            const durationSec = parseInt(leg.duration.replace('s', ''));
+            const distKm = (leg.distanceMeters / 1000).toFixed(1);
+            
+            return {
+              ...wp,
+              travelTimeFromPrevious: Math.round(durationSec / 60),
+              travelDistanceFromPrevious: `${distKm} km`,
+              orderId: wp.orderId
+            };
+          });
+
+          // Origin has 0 travel time from previous
+          const startLoc = { ...input.startLocation, travelTimeFromPrevious: 0 };
+          
+          // Last leg is to endLocation
+          const lastLeg = route.legs?.[route.legs.length - 1];
+          const endLoc = { ...input.endLocation };
+          if (lastLeg) {
+             const durationSec = parseInt(lastLeg.duration.replace('s', ''));
+             (endLoc as any).travelTimeFromPrevious = Math.round(durationSec / 60);
+             (endLoc as any).travelDistanceFromPrevious = `${(lastLeg.distanceMeters / 1000).toFixed(1)} km`;
+          }
+
+          const resultRoute = [startLoc, ...resultWaypoints, endLoc];
 
           // Format distance
           const distanceKm = (route.distanceMeters / 1000).toFixed(1);
@@ -209,11 +240,27 @@ const optimizeRouteFlow = ai.defineFlow(
     const estimatedRoadDistance = totalDistanceKm * 1.3;
     const averageSpeedKmh = input.avoidHighways ? 25 : 35;
     const totalMinutes = Math.round((estimatedRoadDistance / averageSpeedKmh) * 60);
+    
+    const resultRoute = optimizedRoute.map((loc, i) => {
+       if (i === 0) return { ...loc, travelTimeFromPrevious: 0 };
+       
+       // Simple distribution for fallback
+       const d = calculateDistanceFallback(optimizedRoute[i-1].latitude, optimizedRoute[i-1].longitude, loc.latitude, loc.longitude);
+       const legMinutes = Math.round(((d * 1.3) / averageSpeedKmh) * 60);
+       
+       return {
+         ...loc,
+         travelTimeFromPrevious: legMinutes,
+         travelDistanceFromPrevious: `${(d * 1.3).toFixed(1)} km`,
+         orderId: (loc as any).orderId
+       };
+    });
+
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
     
     return {
-      optimizedRoute,
+      optimizedRoute: resultRoute as any,
       estimatedTravelTime: hours > 0 ? `${hours}時間${mins}分` : `${mins}分`,
       estimatedTravelDistance: `${estimatedRoadDistance.toFixed(1)} km`,
     };

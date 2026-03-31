@@ -321,6 +321,11 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     description: findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '',
     '本数': findKey(rawOrder, ['本数', 'honsu', '数量', 'Qty', 'Quantity', '本']) || '',
     serviceType: findKey(rawOrder, ['サービス種別', 'サービス区分']) || '',
+    travelTime: (() => {
+      const val = findKey(rawOrder, ['移動時間（分）', '移動時間', 'travelTime']);
+      return val ? parseInt(String(val), 10) : undefined;
+    })(),
+    travelDistance: findKey(rawOrder, ['移動距離', 'travelDistance']),
     emergencyMessage: findKey(rawOrder, ['緊急連絡']) || '',
     adminReply: findKey(rawOrder, ['管理者返信']) || '',
     isConfirmed: !!(findKey(rawOrder, ['既読確認', '既読', 'confirmedAt', 'readAt'])),

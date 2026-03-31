@@ -4,6 +4,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import { CUSTOMER_GAS_URL } from '@/lib/settings';
+import { useUserProfile } from '@/hooks/use-user-profile';
 
 import type { WithId, Customer } from '@/lib/types';
 
@@ -60,7 +61,12 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
+
   useEffect(() => {
+    // Only load if user is logged in
+    if (isProfileLoading || !profile) return;
+
     const fetchCustomers = async () => {
       // Use current state customerGasUrl
       if (!customerGasUrl) {
@@ -146,7 +152,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     };
 
     fetchCustomers();
-  }, [customerGasUrl]); // Re-run when URL changes
+  }, [customerGasUrl, profile, isProfileLoading]); // Re-run when URL or auth changes
 
 
   const value = {
