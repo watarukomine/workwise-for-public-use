@@ -50,7 +50,8 @@ export default function DashboardPage() {
     isSyncingOrders,
     refetchOrders,
     rawOrdersData,
-    orders
+    orders,
+    setCurrentViewedDate
   } = useOrder();
 
   const counts = React.useMemo(() => {
@@ -270,13 +271,15 @@ export default function DashboardPage() {
           setIsSyncing(false);
           
           // CRITICAL: Fetch additional data for this date if not already in context
-          // This enables lazy-loading for PC dashboard speed-up
           loadOrders(currentDate);
+          
+          // Inform OrderProvider about the current viewed date for background polling
+          setCurrentViewedDate(currentDate);
         }
       }
     };
     syncAttendance();
-  }, [currentDate, setSelectedStaffIds, scheduleEvents, loadOrders]);
+  }, [currentDate, setSelectedStaffIds, scheduleEvents, loadOrders, setCurrentViewedDate]);
 
   // Selection state is persisted in localStorage via SelectedStaffContext.
   // We NO LONGER auto-save selection to "saveDailyAttendance" (Database) 

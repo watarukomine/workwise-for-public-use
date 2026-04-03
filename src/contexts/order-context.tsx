@@ -4,7 +4,7 @@ import React, { createContext, useState, useContext, ReactNode, useEffect, useCa
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
 import { findKey, mapRawToOrder } from '@/lib/utils';
-import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes } from 'date-fns';
+import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes, addDays } from 'date-fns';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { useSelectedStaff, processStaffData } from './selected-staff-context';
 import { logStaffNotFound, logOldDateDetected, logInvalidDate } from '@/lib/order-validation-logger';
@@ -36,6 +36,8 @@ interface OrderContextType {
   setOrderGasUrl: (url: string) => void;
   toggleTripSuppression: (tripId: string) => void;
   suppressedTripIds: Set<string>;
+  currentViewedDate: Date | null;
+  setCurrentViewedDate: (date: Date | null) => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -379,7 +381,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const { allStaff, isStaffLoading, setAllStaff } = useSelectedStaff();
   const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
-  const [fetchedDateRanges, setFetchedDateRanges] = useState<Set<string>>(new Set()); // トラフィック削減用
+  const [fetchedDateRanges, setFetchedDateRanges] = useState<Map<string, number>>(new Map()); // Use Map for timestamp-based cache
+  const [currentViewedDate, setCurrentViewedDate] = useState<Date | null>(null);
   const ORDERS_CACHE_KEY = 'cached_orders_results';
 
   useEffect(() => {
@@ -459,39 +462,69 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           // Merge based on a unique key to prevent duplicates
           const orderMap = new Map();
           
-          // Helper to get a stable ID from raw GAS data
+          // Helper to get a stable ID from raw GAS data - MUST match mapRawToOrder logic
           const getRawId = (o: any) => {
-            return o.SystemID || o.systemId || o['受注ID'] || (o.id && !String(o.id).startsWith('task') ? o.id : null);
+            // First try explicit IDs
+            const id = o.SystemID || o.systemId || o.sysId || o['受注ID'] || o['受注 ID'] || o.id;
+            if (id && !String(id).startsWith('temp-') && !String(id).startsWith('ord-0.')) {
+                return String(id);
+            }
+            // Use content-based hash for generic/accpmpanying tasks without IDs
+            // This mirrors mapRawToOrder in utils.ts
+            const cDate = findKey(o, ['作業予定日', 'date']);
+            const cStaff = findKey(o, ['担当者', 'staffName', 'staff']);
+            const cContent = findKey(o, ['業務内容', 'taskDetails', 'title']);
+            if (cDate && cStaff && cContent) {
+                return `gen-${String(cDate)}-${String(cStaff)}-${String(cContent)}`;
+            }
+            return null;
           };
+
+          // Calculate date range of new focus to avoid accidental deletions of other dates
+          const targetDateStr = params?.date;
+          // range calculation or other range-based optimization could go here in future
+          // for now we use a simple stable ID-based merge.
 
           // Populate with existing data
           prev.forEach(o => {
             const id = getRawId(o);
-            if (id) orderMap.set(String(id), o);
+            if (!id) return;
+            
+            // If we are refreshing a specific range, we should be careful.
+            // But ID-based merge is generally safer.
+            // Only skip adding to map if it's a conflict we want to overwrite.
+            orderMap.set(id, o);
           });
 
           // Update/Add with new data
           newRawOrders.forEach(o => {
             const id = getRawId(o);
             if (id) {
-              orderMap.set(String(id), o);
-            } else if (o._type === 'task') {
-              // Task items usually have an ID field
-              const taskId = o.id || o.ID || JSON.stringify(o);
-              orderMap.set(String(taskId), o);
+              orderMap.set(id, o);
+            } else {
+               const tempId = `temp-new-${Math.random()}`;
+               orderMap.set(tempId, o);
             }
           });
 
+          // Final safety check: if we are loading "Today", but an item moved to "Tomorrow",
+          // and we later load "Tomorrow", it will be updated.
+          
           const merged = Array.from(orderMap.values());
-          console.log(`[OrderProvider] Data merged: ${prev.length} -> ${merged.length} items`);
+          // Log significant changes to help debugging missing items
+          if (prev.length > 0 && merged.length < prev.length) {
+              console.warn(`[OrderProvider] Warning: Data size decreased during merge! ${prev.length} -> ${merged.length}. Check getRawId logic.`);
+          } else {
+              console.log(`[OrderProvider] Data merged: ${prev.length} -> ${merged.length} items`);
+          }
           return merged;
         });
 
-        // Record this date range as fetched
+        // Record this date range as fetched with timestamp
         if (params?.date) {
           setFetchedDateRanges(prev => {
-            const next = new Set(prev);
-            next.add(params.date!);
+            const next = new Map(prev);
+            next.set(params.date!, Date.now());
             return next;
           });
         }
@@ -532,7 +565,15 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       if (data) {
         console.log('[OrderProvider] Real-time signal received:', data);
         // Trigger multi-stage background fetch for better responsiveness
-        fetchAndProcessData(true); // Immediate
+        // 1. Refresh Today
+        fetchAndProcessData(true); 
+        
+        // 2. Refresh Viewed Date if specialized
+        if (currentViewedDate) {
+            const viewedDateStr = currentViewedDate.toISOString().split('T')[0];
+            fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
+        }
+
         setTimeout(() => fetchAndProcessData(true), 3000); // 3s later (GAS usually writes fast)
         setTimeout(() => fetchAndProcessData(true), 8000); // 8s later (Safety margin)
       }
@@ -549,13 +590,27 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     if (isProfileLoading || !profile) return;
 
     // Initial fetch for today +/- 3 days
-    const today = new Date().toISOString().split('T')[0];
-    fetchAndProcessData(false, { date: today, range: 3 });
+    // Initial fetch for today +/- 3 days
+    const todayStr = new Date().toISOString().split('T')[0];
+    fetchAndProcessData(false, { date: todayStr, range: 3 });
     
-    // Background polling every 30s (increased from 15s to be more polite since we have dynamic loading)
-    const interval = setInterval(() => fetchAndProcessData(true, { date: today, range: 3 }), 30000); 
+    // Background polling every 30s
+    const interval = setInterval(() => {
+        // Poll Today
+        fetchAndProcessData(true, { date: todayStr, range: 3 });
+        
+        // Poll Viewed Date if it's far in future/past (outside context of range 3)
+        if (currentViewedDate) {
+            const viewedDateStr = currentViewedDate.toISOString().split('T')[0];
+            const diffDays = Math.abs(differenceInMinutes(currentViewedDate, new Date()) / (60 * 24));
+            if (diffDays > 3) {
+                console.log(`[OrderProvider] Polling out-of-range viewed date: ${viewedDateStr}`);
+                fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
+            }
+        }
+    }, 30000); 
     return () => clearInterval(interval);
-  }, [fetchAndProcessData, profile, isProfileLoading]);
+  }, [fetchAndProcessData, profile, isProfileLoading, currentViewedDate]);
 
   const saveLocalEvent = (event: WithId<ScheduleEvent>) => {
     setLocalScheduleEvents(prev => {
@@ -636,11 +691,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     statuses,
     loadOrders: async (date: Date) => {
       const dateStr = date.toISOString().split('T')[0];
-      if (fetchedDateRanges.has(dateStr)) {
-        console.log(`[OrderProvider] Date ${dateStr} already fetched, skipping loadOrders`);
+      const lastFetched = fetchedDateRanges.get(dateStr);
+      const isStale = lastFetched ? (Date.now() - lastFetched > 60000) : true; // Refresh if > 1 min
+
+      if (!isStale) {
+        console.log(`[OrderProvider] Date ${dateStr} recently fetched, skipping loadOrders`);
         return;
       }
-      console.log(`[OrderProvider] Loading additional data for: ${dateStr}`);
+      console.log(`[OrderProvider] Loading/Refreshing data for: ${dateStr}`);
       await fetchAndProcessData(true, { date: dateStr, range: 1 });
     },
     syncOrders: async () => { await fetchAndProcessData(false); },
@@ -659,7 +717,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     orderGasUrl,
     setOrderGasUrl,
     toggleTripSuppression,
-    suppressedTripIds
+    suppressedTripIds,
+    currentViewedDate,
+    setCurrentViewedDate
   };
 
   return (
