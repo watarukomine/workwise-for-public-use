@@ -15,6 +15,7 @@ import {
   useSensor,
   useSensors,
   pointerWithin,
+  type DragMoveEvent,
 } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
@@ -528,6 +529,8 @@ export function ScheduleView({
   // Order date/time and full details editing state
   const [isEditingOrderDetails, setIsEditingOrderDetails] = React.useState(false);
   const [editOrderForm, setEditOrderForm] = React.useState<any>({});
+  const [hoveredTime, setHoveredTime] = React.useState<string | null>(null);
+  const [hoveredStaffId, setHoveredStaffId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     if ((dialogState.mode === 'details' || dialogState.mode === 'edit') && dialogState.event) {
@@ -873,6 +876,30 @@ export function ScheduleView({
     setActive(event.active);
   };
 
+  const handleDragMove = (event: DragMoveEvent) => {
+    const { active, over } = event;
+    if (!over) {
+      setHoveredTime(null);
+      setHoveredStaffId(null);
+      return;
+    }
+
+    const staffId = over.id as string;
+    setHoveredStaffId(staffId);
+    
+    const staffRowElement = document.getElementById(`staff-row-${staffId}`);
+    if (staffRowElement && active.rect.current.translated) {
+      const timelineRect = staffRowElement.getBoundingClientRect();
+      // Calculate X relative to the timeline start (after the staff column)
+      const dropX = active.rect.current.translated.left - timelineRect.left;
+      const minutes = pixelsToMinutes(dropX);
+      const baseDate = new Date(currentDate);
+      baseDate.setHours(timelineStartHour, 0, 0, 0);
+      const targetTime = addMinutes(baseDate, minutes);
+      setHoveredTime(format(targetTime, 'HH:mm'));
+    }
+  };
+
   // ... (lines 436-580 are mostly unchanged, just jumping to specific updates around line 590)
 
   // Wait, I can't use replace_file_content for non-contiguous blocks like this easily.
@@ -934,6 +961,8 @@ export function ScheduleView({
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over, delta } = event;
     setActive(null);
+    setHoveredTime(null);
+    setHoveredStaffId(null);
 
     if (!over) return;
 
@@ -1921,7 +1950,13 @@ export function ScheduleView({
         sensors={sensors}
         collisionDetection={pointerWithin}
         onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
+        onDragCancel={() => {
+          setActive(null);
+          setHoveredTime(null);
+          setHoveredStaffId(null);
+        }}
       >
 
         <TooltipProvider>
@@ -2027,7 +2062,19 @@ export function ScheduleView({
                         const events = dailySchedule.filter((e) => e.staffId === staff.id);
                         const status = statuses.find(s => s.staffId === staff.id);
                         return (
-                          <StaffRow key={staff.id} staff={staff} events={events} status={status} getCustomerByCode={getCustomerByCode} isOver={false} onDoubleClickEvent={handleDoubleClickEvent} onDoubleClickTimeline={handleDoubleClickTimeline} isToday={isToday(currentDate)} />
+                          <StaffRow 
+                            key={staff.id} 
+                            staff={staff} 
+                            events={events} 
+                            status={status} 
+                            getCustomerByCode={getCustomerByCode} 
+                            isOver={hoveredStaffId === staff.id} 
+                            onDoubleClickEvent={handleDoubleClickEvent} 
+                            onDoubleClickTimeline={handleDoubleClickTimeline} 
+                            isToday={isToday(currentDate)}
+                            hoveredTime={hoveredStaffId === staff.id ? hoveredTime : null}
+                            isHoveredStaff={hoveredStaffId === staff.id}
+                          />
                         );
                       })}
                     </div>
@@ -2429,9 +2476,11 @@ interface StaffRowProps {
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
   isToday: boolean;
+  hoveredTime?: string | null;
+  isHoveredStaff?: boolean;
 }
 
-const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, isToday }) => {
+const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, isToday, hoveredTime, isHoveredStaff }) => {
   const { setNodeRef } = useDroppable({ id: staff.id });
   const { toggleTripSuppression } = useOrder();
   const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
@@ -2461,6 +2510,25 @@ const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerB
         <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (<DraggableEvent key={event.id} targetEvent={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={() => onDoubleClickEvent(event)} onDelete={() => toggleTripSuppression(event.tripId || '')} />))}
         </div>
+        
+        {/* Drag Guidance Line & Time Label */}
+        {isOver && isHoveredStaff && hoveredTime && (
+            <>
+                <div 
+                    className="absolute top-0 bottom-0 border-l-2 border-dashed border-red-500/60 z-[100] pointer-events-none"
+                    style={{ left: `${minutesToPixels((parseInt(hoveredTime.split(':')[0]) - timelineStartHour) * 60 + parseInt(hoveredTime.split(':')[1]))}px` }}
+                />
+                <div 
+                    className="absolute top-0 px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded shadow-lg z-[101] pointer-events-none whitespace-nowrap -translate-y-1/2"
+                    style={{ 
+                        left: `${minutesToPixels((parseInt(hoveredTime.split(':')[0]) - timelineStartHour) * 60 + parseInt(hoveredTime.split(':')[1]))}px`,
+                        transform: 'translateX(-50%) translateY(-5px)'
+                    }}
+                >
+                    {hoveredTime}
+                </div>
+            </>
+        )}
       </div>
       <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[120px]")}>
         {status && isToday && (<div className="text-xs text-center font-medium">{status.status}</div>)}
