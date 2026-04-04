@@ -1,87 +1,87 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, Upload, CheckCircle, AlertCircle, Database } from 'lucide-react';
+import {
+  Loader2, Upload, CheckCircle, AlertCircle, Database, FileSpreadsheet,
+  Trash2, Eye, ArrowRight, UploadCloud, X,
+} from 'lucide-react';
 import { initializeFirebase } from '@/firebase';
-import { collection, doc, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs, query, limit } from 'firebase/firestore';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec';
+// --- CSV Parser ---
+function parseCSV(text: string): { headers: string[]; rows: string[][] } {
+  const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+  if (lines.length === 0) return { headers: [], rows: [] };
 
-interface SeedResult {
-  collection: string;
-  success: number;
-  failed: number;
-  error?: string;
+  const parseLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (inQuotes) {
+        if (char === '"' && line[i + 1] === '"') { current += '"'; i++; }
+        else if (char === '"') { inQuotes = false; }
+        else { current += char; }
+      } else {
+        if (char === '"') { inQuotes = true; }
+        else if (char === ',') { result.push(current.trim()); current = ''; }
+        else { current += char; }
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const headers = parseLine(lines[0]);
+  const rows = lines.slice(1).map(line => parseLine(line));
+  return { headers, rows };
 }
 
-// Collections config
-const SEED_CONFIGS = [
-  {
-    name: 'スタッフ',
-    action: 'getStaffList',
-    firestoreCollection: 'users',
-    idKeys: ['id', 'staffId', 'スタッフID'],
-    responseKeys: ['staffList', 'data', 'result'],
-  },
-  {
-    name: '販売店情報',
-    action: 'getCustomerList',
-    firestoreCollection: 'customers',
-    idKeys: ['ユーザーコード', 'userCode', 'id'],
-    responseKeys: ['customerList', 'data', 'result'],
-  },
-  {
-    name: '受注データ',
-    action: 'getOrderData',
-    firestoreCollection: 'orders',
-    idKeys: ['SystemID', 'systemId', '受注 ID', '受注ID', 'id'],
-    responseKeys: ['orders', 'data', 'result'],
-  },
+// --- Collection Presets ---
+const COLLECTION_PRESETS = [
+  { value: 'orders', label: '受注データ', icon: '📦', description: 'orders コレクション' },
+  { value: 'users', label: 'スタッフ', icon: '👤', description: 'users コレクション' },
+  { value: 'customers', label: '販売店情報', icon: '🏪', description: 'customers コレクション' },
+  { value: 'custom', label: 'カスタム', icon: '⚙️', description: '任意のコレクション名を指定' },
 ];
 
-function findId(record: any, keys: string[]): string | null {
-  for (const key of keys) {
-    if (record[key] !== undefined && record[key] !== null && record[key] !== '') {
-      return String(record[key]);
-    }
-  }
-  return null;
-}
-
-function extractArray(data: any, keys: string[]): any[] {
-  if (Array.isArray(data)) return data;
-  for (const key of keys) {
-    if (data[key] && Array.isArray(data[key])) return data[key];
-  }
-  // Try to find any array
-  for (const key of Object.keys(data)) {
-    if (Array.isArray(data[key])) return data[key];
-  }
-  return [];
-}
-
-function cleanRecord(record: any): Record<string, any> {
-  const cleaned: Record<string, any> = {};
-  for (const [key, value] of Object.entries(record)) {
-    if (value === undefined) continue;
-    cleaned[key] = value;
-  }
-  cleaned._importedAt = new Date().toISOString();
-  cleaned._source = 'spreadsheet-seed';
-  return cleaned;
-}
+// --- Steps ---
+type Step = 'upload' | 'preview' | 'importing' | 'done';
 
 export default function ImportPage() {
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [currentStep, setCurrentStep] = useState('');
-  const [results, setResults] = useState<SeedResult[]>([]);
+  // State
+  const [step, setStep] = useState<Step>('upload');
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [rows, setRows] = useState<string[][]>([]);
+  const [targetCollection, setTargetCollection] = useState('orders');
+  const [customCollection, setCustomCollection] = useState('');
+  const [idColumn, setIdColumn] = useState<string>('__auto__');
+  const [mergeMode, setMergeMode] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const router = useRouter();
 
@@ -93,183 +93,456 @@ export default function ImportPage() {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
   };
 
-  const seedCollection = async (config: typeof SEED_CONFIGS[0]): Promise<SeedResult> => {
-    setCurrentStep(`📡 ${config.name} をGASから取得中...`);
-    addLog(`${config.name}: GASからデータ取得開始 (action=${config.action})`);
+  // --- File Processing ---
+  const processFile = useCallback((file: File) => {
+    if (!file.name.endsWith('.csv') && !file.name.endsWith('.tsv') && !file.name.endsWith('.txt')) {
+      alert('CSVファイル (.csv) を選択してください。');
+      return;
+    }
+    setCsvFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      // Try Shift-JIS detection - if garbled, suggest UTF-8
+      const { headers: h, rows: r } = parseCSV(text);
+      if (h.length === 0) {
+        alert('CSVファイルにデータがありません。');
+        return;
+      }
+      setHeaders(h);
+      setRows(r);
+      // Auto-detect ID column
+      const idCandidates = ['SystemID', 'systemId', 'id', 'ID', 'ユーザーコード', 'userCode', 'staffId', '受注ID', '受注 ID'];
+      const found = idCandidates.find(c => h.includes(c));
+      setIdColumn(found || '__auto__');
+      setStep('preview');
+    };
+    // Try reading as UTF-8 first
+    reader.readAsText(file, 'UTF-8');
+  }, []);
+
+  const rereadAsShiftJIS = useCallback(() => {
+    if (!csvFile) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const { headers: h, rows: r } = parseCSV(text);
+      setHeaders(h);
+      setRows(r);
+    };
+    reader.readAsText(csvFile, 'Shift_JIS');
+  }, [csvFile]);
+
+  // --- Drag & Drop ---
+  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); }, []);
+  const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); }, []);
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  }, [processFile]);
+
+  // --- Import ---
+  const handleImport = async () => {
+    const collName = targetCollection === 'custom' ? customCollection : targetCollection;
+    if (!collName) { alert('コレクション名を入力してください。'); return; }
+
+    setStep('importing');
+    setLogs([]);
+    setImportResult(null);
+
+    addLog(`🚀 インポート開始: ${rows.length} 件 → ${collName}`);
+    addLog(`📋 フィールド: [${headers.join(', ')}]`);
+    addLog(`🔑 IDカラム: ${idColumn === '__auto__' ? '自動生成' : idColumn}`);
+
+    const { firestore } = initializeFirebase();
+    const BATCH_SIZE = 450;
+    let success = 0;
+    let failed = 0;
+    const errors: string[] = [];
 
     try {
-      // Fetch from GAS
-      const url = `${GAS_URL}?action=${config.action}`;
-      const response = await fetch(url, { redirect: 'follow' });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      const records = extractArray(data, config.responseKeys);
-      
-      addLog(`${config.name}: ${records.length} 件のレコードを受信`);
-      
-      if (records.length === 0) {
-        addLog(`${config.name}: データが空です。スキップ`);
-        return { collection: config.name, success: 0, failed: 0, error: 'データが空です' };
-      }
-
-      // Show sample fields
-      const sampleKeys = Object.keys(records[0]);
-      addLog(`${config.name}: フィールド = [${sampleKeys.slice(0, 10).join(', ')}${sampleKeys.length > 10 ? '...' : ''}]`);
-
-      // Write to Firestore using batched writes
-      const { firestore } = initializeFirebase();
-      const BATCH_SIZE = 450;
-      let success = 0;
-      let failed = 0;
-
-      for (let i = 0; i < records.length; i += BATCH_SIZE) {
+      for (let i = 0; i < rows.length; i += BATCH_SIZE) {
         const batch = writeBatch(firestore);
-        const slice = records.slice(i, i + BATCH_SIZE);
-        
-        setCurrentStep(`✍️ ${config.name}: ${i + 1}〜${Math.min(i + BATCH_SIZE, records.length)} / ${records.length} 件を書き込み中...`);
+        const slice = rows.slice(i, i + BATCH_SIZE);
 
-        for (const record of slice) {
-          const docId = findId(record, config.idKeys);
-          const cleaned = cleanRecord(record);
-          
-          try {
-            if (docId) {
-              const docRef = doc(firestore, config.firestoreCollection, docId);
-              batch.set(docRef, cleaned, { merge: true });
+        for (const row of slice) {
+          // Build document from row
+          const docData: Record<string, any> = {};
+          headers.forEach((h, idx) => {
+            const val = row[idx] || '';
+            // Try to convert numbers
+            if (val !== '' && !isNaN(Number(val)) && val.length < 15) {
+              docData[h] = Number(val);
             } else {
-              // Auto-generate ID
-              const colRef = collection(firestore, config.firestoreCollection);
-              const docRef = doc(colRef);
-              batch.set(docRef, cleaned);
+              docData[h] = val;
+            }
+          });
+          docData._importedAt = new Date().toISOString();
+          docData._source = `csv-import:${csvFile?.name || 'unknown'}`;
+
+          try {
+            let docRef;
+            if (idColumn !== '__auto__' && docData[idColumn]) {
+              docRef = doc(firestore, collName, String(docData[idColumn]));
+            } else {
+              docRef = doc(collection(firestore, collName));
+            }
+
+            if (mergeMode) {
+              batch.set(docRef, docData, { merge: true });
+            } else {
+              batch.set(docRef, docData);
             }
             success++;
           } catch (e: any) {
-            addLog(`  ❌ エラー: ${e.message}`);
+            errors.push(`行 ${i + rows.indexOf(row) + 2}: ${e.message}`);
             failed++;
           }
         }
-        
+
         await batch.commit();
-        addLog(`${config.name}: バッチ ${Math.floor(i / BATCH_SIZE) + 1} (${slice.length}件) 書き込み完了`);
+        setImportProgress({ current: Math.min(i + BATCH_SIZE, rows.length), total: rows.length });
+        addLog(`✍️ バッチ ${Math.floor(i / BATCH_SIZE) + 1}: ${slice.length} 件書き込み完了`);
       }
-
-      addLog(`${config.name}: ✅ 完了 (${success}件成功 / ${failed}件失敗)`);
-      return { collection: config.name, success, failed };
     } catch (e: any) {
-      addLog(`${config.name}: ❌ エラー: ${e.message}`);
-      return { collection: config.name, success: 0, failed: 0, error: e.message };
-    }
-  };
-
-  const handleSeed = async () => {
-    setIsSeeding(true);
-    setResults([]);
-    setLogs([]);
-    addLog('🚀 シード処理を開始します...');
-
-    const allResults: SeedResult[] = [];
-
-    for (const config of SEED_CONFIGS) {
-      const result = await seedCollection(config);
-      allResults.push(result);
-      setResults([...allResults]);
+      addLog(`❌ バッチエラー: ${e.message}`);
+      errors.push(e.message);
     }
 
-    setCurrentStep('');
-    addLog('✨ すべてのシード処理が完了しました！');
-    setIsSeeding(false);
+    addLog(`✨ 完了: ${success} 件成功, ${failed} 件失敗`);
+    setImportResult({ success, failed, errors });
+    setStep('done');
   };
 
+  // --- Reset ---
+  const handleReset = () => {
+    setCsvFile(null); setHeaders([]); setRows([]); setStep('upload');
+    setImportResult(null); setLogs([]); setImportProgress({ current: 0, total: 0 });
+  };
+
+  // --- Auth Guard ---
   if (isProfileLoading || !profile) {
     return <div className="flex items-center justify-center p-10"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
   if (profile.role !== 'admin') {
-    return <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>権限がありません</AlertTitle></Alert>;
+    return (
+      <div className="max-w-lg mx-auto mt-20">
+        <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>権限がありません</AlertTitle>
+          <AlertDescription>この機能は管理者のみ使用できます。</AlertDescription></Alert>
+      </div>
+    );
   }
 
+  const collName = targetCollection === 'custom' ? customCollection : targetCollection;
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6 p-4">
+    <div className="max-w-4xl mx-auto space-y-6 p-4 pb-20">
+      {/* Header */}
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
           <Database className="h-6 w-6" />
-          スプレッドシート → Firestore インポート
+          データインポート
         </h1>
         <p className="text-muted-foreground">
-          GAS（Google Apps Script）経由でスプレッドシートのデータを取得し、Firestoreデータベースにインポートします。
+          CSVファイルからFirestoreデータベースにデータをインポートします。スプレッドシートからCSVとしてダウンロードしたファイルをアップロードしてください。
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>インポート対象</CardTitle>
-          <CardDescription>以下の3つのコレクションにデータを投入します（既存データはマージされます）</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3">
-            {SEED_CONFIGS.map(config => {
-              const result = results.find(r => r.collection === config.name);
-              return (
-                <div key={config.name} className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                  <div>
-                    <p className="font-medium text-sm">{config.name}</p>
-                    <p className="text-xs text-muted-foreground">→ {config.firestoreCollection}</p>
-                  </div>
-                  {result ? (
-                    result.error ? (
-                      <span className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="h-3.5 w-3.5" />{result.error}</span>
-                    ) : (
-                      <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="h-3.5 w-3.5" />{result.success} 件</span>
-                    )
-                  ) : isSeeding && currentStep.includes(config.name) ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
+      {/* Steps indicator */}
+      <div className="flex items-center gap-2 text-sm">
+        {[
+          { key: 'upload', label: '1. ファイル選択' },
+          { key: 'preview', label: '2. プレビュー・設定' },
+          { key: 'importing', label: '3. インポート実行' },
+          { key: 'done', label: '4. 完了' },
+        ].map((s, i) => (
+          <React.Fragment key={s.key}>
+            {i > 0 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
+            <Badge
+              variant={step === s.key ? 'default' : 'outline'}
+              className={cn("text-xs", step === s.key ? '' : 'text-muted-foreground')}
+            >
+              {s.label}
+            </Badge>
+          </React.Fragment>
+        ))}
+      </div>
 
-          <Button onClick={handleSeed} disabled={isSeeding} size="lg" className="w-full gap-2">
-            {isSeeding ? (
-              <><Loader2 className="h-4 w-4 animate-spin" />{currentStep}</>
-            ) : (
-              <><Upload className="h-4 w-4" />スプレッドシートデータをインポート</>
-            )}
-          </Button>
-        </CardContent>
-      </Card>
-
-      {logs.length > 0 && (
+      {/* Step 1: Upload */}
+      {step === 'upload' && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">実行ログ</CardTitle>
+            <CardTitle className="flex items-center gap-2"><FileSpreadsheet className="h-5 w-5" />CSVファイルをアップロード</CardTitle>
+            <CardDescription>スプレッドシートから「ファイル → ダウンロード → カンマ区切り(.csv)」でダウンロードしたファイルを使用してください。</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="bg-muted/50 rounded-md p-3 max-h-[300px] overflow-auto font-mono text-xs space-y-0.5">
-              {logs.map((log, i) => (
-                <div key={i} className={log.includes('❌') ? 'text-destructive' : log.includes('✅') || log.includes('✨') ? 'text-green-600' : 'text-muted-foreground'}>
-                  {log}
-                </div>
-              ))}
+            <div
+              className={cn(
+                "border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200",
+                isDragging ? "border-primary bg-primary/5 scale-[1.01]" : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/30"
+              )}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <UploadCloud className={cn("h-12 w-12 mx-auto mb-4 transition-colors", isDragging ? "text-primary" : "text-muted-foreground/50")} />
+              <p className="text-lg font-medium mb-1">ここにCSVファイルをドラッグ＆ドロップ</p>
+              <p className="text-sm text-muted-foreground mb-4">または クリックしてファイルを選択</p>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Upload className="h-3.5 w-3.5" /> ファイルを選択
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.tsv,.txt"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) processFile(f); }}
+              />
+            </div>
+
+            <div className="mt-4 p-3 rounded-lg bg-muted/40 text-xs text-muted-foreground space-y-1">
+              <p className="font-medium">💡 CSVの準備方法:</p>
+              <ol className="list-decimal list-inside space-y-0.5 ml-2">
+                <li>Googleスプレッドシートを開く</li>
+                <li>「ファイル」→「ダウンロード」→「カンマ区切り形式(.csv)」を選択</li>
+                <li>ダウンロードされたCSVファイルをここにドロップ</li>
+              </ol>
+              <p className="mt-2">※ 1行目がヘッダー（列名）として扱われます。UTF-8 / Shift-JIS 両対応。</p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {results.length > 0 && !isSeeding && (
-        <Alert>
-          <CheckCircle className="h-4 w-4" />
-          <AlertTitle>インポート完了</AlertTitle>
-          <AlertDescription>
-            {results.map(r => `${r.collection}: ${r.success}件`).join(' / ')}
-            <br />
-            <span className="text-xs">各管理ページでデータを確認してください。</span>
-          </AlertDescription>
-        </Alert>
+      {/* Step 2: Preview */}
+      {step === 'preview' && (
+        <>
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2"><Eye className="h-5 w-5" />データプレビュー</CardTitle>
+                  <CardDescription className="mt-1">
+                    <span className="font-medium">{csvFile?.name}</span> — {headers.length} カラム × {rows.length} 行
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1 text-muted-foreground">
+                  <X className="h-3.5 w-3.5" /> やり直す
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Encoding fix */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs text-muted-foreground">文字化けの場合:</span>
+                <Button variant="outline" size="sm" onClick={rereadAsShiftJIS} className="text-xs h-7">Shift-JISとして再読み込み</Button>
+              </div>
+
+              {/* Preview table */}
+              <ScrollArea className="h-[300px] rounded-md border">
+                <Table>
+                  <TableHeader className="sticky top-0 bg-background z-10">
+                    <TableRow>
+                      <TableHead className="w-[40px] text-xs">#</TableHead>
+                      {headers.map((h, i) => (
+                        <TableHead key={i} className="text-xs font-semibold whitespace-nowrap px-2">
+                          {h}
+                          {idColumn === h && <Badge variant="default" className="ml-1 text-[10px] px-1">ID</Badge>}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.slice(0, 50).map((row, ri) => (
+                      <TableRow key={ri}>
+                        <TableCell className="text-xs text-muted-foreground">{ri + 1}</TableCell>
+                        {headers.map((_, ci) => (
+                          <TableCell key={ci} className="text-xs py-1 px-2 max-w-[200px] truncate" title={row[ci]}>
+                            {row[ci] || <span className="text-muted-foreground/30">−</span>}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+              {rows.length > 50 && (
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  ※ プレビューは最初の50行のみ表示。全 {rows.length} 行がインポートされます。
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Import Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">インポート設定</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {/* Target Collection */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">インポート先コレクション</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {COLLECTION_PRESETS.map(preset => (
+                    <button
+                      key={preset.value}
+                      onClick={() => setTargetCollection(preset.value)}
+                      className={cn(
+                        "flex flex-col items-center gap-1 p-3 rounded-lg border text-sm transition-all",
+                        targetCollection === preset.value
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "hover:bg-muted/50"
+                      )}
+                    >
+                      <span className="text-lg">{preset.icon}</span>
+                      <span className="font-medium">{preset.label}</span>
+                      <span className="text-[10px] text-muted-foreground">{preset.description}</span>
+                    </button>
+                  ))}
+                </div>
+                {targetCollection === 'custom' && (
+                  <input
+                    type="text"
+                    value={customCollection}
+                    onChange={(e) => setCustomCollection(e.target.value)}
+                    placeholder="コレクション名を入力..."
+                    className="mt-2 w-full px-3 py-2 text-sm border rounded-md"
+                  />
+                )}
+              </div>
+
+              {/* ID Column */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">ドキュメントIDに使用するカラム</Label>
+                <Select value={idColumn} onValueChange={setIdColumn}>
+                  <SelectTrigger className="w-full max-w-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__auto__">🔄 自動生成（Firestore任意ID）</SelectItem>
+                    {headers.map(h => (
+                      <SelectItem key={h} value={h}>📌 {h}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  ※ 同じIDのドキュメントが既にある場合、データが上書き/マージされます。
+                </p>
+              </div>
+
+              {/* Merge Mode */}
+              <div className="flex items-center gap-3">
+                <Switch id="merge-mode" checked={mergeMode} onCheckedChange={setMergeMode} />
+                <Label htmlFor="merge-mode" className="text-sm">
+                  マージモード（既存データを保持して追加分だけ更新）
+                </Label>
+              </div>
+
+              {/* Import Button */}
+              <div className="pt-2">
+                <Button onClick={handleImport} size="lg" className="w-full gap-2" disabled={!collName}>
+                  <Upload className="h-4 w-4" />
+                  {rows.length} 件を「{collName || '...'}」にインポート
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+
+      {/* Step 3: Importing */}
+      {step === 'importing' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Loader2 className="h-5 w-5 animate-spin" />インポート実行中...</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>{importProgress.current} / {importProgress.total} 件</span>
+                <span>{importProgress.total > 0 ? Math.round(importProgress.current / importProgress.total * 100) : 0}%</span>
+              </div>
+              <div className="h-3 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-300"
+                  style={{ width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+            {logs.length > 0 && (
+              <div className="bg-muted/50 rounded-md p-3 max-h-[200px] overflow-auto font-mono text-xs space-y-0.5">
+                {logs.map((log, i) => (
+                  <div key={i} className={log.includes('❌') ? 'text-destructive' : log.includes('✅') || log.includes('✨') ? 'text-green-600' : 'text-muted-foreground'}>
+                    {log}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 4: Done */}
+      {step === 'done' && importResult && (
+        <>
+          <Alert className={importResult.failed === 0 ? 'border-green-500/50 bg-green-50 dark:bg-green-900/10' : ''}>
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertTitle className="text-green-700 dark:text-green-400">インポート完了</AlertTitle>
+            <AlertDescription>
+              <div className="space-y-1 mt-1">
+                <p><strong>{importResult.success}</strong> 件が「{collName}」コレクションにインポートされました。</p>
+                {importResult.failed > 0 && <p className="text-destructive">{importResult.failed} 件が失敗しました。</p>}
+                <p className="text-xs text-muted-foreground mt-2">
+                  ファイル: {csvFile?.name} | カラム: {headers.length} | 総行数: {rows.length}
+                </p>
+              </div>
+            </AlertDescription>
+          </Alert>
+
+          {importResult.errors.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm text-destructive">エラー詳細</CardTitle></CardHeader>
+              <CardContent>
+                <div className="max-h-[150px] overflow-auto text-xs font-mono text-destructive space-y-0.5">
+                  {importResult.errors.map((e, i) => <div key={i}>{e}</div>)}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {logs.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm">実行ログ</CardTitle></CardHeader>
+              <CardContent>
+                <div className="bg-muted/50 rounded-md p-3 max-h-[200px] overflow-auto font-mono text-xs space-y-0.5">
+                  {logs.map((log, i) => (
+                    <div key={i} className={log.includes('❌') ? 'text-destructive' : log.includes('✅') || log.includes('✨') ? 'text-green-600' : 'text-muted-foreground'}>
+                      {log}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="flex gap-3">
+            <Button onClick={handleReset} variant="outline" className="gap-1.5">
+              <Upload className="h-3.5 w-3.5" /> 別のファイルをインポート
+            </Button>
+            <Button onClick={() => {
+              if (collName === 'orders') router.push('/orders');
+              else if (collName === 'users') router.push('/staff');
+              else if (collName === 'customers') router.push('/customers');
+              else router.push('/dashboard');
+            }} className="gap-1.5">
+              <Eye className="h-3.5 w-3.5" /> データを確認する
+            </Button>
+          </div>
+        </>
       )}
     </div>
   );
