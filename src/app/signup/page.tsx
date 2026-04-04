@@ -5,6 +5,7 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -27,7 +28,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { signUpWithEmail } from '@/lib/auth';
-import Link from 'next/link';
 
 const signupSchema = z.object({
     name: z.string().min(1, { message: '名前を入力してください。' }),
@@ -59,13 +59,12 @@ export default function SignupPage() {
             await signUpWithEmail(data.email, data.password, data.name);
             toast({
                 title: 'アカウントを作成しました',
-                description: '自動的にログインします...',
+                description: 'WorkWiseへようこそ！',
             });
             // Redirect to home
             window.location.href = '/';
         } catch (e: any) {
             console.error(e);
-            // Firebase auth errors
             let msg = '登録中にエラーが発生しました。';
             if (e.code === 'auth/email-already-in-use') {
                 msg = 'このメールアドレスは既に使用されています。';
@@ -81,11 +80,11 @@ export default function SignupPage() {
     const togglePasswordVisibility = () => setIsPasswordVisible((prev) => !prev);
 
     return (
-        <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
-            <Card className="w-full max-w-md">
-                <CardHeader>
-                    <CardTitle>新規登録</CardTitle>
-                    <CardDescription>
+        <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center p-4">
+            <Card className="w-full max-w-md shadow-lg border-primary/10">
+                <CardHeader className="space-y-1">
+                    <CardTitle className="text-2xl font-bold text-center">新規登録</CardTitle>
+                    <CardDescription className="text-center">
                         新しいアカウントを作成してください。
                     </CardDescription>
                 </CardHeader>
@@ -128,7 +127,7 @@ export default function SignupPage() {
                                             <FormControl>
                                                 <Input
                                                     type={isPasswordVisible ? 'text' : 'password'}
-                                                    placeholder="password"
+                                                    placeholder="••••••••"
                                                     {...field}
                                                 />
                                             </FormControl>
@@ -136,7 +135,7 @@ export default function SignupPage() {
                                                 type="button"
                                                 variant="ghost"
                                                 size="icon"
-                                                className="absolute inset-y-0 right-0 h-full px-3 text-muted-foreground"
+                                                className="absolute inset-y-0 right-0 h-full px-3 text-muted-foreground hover:bg-transparent"
                                                 onClick={togglePasswordVisibility}
                                             >
                                                 {isPasswordVisible ? (
@@ -153,19 +152,19 @@ export default function SignupPage() {
                         </CardContent>
                         <CardFooter className="flex flex-col gap-4">
                             {error && (
-                                <Alert variant="destructive">
-                                    <AlertDescription>{error}</AlertDescription>
+                                <Alert variant="destructive" className="py-2">
+                                    <AlertDescription className="text-xs">{error}</AlertDescription>
                                 </Alert>
                             )}
-                            <Button type="submit" className="w-full" disabled={isLoading}>
+                            <Button type="submit" className="w-full font-bold" disabled={isLoading}>
                                 {isLoading && (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 )}
                                 アカウント作成
                             </Button>
-                            <div className="text-center text-sm">
+                            <div className="text-center text-sm text-muted-foreground mt-2">
                                 すでにアカウントをお持ちですか？{' '}
-                                <Link href="/login" className="underline hover:text-primary">
+                                <Link href="/login" className="text-primary font-medium hover:underline">
                                     ログイン
                                 </Link>
                             </div>
