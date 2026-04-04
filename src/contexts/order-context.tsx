@@ -6,6 +6,7 @@ import { OrderService } from '@/services/order-service';
 import { useToast } from '@/hooks/use-toast';
 import { parseISO, startOfDay, format, addMinutes, subMinutes, isValid } from 'date-fns';
 import { mapRawToOrder } from '@/lib/utils';
+import { useUser } from '@/firebase/provider';
 
 export type OrderContextType = {
   orders: WithId<Order>[];
@@ -48,8 +49,14 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   
   const { toast } = useToast();
+  const { user, isUserLoading } = useUser();
 
   const fetchAndProcessData = useCallback(async (date: Date) => {
+    // Guard: skip Firestore fetch if user is not authenticated
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
@@ -74,10 +81,13 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, suppressedTripIds]);
+  }, [toast, suppressedTripIds, user]);
 
   // Initial load and Realtime Subscription
   useEffect(() => {
+    // Guard: skip if user is not authenticated or still loading
+    if (isUserLoading || !user) return;
+
     fetchAndProcessData(currentDate);
     
     // Subscribe to real-time updates for the current date
@@ -94,7 +104,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [fetchAndProcessData, currentDate, suppressedTripIds]);
+  }, [fetchAndProcessData, currentDate, suppressedTripIds, user, isUserLoading]);
 
   const rawOrdersData = useMemo(() => orders.map(o => o.raw || {}), [orders]);
 

@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useRe
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { StaffService } from '@/services/staff-service';
+import { useUser } from '@/firebase/provider';
 
 const simpleHash = (str: string) => {
   let hash = 0;
@@ -34,6 +35,7 @@ const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>
 
 export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  const { user, isUserLoading } = useUser();
 
   const [allStaff, setAllStaffState] = useState<WithId<Staff>[]>([]);
   const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
@@ -79,6 +81,12 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Guard: skip if user is not authenticated or still loading
+    if (isUserLoading || !user) {
+      setIsLoading(false);
+      return;
+    }
+
     const loadStaff = async () => {
       setError(null);
       setIsLoading(true);
@@ -159,7 +167,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
       }
     };
     loadStaff();
-  }, [allStaff.length]); // Dependency can be adjusted, mainly run on mount
+  }, [allStaff.length, user, isUserLoading]); // Re-run when auth state changes
 
   const setAllStaff = React.useCallback((staff: WithId<Staff>[]) => {
     setAllStaffState(staff);

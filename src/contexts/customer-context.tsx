@@ -4,6 +4,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import type { WithId, Customer } from '@/lib/types';
 import { CustomerService } from '@/services/customer-service';
+import { useUser } from '@/firebase/provider';
 
 interface CustomerContextType {
   customers: WithId<Customer>[];
@@ -19,6 +20,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomersState] = useState<WithId<Customer>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setErrorState] = useState<string | null>(null);
+  const { user, isUserLoading } = useUser();
 
   const CUSTOMER_CACHE_KEY = 'cached_customer_data_v2'; // Changed key
 
@@ -31,6 +33,12 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Guard: skip if user is not authenticated or still loading
+    if (isUserLoading || !user) {
+      setIsLoading(false);
+      return;
+    }
+
     const fetchCustomers = async () => {
       setErrorState(null);
 
@@ -101,7 +109,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     };
 
     fetchCustomers();
-  }, []);
+  }, [user, isUserLoading]);
 
 
   const value = {
