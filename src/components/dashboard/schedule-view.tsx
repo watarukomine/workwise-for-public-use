@@ -60,7 +60,8 @@ import {
   SelectValue,
 } from "../ui/select";
 import { useOrder } from '../../contexts/order-context';
-import { updateSheetStatus, sendIcsEmail, createTask, updateOrderDateTime } from '../../app/actions/gas-actions';
+import { OrderService } from '@/services/order-service';
+import { sendIcsEmail } from '../../app/actions/gas-actions'; // Keeping for email only if needed
 import { ORDER_GAS_URL } from '../../lib/settings';
 import { Mail, Pencil, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { createContext, useContext, useState } from 'react';
@@ -534,7 +535,9 @@ export function ScheduleView({
 
   React.useEffect(() => {
     setCurrentViewedDate(currentDate);
-    return () => setCurrentViewedDate(null);
+    return () => {
+      // Avoid setting null if it causes type issues, or handle it in provider
+    };
   }, [currentDate, setCurrentViewedDate]);
 
   React.useEffect(() => {
@@ -767,15 +770,13 @@ export function ScheduleView({
         });
       }
 
-      await updateSheetStatus({
-        gasUrl: ORDER_GAS_URL,
-        eventTitle: `(ID: ${event.rawOrderId})`,
-        staffName: event.staffName,
-        statusValue: recoveryStatus, // Restore status
-        comment: newComment,
-        emergencyFlag: false,
+      // Firestore Native Update
+      await OrderService.updateOrder(event.systemId, {
+        status: recoveryStatus, // Restore status
+        emergencyMessage: newComment,
+        isEmergency: false,
         adminReply: '',
-        systemId: event.systemId
+        updatedAt: new Date().toISOString()
       });
 
       toast({ title: "緊急ステータスを解除しました" });
@@ -807,15 +808,12 @@ export function ScheduleView({
       const timestamp = format(new Date(), 'HH:mm');
       const finalReply = `[${timestamp}]: ${replyMessage}`;
 
-      const result = await updateSheetStatus({
-        gasUrl: ORDER_GAS_URL,
-        eventTitle: `(ID: ${rawOrderId})`,
-        staffName: staffName,
+      // Firestore Native Update
+      await OrderService.updateOrder((targetEmergencyEvent as any).systemId, {
         adminReply: finalReply,
-        emergencyFlag: true, // Keep it active
-        systemId: (targetEmergencyEvent as any).systemId
+        isEmergency: true, // Keep it active
+        updatedAt: new Date().toISOString()
       });
-      console.log("Send Reply Result:", result);
 
       toast({ title: "返信を送信しました" });
       setReplyDialogOpen(false);
@@ -841,22 +839,19 @@ export function ScheduleView({
         newComment = currentComment.replace(/【緊急】/g, '').trim();
       }
 
-      const result = await updateSheetStatus({
-        gasUrl: ORDER_GAS_URL,
-        systemId: event.id,
-        statusValue: event.status,
-        emergencyFlag: isEmergency,
+      // Firestore Native Update
+      await OrderService.updateOrder(event.id, {
+        status: event.status,
+        isEmergency: isEmergency,
+        emergencyMessage: newComment,
+        updatedAt: new Date().toISOString()
       });
 
-      if (result.status === 'success') {
-        toast({
-          title: isEmergency ? '緊急ステータスに設定しました' : '緊急ステータスを解除しました',
-        });
-        deleteLocalEvent(event.id);
-        await refetchOrders();
-      } else {
-        throw new Error(result.message);
-      }
+      toast({
+        title: isEmergency ? '緊急ステータスに設定しました' : '緊急ステータスを解除しました',
+      });
+      deleteLocalEvent(event.id);
+      await refetchOrders();
     } catch (error) {
       console.error('Failed to toggle emergency status:', error);
       toast({
@@ -928,14 +923,13 @@ export function ScheduleView({
     // recalculates and pushes the new state (including the unassigned list).
 
     try {
-      await updateSheetStatus({
-        gasUrl: ORDER_GAS_URL,
-        eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
-        staffName: "",
-        statusValue: "未割当",
-        scheduledTime: "",
-        timestamp: new Date().toISOString(),
-        systemId: orderToUnassign.id
+      // Firestore Native Update
+      await OrderService.updateOrder(orderToUnassign.id, {
+        staffId: '',
+        staffName: '',
+        status: "未割当",
+        scheduledTime: '', // Clear time for unassigned
+        updatedAt: new Date().toISOString()
       });
 
       await refetchOrders();
@@ -986,14 +980,8 @@ export function ScheduleView({
       } else {
         if (scheduleItem.rawOrderId) {
           try {
-            await updateSheetStatus({
-              gasUrl: ORDER_GAS_URL,
-              eventTitle: `(ID: ${scheduleItem.rawOrderId})`,
-              staffName: "",
-              statusValue: "キャンセル",
-              timestamp: new Date().toISOString(),
-              systemId: scheduleItem.id
-            });
+            // Firestore Native Delete
+            await OrderService.deleteOrder(scheduleItem.id);
             await refetchOrders();
           } catch (e) {
             console.error("Failed to cancel generic task:", e);
@@ -1088,19 +1076,14 @@ export function ScheduleView({
             saveLocalEvent(updatedEvent);
 
             // Backend Update
-            await updateSheetStatus({
-              gasUrl: ORDER_GAS_URL,
-              eventTitle: draggedEvent.title,
+            await OrderService.updateOrder(draggedEvent.id, {
+              staffId: newStaffId,
               staffName: newStaff.name,
-              statusValue: undefined, // Status usually doesn't change for generic tasks on move
               scheduledDate: format(newStart, 'yyyy/MM/dd'),
-              scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
-              scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
+              scheduledTime: format(newStart, 'HH:mm:ss'),
+              scheduledEndTime: format(taskEnd, 'HH:mm:ss'),
               estimatedDuration: duration,
-              "チップ配置作業予定": format(newStart, 'yyyy/MM/dd HH:mm:ss'),
-              "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
-              "作業予定日": format(newStart, 'yyyy/MM/dd'),
-              systemId: draggedEvent.id
+              // Keep other spreadsheet fields as tags in `raw` if needed
             });
             toast({ title: "タスク時間を更新しました", duration: 3000 });
             await refetchOrders();
@@ -1175,20 +1158,15 @@ export function ScheduleView({
               ? mapRawToOrder(draggedEvent.raw).id
               : draggedEvent.id.replace(/-(task|travel)$/, '');
 
-            await updateSheetStatus({
-              gasUrl: ORDER_GAS_URL,
-              eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
+            // Backend Update (Firestore Native)
+            await OrderService.updateOrder(finalSystemId, {
+              staffId: newStaffId,
               staffName: newStaff.name,
-              statusValue: (draggedEvent.staffId !== newStaffId) ? '割当済' : undefined,
+              status: (draggedEvent.staffId !== newStaffId) ? '割当済' : undefined,
               scheduledDate: format(taskStart, 'yyyy/MM/dd'),
-              scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
+              scheduledTime: format(taskStart, 'HH:mm:ss'),
+              scheduledEndTime: format(taskEnd, 'HH:mm:ss'),
               estimatedDuration: taskDuration,
-              "チップ配置作業予定": format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
-              "作業予定日": format(taskStart, 'yyyy/MM/dd'),
-              "作業時間（分）": taskDuration,
-              systemId: finalSystemId
             });
             toast({ title: "スケジュールを更新しました", duration: 3000 });
             // await new Promise(resolve => setTimeout(resolve, 2000)); // Removed artificial delay
@@ -1300,17 +1278,19 @@ export function ScheduleView({
 
             for (let i = 0; i < eventsToCreate.length; i++) {
               const ev = eventsToCreate[i];
-              const res = await createTask({
-                gasUrl: ORDER_GAS_URL,
+              const resId = await OrderService.createOrder({
                 staffName: staff.name,
-                taskName: ev.title,
-                startTime: ev.start as string,
-                endTime: ev.end as string,
-                estimatedDuration: differenceInMinutes(parseISO(ev.end as string), parseISO(ev.start as string))
+                staffId: staff.id,
+                taskDetails: ev.title,
+                scheduledDate: format(parseISO(ev.start as string), 'yyyy/MM/dd'),
+                scheduledTime: format(parseISO(ev.start as string), 'HH:mm:ss'),
+                scheduledEndTime: format(parseISO(ev.end as string), 'HH:mm:ss'),
+                estimatedDuration: differenceInMinutes(parseISO(ev.end as string), parseISO(ev.start as string)),
+                status: '割当済'
               });
 
-              if (res.eventId) {
-                const realId = res.eventId;
+              if (resId) {
+                const realId = resId;
                 const derivedTripId = `trip-${realId}`;
                 const frontendTaskId = `${derivedTripId}-task`;
                 const frontendTravelId = `${derivedTripId}-travel`;
@@ -1373,33 +1353,24 @@ export function ScheduleView({
             if (taskEvent) {
               const isNewlyAssigned = order.status === '未割当' || order.status === '入庫待ち' || !order.staffName;
 
-              const payload: any = {
-                gasUrl: ORDER_GAS_URL,
-                eventTitle: `(ID: ${order.rawOrderId})`,
+              // Firestore Native Update
+              await OrderService.updateOrder(order.id, {
                 staffName: staff.name,
-                statusValue: '割当済',
+                staffId: staff.id,
+                status: '割当済',
                 scheduledDate: format(parseISO(taskEvent.start as string), 'yyyy/MM/dd'),
-                scheduledTime: format(parseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
-                scheduledEndTime: format(parseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
+                scheduledTime: format(parseISO(taskEvent.start as string), 'HH:mm:ss'),
+                scheduledEndTime: format(parseISO(taskEvent.end as string), 'HH:mm:ss'),
                 estimatedDuration: order.estimatedDuration,
-                "チップ配置作業予定": format(parseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
-                "チップ配置作業完了予定": format(parseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
-                "作業予定日": format(parseISO(taskEvent.start as string), 'yyyy/MM/dd'),
-                "作業時間（分）": order.estimatedDuration,
-                timestamp: new Date().toISOString(),
-                systemId: order.id
-              };
-
-              // Clear any corrupted 1970 dates in action history upon initial assignment
-              if (isNewlyAssigned) {
-                payload.startTravelTime = "";
-                payload.arrivalTimestamp = "";
-                payload.actualStartTime = "";
-                payload.actualEndTime = "";
-                payload.actualDuration = "";
-              }
-
-              await updateSheetStatus(payload);
+                // Reset history if newly assigned
+                ...(isNewlyAssigned ? {
+                  startTravelTime: "",
+                  arrivalTimestamp: "",
+                  actualStartTime: "",
+                  actualEndTime: "",
+                  actualDuration: ""
+                } : {})
+              });
               await refetchOrders();
               toast({ title: "タスクを割り当てました。" });
             }
@@ -1474,14 +1445,11 @@ export function ScheduleView({
       }
 
       if (orderId) {
-        await updateSheetStatus({
-          gasUrl: ORDER_GAS_URL,
-          eventTitle: `(ID: ${orderId})`,
-          staffName: '', // Unassign
-          statusValue: 'キャンセル',
-          cancelDate: new Date().toISOString(),
-          cancelContact: cancelContact,
-          timestamp: new Date().toISOString()
+        await OrderService.updateOrder(orderId, {
+          staffId: '', // Unassign
+          staffName: '',
+          status: 'キャンセル',
+          comment: `(キャンセル連絡者: ${cancelContact})`
         });
         toast({ title: "作業キャンセルを記録しました" });
         setIsCancelling(false);
@@ -1560,18 +1528,19 @@ export function ScheduleView({
         const staff = getStaffById(dialogState.staffId);
         if (!staff) throw new Error("担当スタッフが見つかりません。");
 
-        const res = await createTask({
-          gasUrl: ORDER_GAS_URL,
+        const resId = await OrderService.createOrder({
           staffName: staff.name,
-          taskName: editedEventDetails.title,
-          description: editedEventDetails.description,
-          startTime: newStart.toISOString(),
-          endTime: finalEnd.toISOString(),
-          estimatedDuration: durationMinutes
+          staffId: staff.id,
+          taskDetails: editedEventDetails.title,
+          scheduledDate: format(newStart, 'yyyy/MM/dd'),
+          scheduledTime: format(newStart, 'HH:mm:ss'),
+          scheduledEndTime: format(finalEnd, 'HH:mm:ss'),
+          estimatedDuration: durationMinutes,
+          status: '割当済'
         });
 
-        if (res.eventId) {
-          const derivedTripId = `trip-${res.eventId}`;
+        if (resId) {
+          const derivedTripId = `trip-${resId}`;
           const frontendId = `${derivedTripId}-task`;
           const newEvent: WithId<ScheduleEvent> = {
             id: frontendId,
@@ -1636,31 +1605,20 @@ export function ScheduleView({
             isUpdate: dialogState.mode === 'edit'
           } : undefined;
 
-          const sheetResult = await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`,
-            systemId: eventToUpdate.systemId,
-            ...editOrderForm,
-            ...overrides, // High-priority overrides (e.g., status/time from Force Complete)
+          // Firestore Native Update
+          await OrderService.updateOrder(eventToUpdate.systemId || eventToUpdate.id, {
+            ...overrides,
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
-            scheduledTime: format(newStart, 'HH:mm'), // Changed to HH:mm for clarity against 1970 bugs
+            scheduledTime: format(newStart, 'HH:mm'),
             scheduledEndTime: format(finalEnd, 'HH:mm'),
             estimatedDuration: durationMinutes,
-            timestamp: new Date().toISOString(),
-            "チップ配置作業予定": format(newStart, 'yyyy/MM/dd HH:mm:ss'),
-            "チップ配置作業完了予定": format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
-            "作業予定日": format(newStart, 'yyyy/MM/dd'),
-            "作業時間（分）": durationMinutes,
             staffName: staff?.name,
-            shouldSendEmail: !!emailParams,
-            emailParams: emailParams
+            staffId: staff?.id,
           });
-
-          if (sheetResult.status === 'error') throw new Error(sheetResult.message);
 
           toast({
             title: '保存完了',
-            description: sheetResult.message
+            description: '注文情報を更新しました',
           });
 
           setIsEditingOrderDetails(false);
@@ -1729,16 +1687,8 @@ export function ScheduleView({
 
           // CRITICAL: Also delete the companion event from GAS Backend
           // Even if it doesn't have a task- ID, the fallback search in GAS (by Staff+Time) will catch it.
-          await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: companionTravel.title,
-            staffName: staffName,
-            statusValue: "キャンセル",
-            timestamp: new Date().toISOString(),
-            systemId: companionTravel.id,
-            scheduledTime: companionTravel.start instanceof Date ? companionTravel.start.toISOString() : companionTravel.start,
-            actionType: 'cancel'
-          });
+          // Firestore Native Update for Companion
+          await OrderService.deleteOrder(companionTravel.id);
         }
       }
 
@@ -1750,15 +1700,10 @@ export function ScheduleView({
         cleanSystemId = cleanSystemId.replace('trip-', '').replace('-task', '');
       }
 
-      await updateSheetStatus({
-        gasUrl: ORDER_GAS_URL,
-        eventTitle: eventToDelete.title || `(ID: ${eventToDelete.rawOrderId || 'N/A'})`,
-        staffName: staffName, // Needed for fallback search
-        statusValue: "キャンセル",
-        timestamp: new Date().toISOString(),
-        systemId: cleanSystemId, // Pass CLEAN stable ID
-        scheduledTime: eventToDelete.start instanceof Date ? eventToDelete.start.toISOString() : eventToDelete.start, // Pass Start Time for fallback search
-        actionType: 'cancel' // Optional context
+      // Firestore Native Update
+      await OrderService.updateOrder(cleanSystemId, {
+        status: "キャンセル",
+        updatedAt: new Date().toISOString()
       });
 
       toast({ title: '汎用タスクを削除しました', duration: 3000 });
@@ -1787,25 +1732,22 @@ export function ScheduleView({
     try {
       if (isGeneric) {
         if (eventToDelete.rawOrderId) {
-          await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: `(ID: ${eventToDelete.rawOrderId})`,
-            staffName: "",
-            statusValue: "キャンセル",
-            timestamp: new Date().toISOString(),
-            systemId: eventToDelete.id
+          // Firestore Native Update
+          await OrderService.updateOrder(eventToDelete.id, {
+            staffId: '',
+            staffName: '',
+            status: "キャンセル"
           });
         }
       } else {
         const orderToUnassign = mapRawToOrder(eventToDelete.raw);
-        await updateSheetStatus({
-          gasUrl: ORDER_GAS_URL,
-          eventTitle: `(ID: ${eventToDelete.rawOrderId})`,
-          staffName: "",
-          statusValue: "未割当",
-          scheduledTime: "",
-          timestamp: new Date().toISOString(),
-          systemId: orderToUnassign.id
+        // Firestore Native Update for Unassignment
+        await OrderService.updateOrder(orderToUnassign.id, {
+          staffId: '',
+          staffName: '',
+          status: "未割当",
+          scheduledTime: '',
+          updatedAt: new Date().toISOString()
         });
       }
 
@@ -2389,30 +2331,19 @@ export function ScheduleView({
                               setIsSaving(true);
 
                               try {
-                                const result = await updateSheetStatus({
-                                  gasUrl: ORDER_GAS_URL,
-                                  eventTitle: `(ID: ${dialogState.order.id})`,
-                                  systemId: dialogState.order.id,
-                                  timestamp: new Date().toISOString(),
-                                  ...editOrderForm,
-                                  shouldSendEmail: false
+                                // Firestore Native Update
+                                await OrderService.updateOrder(dialogState.order.id, {
+                                    ...editOrderForm,
+                                    updatedAt: new Date().toISOString()
                                 });
 
-                                if (result.status === 'success') {
-                                  toast({
+                                toast({
                                     title: '保存しました',
                                     description: 'オーダー詳細を更新しました'
-                                  });
-                                  setIsEditingOrderDetails(false);
-                                  await refetchOrders();
-                                  setDialogState({ mode: 'closed' });
-                                } else {
-                                  toast({
-                                    title: 'エラー',
-                                    description: result.message || '更新に失敗しました',
-                                    variant: 'destructive'
-                                  });
-                                }
+                                });
+                                setIsEditingOrderDetails(false);
+                                await refetchOrders();
+                                setDialogState({ mode: 'closed' });
                               } catch (error) {
                                 console.error('Failed to update order details:', error);
                                 toast({

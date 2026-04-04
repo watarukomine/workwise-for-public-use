@@ -1,32 +1,27 @@
 
 'use client';
 
-import { fetchStaffDataFromGAS } from '@/contexts/selected-staff-context';
+import { StaffService } from '@/services/staff-service';
 import type { Staff, WithId } from './types';
 
 const USER_SESSION_KEY = 'workwise-user-profile';
 
 /**
- * Signs in a user by checking their credentials against the staff data from GAS.
+ * Signs in a user by checking their credentials against Firestore data.
  * @param email The user's email.
  * @param password The user's password.
  * @returns A promise that resolves with the user's profile if successful.
  */
 export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
-  console.log(`Attempting to sign in via spreadsheet for email: ${email}`);
+  console.log(`Attempting to sign in via Firestore for email: ${email}`);
   try {
-    const { staffList, error } = await fetchStaffDataFromGAS();
-    if (error || !staffList) {
-      throw new Error(error || 'Could not fetch staff data.');
-    }
-
-    const staffMember = staffList.find(s => s.email === email);
+    const staffMember = await StaffService.getStaffByEmail(email);
 
     if (!staffMember) {
       throw new Error('指定されたメールアドレスのスタッフが見つかりません。');
     }
 
-    // Passwords in the sheet might be numbers, so we compare them as strings.
+    // Passwords should be stored securely, but for now we follow the custom auth logic.
     if (String(staffMember.password) !== String(password)) {
       throw new Error('パスワードが正しくありません。');
     }
@@ -34,26 +29,40 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     // On successful login, save profile to session storage
     sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffMember));
 
-    console.log('Spreadsheet sign in successful for:', staffMember.name);
+    console.log('Firestore sign in successful for:', staffMember.name);
     return staffMember;
 
   } catch (error: any) {
-    console.error('Spreadsheet sign-in error:', error);
-    throw error; // Re-throw the error to be caught by the calling function
+    console.error('Firestore sign-in error:', error);
+    throw error;
   }
 };
 
 /**
- * Mock function for sign up. In a spreadsheet-only world, this doesn't create a new user,
- * but we can pretend it does for UI consistency.
- * @param email The new user's email.
- * @param password The new user's password.
- * @param name The new user's display name.
- * @returns A promise that rejects as this is not a real operation.
+ * Signs up a new user in Firestore.
  */
 export const signUpWithEmail = async (email: string, password: string, name: string): Promise<void> => {
-  console.warn('Sign up is not supported in spreadsheet-only authentication mode.');
-  throw new Error('新規登録は現在サポートされていません。管理者に連絡してスプレッドシートにアカウントを追加してもらってください。');
+  try {
+    const existing = await StaffService.getStaffByEmail(email);
+    if (existing) {
+        throw new Error('このメールアドレスは既に登録されています。');
+    }
+
+    const newStaff: any = {
+        name,
+        email,
+        password,
+        role: 'staff', // Default role
+    };
+
+    // Use email as a temporary ID if no separate auth ID is provided
+    await StaffService.saveStaff(email, newStaff);
+    console.log('User signed up successfully:', email);
+
+  } catch (error: any) {
+    console.error('Sign up error:', error);
+    throw error;
+  }
 };
 
 /**
@@ -65,7 +74,6 @@ export const signOut = (): void => {
     sessionStorage.removeItem(USER_SESSION_KEY);
   } catch (error) {
     console.error('Sign out error:', error);
-    // This should rarely fail, but we'll log it if it does.
   }
 };
 

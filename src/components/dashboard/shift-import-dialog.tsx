@@ -17,7 +17,6 @@ import { useToast } from '../../hooks/use-toast';
 import { read, utils } from 'xlsx';
 import { format, parse, isValid } from 'date-fns';
 import { saveDailyAttendanceBatch, saveDailyScheduledBatch, getMonthlyAttendance, getMonthlySchedule } from '../../services/attendance-service';
-import { syncOrdersFromGasToFirestore } from '../../services/order-service';
 import { Loader2, Upload } from 'lucide-react';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';
 import type { WithId, Staff } from '../../lib/types';

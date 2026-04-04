@@ -4,61 +4,26 @@
 import { OrderTable } from '@/components/orders/order-table';
 import React, { useState, useEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2, Save, ShoppingBag, ExternalLink } from 'lucide-react';
+import { AlertCircle, Loader2, ShoppingBag, ExternalLink } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { useOrder } from '@/contexts/order-context';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { ORDER_GAS_URL, ORDER_SHEET_URL } from '@/lib/settings';
+import { ORDER_SHEET_URL } from '@/lib/settings';
 import { useRouter } from 'next/navigation';
 
 export default function OrdersPage() {
-  const { orders, isLoading: isLoadingOrders, error: orderError, orderGasUrl, setOrderGasUrl } = useOrder();
+  const { orders, isLoading: isLoadingOrders, error: orderError } = useOrder();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
   const router = useRouter();
-
-  const [localUrl, setLocalUrl] = useState(orderGasUrl);
-  const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
-
-  useEffect(() => {
-    // Update local state if context URL changes (e.g. initial load from storage)
-    if (orderGasUrl) {
-      setLocalUrl(orderGasUrl);
-    }
-  }, [orderGasUrl]);
 
   useEffect(() => {
     if (!isProfileLoading && !profile) {
       router.push('/login');
     }
   }, [isProfileLoading, profile, router]);
-
-  const handleUrlUpdate = () => {
-    setIsUpdating(true);
-    try {
-      if (localUrl !== orderGasUrl) {
-        setOrderGasUrl(localUrl);
-        toast({
-          title: "URLを更新しました",
-          description: "新しいURLからデータを再取得し、設定をブラウザに保存しました。",
-        });
-      }
-    } catch (e) {
-      console.error(e);
-      toast({
-        variant: "destructive",
-        title: "エラー",
-        description: "URLの更新に失敗しました。",
-      });
-    } finally {
-      setIsUpdating(false);
-    }
-  };
 
   const handleHeaderClick = () => {
     if (ORDER_SHEET_URL && isAdmin) {
@@ -98,7 +63,7 @@ export default function OrdersPage() {
           受注管理
         </h1>
         <p className="text-muted-foreground">
-          スプレッドシートから自動取得された受注情報の一覧です。
+          Firestoreデータベースからリアルタイムに同期されている受注情報の一覧です。
         </p>
       </div>
 
@@ -119,7 +84,7 @@ export default function OrdersPage() {
               <AlertTitle>データ取得エラー</AlertTitle>
               <AlertDescription>
                 {orderError}
-                <p className="mt-2">下のフォームでURLが正しいか確認するか、`src/lib/settings.ts`の`ORDER_GAS_URL`を確認してください。</p>
+                <p className="mt-2 text-xs">Firestoreの接続設定を確認してください。</p>
               </AlertDescription>
             </Alert>
           ) : null}
@@ -129,35 +94,13 @@ export default function OrdersPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>データソースURL設定</CardTitle>
-          <CardDescription>
-            受注情報の読み込み、および担当者更新を行うGoogle Apps ScriptのURLです。設定はブラウザに保存され、次回以降も使用されます。
-          </CardDescription>
+          <CardTitle>バックエンド設定</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex w-full max-w-xl items-center space-x-2">
-            <Input
-              type="url"
-              placeholder="https://script.google.com/macros/s/..."
-              value={localUrl}
-              onChange={(e) => setLocalUrl(e.target.value)}
-              disabled={isUpdating}
-            />
-            <Button onClick={handleUrlUpdate} disabled={isUpdating || localUrl === ORDER_GAS_URL}>
-              {isUpdating ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              URLを保存して更新
-            </Button>
-          </div>
-        </CardContent>
-        <CardFooter>
-          <p className="text-xs text-muted-foreground">
-            ここでの変更はブラウザ(localStorage)に保存され、`src/lib/settings.ts`のデフォルト値より優先されます。
+          <p className="text-sm text-muted-foreground">
+            現在はFirestoreデータベースをプライマリデータソースとして使用しています。Google Apps Scriptによるデータの取得・更新は無効化されています。
           </p>
-        </CardFooter>
+        </CardContent>
       </Card>
     </div>
   );

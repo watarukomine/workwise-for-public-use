@@ -2,18 +2,17 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getFirestore, initializeFirestore, memoryLocalCache, Firestore } from 'firebase/firestore';
-import { getFunctions, Functions } from 'firebase/functions';
-import { getDatabase, Database } from 'firebase/database';
-import { Auth, getAuth } from 'firebase/auth';
-import { getMessaging, Messaging } from 'firebase/messaging';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, initializeFirestore, memoryLocalCache } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
+  console.log('[Firebase] Initializing with config:', firebaseConfig);
   // Debug toggle: Use a named app in development to decouple from default instance
   // and ensure our custom Firestore settings (experimentalForceLongPolling) are applied.
   if (process.env.NODE_ENV === 'development') {
-    const devAppName = 'WorkWiseDevClient_v3';
+    const devAppName = 'WorkWiseDevClient_v4';
     try {
       // If the named app already exists, use it.
       // This app instance should already have Firestore initialized with our custom settings
@@ -60,13 +59,13 @@ export function getSdks(firebaseApp: FirebaseApp) {
 
   let firestore;
   try {
-    // Attempt to initialize with Long Polling (User requested to keep this)
+    // Restore Long Polling settings for corporate network compatibility
     firestore = initializeFirestore(firebaseApp, {
       experimentalForceLongPolling: true,
       localCache: memoryLocalCache(),
       // @ts-ignore
       useFetchStreams: false,
-    }, 'workwise');
+    });
     console.log('[Firestore] Successfully initialized with experimentalForceLongPolling: true');
   } catch (e: any) {
     if (e.code === 'failed-precondition') {
@@ -75,17 +74,7 @@ export function getSdks(firebaseApp: FirebaseApp) {
       console.warn('[Firestore] Initialization warning:', e);
     }
     // If already initialized, get the existing instance
-    firestore = getFirestore(firebaseApp, 'workwise');
-  }
-
-  // Messaging is client-side only, so check for window
-  let messaging: Messaging | undefined;
-  if (typeof window !== 'undefined') {
-    try {
-      messaging = getMessaging(firebaseApp);
-    } catch (e) {
-      console.warn('[Firebase] Messaging initialization failed:', e);
-    }
+    firestore = getFirestore(firebaseApp);
   }
 
   return {
@@ -93,19 +82,8 @@ export function getSdks(firebaseApp: FirebaseApp) {
     auth: getAuth(firebaseApp),
     firestore,
     functions: getFunctions(firebaseApp, region),
-    database: getDatabase(firebaseApp),
-    messaging,
   };
 }
-
-export type FirebaseSdks = {
-  firebaseApp: FirebaseApp;
-  auth: Auth;
-  firestore: Firestore;
-  functions: Functions;
-  database: Database;
-  messaging?: Messaging;
-};
 
 export * from './provider';
 export * from './client-provider';

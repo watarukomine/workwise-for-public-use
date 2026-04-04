@@ -32,3 +32,21 @@ env:
     value: https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec
   - variable: NEXT_PUBLIC_ORDER_GAS_URL
     value: https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyBBelBzLORqNEmMgDMEi8IiqutIGpxfpto
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: workwise-general-v2-kp.firebaseapp.com
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: workwise-general-v2-kp
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: workwise-general-v2-kp.firebasestorage.app
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "152475256065"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:152475256065:web:19dcae9d2c7e91fcd0c700
+  - variable: NEXT_PUBLIC_STAFF_SHEET_URL
+    value: https://docs.google.com/spreadsheets/d/18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo/edit?usp=sharing
+  - variable: NEXT_PUBLIC_CUSTOMER_SHEET_URL
+    value: https://docs.google.com/spreadsheets/d/1jZdToM75DunESxVU07QjSCbYEsqd_nSwxzjr09a52CA/edit?usp=sharing
+  - variable: NEXT_PUBLIC_ORDER_SHEET_URL
+    value: https://docs.google.com/spreadsheets/d/17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s/edit?usp=sharing

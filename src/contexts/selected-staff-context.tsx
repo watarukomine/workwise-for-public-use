@@ -4,10 +4,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
-import { useUserProfile } from '@/hooks/use-user-profile';
-import { fetchGasData } from '@/app/actions/fetch-gas-data';
-import { STAFF_GAS_URL } from '@/lib/settings';
-import { findKey } from '@/lib/utils';
+import { StaffService } from '@/services/staff-service';
 
 const simpleHash = (str: string) => {
   let hash = 0;
@@ -17,68 +14,6 @@ const simpleHash = (str: string) => {
     hash |= 0;
   }
   return Math.abs(hash);
-};
-
-export const processStaffData = (dataToProcess: any[]): WithId<Staff>[] => {
-  if (!dataToProcess || dataToProcess.length === 0) return [];
-
-  return dataToProcess.map((item: any): WithId<Staff> => {
-    const getRole = (): 'admin' | 'staff' => {
-      const roleValue = findKey(item, ['ロール', '権限', 'role', 'Role']);
-      if (typeof roleValue === 'string' && roleValue.toLowerCase() === 'admin') {
-        return 'admin';
-      }
-      return 'staff';
-    };
-
-    const staffId = String(findKey(item, ['id', 'ID', 'スタッフID']) || `gas-staff-${Math.random()}`);
-
-    const assignedColor = findKey(item, ['color', 'カラー']);
-    const fallbackColor = `hsl(${simpleHash(staffId) % 360}, 70%, 60%)`;
-
-    return {
-      id: staffId,
-      name: findKey(item, ['スタッフ名', 'name']) || 'No Name',
-      email: findKey(item, ['メールアドレス', 'email', 'e-mail', 'mail', 'Email Address', 'email address']) || '',
-      password: findKey(item, ['パスワード', 'password', 'Password']) || '',
-      role: getRole(),
-      color: assignedColor || fallbackColor,
-      avatarUrl: findKey(item, ['avatarUrl']) || '',
-      calendarId: findKey(item, ['calendarId', 'カレンダーID']),
-      '母店': findKey(item, ['母店']),
-      ...item
-    };
-  });
-};
-
-export const fetchStaffDataFromGAS = async (url: string = STAFF_GAS_URL): Promise<{ staffList?: WithId<Staff>[]; error?: string }> => {
-  if (!url || url.includes('TODO_REPLACE_THIS_URL')) {
-    const errorMessage = "スタッフ情報を取得するためのURLが /src/lib/settings.ts で設定されていません。";
-    console.warn(errorMessage);
-    return { error: errorMessage };
-  }
-
-  try {
-    const result = await fetchGasData(url);
-
-    if (result.error) {
-      return { error: result.error };
-    }
-
-    const dataToProcess = result.staff || result.data || [];
-
-    if (dataToProcess.length === 0) {
-      console.warn("GASから取得したスタッフデータが空です。");
-      return { staffList: [] };
-    }
-
-    const staffList = processStaffData(dataToProcess);
-    return { staffList };
-
-  } catch (error: any) {
-    console.error('Error fetching staff data from GAS:', error);
-    return { error: error.message };
-  }
 };
 
 interface SelectedStaffContextType {
@@ -93,8 +28,6 @@ interface SelectedStaffContextType {
   isLoading: boolean;
   isStaffLoading: boolean;
   error: string | null;
-  staffGasUrl: string;
-  setStaffGasUrl: (url: string) => void;
 }
 
 const SelectedStaffContext = createContext<SelectedStaffContextType | undefined>(undefined);
@@ -108,15 +41,11 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize with default, will update from localStorage in useEffect
-  const [staffGasUrl, setStaffGasUrlState] = useState(STAFF_GAS_URL);
-
   const LOCAL_STORAGE_KEY = 'appliedStaffIds';
   const LOCAL_STORAGE_SELECTION_KEY = 'workwise_staff_selection'; // { date: string, ids: string[] }
-  const URL_STORAGE_KEY = 'custom_staff_gas_url';
 
   const initialLoadDone = useRef(false);
-  const STAFF_CACHE_KEY = 'cached_staff_data';
+  const STAFF_CACHE_KEY = 'cached_staff_data_v2'; // Changed key to avoid conflict with old GAS data
 
   // Persist selection
   useEffect(() => {
@@ -149,57 +78,17 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const setStaffGasUrl = (url: string) => {
-    setStaffGasUrlState(url);
-    try {
-      localStorage.setItem(URL_STORAGE_KEY, url);
-    } catch (e) {
-      console.warn('Failed to save staff GAS URL to localStorage:', e);
-    }
-  };
-
   useEffect(() => {
-    // Load saved URL from localStorage
-    try {
-      const savedUrl = localStorage.getItem(URL_STORAGE_KEY);
-      if (savedUrl) {
-        setStaffGasUrlState(savedUrl);
-      }
-    } catch (e) {
-      console.warn('Failed to load saved URL:', e);
-    }
-  }, []);
-
-  const { profile, isLoading: isProfileLoading } = useUserProfile();
-
-  useEffect(() => {
-    // Only load if user is logged in
-    if (isProfileLoading || !profile) return;
-
-    // Rely on effect dependency to reload when staffGasUrl changes
-    // But verify if we need to reset initialLoadDone or just call loadStaff directly
-
-    // We can't rely strictly on initialLoadDone ref if we want to support URL updates triggering re-fetch
-    // So we reset it or just allow re-fetching
-
     const loadStaff = async () => {
       setError(null);
       setIsLoading(true);
-
-      const currentUrl = staffGasUrl;
-
-      if (!currentUrl || currentUrl.includes('TODO_REPLACE_THIS_URL')) {
-        setError("スタッフ情報を取得するためのURLが設定されていません。「/src/lib/settings.ts」ファイルで設定してください。");
-        setIsLoading(false);
-        return;
-      }
 
       // Step 1: Load cached data immediately (optimistic)
       if (!initialLoadDone.current) {
         try {
           const cachedData = localStorage.getItem(STAFF_CACHE_KEY);
           if (cachedData) {
-            const { staffList: cachedStaff, timestamp } = JSON.parse(cachedData);
+            const { staffList: cachedStaff } = JSON.parse(cachedData);
             if (cachedStaff && cachedStaff.length > 0) {
               setAllStaffState(cachedStaff);
 
@@ -219,27 +108,25 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         initialLoadDone.current = true;
       }
 
-      // Step 2: Fetch fresh data in background (or foreground if URL changed)
+      // Step 2: Fetch fresh data from Firestore
       try {
         if (allStaff.length === 0) setIsLoading(true);
 
-        const { staffList, error: fetchError } = await fetchStaffDataFromGAS(currentUrl);
-
-        if (fetchError) {
-          if (allStaff.length === 0) {
-            throw new Error(fetchError);
-          } else {
-            console.warn('Background refresh failed, using cached data:', fetchError);
-          }
-        }
+        const staffList = await StaffService.getAllStaff();
 
         if (staffList && staffList.length > 0) {
-          setAllStaffState(staffList);
+          // Apply fallback colors if missing
+          const processedStaff = staffList.map(s => ({
+            ...s,
+            color: s.color || `hsl(${simpleHash(s.id) % 360}, 70%, 60%)`
+          }));
+
+          setAllStaffState(processedStaff);
 
           // Cache the fresh data
           try {
             localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify({
-              staffList,
+              staffList: processedStaff,
               timestamp: Date.now()
             }));
           } catch (e) {
@@ -254,29 +141,28 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
               setAppliedSelectedStaffIds(parsedIds);
               setPendingSelectedStaffIds(parsedIds);
             } else {
-              // Default to empty if no saved selection
               setAppliedSelectedStaffIds([]);
               setPendingSelectedStaffIds([]);
             }
           }
+        } else {
+          console.log("No staff found in Firestore.");
         }
 
       } catch (e: any) {
         if (allStaff.length === 0) {
           setError(`スタッフ情報の取得に失敗しました: ${e.message}`);
         }
-        console.error(e);
+        console.error("Failed to load staff from Firestore:", e);
       } finally {
         setIsLoading(false);
       }
     };
     loadStaff();
-  }, [staffGasUrl, profile, isProfileLoading]); // Re-run when URL or auth changes
-
+  }, [allStaff.length]); // Dependency can be adjusted, mainly run on mount
 
   const setAllStaff = React.useCallback((staff: WithId<Staff>[]) => {
     setAllStaffState(staff);
-    setIsLoading(false);
   }, []);
 
   const togglePendingStaffSelection = React.useCallback((staffId: string) => {
@@ -333,15 +219,12 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     isLoading: isLoading,
     isStaffLoading: isLoading,
     error,
-    staffGasUrl,
-    setStaffGasUrl,
   }), [
     pendingSelectedStaffIds,
     appliedSelectedStaffIds,
     allStaff,
     isLoading,
     error,
-    staffGasUrl
   ]);
 
   return (

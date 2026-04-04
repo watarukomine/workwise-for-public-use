@@ -4,6 +4,8 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import type { Staff, WithId } from '@/lib/types';
 import { getCurrentUser } from '@/lib/auth';
+import { initializeFirebase } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface UserProfileContextType {
   profile: WithId<Staff> | null;
@@ -21,23 +23,39 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    // Safety timeout to ensure loading doesn't stick forever (e.g. if localStorage access fails silently)
+    // Safety timeout to ensure loading doesn't stick forever
     const timeoutId = setTimeout(() => {
       setIsLoading(false);
-    }, 2000);
+    }, 5000);
 
-    try {
-      // On initial load, try to get the user from session storage
-      const user = getCurrentUser();
-      if (user) {
-        setProfile(user);
+    const syncProfile = async () => {
+      try {
+        const cachedUser = getCurrentUser();
+        if (cachedUser) {
+          // Initialize Firebase to get Firestore
+          const { firestore } = initializeFirebase();
+          const userDocRef = doc(firestore, 'users', cachedUser.id);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists()) {
+            const latestProfile = { ...userDoc.data() as Staff, id: userDoc.id };
+            handleSetProfile(latestProfile);
+          } else {
+            setProfile(cachedUser);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to sync profile with Firestore:', e);
+        // Fallback to cached user if available
+        const cachedUser = getCurrentUser();
+        if (cachedUser) setProfile(cachedUser);
+      } finally {
+        setIsLoading(false);
+        clearTimeout(timeoutId);
       }
-    } catch (e) {
-      setError(e instanceof Error ? e : new Error('Failed to load user profile'));
-    } finally {
-      setIsLoading(false);
-      clearTimeout(timeoutId);
-    }
+    };
+
+    syncProfile();
   }, []);
 
   const handleSetProfile = (user: WithId<Staff> | null) => {

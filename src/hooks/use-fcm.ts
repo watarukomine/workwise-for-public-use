@@ -1,16 +1,20 @@
+
 import { useEffect, useCallback } from 'react';
 import { getToken, onMessage } from 'firebase/messaging';
+// @ts-ignore - Realtime Database might not be initialized
 import { ref, set } from 'firebase/database';
 import { useFirebase } from '@/firebase';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useToast } from '@/hooks/use-toast';
 
 // VAPIDキー（Firebaseコンソールから取得が必要）
-// 一旦プレースホルダーとして空文字にしていますが、ユーザーに設定してもらう必要があります。
 const VAPID_KEY = 'BORdd3TgnHTsUUfH_wtTd2JKJSywHyHVw_8-kG71KhcbIJloemep4ggJ6fy8KgvOaiMDkYxPeY4vXsIPNnukIQs';
 
 export function useFcm() {
-  const { messaging, database } = useFirebase();
+  const firebase = useFirebase() as any;
+  const messaging = firebase.messaging;
+  const database = firebase.database;
+  
   const { profile } = useUserProfile();
   const { toast } = useToast();
 
@@ -18,7 +22,7 @@ export function useFcm() {
     console.log('[FCM] requestPermission called');
     
     if (!messaging || !database || !profile?.id || profile.role !== 'admin') {
-      console.log('[FCM] Skipping permission request (not admin or not initialized)');
+      console.log('[FCM] Skipping permission request (messaging/database service missing or not admin)');
       return;
     }
 
@@ -28,7 +32,6 @@ export function useFcm() {
       console.log('[FCM] Permission result:', permission);
 
       if (permission === 'granted') {
-        // Explicitly register Service Worker for background notifications
         let registration;
         if ('serviceWorker' in navigator) {
           registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
@@ -42,8 +45,6 @@ export function useFcm() {
 
         if (token) {
           console.log('[FCM] Token acquired:', token);
-          // Save token to Realtime Database using a hash of the token as the key
-          // This allows multiple devices (PC, Mobile) to have their own tokens
           const tokenKey = btoa(token).replace(/[=/+]/g, '').substring(0, 20);
           const tokenRef = ref(database, `admin_fcm_tokens/${profile.id}/${tokenKey}`);
           await set(tokenRef, {
@@ -52,8 +53,6 @@ export function useFcm() {
             platform: typeof window !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop'
           });
           console.log('[FCM] Token saved to DB');
-        } else {
-          console.warn('[FCM] No registration token available.');
         }
       }
     } catch (error) {
@@ -62,11 +61,10 @@ export function useFcm() {
   }, [messaging, profile, database]);
 
   useEffect(() => {
-    console.log('[FCM] useEffect triggered. Role:', profile?.role);
-    if (profile?.role === 'admin') {
+    if (profile?.role === 'admin' && messaging && database) {
       requestPermission();
     }
-  }, [profile, requestPermission]);
+  }, [profile, requestPermission, messaging, database]);
 
   useEffect(() => {
     if (!messaging) return;

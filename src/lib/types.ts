@@ -50,6 +50,7 @@ export type Order = {
   id: string; // System ID (Unique: Date_User_UUID)
   displayId?: string; // Visual ID (Row Number: 1, 2, 3...)
   rawOrderId?: string;
+  tripId?: string;
   customerCode: string;
   customerName: string;
   address: string;
@@ -66,10 +67,10 @@ export type Order = {
   staffName?: string;
   staffId?: string; // Added field
   mainStore?: string; // Added field for D column
-  actualStartTime?: Date; // Added for analytics
-  actualEndTime?: Date; // Added for analytics
-  startTravelTime?: Date; // Added for travel analysis
-  arrivalTimestamp?: Date; // Added for travel analysis
+  actualStartTime?: Date | string; // Added for analytics
+  actualEndTime?: Date | string; // Added for analytics
+  startTravelTime?: Date | string; // Added for analytics
+  arrivalTimestamp?: Date | string; // Added for analytics
   equipmentStatus?: string;
   tireNumber?: string;
   tireSize?: string;
@@ -93,6 +94,7 @@ export type Order = {
   submitter?: string;
   confirmedAt?: string;
   description?: string;
+  updatedAt?: string | Date;
 };
 
 export type ScheduleEvent = WithId<Order> & {
