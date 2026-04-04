@@ -4,11 +4,9 @@
 import { CustomerTable } from '@/components/customers/customer-table';
 import React, { useEffect } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Loader2, ExternalLink } from 'lucide-react';
+import { AlertCircle, Loader2, Building2 } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useCustomer } from '@/contexts/customer-context';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CUSTOMER_SHEET_URL } from '@/lib/settings';
 import { useRouter } from 'next/navigation';
 
 export default function CustomersPage() {
@@ -22,12 +20,6 @@ export default function CustomersPage() {
       router.push('/login');
     }
   }, [isProfileLoading, profile, router]);
-
-  const handleHeaderClick = () => {
-    if (CUSTOMER_SHEET_URL && isAdmin) {
-      window.open(CUSTOMER_SHEET_URL, '_blank', 'noopener,noreferrer');
-    }
-  };
 
   const isLoading = isLoadingCustomers || isProfileLoading;
 
@@ -44,53 +36,35 @@ export default function CustomersPage() {
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>権限がありません</AlertTitle>
-        <AlertDescription>
-          このページは管理者のみがアクセスできます。
-        </AlertDescription>
+        <AlertDescription>このページは管理者のみがアクセスできます。</AlertDescription>
       </Alert>
-    )
+    );
   }
 
   return (
-    <div className="space-y-8">
-      <Card>
-        <CardHeader>
-          <CardTitle
-            onClick={handleHeaderClick}
-            className={isAdmin && CUSTOMER_SHEET_URL ? "cursor-pointer hover:underline flex items-center gap-2" : "flex items-center gap-2"}
-          >
-            販売店情報
-            {isAdmin && CUSTOMER_SHEET_URL && <ExternalLink className="h-5 w-5 text-muted-foreground" />}
-          </CardTitle>
-          <CardDescription>
-            Firestoreデータベースから取得された販売店の一覧です。
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {customerError && !isLoadingCustomers ? (
-            <Alert variant="destructive" className="mb-6">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>データ取得エラー</AlertTitle>
-              <AlertDescription>
-                {customerError}
-                <p className="mt-2 text-xs">Firestoreの接続設定を確認してください。</p>
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          <CustomerTable customers={customers} isLoading={isLoading} />
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+          <Building2 className="h-6 w-6" />
+          販売店情報
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          Firestoreデータベースとリアルタイム同期 · セルをクリックして直接編集
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>バックエンド設定</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            現在はFirestoreデータベースをデータソースとして使用しています。Google Apps Scriptによるデータの取得・更新は無効化されています。
-          </p>
-        </CardContent>
-      </Card>
+      {customerError && !isLoadingCustomers && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>データ取得エラー</AlertTitle>
+          <AlertDescription>
+            {customerError}
+            <p className="mt-1 text-xs">Firestoreの接続設定を確認してください。</p>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <CustomerTable customers={customers} isLoading={isLoading} />
     </div>
   );
 }

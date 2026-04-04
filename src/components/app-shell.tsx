@@ -18,6 +18,9 @@ import {
     BookOpen,
     LayoutList,
     Monitor,
+    Upload,
+    UserCircle,
+    Settings,
 } from 'lucide-react';
 
 import {
@@ -60,6 +63,7 @@ const allNavItems = [
     { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
     { href: '/admin/analytics', label: '分析レポート', icon: BarChart, roles: ['admin'] },
     { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'], hideOnMobile: true },
+    { href: '/import', label: 'インポート', icon: Upload, roles: ['admin'] },
     { href: '/manuals', label: 'マニュアル', icon: BookOpen, roles: ['admin', 'staff'] },
 ];
 
@@ -290,10 +294,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                 <DropdownMenuContent align="end" className="w-56">
                                     <DropdownMenuLabel>{displayName}</DropdownMenuLabel>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => router.push('/staff')}>Profile</DropdownMenuItem>
-                                    <DropdownMenuItem>Settings</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => router.push('/staff')}><UserCircle className="mr-2 h-4 w-4" />プロフィール</DropdownMenuItem>
+                                    <DropdownMenuItem><Settings className="mr-2 h-4 w-4" />設定</DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={handleSignOut}><LogOut className="mr-2 h-4 w-4" />ログアウト</DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         ) : null}
@@ -342,12 +346,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                                <DropdownMenuLabel>マイアカウント</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => router.push('/staff')}>Profile</DropdownMenuItem>
-                                <DropdownMenuItem>Settings</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => router.push('/staff')}><UserCircle className="mr-2 h-4 w-4" />プロフィール</DropdownMenuItem>
+                                <DropdownMenuItem><Settings className="mr-2 h-4 w-4" />設定</DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={handleSignOut}>Log out</DropdownMenuItem>
+                                <DropdownMenuItem onClick={handleSignOut}><LogOut className="mr-2 h-4 w-4" />ログアウト</DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : showLoginButton ? (

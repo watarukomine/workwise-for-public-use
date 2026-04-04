@@ -300,6 +300,7 @@ export default function ImportPage() {
                 type="file"
                 accept=".csv,.tsv,.txt"
                 className="hidden"
+                aria-label="CSVファイルを選択"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) processFile(f); }}
               />
             </div>
@@ -468,8 +469,8 @@ export default function ImportPage() {
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary rounded-full transition-all duration-300"
-                  style={{ width: `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` }}
+                  className="h-full bg-primary rounded-full transition-all duration-300 dynamic-width"
+                  style={{ '--dynamic-width': `${importProgress.total > 0 ? (importProgress.current / importProgress.total) * 100 : 0}%` } as React.CSSProperties}
                 />
               </div>
             </div>
