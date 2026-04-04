@@ -36,9 +36,25 @@ interface StaffTableProps {
 }
 
 // --- System/internal fields to exclude ---
+// Order-related fields that may have been mixed into the users collection via GAS import
+const ORDER_FIELDS_TO_EXCLUDE = [
+  'scheduledTime', 'scheduledDate', 'staffName', 'status', 'taskDetails',
+  'uid', 'ご担当者様', 'キャンセル日時', 'キャンセル連絡者', 'スタッフ名',
+  'タイヤサイズ', 'タイヤ品番', 'タイヤ手配状況', 'タイヤ状況',
+  'チップ配置作業予定', 'チップ配置作業完了予定', 'フォーム入力者',
+  '予定時間', '作業予定日', '作業内容', '本数', '機材有無', '空気圧センサーパッキン交換',
+  '受注ステータス', '受注 ID', '受注ID', '受注 No', '受注No',
+  'SystemID', 'systemId', 'customerName', 'customerCode', 'お取引先名',
+  'ユーザーコード', '主管店舗', '主管店舗コード', '店舗名', '店舗',
+  '品名', '担当', 'address', 'scheduledEndTime', 'estimatedDuration',
+  'actualDuration', 'actualEndTime', 'actualStartTime', 'arrivalTimestamp',
+  'serviceType', 'staffId', 'startTravelTime', 'value',
+  '_importedAt', '_source', '任意コメント', 'リマーク',
+];
 const EXCLUDED_FIELDS = new Set([
   'Order_URL', 'createdAt', 'updatedAt', '__memo', 'password',
   'calendarId', 'photoURL', 'avatarUrl',
+  ...ORDER_FIELDS_TO_EXCLUDE,
 ]);
 
 // Priority fields shown first

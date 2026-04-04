@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
-import { Search, Plus, Trash2, Download, Loader2, Settings2 } from 'lucide-react';
+import { Search, Plus, Trash2, Download, Loader2, Settings2, CalendarDays } from 'lucide-react';
 import { cn, findKey } from '@/lib/utils';
 import { format, isValid, parseISO, startOfToday, isAfter, isEqual } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -240,16 +240,23 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
   const displayColumns = React.useMemo(() => allColumns.filter(c => visibleColumns.has(c)), [allColumns, visibleColumns]);
 
+  const [showFutureOnly, setShowFutureOnly] = React.useState(false);
+
   const filteredAndSortedOrders = React.useMemo(() => {
-    const today = startOfToday();
-    let ordersToDisplay = (rawOrders || []).filter(order => {
-      const workDateStr = findKey(order, ['作業予定日', 'scheduledDate']);
-      if (!workDateStr) return true;
-      try {
-        const workDate = parseISO(workDateStr);
-        return isValid(workDate) && (isAfter(workDate, today) || isEqual(workDate, today));
-      } catch { return false; }
-    });
+    let ordersToDisplay = rawOrders || [];
+
+    // Optional: filter to future dates only
+    if (showFutureOnly) {
+      const today = startOfToday();
+      ordersToDisplay = ordersToDisplay.filter(order => {
+        const workDateStr = findKey(order, ['作業予定日', 'scheduledDate']);
+        if (!workDateStr) return true;
+        try {
+          const workDate = parseISO(workDateStr);
+          return isValid(workDate) && (isAfter(workDate, today) || isEqual(workDate, today));
+        } catch { return false; }
+      });
+    }
 
     if (searchTerm.trim() !== '') {
       const term = searchTerm.toLowerCase();
@@ -261,11 +268,11 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     ordersToDisplay.sort((a, b) => {
       const dateA = findKey(a, ['scheduledDate', '作業予定日']) || '';
       const dateB = findKey(b, ['scheduledDate', '作業予定日']) || '';
-      return dateA.localeCompare(dateB);
+      return dateB.localeCompare(dateA); // Newest first
     });
 
     return ordersToDisplay;
-  }, [rawOrders, searchTerm, displayColumns]);
+  }, [rawOrders, searchTerm, displayColumns, showFutureOnly]);
 
   const handleSaveCell = React.useCallback(async (orderId: string, fieldKey: string, newValue: string) => {
     await OrderService.updateOrder(orderId, { [fieldKey]: newValue });
@@ -330,6 +337,17 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
               <Input placeholder="検索..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 h-9" />
             </div>
             <div className="flex items-center gap-2">
+              {/* Date filter toggle */}
+              <Button
+                variant={showFutureOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowFutureOnly(prev => !prev)}
+                className="gap-1.5"
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                {showFutureOnly ? '今日以降のみ' : '全件表示'}
+              </Button>
+
               {/* Column visibility toggle */}
               <Popover>
                 <PopoverTrigger asChild>
