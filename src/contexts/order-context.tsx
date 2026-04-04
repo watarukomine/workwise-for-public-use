@@ -198,9 +198,6 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         } catch (e) { }
 
         if (scheduledTime && isValid(scheduledTime)) {
-          if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
-
-          const tripId = `trip-${order.rawOrderId || order.id}`;
           let taskEndTime: Date | null = null;
 
           if (order.scheduledEndTime) {
@@ -230,15 +227,21 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
           }
 
           if (isValid(taskEndTime)) {
-            explicitScheduleItems.push({
-              order,
-              start: scheduledTime,
-              end: taskEndTime!,
-              staffId: staffMember.id,
-              tripId,
-              isGeneric: isGenericTask,
-              isAccompany: order.taskDetails.includes('同行')
-            });
+            // Only add to timeline if scheduled time is 09:00 or later
+            if (scheduledTime.getHours() >= 9) {
+              if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
+
+              const tripId = `trip-${order.rawOrderId || order.id}`;
+              explicitScheduleItems.push({
+                order,
+                start: scheduledTime,
+                end: taskEndTime!,
+                staffId: staffMember.id,
+                tripId,
+                isGeneric: isGenericTask,
+                isAccompany: order.taskDetails.includes('同行')
+              });
+            }
           }
         }
       }

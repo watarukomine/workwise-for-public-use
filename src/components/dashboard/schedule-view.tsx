@@ -517,7 +517,7 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { allStaff } = useSelectedStaff(); // Get full list
   const { toast } = useToast();
-  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, toggleTripSuppression } = useOrder();
+  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, toggleTripSuppression, setCurrentViewedDate } = useOrder();
 
   const [isClient, setIsClient] = React.useState(false);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
@@ -531,6 +531,11 @@ export function ScheduleView({
   const [editOrderForm, setEditOrderForm] = React.useState<any>({});
   const [hoveredTime, setHoveredTime] = React.useState<string | null>(null);
   const [hoveredStaffId, setHoveredStaffId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setCurrentViewedDate(currentDate);
+    return () => setCurrentViewedDate(null);
+  }, [currentDate, setCurrentViewedDate]);
 
   React.useEffect(() => {
     if ((dialogState.mode === 'details' || dialogState.mode === 'edit') && dialogState.event) {
@@ -557,7 +562,6 @@ export function ScheduleView({
         scheduledDate: formatDate(findKey(dialogState.event.raw, ['作業予定日']), 'yyyy-MM-dd') || '',
         scheduledTime: formatTime(findKey(dialogState.event.raw, ['予定時間', 'チップ配置作業予定'])) || ''
       });
-      setIsEditingOrderDetails(false);
     } else if (dialogState.mode === 'order-details' && dialogState.order) {
       setEditOrderForm({
         storeName: findKey(dialogState.order.raw, ["お取引先名", "店舗", "店舗名", "名称", "店舗名称", "Customer", "お名前"]) || '',
@@ -582,9 +586,7 @@ export function ScheduleView({
         scheduledDate: formatDate(findKey(dialogState.order.raw, ['作業予定日']), 'yyyy-MM-dd') || '',
         scheduledTime: formatTime(findKey(dialogState.order.raw, ['予定時間', 'チップ配置作業予定'])) || ''
       });
-      setIsEditingOrderDetails(false);
     } else {
-      setIsEditingOrderDetails(false);
       setEditOrderForm({});
     }
   }, [dialogState]);
@@ -890,7 +892,6 @@ export function ScheduleView({
     const staffRowElement = document.getElementById(`staff-row-${staffId}`);
     if (staffRowElement && active.rect.current.translated) {
       const timelineRect = staffRowElement.getBoundingClientRect();
-      // Calculate X relative to the timeline start (after the staff column)
       const dropX = active.rect.current.translated.left - timelineRect.left;
       const minutes = pixelsToMinutes(dropX);
       const baseDate = new Date(currentDate);
@@ -900,15 +901,6 @@ export function ScheduleView({
     }
   };
 
-  // ... (lines 436-580 are mostly unchanged, just jumping to specific updates around line 590)
-
-  // Wait, I can't use replace_file_content for non-contiguous blocks like this easily.
-  // I need to use multi_replace for schedule-view.tsx.
-  // The first chunk is adding saveLocalEvent to destructuring.
-  // The second chunk is updating handleDragEnd to use saveLocalEvent.
-  // The third chunk is fixing the icon logic.
-
-  // Cancelling this tool call to use multi_replace.
 
 
   const unassignTask = async (eventToUnassign: WithId<ScheduleEvent>) => {
