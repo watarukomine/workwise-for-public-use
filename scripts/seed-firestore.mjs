@@ -65,22 +65,27 @@ async function fetchFromGAS(action) {
   
   // GAS returns data in various formats, try to extract the array
   let records = [];
-  if (Array.isArray(data)) {
+  
+  // Prioritize action-based keys to avoid accidental pollution
+  if (action === 'getStaffList' && Array.isArray(data.staffList)) {
+    records = data.staffList;
+  } else if (action === 'getCustomerList' && Array.isArray(data.customerList)) {
+    records = data.customerList;
+  } else if (action === 'getOrderData' && Array.isArray(data.orders)) {
+    records = data.orders;
+  } else if (Array.isArray(data)) {
     records = data;
   } else if (data.data && Array.isArray(data.data)) {
     records = data.data;
   } else if (data.result && Array.isArray(data.result)) {
     records = data.result;
-  } else if (data.staffList && Array.isArray(data.staffList)) {
-    records = data.staffList;
-  } else if (data.customerList && Array.isArray(data.customerList)) {
-    records = data.customerList;
-  } else if (data.orders && Array.isArray(data.orders)) {
-    records = data.orders;
   } else {
     // Try to find any array in the response
     for (const key of Object.keys(data)) {
       if (Array.isArray(data[key])) {
+        // Safety check: if we are looking for staff but find something that looks like orders, skip it
+        if (action === 'getStaffList' && key.toLowerCase().includes('order')) continue;
+        
         records = data[key];
         console.log(`  → データキー "${key}" から ${records.length} 件を検出`);
         break;
@@ -119,12 +124,31 @@ function cleanRecord(record) {
   return cleaned;
 }
 
+// Cache existing admins for protection
+const existingAdmins = new Set();
+
+async function cacheAdmins() {
+  console.log('🛡️ 既存の管理者（Admin）リストを保護用に取得中...');
+  const adminSnapshot = await db.collection('users').where('role', '==', 'admin').get();
+  adminSnapshot.docs.forEach(doc => {
+    existingAdmins.add(doc.id);
+    const email = doc.data().email;
+    if (email) existingAdmins.add(email.toLowerCase());
+  });
+  console.log(`  ✅ ${adminSnapshot.size} 名の管理者を保護対象として認識しました。`);
+}
+
 async function seedCollection(collectionType) {
   const config = COLLECTIONS[collectionType];
   console.log(`\n${'='.repeat(60)}`);
   console.log(`📦 コレクション: ${config.firestoreCollection}`);
   console.log(`${'='.repeat(60)}`);
   
+  // Initialize admin cache if seeding staff (users)
+  if (collectionType === 'staff' && existingAdmins.size === 0) {
+    await cacheAdmins();
+  }
+
   let records;
   try {
     records = await fetchFromGAS(config.action);
@@ -171,6 +195,22 @@ async function seedCollection(collectionType) {
       try {
         const docRef = db.collection(config.firestoreCollection).doc(docId);
         const cleaned = cleanRecord(record);
+        
+        // --- Add Protection and Metadata ---
+        if (collectionType === 'staff') {
+            cleaned._type = 'staff';
+            
+            // Protect existing admins from accidental downgrade
+            if (existingAdmins.has(docId) || (cleaned.email && existingAdmins.has(cleaned.email.toLowerCase()))) {
+                console.log(`  🛡️ ${docId}: 管理者権限を維持します。`);
+                cleaned.role = 'admin';
+            }
+        } else if (collectionType === 'customers') {
+            cleaned._type = 'customer';
+        } else if (collectionType === 'orders') {
+            cleaned._type = 'order';
+        }
+        
         cleaned._importedAt = new Date().toISOString();
         cleaned._source = 'spreadsheet-seed';
         batch.set(docRef, cleaned, { merge: true });
@@ -197,13 +237,20 @@ async function seedCollection(collectionType) {
 
 // --- Main ---
 async function main() {
+  const target = process.argv[2]; // e.g. 'staff', 'customers', 'orders'
+  
   console.log('🚀 スプレッドシート → Firestore データシードを開始します');
   console.log(`📌 プロジェクト: ${PROJECT_ID}`);
   console.log(`📡 GAS URL: ${GAS_URL.substring(0, 60)}...`);
   
   const results = {};
+  const collectionsToSeed = target ? [target] : Object.keys(COLLECTIONS);
   
-  for (const collectionType of Object.keys(COLLECTIONS)) {
+  for (const collectionType of collectionsToSeed) {
+    if (!COLLECTIONS[collectionType]) {
+      console.error(`  ❌ 不明なターゲット: ${collectionType}`);
+      continue;
+    }
     results[collectionType] = await seedCollection(collectionType);
   }
   

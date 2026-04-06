@@ -24,7 +24,9 @@ export const StaffService = {
     async getAllStaff(): Promise<WithId<Staff>[]> {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
-        const snapshot = await getDocs(colRef);
+        // During transition, we filter out known 'order' types to avoid junk
+        const q = query(colRef, where('_type', '!=', 'order'));
+        const snapshot = await getDocs(q);
 
         return snapshot.docs.map(docSnap => ({
             id: docSnap.id,
@@ -54,12 +56,16 @@ export const StaffService = {
     async getStaffByEmail(email: string): Promise<WithId<Staff> | null> {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
-        const q = query(colRef, where('email', '==', email));
+        const q = query(colRef, where('email', '==', email.trim().toLowerCase()));
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) return null;
 
-        const docSnap = snapshot.docs[0];
+        // Filter out any accidentally imported order docs that might have an email field matches
+        const staffDocs = snapshot.docs.filter(doc => doc.data()._type !== 'order');
+        if (staffDocs.length === 0) return null;
+
+        const docSnap = staffDocs[0];
         return {
             id: docSnap.id,
             ...docSnap.data()
@@ -86,6 +92,7 @@ export const StaffService = {
         const docRef = doc(firestore, COLLECTION, id);
         await setDoc(docRef, {
             ...data,
+            _type: 'staff',
             updatedAt: serverTimestamp()
         }, { merge: true });
     }

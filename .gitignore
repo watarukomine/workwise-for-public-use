@@ -43,3 +43,9 @@ next-env.d.ts
 # genkit
 .genkit/
 .genkit-cache.json
+
+# Firebase & Local Scripts
+service-account.json
+staff_data.json
+scripts/seed-auth.mjs
+scripts/cleanup-users.mjs

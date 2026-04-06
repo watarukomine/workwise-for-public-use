@@ -5,6 +5,7 @@ export type WithId<T> = T & { id: string };
 
 export type Staff = {
   id: string; // Corresponds to Firebase Auth UID
+  _type?: 'staff' | 'order'; // Isolation marker
   name: string;
   email: string | null;
   photoURL?: string | null;

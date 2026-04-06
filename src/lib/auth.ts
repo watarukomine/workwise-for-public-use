@@ -21,32 +21,39 @@ const USER_SESSION_KEY = 'workwise-user-profile';
  * @returns A promise that resolves with the user's profile from Firestore if successful.
  */
 export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
-  console.log(`Attempting to sign in via Firebase Auth for email: ${email}`);
+  const normalizedEmail = email.trim().toLowerCase();
+  console.log(`[Auth] Attempting sign-in for: ${normalizedEmail}`);
   const { auth } = initializeFirebase();
   
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
     const user = userCredential.user;
 
     // Fetch additional profile info from Firestore
+    console.log(`[Auth] Firebase Auth success, fetching profile for: ${user.email}`);
     const staffMember = await StaffService.getStaffByEmail(user.email!);
 
     if (!staffMember) {
-      throw new Error('認証は成功しましたが、スタッフ情報が見つかりません。管理者に問い合わせてください。');
+      console.error(`[Auth] Profile NOT found in Firestore 'users' collection for email: ${user.email}`);
+      throw new Error('認証は成功しましたが、システム内にスタッフ情報が見つかりません。管理者にアカウントの有効化を依頼してください。');
     }
 
     // On successful login, save profile to session storage
     sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffMember));
 
-    console.log('Firebase Auth sign in successful for:', staffMember.name);
+    console.log(`[Auth] Login complete for: ${staffMember.name} (${staffMember.role})`);
     return staffMember;
 
   } catch (error: any) {
-    console.error('Firebase Auth sign-in error:', error);
-    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+    console.error('[Auth] Sign-in error:', error);
+    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-email') {
       throw new Error('メールアドレスまたはパスワードが正しくありません。');
     }
-    throw error;
+    // Forward the specific profile-missing error
+    if (error.message.includes('スタッフ情報が見つかりません')) {
+      throw error;
+    }
+    throw new Error(error.message || 'ログイン中に予期せぬエラーが発生しました。');
   }
 };
 
@@ -54,32 +61,33 @@ export const signInWithEmail = async (email: string, password: string): Promise<
  * Signs up a new user using Firebase Authentication and initializes their Firestore record.
  */
 export const signUpWithEmail = async (email: string, password: string, name: string): Promise<void> => {
+  const normalizedEmail = email.trim().toLowerCase();
   const { auth } = initializeFirebase();
   
   try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, password);
     const user = userCredential.user;
 
     const newStaff: any = {
         uid: user.uid,
         name,
-        email,
-        // We no longer store passwords in Firestore for security
+        email: normalizedEmail,
+        _type: 'staff',
         role: 'staff',
         createdAt: new Date().toISOString()
     };
 
-    // Use email or UID as key, here we stay consistent with previous code using email as key if desired, 
-    // but UID is better. Let's keep email as key for compatibility with existing queries if necessary.
-    await StaffService.saveStaff(email, newStaff);
+    // Use UID as key for better practice and consistency
+    await StaffService.saveStaff(user.uid, newStaff);
     
     // Also save to session storage so user is "logged in" immediately
-    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(newStaff));
+    const staffWithId = { ...newStaff, id: user.uid };
+    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffWithId));
     
-    console.log('User signed up successfully with Firebase Auth:', email);
+    console.log('[Auth] User signed up successfully:', normalizedEmail);
 
   } catch (error: any) {
-    console.error('Sign up error:', error);
+    console.error('[Auth] Sign up error:', error);
     throw error;
   }
 };
