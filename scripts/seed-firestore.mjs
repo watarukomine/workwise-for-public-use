@@ -13,6 +13,8 @@
 
 import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 // --- Configuration ---
 const PROJECT_ID = 'workwise-general-v2-kp';
@@ -27,16 +29,17 @@ const COLLECTIONS = {
 };
 
 // --- Initialize Firebase Admin ---
+const serviceAccountPath = join(process.cwd(), 'service-account.json');
+const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
+
 let app;
 try {
   app = initializeApp({
     projectId: PROJECT_ID,
-    credential: applicationDefault(),
+    credential: cert(serviceAccount),
   });
 } catch (e) {
-  console.error('Firebase Admin initialization failed. Make sure you have valid credentials.');
-  console.error('Run: gcloud auth application-default login');
-  console.error('Or set GOOGLE_APPLICATION_CREDENTIALS env var to a service account key file.');
+  console.error('Firebase Admin initialization failed. Make sure service-account.json exists.');
   process.exit(1);
 }
 
@@ -67,18 +70,16 @@ async function fetchFromGAS(action) {
   let records = [];
   
   // Prioritize action-based keys to avoid accidental pollution
-  if (action === 'getStaffList' && Array.isArray(data.staffList)) {
-    records = data.staffList;
-  } else if (action === 'getCustomerList' && Array.isArray(data.customerList)) {
-    records = data.customerList;
-  } else if (action === 'getOrderData' && Array.isArray(data.orders)) {
-    records = data.orders;
+  if (action === 'getStaffList' && (Array.isArray(data.staff) || Array.isArray(data.staffList))) {
+    records = data.staff || data.staffList;
+  } else if (action === 'getCustomerList' && (Array.isArray(data.customers) || Array.isArray(data.customerList))) {
+    records = data.customers || data.customerList;
+  } else if (action === 'getOrderData' && (Array.isArray(data.orders) || Array.isArray(data.data))) {
+    records = data.orders || data.data;
   } else if (Array.isArray(data)) {
     records = data;
   } else if (data.data && Array.isArray(data.data)) {
     records = data.data;
-  } else if (data.result && Array.isArray(data.result)) {
-    records = data.result;
   } else {
     // Try to find any array in the response
     for (const key of Object.keys(data)) {
@@ -112,17 +113,35 @@ function generateDocId(record, collectionType) {
   return null;
 }
 
-function cleanRecord(record) {
-  // Remove undefined values and convert dates
+function cleanRecord(record, collectionType) {
   const cleaned = {};
+  
+  // Field mappings to ensure app compatibility
+  if (collectionType === 'staff') {
+    cleaned.email = (record['メールアドレス'] || record.email || '').trim().toLowerCase();
+    cleaned.name = record['スタッフ名'] || record.name || '';
+    cleaned.role = (record['ロール'] || record.role || 'staff').toLowerCase();
+    cleaned.staffId = record['スタッフID'] || record.staffId || '';
+  } else if (collectionType === 'customers') {
+    cleaned.userCode = record['ユーザーコード'] || record.userCode || '';
+    cleaned.name = record['店舗名'] || record.name || '';
+  } else if (collectionType === 'orders') {
+    cleaned.systemId = record.SystemID || record.systemId || '';
+  }
+
+  // Copy other fields
   for (const [key, value] of Object.entries(record)) {
-    if (value === undefined) continue;
-    if (value === null) continue;
-    // Keep empty strings to preserve column structure
-    cleaned[key] = value;
+    if (value === undefined || value === null) continue;
+    // Don't overwrite specialized fields if they were already mapped
+    if (cleaned[key] === undefined) {
+      cleaned[key] = value;
+    }
   }
   return cleaned;
 }
+
+// ... (existing code for cacheAdmins omitted for brevity in this tool call, normally I'd include it if it's in the range)
+// Note: I will use multi_replace if I need to preserve the middle part, but here I'm replacing a large block.
 
 // Cache existing admins for protection
 const existingAdmins = new Set();
@@ -184,7 +203,7 @@ async function seedCollection(collectionType) {
       if (!docId) {
         // Auto-generate ID
         const docRef = db.collection(config.firestoreCollection).doc();
-        const cleaned = cleanRecord(record);
+        const cleaned = cleanRecord(record, collectionType);
         cleaned._importedAt = new Date().toISOString();
         cleaned._source = 'spreadsheet-seed';
         batch.set(docRef, cleaned, { merge: true });
@@ -194,7 +213,7 @@ async function seedCollection(collectionType) {
       
       try {
         const docRef = db.collection(config.firestoreCollection).doc(docId);
-        const cleaned = cleanRecord(record);
+        const cleaned = cleanRecord(record, collectionType);
         
         // --- Add Protection and Metadata ---
         if (collectionType === 'staff') {
