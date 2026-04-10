@@ -379,6 +379,12 @@ function confirmReadOrder(params) {
     if (!systemId) return errorResponse("systemId が指定されていません");
     if (!staffName) return errorResponse("staffName が指定されていません");
 
+    // 汎用タスク（task-〜）の場合は、行動記録シートに「既読」列を作っていないため、
+    // ここで成功を返して無視する（そうしないと受注シートを探してエラーになってしまう）
+    if (String(systemId).replace(/-/g, '').startsWith('task')) {
+        return successResponse("汎用タスクのため既読処理をスキップしました", { confirmed: true });
+    }
+
     try {
         const orderSpreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
         const sheet = orderSpreadsheet.getSheetByName(ORDER_SHEET_NAME);
@@ -630,7 +636,8 @@ function updateSheetWithOrderInfo(params) {
         }
 
         // 汎用タスク（行動記録シート）の更新判定
-        if (searchId && String(searchId).startsWith('task-')) {
+        // ハイフンが抜けて送られて来るケース（LINE経由など）を考慮し、ハイフンを抜いて判定する
+        if (searchId && String(searchId).replace(/-/g, '').startsWith('task')) {
             return updateTaskSheet(searchId, params);
         }
 
@@ -957,7 +964,8 @@ function updateTaskSheet(taskId, params) {
     // 1. ID検索
     if (taskId) {
         for (let i = 1; i < data.length; i++) {
-            if (String(data[i][idCol]) === String(taskId)) {
+            // ハイフンを取り除いて比較（LINEなどのアプリ側でURLのハイフンが削られるケースへの対策）
+            if (String(data[i][idCol]).replace(/-/g, '') === String(taskId).replace(/-/g, '')) {
                 rowNum = i + 1;
                 break;
             }

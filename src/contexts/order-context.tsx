@@ -386,7 +386,17 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
   const [fetchedDateRanges, setFetchedDateRanges] = useState<Map<string, number>>(new Map()); // Use Map for timestamp-based cache
   const [currentViewedDate, setCurrentViewedDate] = useState<Date | null>(null);
+  const currentViewedDateRef = React.useRef<Date | null>(null);
+  const fetchedDateRangesRef = React.useRef(fetchedDateRanges);
   const ORDERS_CACHE_KEY = 'cached_orders_results';
+
+  useEffect(() => {
+    currentViewedDateRef.current = currentViewedDate;
+  }, [currentViewedDate]);
+
+  useEffect(() => {
+    fetchedDateRangesRef.current = fetchedDateRanges;
+  }, [fetchedDateRanges]);
 
   useEffect(() => {
     try {
@@ -567,34 +577,44 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       const data = snapshot.val();
       if (data) {
         console.log('[OrderProvider] Real-time signal received:', data);
-        // Trigger multi-stage background fetch for better responsiveness
-        // 1. Refresh Today
-        fetchAndProcessData(true); 
         
-        // 2. Refresh Viewed Date if specialized
-        if (currentViewedDate) {
-            const viewedDateStr = currentViewedDate.toISOString().split('T')[0];
-            fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
-        }
+        const triggerFetch = () => {
+          // 1. Refresh Today
+          fetchAndProcessData(true); 
+          
+          // 2. Refresh Viewed Date if specialized
+          const viewedDate = currentViewedDateRef.current;
+          if (viewedDate) {
+              const viewedDateStr = viewedDate.toISOString().split('T')[0];
+              const diffDays = Math.abs(differenceInMinutes(viewedDate, new Date()) / (60 * 24));
+              if (diffDays > 3) {
+                  fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
+              } else {
+                  // If it's near today, refresh with range 3 just in case
+                  fetchAndProcessData(true, { date: viewedDateStr, range: 3 });
+              }
+          }
+        };
 
-        setTimeout(() => fetchAndProcessData(true), 3000); // 3s later (GAS usually writes fast)
-        setTimeout(() => fetchAndProcessData(true), 8000); // 8s later (Safety margin)
+        // Trigger multi-stage background fetch for better responsiveness
+        triggerFetch();
+        setTimeout(triggerFetch, 3000); // 3s later (GAS usually writes fast)
+        setTimeout(triggerFetch, 8000); // 8s later (Safety margin)
       }
     });
 
     return () => unsubscribe();
   }, [database, fetchAndProcessData]);
 
-  // 2. Fetch data on mount (Init with today range)
+  // 2. Fetch data on mount & Background polling
   const { profile, isLoading: isProfileLoading } = useUserProfile();
 
   useEffect(() => {
-    // Only fetch if user is logged in
     if (isProfileLoading || !profile) return;
 
-    // Initial fetch for today +/- 3 days
-    // Initial fetch for today +/- 3 days
     const todayStr = new Date().toISOString().split('T')[0];
+    
+    // Initial fetch for today +/- 3 days
     fetchAndProcessData(false, { date: todayStr, range: 3 });
     
     // Background polling every 30s
@@ -602,10 +622,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         // Poll Today
         fetchAndProcessData(true, { date: todayStr, range: 3 });
         
-        // Poll Viewed Date if it's far in future/past (outside context of range 3)
-        if (currentViewedDate) {
-            const viewedDateStr = currentViewedDate.toISOString().split('T')[0];
-            const diffDays = Math.abs(differenceInMinutes(currentViewedDate, new Date()) / (60 * 24));
+        // Poll Viewed Date using Ref to avoid resetting interval on date change
+        const viewedDate = currentViewedDateRef.current;
+        if (viewedDate) {
+            const viewedDateStr = viewedDate.toISOString().split('T')[0];
+            const diffDays = Math.abs(differenceInMinutes(viewedDate, new Date()) / (60 * 24));
             if (diffDays > 3) {
                 console.log(`[OrderProvider] Polling out-of-range viewed date: ${viewedDateStr}`);
                 fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
@@ -613,7 +634,24 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         }
     }, 30000); 
     return () => clearInterval(interval);
-  }, [fetchAndProcessData, profile, isProfileLoading, currentViewedDate]);
+  }, [fetchAndProcessData, profile, isProfileLoading]);
+
+  // 2.5 Fetch immediately when currentViewedDate changes to an out-of-range date
+  useEffect(() => {
+    if (!currentViewedDate || isProfileLoading || !profile) return;
+    
+    const diffDays = Math.abs(differenceInMinutes(currentViewedDate, new Date()) / (60 * 24));
+    if (diffDays > 3) {
+      const viewedDateStr = currentViewedDate.toISOString().split('T')[0];
+      const lastFetched = fetchedDateRangesRef.current.get(viewedDateStr);
+      const isStale = !lastFetched || (Date.now() - lastFetched > 10000); // 10s cooldown
+      
+      if (isStale) {
+        console.log(`[OrderProvider] Viewed date changed to ${viewedDateStr}, fetching immediately.`);
+        fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
+      }
+    }
+  }, [currentViewedDate, fetchAndProcessData, isProfileLoading, profile]);
 
   const saveLocalEvent = (event: WithId<ScheduleEvent>) => {
     setLocalScheduleEvents(prev => {
@@ -710,7 +748,19 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     error,
     saveLocalEvent,
     deleteLocalEvent,
-    refetchOrders: async () => { await fetchAndProcessData(true); },
+    refetchOrders: async () => {
+      const todayStr = new Date().toISOString().split('T')[0];
+      await fetchAndProcessData(true, { date: todayStr, range: 3 });
+      
+      const viewedDate = currentViewedDateRef.current;
+      if (viewedDate) {
+        const diffDays = Math.abs(differenceInMinutes(viewedDate, new Date()) / (60 * 24));
+        if (diffDays > 3) {
+          const viewedDateStr = viewedDate.toISOString().split('T')[0];
+          await fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
+        }
+      }
+    },
     loadRange: async (date: Date, range: number) => {
       const dateStr = date.toISOString().split('T')[0];
       console.log(`[OrderProvider] Loading wider range data for: ${dateStr}, range: ${range}`);
