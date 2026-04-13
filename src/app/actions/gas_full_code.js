@@ -163,7 +163,22 @@ function getSheetData(sheet, maxRows = 2000, filterColumnName = null, startDate 
     const dataRange = sheet.getRange(startIdx, 1, actualNumRows, headers.length);
     const displayValues = dataRange.getDisplayValues();
     const rawValues = dataRange.getValues();
-    const backgrounds = dataRange.getBackgrounds();
+    
+    // 背景色の取得は「カラー」等の指定列がある場合のみに限定して大幅に高速化（3分掛かっていたものを数秒に短縮）
+    const colorColIndices = [];
+    headers.forEach((h, idx) => {
+        const headerName = String(h).trim().toLowerCase();
+        if (headerName === 'color' || headerName === 'カラー') {
+            colorColIndices.push(idx);
+        }
+    });
+
+    const columnBackgrounds = {};
+    colorColIndices.forEach(colIdx => {
+        // GASのgetRangeは列指定が1から始まるため colIdx + 1
+        const bgRange = sheet.getRange(startIdx, colIdx + 1, actualNumRows, 1);
+        columnBackgrounds[colIdx] = bgRange.getBackgrounds();
+    });
 
     const sheetId = sheet.getSheetId();
     const spreadsheetId = sheet.getParent().getId();
@@ -194,7 +209,6 @@ function getSheetData(sheet, maxRows = 2000, filterColumnName = null, startDate 
         }
 
         const obj = {};
-        const bgRow = backgrounds[rowIndex];
         const actualRowIndex = startIdx + rowIndex;
 
         headers.forEach((header, index) => {
@@ -202,9 +216,10 @@ function getSheetData(sheet, maxRows = 2000, filterColumnName = null, startDate 
             if (!h) return;
             const displayValue = row[index];
             const rawValue = rawRow[index];
-            const bgValue = bgRow[index];
 
             if (h.toLowerCase() === 'color' || h === 'カラー') {
+                const bgRowArray = columnBackgrounds[index];
+                const bgValue = bgRowArray ? bgRowArray[rowIndex][0] : null;
                 if (bgValue && bgValue !== '#ffffff') {
                     obj[h] = bgValue;
                     return;
