@@ -10,7 +10,7 @@ import { unstable_noStore as noStore } from 'next/cache';
  * @param params Optional query parameters (e.g., { date: '2024-03-30', range: 3 })
  * @returns A promise that resolves to an object with either 'data' or 'error' property.
  */
-export async function fetchGasData(url: string, params?: { date?: string; range?: number }): Promise<{ data?: any; staff?: any; orders?: any; customers?: any; error?: string; message?: string }> {
+export async function fetchGasData(url: string, params?: { date?: string; range?: number; ordersOnly?: boolean }): Promise<{ data?: any; staff?: any; orders?: any; customers?: any; error?: string; message?: string }> {
   // This function will always be dynamically rendered, disabling caching.
   noStore();
 
@@ -28,6 +28,7 @@ export async function fetchGasData(url: string, params?: { date?: string; range?
       const urlObj = new URL(url);
       if (params.date) urlObj.searchParams.set('date', params.date);
       if (params.range !== undefined) urlObj.searchParams.set('range', String(params.range));
+      if (params.ordersOnly) urlObj.searchParams.set('ordersOnly', 'true');
       finalUrl = urlObj.toString();
     }
 

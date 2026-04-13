@@ -28,6 +28,7 @@ function doGet(e) {
         // パラメータの取得
         const targetDateStr = e.parameter.date; // "YYYY-MM-DD"
         const rangeDays = parseInt(e.parameter.range || "3"); // 前後何日分か（デフォルト3）
+        const ordersOnly = e.parameter.ordersOnly === "true";
 
         let startDate = null;
         let endDate = null;
@@ -94,26 +95,28 @@ function doGet(e) {
             console.error("Action Log Sheet Read Error:", err);
         }
 
-        // 3. スタッフマスタの取得 (マスタは全件取得)
-        try {
-            const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
-            const staffSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
-            if (staffSheet) {
-                staffDataResult = getSheetData(staffSheet);
+        if (!ordersOnly) {
+            // 3. スタッフマスタの取得 (マスタは全件取得)
+            try {
+                const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
+                const staffSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
+                if (staffSheet) {
+                    staffDataResult = getSheetData(staffSheet);
+                }
+            } catch (err) {
+                console.error("Staff Sheet Read Error:", err);
             }
-        } catch (err) {
-            console.error("Staff Sheet Read Error:", err);
-        }
 
-        // 4. 販売店情報の取得 (マスタは全件取得)
-        try {
-            const customerSpreadsheet = SpreadsheetApp.openById(CUSTOMER_SPREADSHEET_ID);
-            const customerSheet = customerSpreadsheet.getSheetByName(CUSTOMER_SHEET_NAME);
-            if (customerSheet) {
-                customerDataResult = getSheetData(customerSheet);
+            // 4. 販売店情報の取得 (マスタは全件取得)
+            try {
+                const customerSpreadsheet = SpreadsheetApp.openById(CUSTOMER_SPREADSHEET_ID);
+                const customerSheet = customerSpreadsheet.getSheetByName(CUSTOMER_SHEET_NAME);
+                if (customerSheet) {
+                    customerDataResult = getSheetData(customerSheet);
+                }
+            } catch (err) {
+                console.error("Customer Sheet Read Error:", err);
             }
-        } catch (err) {
-            console.error("Customer Sheet Read Error:", err);
         }
 
         // 統合されたレスポンスを返す
