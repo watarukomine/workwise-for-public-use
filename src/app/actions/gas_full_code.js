@@ -252,6 +252,10 @@ function doPost(e) {
             return updateOrderSchedule(params);
         } else if (params.action === 'confirmRead') { // 既読確認
             return confirmReadOrder(params);
+        } else if (params.action === 'updateStaff') { // スタッフマスタ更新
+            return updateMasterSheet(STAFF_SPREADSHEET_ID, STAFF_SHEET_NAME, "ID", params.id, params);
+        } else if (params.action === 'updateCustomer') { // 販売店情報更新
+            return updateMasterSheet(CUSTOMER_SPREADSHEET_ID, CUSTOMER_SHEET_NAME, "顧客コード", params.id, params);
         } else if (params.eventTitle || params.systemId || params.orderId) { // 既存更新
             return updateSheetWithOrderInfo(params);
         } else if (params.action === 'createOrder') { // 新規注文
@@ -1306,6 +1310,63 @@ function updateOrderSchedule(params) {
     } catch (error) {
         console.error("updateOrderSchedule Error:", error);
         return errorResponse(`受注の更新中にエラーが発生しました: ${error.message}`);
+    }
+}
+
+/**
+ * スタッフマスタや販売店情報などのマスタシートを更新する汎用関数
+ */
+function updateMasterSheet(spreadsheetId, sheetName, idColumnName, idValue, data) {
+    try {
+        const ss = SpreadsheetApp.openById(spreadsheetId);
+        const sheet = ss.getSheetByName(sheetName);
+        if (!sheet) throw new Error(`シート「${sheetName}」が見つかりません`);
+
+        const values = sheet.getDataRange().getValues();
+        const headers = values[0];
+        
+        // ID列を探す
+        const idColIdx = headers.map(h => String(h).trim()).indexOf(idColumnName);
+        if (idColIdx === -1) throw new Error(`ID列「${idColumnName}」が見つかりません`);
+
+        // 対象行を探す
+        let targetRowNum = -1;
+        for (let i = 1; i < values.length; i++) {
+            if (String(values[i][idColIdx]).trim() === String(idValue).trim()) {
+                targetRowNum = i + 1;
+                break;
+            }
+        }
+
+        // 見つからなければ新規追加
+        if (targetRowNum === -1) {
+            const newRow = headers.map(h => {
+                const header = String(h).trim();
+                if (header === idColumnName) return idValue;
+                return data[header] !== undefined ? data[header] : "";
+            });
+            sheet.appendRow(newRow);
+            return successResponse(`マスタに新規追加しました: ${idValue}`);
+        }
+
+        // 既存行を更新（データに含まれる項目のみ）
+        headers.forEach((h, idx) => {
+            const header = String(h).trim();
+            if (header === idColumnName) return; // IDは更新しない
+            
+            // データ内に該当するキーがあれば上書き
+            if (data[header] !== undefined) {
+                sheet.getRange(targetRowNum, idx + 1).setValue(data[header]);
+            }
+        });
+
+        SpreadsheetApp.flush();
+        sendFirebaseSignal('update');
+        return successResponse(`マスタを更新しました: ${idValue}`);
+
+    } catch (e) {
+        console.error("updateMasterSheet Error:", e);
+        return errorResponse("マスタ更新エラー: " + e.message);
     }
 }
 

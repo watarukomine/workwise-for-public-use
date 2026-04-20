@@ -13,6 +13,7 @@ import {
     serverTimestamp
 } from 'firebase/firestore';
 import type { Customer, WithId } from '@/lib/types';
+import { ORDER_GAS_URL } from '@/config/settings';
 
 const COLLECTION = 'customers';
 
@@ -62,6 +63,9 @@ export const CustomerService = {
             updatedAt: serverTimestamp()
         });
 
+        // GAS Backup
+        this.backupToGas(docRef.id, data, 'updateCustomer');
+
         return docRef.id;
     },
 
@@ -75,6 +79,30 @@ export const CustomerService = {
             ...data,
             updatedAt: serverTimestamp()
         });
+
+        // GAS Backup
+        // Fetch full data if possible, or just send partial data if GAS handles it
+        this.backupToGas(id, data, 'updateCustomer');
+    },
+
+    /**
+     * Backs up customer data to Google Sheets via GAS.
+     */
+    async backupToGas(id: string, data: any, action: string) {
+        try {
+            fetch(ORDER_GAS_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...data,
+                    id: id,
+                    action: action
+                }),
+            }).catch(e => console.error("GAS Customer Backup request failed:", e));
+        } catch (e) {
+            console.error("GAS Customer Backup failed:", e);
+        }
     },
 
     /**

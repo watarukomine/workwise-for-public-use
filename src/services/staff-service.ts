@@ -13,6 +13,7 @@ import {
     serverTimestamp
 } from 'firebase/firestore';
 import type { Staff, WithId } from '@/lib/types';
+import { ORDER_GAS_URL } from '@/config/settings';
 
 const COLLECTION = 'users';
 
@@ -82,6 +83,9 @@ export const StaffService = {
             ...data,
             updatedAt: serverTimestamp()
         });
+
+        // GAS Backup
+        this.backupToGas(id, data, 'updateStaff');
     },
 
     /**
@@ -90,10 +94,34 @@ export const StaffService = {
     async saveStaff(id: string, data: Staff): Promise<void> {
         const { firestore } = initializeFirebase();
         const docRef = doc(firestore, COLLECTION, id);
-        await setDoc(docRef, {
+        const staffData = {
             ...data,
-            _type: 'staff',
+            _type: 'staff' as const,
             updatedAt: serverTimestamp()
-        }, { merge: true });
+        };
+        await setDoc(docRef, staffData, { merge: true });
+
+        // GAS Backup
+        this.backupToGas(id, data, 'updateStaff');
+    },
+
+    /**
+     * Backs up master data to Google Sheets via GAS.
+     */
+    async backupToGas(id: string, data: any, action: string) {
+        try {
+            fetch(ORDER_GAS_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...data,
+                    id: id,
+                    action: action
+                }),
+            }).catch(e => console.error("GAS Backup request failed:", e));
+        } catch (e) {
+            console.error("GAS Backup failed:", e);
+        }
     }
 };
