@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { createOrder } from '@/app/actions/gas-actions';
+import { OrderService } from '@/services/order-service';
 import { useToast } from '@/hooks/use-toast';
 import { useCustomer } from '@/contexts/customer-context';
 import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -215,7 +215,7 @@ export default function OrderFormPage() {
             }
 
             // Handle 'その他' values
-            const submissionData = { ...data };
+            const submissionData = { ...data } as any;
             if (data.workType === 'その他' && data.otherWorkType) {
                 submissionData.workType = data.otherWorkType;
             }
@@ -223,16 +223,16 @@ export default function OrderFormPage() {
                 submissionData.quantity = data.customQuantity;
             }
 
-            const result = await createOrder({
-                gasUrl: ORDER_GAS_URL,
+            // Write to Firestore (Primary) + GAS (Backup) via Dual-Write Service
+            const systemId = await OrderService.createOrder({
                 ...submissionData,
             });
 
-            if (result.status === 'success') {
+            if (systemId) {
                 setIsSuccess(true);
                 window.scrollTo(0, 0);
             } else {
-                throw new Error(result.message || '送信に失敗しました。');
+                throw new Error('送信に失敗しました。もう一度お試しください。');
             }
         } catch (error: any) {
             console.error(error);
