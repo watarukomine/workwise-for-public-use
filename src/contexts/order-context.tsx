@@ -66,8 +66,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       const firestoreOrders = await OrderService.getOrdersByDate(dateStr);
       
       // 2. Process into sets
-      const newOrders = firestoreOrders.filter(o => !o.id.startsWith('task-'));
-      const newUnassigned = firestoreOrders.filter(o => !o.staffId && !o.id.startsWith('task-'));
+      const newOrders = firestoreOrders.filter(o => o._type !== 'task');
+      const newUnassigned = firestoreOrders.filter(o => !o.staffId && o._type !== 'task');
       
       const derivedEvents = deriveScheduleEvents(firestoreOrders, suppressedTripIds, date);
       
@@ -94,8 +94,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     const dateStr = format(currentDate, 'yyyy/MM/dd');
     const unsubscribe = OrderService.subscribeToOrders(dateStr, (updatedOrders) => {
       // When Firestore updates, we refresh everything
-      const newOrders = updatedOrders.filter(o => !o.id.startsWith('task-'));
-      const newUnassigned = updatedOrders.filter(o => !o.staffId && !o.id.startsWith('task-'));
+      const newOrders = updatedOrders.filter(o => o._type !== 'task');
+      const newUnassigned = updatedOrders.filter(o => !o.staffId && o._type !== 'task');
       const derivedEvents = deriveScheduleEvents(updatedOrders, suppressedTripIds, currentDate);
       
       setOrders(newOrders);
@@ -225,8 +225,8 @@ function deriveScheduleEvents(orders: WithId<Order>[], suppressedTripIds: string
     const events: WithId<ScheduleEvent>[] = [];
     
     orders.forEach(order => {
-      // Handle generic tasks (id starts with task-)
-      if (order.id.startsWith('task-')) {
+      // Handle generic tasks (where _type is task or id starts with task-)
+      if (order._type === 'task' || order.id.startsWith('task-')) {
           if (!order.scheduledDate || !order.scheduledTime || !order.scheduledEndTime) return;
           const datePart = order.scheduledDate.replace(/\//g, '-');
           events.push({

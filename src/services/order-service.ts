@@ -31,8 +31,7 @@ export const OrderService = {
 
         const q = query(
             colRef, 
-            where('scheduledDate', '==', dateStr),
-            where('_type', '==', 'order') // Only regular orders
+            where('scheduledDate', '==', dateStr)
         );
         const snapshot = await getDocs(q);
 
