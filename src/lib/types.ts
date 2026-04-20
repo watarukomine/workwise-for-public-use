@@ -52,8 +52,8 @@ export type Order = {
   displayId?: string; // Visual ID (Row Number: 1, 2, 3...)
   rawOrderId?: string;
   tripId?: string;
-  customerCode: string;
-  customerName: string;
+  customerCode?: string;
+  customerName?: string;
   address: string;
   taskDetails: string;
   serviceType: string;

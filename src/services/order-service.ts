@@ -106,7 +106,7 @@ export const OrderService = {
           id: systemId,
           displayId: displayId,
           systemId: systemId,
-          _type: data.customerCode ? 'order' : 'task',
+          _type: (data.customerCode ? 'order' : 'task') as 'order' | 'task',
           createdAt: now,
           updatedAt: now,
           status: data.status || '未割当'
@@ -117,7 +117,7 @@ export const OrderService = {
 
         // 3. GAS Backup (Non-blocking or background call recommended)
         // Note: For spreadsheet parity, we call the createOrder action in GAS
-        this.backupToGas(orderData, 'create');
+        this.backupToGas(orderData as any as Order, 'create');
 
         return systemId;
     },
