@@ -169,6 +169,25 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     return Array.from(statusMap.values());
   }, [orders]);
 
+  const createOrder = useCallback(async (data: Partial<Order>) => {
+    try {
+      await OrderService.createOrder(data);
+      // Real-time listener will update the state
+      toast({ title: '受注を作成しました' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '作成に失敗', description: e.message });
+    }
+  }, [toast]);
+
+  const updateOrder = useCallback(async (id: string, data: Partial<Order>) => {
+    try {
+      await OrderService.updateOrder(id, data);
+      // Real-time listener will update the state
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '更新に失敗', description: e.message });
+    }
+  }, [toast]);
+
   const value = {
     orders,
     setOrders,
@@ -179,6 +198,8 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     statuses,
     loadOrders,
     syncOrders,
+    createOrder,
+    updateOrder,
     isLoading,
     isSyncingOrders: isLoading,
     error,

@@ -84,6 +84,17 @@ export type Order = {
   cancelDate?: string;
   cancelContact?: string;
   '本数'?: string;
+  arrivalStatus?: string;
+  productName?: string;
+  sensor?: string;
+  arrangement?: string;
+  disposal?: string;
+  picName?: string;
+  orderNo?: string;
+  contact?: string;
+  systemId?: string; // Legacy ID or generated system ID
+  latitude?: number;
+  longitude?: number;
   raw?: Record<string, any>;
   // Validation metadata
   hasValidationIssues?: boolean;
@@ -96,6 +107,8 @@ export type Order = {
   confirmedAt?: string;
   description?: string;
   updatedAt?: string | Date;
+  createdAt?: string | Date; // Added for tracking
+  _type?: 'order' | 'task'; // Added for isolation
 };
 
 export type ScheduleEvent = WithId<Order> & {

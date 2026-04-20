@@ -1,4 +1,3 @@
-
 import { initializeFirebase } from '@/firebase';
 import {
     collection,
@@ -12,24 +11,29 @@ import {
     where,
     serverTimestamp,
     Timestamp,
-    onSnapshot
+    onSnapshot,
+    orderBy,
+    limit
 } from 'firebase/firestore';
 import type { Order, WithId } from '@/lib/types';
+import { CounterService } from './counter-service';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
 const COLLECTION = 'orders';
 
 export const OrderService = {
     /**
      * Fetches orders for a specific date (or all if not specified).
-     * Note: This replaces the daily-sheet based fetching.
      */
     async getOrdersByDate(dateStr: string): Promise<WithId<Order>[]> {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
 
-        // Query orders where scheduledDate == dateStr
-        // We assume scheduledDate is stored as YYYY-MM-DD string as per type definition
-        const q = query(colRef, where('scheduledDate', '==', dateStr));
+        const q = query(
+            colRef, 
+            where('scheduledDate', '==', dateStr),
+            where('_type', '==', 'order') // Only regular orders
+        );
         const snapshot = await getDocs(q);
 
         return snapshot.docs.map(doc => ({
@@ -39,7 +43,27 @@ export const OrderService = {
     },
 
     /**
-     * Real-time subscription to orders for a date.
+     * Fetches generic tasks for a specific date.
+     */
+    async getTasksByDate(dateStr: string): Promise<WithId<Order>[]> {
+        const { firestore } = initializeFirebase();
+        const colRef = collection(firestore, COLLECTION);
+
+        const q = query(
+            colRef, 
+            where('scheduledDate', '==', dateStr),
+            where('_type', '==', 'task')
+        );
+        const snapshot = await getDocs(q);
+
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as WithId<Order>));
+    },
+
+    /**
+     * Real-time subscription to both orders and tasks for a date.
      */
     subscribeToOrders(dateStr: string, callback: (orders: WithId<Order>[]) => void): () => void {
         const { firestore } = initializeFirebase();
@@ -57,96 +81,112 @@ export const OrderService = {
     },
 
     /**
-     * Fetches unassigned orders.
-     * Assuming strict definition: no staffId assignment.
-     */
-    async getUnassignedOrders(): Promise<WithId<Order>[]> {
-        const { firestore } = initializeFirebase();
-        const colRef = collection(firestore, COLLECTION);
-        // Query where staffId is null or empty
-        const q = query(colRef, where('staffId', '==', null));
-        // Firestore doesn't support OR in simple queries for (null OR empty). 
-        // We might need to filter client side or ensure we always store null for unassigned.
-
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        } as WithId<Order>));
-    },
-
-    /**
-     * Fetches a single order by ID.
-     */
-    async getOrderById(id: string): Promise<WithId<Order> | null> {
-        const { firestore } = initializeFirebase();
-        const docRef = doc(firestore, COLLECTION, id);
-        const snapshot = await getDoc(docRef);
-
-        if (!snapshot.exists()) return null;
-
-        return {
-            id: snapshot.id,
-            ...snapshot.data()
-        } as WithId<Order>;
-    },
-
-    /**
      * Creates a new order.
-     * Supports both object-based creation and mapping from form args.
+     * Performs dual-write: Firestore (Primary) + GAS (Backup).
      */
     async createOrder(data: Partial<Order>): Promise<string> {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
-        const docRef = doc(colRef); // Generate ID
+        
+        // 1. Generate IDs
+        // Only generate a sequential displayId if it's a real order (has customerCode)
+        let displayId = '';
+        if (data.customerCode) {
+          const nextDisplayId = await CounterService.getNextOrderId();
+          displayId = String(nextDisplayId);
+        }
 
+        const systemId = data.systemId || `${data.scheduledDate?.replace(/\//g, '') || ''}_${data.customerCode || 'new'}_${Math.random().toString(36).substr(2, 5)}`;
+        
+        const docRef = doc(colRef, systemId);
         const now = serverTimestamp();
 
-        // Ensure minimal fields
         const orderData = {
-            ...data,
-            id: docRef.id,
-            createdAt: now,
-            updatedAt: now,
-            // Default status if not provided
-            status: data.status || '未割当'
+          ...data,
+          id: systemId,
+          displayId: displayId,
+          systemId: systemId,
+          _type: data.customerCode ? 'order' : 'task',
+          createdAt: now,
+          updatedAt: now,
+          status: data.status || '未割当'
         };
 
+        // 2. Firestore Sync
         await setDoc(docRef, orderData);
 
-        return docRef.id;
+        // 3. GAS Backup (Non-blocking or background call recommended)
+        // Note: For spreadsheet parity, we call the createOrder action in GAS
+        this.backupToGas(orderData, 'create');
+
+        return systemId;
     },
 
     /**
      * Updates an order.
+     * Performs dual-write: Firestore + GAS Sync.
      */
     async updateOrder(id: string, data: Partial<Order>): Promise<void> {
         const { firestore } = initializeFirebase();
         const docRef = doc(firestore, COLLECTION, id);
-        await updateDoc(docRef, {
+        
+        const updateData = {
             ...data,
             updatedAt: serverTimestamp()
-        });
+        };
+
+        await updateDoc(docRef, updateData);
+
+        // Fetch full data for GAS backup update
+        const fullDoc = await getDoc(docRef);
+        if (fullDoc.exists()) {
+            this.backupToGas(fullDoc.data() as Order, 'update');
+        }
     },
 
     /**
-      * Deletes an order.
-      */
+     * Backs up data to Google Sheets via GAS.
+     */
+    async backupToGas(order: Order, action: 'create' | 'update') {
+        try {
+            // We can't directly call "use server" actions easily from here if this runs on client.
+            // But we can perform a simple fetch to the GAS URL.
+            const payload = {
+                ...order,
+                gasUrl: ORDER_GAS_URL,
+                action: action === 'create' ? 'createOrder' : 'updateOrderSchedule',
+            };
+
+            // Non-blocking fetch
+            fetch(ORDER_GAS_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+                mode: 'no-cors' // Simple fire and forget
+            }).catch(e => console.warn('GAS backup background fetch failed:', e));
+            
+        } catch (e) {
+            console.error('Failed to trigger GAS backup:', e);
+        }
+    },
+
     async deleteOrder(id: string): Promise<void> {
         const { firestore } = initializeFirebase();
         const docRef = doc(firestore, COLLECTION, id);
         await deleteDoc(docRef);
     },
 
-    /**
-     * Specialized method to update status/location (e.g. from mobile app)
-     */
     async updateStatus(id: string, status: string, location?: { lat: number, lon: number }): Promise<void> {
-        const updateData: any = { status };
+        const updateData: any = { 
+            status,
+            updatedAt: serverTimestamp()
+        };
         if (location) {
             updateData.latitude = location.lat;
             updateData.longitude = location.lon;
         }
+        
+        // This is a specialized update, often used in mobile.
+        // We ensure it also triggers the backup.
         await this.updateOrder(id, updateData);
     }
 };
