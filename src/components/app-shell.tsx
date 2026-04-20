@@ -103,7 +103,8 @@ const DesktopNav = () => {
     const navItems = React.useMemo(() => {
         if (isLoading || !profile) return [];
         return allNavItems.filter(item => {
-            const roleMatch = item.roles.includes(userRole || 'staff');
+            const normalizedUserRole = (userRole || 'staff').trim().toLowerCase();
+            const roleMatch = item.roles.includes(normalizedUserRole);
             const deviceMatch = !item.mobileOnly;
             return roleMatch && deviceMatch;
         });
@@ -181,7 +182,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         const navItems = React.useMemo(() => {
             if (isLoading || !profile) return [];
-            return allNavItems.filter(item => item.roles.includes(userRole || 'staff') && !item.hideOnMobile);
+            const normalizedUserRole = (userRole || 'staff').trim().toLowerCase();
+            return allNavItems.filter(item => item.roles.includes(normalizedUserRole) && !item.hideOnMobile);
         }, [profile, isLoading, userRole]);
 
         if (isLoading) {
