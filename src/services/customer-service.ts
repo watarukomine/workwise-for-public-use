@@ -13,7 +13,7 @@ import {
     serverTimestamp
 } from 'firebase/firestore';
 import type { Customer, WithId } from '@/lib/types';
-import { ORDER_GAS_URL } from '@/config/settings';
+import { ORDER_GAS_URL } from '@/lib/settings';
 
 const COLLECTION = 'customers';
 
