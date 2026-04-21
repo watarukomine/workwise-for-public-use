@@ -226,6 +226,9 @@ export default function OrderFormPage() {
             // Write to Firestore (Primary) + GAS (Backup) via Dual-Write Service
             const systemId = await OrderService.createOrder({
                 ...submissionData,
+                customerCode: submissionData.userCode, // map to expected key
+                customerName: submissionData.storeName, // map to expected key
+                _type: 'order', // Explicitly denote as an order
             });
 
             if (systemId) {
