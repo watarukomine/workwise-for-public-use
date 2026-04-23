@@ -6,10 +6,8 @@ import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/typ
 import { findKey, mapRawToOrder } from '@/lib/utils';
 import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes, addDays } from 'date-fns';
 import { ORDER_GAS_URL } from '@/lib/settings';
-import { useSelectedStaff, processStaffData } from './selected-staff-context';
+import { useSelectedStaff } from './selected-staff-context';
 import { logStaffNotFound, logOldDateDetected, logInvalidDate } from '@/lib/order-validation-logger';
-import { useDatabase } from '@/firebase';
-import { ref, onValue } from 'firebase/database';
 import { useUserProfile } from '@/hooks/use-user-profile';
 
 
@@ -551,7 +549,16 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         // 統合されたスタッフデータがあれば更新
         if (result.staff && Array.isArray(result.staff)) {
           console.log(`[OrderProvider] Consolidated staff data received: ${result.staff.length} items`);
-          const processedStaff = processStaffData(result.staff);
+          // Inline staff processing (processStaffData equivalent)
+          const processedStaff: WithId<Staff>[] = result.staff
+            .filter((s: any) => s && (s.name || s['氏名']))
+            .map((s: any) => ({
+              ...s,
+              id: s.id || s['スタッフID'] || `staff-${Math.random().toString(36).slice(2, 8)}`,
+              name: s.name || s['氏名'] || '',
+              email: s.email || s['メール'] || null,
+              role: s.role || s['ロール'] || 'staff',
+            } as WithId<Staff>));
           if (processedStaff.length > 0) {
             setAllStaff(processedStaff);
           }
@@ -567,47 +574,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, [orderGasUrl, rawOrdersData.length, setAllStaff]);
 
-  // 1.5 Real-time Signal Listener
-  const database = useDatabase();
-  useEffect(() => {
-    if (!database) return;
-
-    console.log('[OrderProvider] Setting up real-time signal listener');
-    const signalRef = ref(database, 'signals/orders_updated');
-
-    // Listen for changes to the signal
-    const unsubscribe = onValue(signalRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        console.log('[OrderProvider] Real-time signal received:', data);
-        
-        const triggerFetch = () => {
-          // 1. Refresh Today
-          fetchAndProcessData(true); 
-          
-          // 2. Refresh Viewed Date if specialized
-          const viewedDate = currentViewedDateRef.current;
-          if (viewedDate) {
-              const viewedDateStr = viewedDate.toISOString().split('T')[0];
-              const diffDays = Math.abs(differenceInMinutes(viewedDate, new Date()) / (60 * 24));
-              if (diffDays > 3) {
-                  fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
-              } else {
-                  // If it's near today, refresh with range 3 just in case
-                  fetchAndProcessData(true, { date: viewedDateStr, range: 3 });
-              }
-          }
-        };
-
-        // Trigger multi-stage background fetch for better responsiveness
-        triggerFetch();
-        setTimeout(triggerFetch, 3000); // 3s later (GAS usually writes fast)
-        setTimeout(triggerFetch, 8000); // 8s later (Safety margin)
-      }
-    });
-
-    return () => unsubscribe();
-  }, [database, fetchAndProcessData]);
+  // Note: Real-time signal listener removed (useDatabase not available in current codebase)
+  // Background polling (below) handles data refresh instead.
 
   // 2. Fetch data on mount & Background polling
   const { profile, isLoading: isProfileLoading } = useUserProfile();
