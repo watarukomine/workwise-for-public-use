@@ -1,12 +1,13 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { Order, WithId, ScheduleEvent, StaffStatus } from '@/lib/types';
+import { Order, WithId, ScheduleEvent, StaffStatus, Staff } from '@/lib/types';
 import { OrderService } from '@/services/order-service';
 import { useToast } from '@/hooks/use-toast';
 import { parseISO, startOfDay, format, addMinutes, subMinutes, isValid } from 'date-fns';
 import { mapRawToOrder } from '@/lib/utils';
 import { useUser } from '@/firebase/provider';
+import { useSelectedStaff } from '@/contexts/selected-staff-context';
 
 export type OrderContextType = {
   orders: WithId<Order>[];
@@ -50,6 +51,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
+  const { allStaff } = useSelectedStaff();
 
   const fetchAndProcessData = useCallback(async (date: Date) => {
     // Guard: skip Firestore fetch if user is not authenticated
@@ -63,13 +65,19 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       const dateStr = format(date, 'yyyy/MM/dd');
       
       // 1. Fetch from Firestore
-      const firestoreOrders = await OrderService.getOrdersByDate(dateStr);
+      const rawFirestoreOrders = await OrderService.getOrdersByDate(dateStr);
       
-      // 2. Process into sets
+      // 2. Normalize data using mapRawToOrder
+      const firestoreOrders = rawFirestoreOrders.map(o => mapRawToOrder(o.raw || o, o.id));
+      
+      // 3. Process into sets
       const newOrders = firestoreOrders.filter(o => o._type !== 'task');
       const newUnassigned = firestoreOrders.filter(o => !o.staffId && o._type !== 'task');
       
-      const derivedEvents = deriveScheduleEvents(firestoreOrders, suppressedTripIds, date);
+      const derivedEvents = deriveScheduleEvents(firestoreOrders, suppressedTripIds, date, allStaff);
+      
+      console.log(`[OrderContext] Fetched ${firestoreOrders.length} orders from Firestore for ${dateStr}`);
+      console.log(`[OrderContext] Derived ${derivedEvents.length} events for timeline`);
       
       setOrders(newOrders);
       setUnassignedOrders(newUnassigned);
@@ -81,7 +89,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [toast, suppressedTripIds, user]);
+  }, [toast, suppressedTripIds, user, allStaff]);
 
   // Initial load and Realtime Subscription
   useEffect(() => {
@@ -93,10 +101,13 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     // Subscribe to real-time updates for the current date
     const dateStr = format(currentDate, 'yyyy/MM/dd');
     const unsubscribe = OrderService.subscribeToOrders(dateStr, (updatedOrders) => {
+      // Normalize data
+      const normalizedOrders = updatedOrders.map(o => mapRawToOrder(o.raw || o, o.id));
+      
       // When Firestore updates, we refresh everything
-      const newOrders = updatedOrders.filter(o => o._type !== 'task');
-      const newUnassigned = updatedOrders.filter(o => !o.staffId && o._type !== 'task');
-      const derivedEvents = deriveScheduleEvents(updatedOrders, suppressedTripIds, currentDate);
+      const newOrders = normalizedOrders.filter(o => o._type !== 'task');
+      const newUnassigned = normalizedOrders.filter(o => !o.staffId && o._type !== 'task');
+      const derivedEvents = deriveScheduleEvents(normalizedOrders, suppressedTripIds, currentDate, allStaff);
       
       setOrders(newOrders);
       setUnassignedOrders(newUnassigned);
@@ -221,58 +232,165 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   return <OrderContext.Provider value={value}>{children}</OrderContext.Provider>;
 }
 
-function deriveScheduleEvents(orders: WithId<Order>[], suppressedTripIds: string[], baseDate: Date): WithId<ScheduleEvent>[] {
+function deriveScheduleEvents(orders: WithId<Order>[], suppressedTripIds: string[], baseDate: Date, staffList?: WithId<Staff>[]): WithId<ScheduleEvent>[] {
     const events: WithId<ScheduleEvent>[] = [];
     
     orders.forEach(order => {
+      // 共通の日付パーツ作成
+      const baseDateStr = order.scheduledDate || format(baseDate, 'yyyy-MM-dd');
+      const datePart = baseDateStr.replace(/\//g, '-');
+
+      // ─── スタッフ名→スタッフID推定フォールバック ───
+      // staffIdが空だがstaffNameがある場合、staffListから一致するIDを補完
+      if (!order.staffId && order.staffName && staffList && staffList.length > 0) {
+        const matchedStaff = staffList.find(s => s.name === order.staffName);
+        if (matchedStaff) {
+          order = { ...order, staffId: matchedStaff.id };
+          console.log(`[deriveScheduleEvents] Resolved staffId from staffName: ${order.staffName} -> ${matchedStaff.id}`);
+        }
+      }
+
+      // ─── scheduledEndTime自動計算フォールバック ───
+      // scheduledEndTimeが空だがscheduledTimeがある場合、estimatedDurationから計算
+      if (order.scheduledTime && !order.scheduledEndTime) {
+        const duration = order.estimatedDuration || 60;
+        const timeStr = order.scheduledTime;
+        let startDate: Date | null = null;
+
+        if (timeStr.includes('T')) {
+          startDate = parseISO(timeStr);
+        } else if (/^\d{1,2}:\d{2}/.test(timeStr)) {
+          const parts = timeStr.split(':');
+          const hh = parts[0].padStart(2, '0');
+          const mm = parts[1].padStart(2, '0');
+          startDate = parseISO(`${datePart}T${hh}:${mm}`);
+        }
+
+        if (startDate && isValid(startDate)) {
+          const endDate = addMinutes(startDate, duration);
+          order = { ...order, scheduledEndTime: endDate.toISOString() };
+          console.log(`[deriveScheduleEvents] Auto-calculated endTime for ID=${order.id}: ${order.scheduledTime} + ${duration}min = ${order.scheduledEndTime}`);
+        }
+      }
+
+      // 時刻文字列をパース可能な形式 (HH:mm) に正規化するヘルパー
+      const normalizeTime = (timeStr: string | undefined) => {
+        if (!timeStr) return null;
+        if (timeStr.includes('T')) return timeStr; // すでにISO形式ならそのまま
+        
+        // "9:00" -> "09:00", "9:00:00" -> "09:00"
+        const parts = timeStr.split(':');
+        if (parts.length >= 2) {
+          const hh = parts[0].padStart(2, '0');
+          const mm = parts[1].padStart(2, '0');
+          return `${hh}:${mm}`;
+        }
+        return null;
+      };
+
       // Handle generic tasks (where _type is task or id starts with task-)
       if (order._type === 'task' || order.id.startsWith('task-')) {
-          if (!order.scheduledDate || !order.scheduledTime || !order.scheduledEndTime) return;
-          const datePart = order.scheduledDate.replace(/\//g, '-');
+          const startTime = order.scheduledTime;
+          const endTime = order.scheduledEndTime;
+          
+          let startDate: Date | null = null;
+          let endDate: Date | null = null;
+
+          if (startTime && startTime.includes('T')) {
+            startDate = parseISO(startTime);
+          } else {
+            const normStart = normalizeTime(startTime);
+            if (normStart) startDate = parseISO(`${datePart}T${normStart}`);
+          }
+
+          if (endTime && endTime.includes('T')) {
+            endDate = parseISO(endTime);
+          } else {
+            const normEnd = normalizeTime(endTime);
+            if (normEnd) endDate = parseISO(`${datePart}T${normEnd}`);
+          }
+
+          if (!startDate || !isValid(startDate) || !endDate || !isValid(endDate)) {
+            console.warn(`[deriveScheduleEvents] Task skipped (Invalid Date): ID=${order.id}, Start=${startTime}, End=${endTime}, Date=${datePart}`);
+            return;
+          }
+
           events.push({
             ...order,
             id: order.id,
-            title: order.taskDetails,
+            title: order.taskDetails || 'タスク',
             staffId: order.staffId || '',
-            start: parseISO(`${datePart}T${order.scheduledTime}`).toISOString(),
-            end: parseISO(`${datePart}T${order.scheduledEndTime}`).toISOString(),
+            staffName: order.staffName || '',
+            start: startDate.toISOString(),
+            end: endDate.toISOString(),
           } as WithId<ScheduleEvent>);
           return;
       }
 
       // Handle regular orders
-      if (!order.staffId || !order.scheduledTime || !order.scheduledEndTime) return;
+      // スタッフIDがなくてもスタッフ名があれば、後続の表示ロジックでマッチングできるため、ここでは通す
+      if (!order.staffId && !order.staffName) {
+        console.log(`[deriveScheduleEvents] Order skipped (No Staff): ID=${order.id}, Customer=${order.customerName}`);
+        return;
+      }
+      
+      if (!order.scheduledTime) {
+        console.log(`[deriveScheduleEvents] Order skipped (No Start Time): ID=${order.id}, Start=${order.scheduledTime}`);
+        return;
+      }
+
+      if (!order.scheduledEndTime) {
+        console.log(`[deriveScheduleEvents] Order skipped (No End Time even after auto-calc): ID=${order.id}, End=${order.scheduledEndTime}`);
+        return;
+      }
 
       const tripId = order.tripId || `trip-${order.id}`;
       if (suppressedTripIds.includes(tripId)) return;
+      
+      let startDate: Date | null = null;
+      let endDate: Date | null = null;
 
-      const baseDateStr = order.scheduledDate || format(baseDate, 'yyyy-MM-dd');
-      const datePart = baseDateStr.replace(/\//g, '-');
-      const startDate = parseISO(`${datePart}T${order.scheduledTime}`);
-      const endDate = parseISO(`${datePart}T${order.scheduledEndTime}`);
+      if (order.scheduledTime.includes('T')) {
+        startDate = parseISO(order.scheduledTime);
+      } else {
+        const normStart = normalizeTime(order.scheduledTime);
+        if (normStart) startDate = parseISO(`${datePart}T${normStart}`);
+      }
 
-      if (!isValid(startDate) || !isValid(endDate)) return;
+      if (order.scheduledEndTime.includes('T')) {
+        endDate = parseISO(order.scheduledEndTime);
+      } else {
+        const normEnd = normalizeTime(order.scheduledEndTime);
+        if (normEnd) endDate = parseISO(`${datePart}T${normEnd}`);
+      }
 
-      // Travel Event
+      if (!startDate || !isValid(startDate) || !endDate || !isValid(endDate)) {
+        console.warn(`[deriveScheduleEvents] Order skipped (Invalid Date): ID=${order.id}, Start=${order.scheduledTime}, End=${order.scheduledEndTime}, Date=${datePart}`);
+        return;
+      }
+
+      // Travel Event (移動)
       const travelDuration = 30;
       events.push({
         id: `${tripId}-travel`,
         tripId,
         title: '移動',
-        staffId: order.staffId!,
+        staffId: order.staffId || '',
+        staffName: order.staffName || '',
         start: subMinutes(startDate, travelDuration).toISOString(),
         end: startDate.toISOString(),
         customerCode: '', customerName: '', address: '', taskDetails: '移動', serviceType: '', status: '移動中', 
-        scheduledDate: order.scheduledDate, estimatedDuration: travelDuration, value: 0, staffName: order.staffName || '', equipmentStatus: '',
+        scheduledDate: order.scheduledDate, estimatedDuration: travelDuration, value: 0, equipmentStatus: '',
         raw: order.raw || {}
       });
 
-      // Task Event
+      // Task Event (本作業)
       events.push({
         id: `${tripId}-task`,
         tripId,
         title: order.taskDetails || '作業',
-        staffId: order.staffId!,
+        staffId: order.staffId || '',
+        staffName: order.staffName || '',
         start: startDate.toISOString(),
         end: endDate.toISOString(),
         customerCode: order.customerCode,
@@ -284,12 +402,12 @@ function deriveScheduleEvents(orders: WithId<Order>[], suppressedTripIds: string
         scheduledDate: order.scheduledDate,
         estimatedDuration: order.estimatedDuration,
         value: order.value,
-        staffName: order.staffName || '',
         equipmentStatus: order.equipmentStatus,
         raw: order.raw || {}
       });
     });
 
+    console.log(`[deriveScheduleEvents] Final events count: ${events.length}`);
     return events;
 }
 

@@ -134,19 +134,19 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
       }
     }
   }
-  let scheduledTime = findKey(rawOrder, ['チップ配置作業予定', '予定時間', 'scheduledTime', '開始日時']);
+  let scheduledTime = findKey(rawOrder, ['チップ配置作業予定', '予定時間', 'scheduledTime', '開始日時', '開始時間', '開始', 'シフト開始', '出勤時間', '勤務開始', '業務開始時間', '勤務開始時間']);
 
   const customerName = findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) || '';
 
   // Extract tire size - try multiple possible column names
   const tireSize = findKey(rawOrder, ['タイヤサイズ', 'サイズ', 'タイヤ']) || '';
 
-  let taskDetails = findKey(rawOrder, ['業務内容', 'taskDetails']) || customerName;
+  let taskDetails = findKey(rawOrder, ['業務内容', '作業内容', '詳細', 'taskDetails']) || customerName;
   if (scheduledTime) {
     // Optionally format time if needed, but raw string might be enough for detail view
     // taskDetails += `\n予定: ${scheduledTime}`; 
   }
-  let scheduledDateVal = formatDate(String(findKey(rawOrder, ['作業予定日']) || ''), 'yyyy-MM-dd');
+  let scheduledDateVal = formatDate(String(findKey(rawOrder, ['作業予定日', '日付', '予定日', 'date', 'scheduledDate', 'シフト日', '勤務日', '出勤日']) || ''), 'yyyy-MM-dd');
 
   // Log if scheduled date is missing
   if (!scheduledDateVal && scheduledTime) {
@@ -242,7 +242,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
   };
 
   // FIX: Also normalize scheduledEndTime to use the correct date
-  let scheduledEndTime = findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime', 'scheduledEndTime', '終了日時']);
+  let scheduledEndTime = findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime', 'scheduledEndTime', '終了日時', 'シフト終了', '退勤時間', '勤務終了', '業務終了時間', '勤務終了時間']);
   if (scheduledEndTime && scheduledDateVal) {
     const timeStr = String(scheduledEndTime);
     let hours = '00';
@@ -286,9 +286,11 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     })(),
     scheduledDate: scheduledDateVal,
     scheduledTime: scheduledTime || '',
+    _type: findKey(rawOrder, ['_type', 'type']) || (findKey(rawOrder, ['ユーザーコード', 'customerCode', 'お取引先コード']) ? 'order' : 'task'),
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
-    value: parseFloat(findKey(rawOrder, ['金額']) || 0),
-    staffName: findKey(rawOrder, ['担当', 'スタッフ名', 'staffName', '氏名', '担当者']) || '',
+    value: parseFloat(findKey(rawOrder, ['金額', '売上', 'price', 'value']) || 0),
+    staffName: findKey(rawOrder, ['担当', 'スタッフ名', 'staffName', '氏名', '担当者', 'スタッフ', '名前', '担当者名', '社員名', '配置担当', 'staff']) || '',
+    staffId: findKey(rawOrder, ['スタッフID', 'スタッフコード', 'staffId', '担当者ID', '担当ID', '社員ID', '社員コード', 'staff_id']) || '',
     mainStore: findKey(rawOrder, ['主管店舗', 'mainStore', '主管']) || '',
     customerName: findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '名称', 'お名前', 'Customer']) || '',
     address: findKey(rawOrder, ['住所', 'Address', '納品先', 'お届け先', '納品先住所', 'お届け先住所', '現場住所']) || '',
