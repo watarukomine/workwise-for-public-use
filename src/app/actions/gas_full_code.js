@@ -28,6 +28,7 @@ function doGet(e) {
         // パラメータの取得
         const targetDateStr = e.parameter.date; // "YYYY-MM-DD"
         const rangeDays = parseInt(e.parameter.range || "3"); // 前後何日分か（デフォルト3）
+        const ordersOnly = e.parameter.ordersOnly === "true";
 
         let startDate = null;
         let endDate = null;
@@ -94,26 +95,28 @@ function doGet(e) {
             console.error("Action Log Sheet Read Error:", err);
         }
 
-        // 3. スタッフマスタの取得 (マスタは全件取得)
-        try {
-            const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
-            const staffSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
-            if (staffSheet) {
-                staffDataResult = getSheetData(staffSheet);
+        if (!ordersOnly) {
+            // 3. スタッフマスタの取得 (マスタは全件取得)
+            try {
+                const staffSpreadsheet = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
+                const staffSheet = staffSpreadsheet.getSheetByName(STAFF_SHEET_NAME);
+                if (staffSheet) {
+                    staffDataResult = getSheetData(staffSheet);
+                }
+            } catch (err) {
+                console.error("Staff Sheet Read Error:", err);
             }
-        } catch (err) {
-            console.error("Staff Sheet Read Error:", err);
-        }
 
-        // 4. 販売店情報の取得 (マスタは全件取得)
-        try {
-            const customerSpreadsheet = SpreadsheetApp.openById(CUSTOMER_SPREADSHEET_ID);
-            const customerSheet = customerSpreadsheet.getSheetByName(CUSTOMER_SHEET_NAME);
-            if (customerSheet) {
-                customerDataResult = getSheetData(customerSheet);
+            // 4. 販売店情報の取得 (マスタは全件取得)
+            try {
+                const customerSpreadsheet = SpreadsheetApp.openById(CUSTOMER_SPREADSHEET_ID);
+                const customerSheet = customerSpreadsheet.getSheetByName(CUSTOMER_SHEET_NAME);
+                if (customerSheet) {
+                    customerDataResult = getSheetData(customerSheet);
+                }
+            } catch (err) {
+                console.error("Customer Sheet Read Error:", err);
             }
-        } catch (err) {
-            console.error("Customer Sheet Read Error:", err);
         }
 
         // 統合されたレスポンスを返す
@@ -163,7 +166,22 @@ function getSheetData(sheet, maxRows = 2000, filterColumnName = null, startDate 
     const dataRange = sheet.getRange(startIdx, 1, actualNumRows, headers.length);
     const displayValues = dataRange.getDisplayValues();
     const rawValues = dataRange.getValues();
-    const backgrounds = dataRange.getBackgrounds();
+    
+    // 背景色の取得は「カラー」等の指定列がある場合のみに限定して大幅に高速化（3分掛かっていたものを数秒に短縮）
+    const colorColIndices = [];
+    headers.forEach((h, idx) => {
+        const headerName = String(h).trim().toLowerCase();
+        if (headerName === 'color' || headerName === 'カラー') {
+            colorColIndices.push(idx);
+        }
+    });
+
+    const columnBackgrounds = {};
+    colorColIndices.forEach(colIdx => {
+        // GASのgetRangeは列指定が1から始まるため colIdx + 1
+        const bgRange = sheet.getRange(startIdx, colIdx + 1, actualNumRows, 1);
+        columnBackgrounds[colIdx] = bgRange.getBackgrounds();
+    });
 
     const sheetId = sheet.getSheetId();
     const spreadsheetId = sheet.getParent().getId();
@@ -194,7 +212,6 @@ function getSheetData(sheet, maxRows = 2000, filterColumnName = null, startDate 
         }
 
         const obj = {};
-        const bgRow = backgrounds[rowIndex];
         const actualRowIndex = startIdx + rowIndex;
 
         headers.forEach((header, index) => {
@@ -202,9 +219,10 @@ function getSheetData(sheet, maxRows = 2000, filterColumnName = null, startDate 
             if (!h) return;
             const displayValue = row[index];
             const rawValue = rawRow[index];
-            const bgValue = bgRow[index];
 
             if (h.toLowerCase() === 'color' || h === 'カラー') {
+                const bgRowArray = columnBackgrounds[index];
+                const bgValue = bgRowArray ? bgRowArray[rowIndex][0] : null;
                 if (bgValue && bgValue !== '#ffffff') {
                     obj[h] = bgValue;
                     return;
@@ -382,6 +400,12 @@ function confirmReadOrder(params) {
     const { systemId, staffName, timestamp } = params;
     if (!systemId) return errorResponse("systemId が指定されていません");
     if (!staffName) return errorResponse("staffName が指定されていません");
+
+    // 汎用タスク（task-〜）の場合は、行動記録シートに「既読」列を作っていないため、
+    // ここで成功を返して無視する（そうしないと受注シートを探してエラーになってしまう）
+    if (String(systemId).replace(/-/g, '').startsWith('task')) {
+        return successResponse("汎用タスクのため既読処理をスキップしました", { confirmed: true });
+    }
 
     try {
         const orderSpreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
@@ -634,7 +658,8 @@ function updateSheetWithOrderInfo(params) {
         }
 
         // 汎用タスク（行動記録シート）の更新判定
-        if (searchId && String(searchId).startsWith('task-')) {
+        // ハイフンが抜けて送られて来るケース（LINE経由など）を考慮し、ハイフンを抜いて判定する
+        if (searchId && String(searchId).replace(/-/g, '').startsWith('task')) {
             return updateTaskSheet(searchId, params);
         }
 
@@ -961,7 +986,8 @@ function updateTaskSheet(taskId, params) {
     // 1. ID検索
     if (taskId) {
         for (let i = 1; i < data.length; i++) {
-            if (String(data[i][idCol]) === String(taskId)) {
+            // ハイフンを取り除いて比較（LINEなどのアプリ側でURLのハイフンが削られるケースへの対策）
+            if (String(data[i][idCol]).replace(/-/g, '') === String(taskId).replace(/-/g, '')) {
                 rowNum = i + 1;
                 break;
             }

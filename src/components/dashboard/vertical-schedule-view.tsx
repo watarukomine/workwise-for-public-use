@@ -92,7 +92,7 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
         const disposal = raw ? findKey(raw, ['廃タイヤ処分', '廃タイヤ']) : undefined;
         const serviceType = raw ? findKey(raw, ['作業内容', 'サービス種別', 'サービス区分']) : undefined;
         const specialNotes = raw ? findKey(raw, ['特記事項', '詳細', '連絡事項']) : (event as any).specialNotes;
-        const hasOrderDetails = !isTravel && (carName || regNo || tireSize || tireNumber || arrangement || disposal || serviceType);
+        const hasOrderDetails = !isTravel && (carName || regNo || tireSize || tireNumber || arrangement || disposal || serviceType || specialNotes);
 
         const eventCard = (
           <Card className={cn(
@@ -156,7 +156,11 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
                   {serviceType && (
                     <span className="w-full mt-1">
                       <span className="font-semibold text-green-700">作業内容:</span> {serviceType}
-                      {serviceType === 'その他' && specialNotes && <span className="ml-1 text-slate-600">({specialNotes})</span>}
+                    </span>
+                  )}
+                  {specialNotes && (
+                    <span className="w-full mt-1">
+                      <span className="font-semibold text-red-600">特記:</span> <span className="text-slate-700">{specialNotes}</span>
                     </span>
                   )}
                 </div>

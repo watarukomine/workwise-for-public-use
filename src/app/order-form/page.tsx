@@ -482,8 +482,8 @@ export default function OrderFormPage() {
                             <div className="space-y-4 pt-4">
                                 <h3 className="text-lg font-medium border-b pb-2">特記事項</h3>
                                 <div className="space-y-2">
-                                    <Label htmlFor="specialNotes">特記事項</Label>
-                                    <Textarea id="specialNotes" placeholder="特記事項があればご記入ください" {...register('specialNotes')} />
+                                    <Label htmlFor="specialNotes" className="sr-only">特記事項</Label>
+                                    <Textarea id="specialNotes" placeholder="作業についての詳細や連絡事項などをご記入ください" {...register('specialNotes')} />
                                 </div>
                             </div>
 
