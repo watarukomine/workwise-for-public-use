@@ -613,10 +613,15 @@ export function ScheduleView({
 
   const dailySchedule = React.useMemo(() => {
     if (!scheduleEvents) return [];
-    return scheduleEvents.filter(event => {
+    console.log('[ScheduleView] filtering events for:', currentDate.toISOString());
+    console.log('[ScheduleView] total events:', scheduleEvents.length);
+    const filtered = scheduleEvents.filter(event => {
       const eventDate = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-      return isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+      const match = isValid(eventDate) && isEqual(startOfDay(eventDate), startOfDay(currentDate));
+      return match;
     });
+    console.log('[ScheduleView] dailySchedule filtered:', filtered.length);
+    return filtered;
   }, [scheduleEvents, currentDate]);
 
   const [replyDialogOpen, setReplyDialogOpen] = React.useState(false);
@@ -1993,8 +1998,17 @@ export function ScheduleView({
                         </div>
                       )}
                       {staffData?.map((staff) => {
-                        const events = dailySchedule.filter((e) => e.staffId === staff.id);
-                        const status = statuses.find(s => s.staffId === staff.id);
+                        const events = dailySchedule.filter((e) => {
+                          const matchesId = e.staffId === staff.id;
+                          const matchesName = e.staffName === staff.name;
+                          
+                          if (!matchesId && matchesName) {
+                            // console.debug(`[ScheduleView] Found name-only match for staff: ${staff.name} (Event ID: ${e.id})`);
+                          }
+                          
+                          return matchesId || matchesName;
+                        });
+                        const status = statuses.find(s => s.staffId === staff.id || (s as any).staffName === staff.name);
                         return (
                           <StaffRow 
                             key={staff.id} 
@@ -2404,6 +2418,9 @@ interface StaffRowProps {
 }
 
 const StaffRow: React.FC<StaffRowProps> = ({ staff, events, status, getCustomerByCode, isOver, onDoubleClickEvent, onDoubleClickTimeline, isToday, hoveredTime, isHoveredStaff }) => {
+  if (events.length > 0) {
+    console.log(`[StaffRow] Rendering ${events.length} events for staff: ${staff.name}`);
+  }
   const { setNodeRef } = useDroppable({ id: staff.id });
   const { toggleTripSuppression } = useOrder();
   const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
@@ -2472,6 +2489,10 @@ interface DraggableEventProps {
 const DraggableEvent: React.FC<DraggableEventProps> = ({ targetEvent, staff, getCustomerByCode, onDoubleClick, isOverlay, onDelete }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: targetEvent.id, data: targetEvent });
   const { left, width } = getEventDimensions(targetEvent.start, targetEvent.end);
+  
+  if (!isOverlay) {
+    console.log(`[DraggableEvent] Event: ${targetEvent.title}, Staff: ${staff.name}, start: ${targetEvent.start}, end: ${targetEvent.end}, left: ${left}, width: ${width}`);
+  }
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(); };
 

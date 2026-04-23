@@ -248,7 +248,7 @@ export default function DashboardPage() {
         setScheduledStaffIds(new Set(scheduledIds));
 
         // 3. Merge lists
-        const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...scheduledStaffIds, ...Array.from(staffWithOrders)]));
+        const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...scheduledIds, ...Array.from(staffWithOrders)]));
 
         if (combinedStaffIds.length > 0) {
           if (isRealDateSwitch) {

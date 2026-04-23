@@ -29,16 +29,24 @@ export const OrderService = {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
 
-        const q = query(
-            colRef, 
-            where('scheduledDate', '==', dateStr)
-        );
-        const snapshot = await getDocs(q);
+        // Try both common formats: yyyy/MM/dd and yyyy-MM-dd
+        const formats = [dateStr, dateStr.replace(/\//g, '-')];
+        
+        const results = await Promise.all(formats.map(async (fmt) => {
+            const q = query(colRef, where('scheduledDate', '==', fmt));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as WithId<Order>));
+        }));
 
-        return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        } as WithId<Order>));
+        // Flatten and de-duplicate by ID
+        const allOrders = results.flat();
+        const uniqueOrders = Array.from(new Map(allOrders.map(item => [item.id, item])).values());
+        
+        console.log(`[OrderService] Fetched ${uniqueOrders.length} unique orders for formats:`, formats);
+        return uniqueOrders;
     },
 
     /**
@@ -63,18 +71,25 @@ export const OrderService = {
 
     /**
      * Real-time subscription to both orders and tasks for a date.
+     * Supports both yyyy/MM/dd and yyyy-MM-dd formats.
      */
     subscribeToOrders(dateStr: string, callback: (orders: WithId<Order>[]) => void): () => void {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
-        const q = query(colRef, where('scheduledDate', '==', dateStr));
+        
+        // Use 'in' query to support both date formats in real-time
+        const formats = [dateStr, dateStr.replace(/\//g, '-')];
+        const q = query(colRef, where('scheduledDate', 'in', formats));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const orders = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             } as WithId<Order>));
+            console.log(`[OrderService] Real-time update: ${orders.length} orders found for formats:`, formats);
             callback(orders);
+        }, (error) => {
+            console.error(`[OrderService] Subscription error:`, error);
         });
         return unsubscribe;
     },

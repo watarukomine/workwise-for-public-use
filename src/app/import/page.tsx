@@ -63,6 +63,31 @@ const COLLECTION_PRESETS = [
   { value: 'custom', label: 'カスタム', icon: '⚙️', description: '任意のコレクション名を指定' },
 ];
 
+// --- Field Mappings for Auto-conversion ---
+const FIELD_MAPPINGS: Record<string, string> = {
+  '作業予定日': 'scheduledDate',
+  '日付': 'scheduledDate',
+  '予定日': 'scheduledDate',
+  '開始時間': 'scheduledTime',
+  '開始': 'scheduledTime',
+  '予定時間': 'scheduledTime',
+  '終了時間': 'scheduledEndTime',
+  '終了': 'scheduledEndTime',
+  '予定終了時間': 'scheduledEndTime',
+  'スタッフ名': 'staffName',
+  '担当者': 'staffName',
+  'スタッフ': 'staffName',
+  'スタッフID': 'staffId',
+  'スタッフコード': 'staffId',
+  '作業内容': 'taskDetails',
+  '詳細': 'taskDetails',
+  'お取引先名': 'customerName',
+  '顧客名': 'customerName',
+  '店舗名': 'customerName',
+  'お取引先コード': 'customerCode',
+  '顧客コード': 'customerCode',
+};
+
 // --- Steps ---
 type Step = 'upload' | 'preview' | 'importing' | 'done';
 
@@ -113,7 +138,7 @@ export default function ImportPage() {
       setHeaders(h);
       setRows(r);
       // Auto-detect ID column
-      const idCandidates = ['SystemID', 'systemId', 'id', 'ID', 'ユーザーコード', 'userCode', 'staffId', '受注ID', '受注 ID'];
+      const idCandidates = ['SystemID', 'systemId', 'id', 'ID', 'ユーザーコード', 'userCode', 'staffId', '受注ID', '受注 ID', '受注番号'];
       const found = idCandidates.find(c => h.includes(c));
       setIdColumn(found || '__auto__');
       setStep('preview');
@@ -170,22 +195,49 @@ export default function ImportPage() {
         for (const row of slice) {
           // Build document from row
           const docData: Record<string, any> = {};
+          const raw: Record<string, any> = {};
+
           headers.forEach((h, idx) => {
             const val = row[idx] || '';
-            // Try to convert numbers
-            if (val !== '' && !isNaN(Number(val)) && val.length < 15) {
-              docData[h] = Number(val);
+            raw[h] = val; // Store original raw data
+
+            // Apply mapping
+            const mappedField = FIELD_MAPPINGS[h] || h;
+            
+            // Try to convert numbers for specific fields or if it looks like a number
+            if (val !== '' && !isNaN(Number(val)) && val.length < 15 && !['scheduledTime', 'scheduledEndTime', 'scheduledDate', 'staffId', 'userCode', 'customerCode'].includes(mappedField)) {
+              docData[mappedField] = Number(val);
             } else {
-              docData[h] = val;
+              docData[mappedField] = val;
             }
           });
+
+          // Post-processing for normalization
+          if (collName === 'orders') {
+            // Normalize Date: yyyy-MM-dd or yyyy/MM/dd -> yyyy/MM/dd
+            if (docData.scheduledDate) {
+              docData.scheduledDate = docData.scheduledDate.replace(/-/g, '/');
+            }
+            // Ensure type
+            if (!docData._type) {
+              docData._type = docData.customerCode ? 'order' : 'task';
+            }
+            // If it's a generic shift, ensure taskDetails is set
+            if (docData._type === 'task' && !docData.taskDetails && docData.customerName) {
+               docData.taskDetails = docData.customerName;
+            }
+          }
+
+          docData.raw = raw;
           docData._importedAt = new Date().toISOString();
           docData._source = `csv-import:${csvFile?.name || 'unknown'}`;
 
           try {
             let docRef;
-            if (idColumn !== '__auto__' && docData[idColumn]) {
-              docRef = doc(firestore, collName, String(docData[idColumn]));
+            const idVal = idColumn !== '__auto__' ? docData[FIELD_MAPPINGS[idColumn] || idColumn] : null;
+            
+            if (idVal) {
+              docRef = doc(firestore, collName, String(idVal));
             } else {
               docRef = doc(collection(firestore, collName));
             }
@@ -210,6 +262,7 @@ export default function ImportPage() {
       addLog(`❌ バッチエラー: ${e.message}`);
       errors.push(e.message);
     }
+
 
     addLog(`✨ 完了: ${success} 件成功, ${failed} 件失敗`);
     setImportResult({ success, failed, errors });

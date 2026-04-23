@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import type { WithId, Staff } from '@/lib/types';
-import { getMonthlyAttendance, saveDailyAttendance } from '@/services/attendance-service';
+import { getMonthlySchedule, saveDailySchedule } from '@/services/attendance-service';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -18,7 +18,7 @@ interface MonthlyShiftTableProps {
 
 export function MonthlyShiftTable({ staffList, refreshTrigger = 0 }: MonthlyShiftTableProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [attendanceData, setAttendanceData] = useState<{ [date: string]: string[] }>({});
+    const [scheduleData, setScheduleData] = useState<{ [date: string]: string[] }>({});
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
 
@@ -29,27 +29,27 @@ export function MonthlyShiftTable({ staffList, refreshTrigger = 0 }: MonthlyShif
     }, [currentMonth]);
 
     useEffect(() => {
-        const fetchAttendance = async () => {
+        const fetchSchedule = async () => {
             setIsLoading(true);
             try {
                 const year = currentMonth.getFullYear();
                 const month = currentMonth.getMonth() + 1;
-                const data = await getMonthlyAttendance(year, month);
-                setAttendanceData(data);
+                const data = await getMonthlySchedule(year, month);
+                setScheduleData(data);
             } catch (error) {
-                console.error("Failed to fetch monthly attendance:", error);
+                console.error("Failed to fetch monthly schedule:", error);
                 toast({
                     variant: "destructive",
                     title: "エラー",
-                    description: "シフトデータの取得に失敗しました。",
+                    description: "シフト予定データの取得に失敗しました。",
                 });
             } finally {
                 setIsLoading(false);
             }
         };
 
-        fetchAttendance();
-    }, [currentMonth, toast]);
+        fetchSchedule();
+    }, [currentMonth, toast, refreshTrigger]);
 
     const handleMonthChange = (direction: 'next' | 'prev') => {
         setCurrentMonth(prev => {
@@ -63,46 +63,38 @@ export function MonthlyShiftTable({ staffList, refreshTrigger = 0 }: MonthlyShif
         });
     };
 
-    const handleCellClick = async (day: Date, staffId: string, isAttending: boolean) => {
+    const handleCellClick = async (day: Date, staffId: string, isScheduled: boolean) => {
         const dateKey = format(day, 'yyyy-MM-dd');
-        const currentAttendingIds = attendanceData[dateKey] || [];
+        const currentScheduledIds = scheduleData[dateKey] || [];
 
         // Optimistic Update
-        let newAttendingIds: string[];
-        if (isAttending) {
+        let newScheduledIds: string[];
+        if (isScheduled) {
             // Remove
-            newAttendingIds = currentAttendingIds.filter(id => id !== staffId);
+            newScheduledIds = currentScheduledIds.filter(id => id !== staffId);
         } else {
             // Add
-            newAttendingIds = [...currentAttendingIds, staffId];
+            newScheduledIds = [...currentScheduledIds, staffId];
         }
 
-        setAttendanceData(prev => ({
+        setScheduleData(prev => ({
             ...prev,
-            [dateKey]: newAttendingIds
+            [dateKey]: newScheduledIds
         }));
 
         try {
-            await saveDailyAttendance(day, newAttendingIds);
-            /* 
-            // Toast might be too noisy for every click, keeping it subtle or removing success toast.
-            toast({
-                title: "保存しました",
-                description: `${format(day, 'M/d')}の変更を保存しました。`,
-                duration: 1000,
-            });
-            */
+            await saveDailySchedule(day, newScheduledIds);
         } catch (error) {
-            console.error("Failed to save attendance:", error);
+            console.error("Failed to save schedule:", error);
             toast({
                 variant: "destructive",
                 title: "保存エラー",
                 description: "変更の保存に失敗しました。ページをリロードしてください。",
             });
             // Revert on error
-            setAttendanceData(prev => ({
+            setScheduleData(prev => ({
                 ...prev,
-                [dateKey]: currentAttendingIds
+                [dateKey]: currentScheduledIds
             }));
         }
     };
@@ -166,16 +158,16 @@ export function MonthlyShiftTable({ staffList, refreshTrigger = 0 }: MonthlyShif
                                     </TableCell>
                                     {daysInMonth.map(day => {
                                         const dateKey = format(day, 'yyyy-MM-dd');
-                                        const attendingIds = attendanceData[dateKey] || [];
-                                        const isAttending = attendingIds.includes(staff.id);
+                                        const scheduledIds = scheduleData[dateKey] || [];
+                                        const isScheduled = scheduledIds.includes(staff.id);
 
                                         return (
                                             <TableCell
                                                 key={day.toISOString()}
                                                 className="text-center p-1 border-l cursor-pointer hover:bg-muted/50 transition-colors"
-                                                onClick={() => handleCellClick(day, staff.id, isAttending)}
+                                                onClick={() => handleCellClick(day, staff.id, isScheduled)}
                                             >
-                                                {isAttending ? (
+                                                {isScheduled ? (
                                                     <div className="flex justify-center">
                                                         <div className="h-4 w-4 rounded-full bg-green-500 shadow-sm" title="クリックで欠席に変更" />
                                                     </div>

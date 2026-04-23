@@ -18,13 +18,13 @@
 // Ensure your GAS project is deployed with "Execute as: Me" and "Who has access: Anyone".
 
 // Staff Data Script (Unified)
-export const STAFF_GAS_URL = process.env.NEXT_PUBLIC_STAFF_GAS_URL || 'https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec';
+export const STAFF_GAS_URL = 'https://script.google.com/macros/s/AKfycbxjqEPQo2Cn4d84H9lHDg1n-BbeEnY_TGi-xoOrf700EgLyjTM1mKOu9nnNA5uRmaaf/exec';
 
 // Customer Data Script (Unified)
-export const CUSTOMER_GAS_URL = process.env.NEXT_PUBLIC_CUSTOMER_GAS_URL || 'https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec';
+export const CUSTOMER_GAS_URL = 'https://script.google.com/macros/s/AKfycbxjqEPQo2Cn4d84H9lHDg1n-BbeEnY_TGi-xoOrf700EgLyjTM1mKOu9nnNA5uRmaaf/exec';
 
 // Order & Task Management Script (Unified)
-export const ORDER_GAS_URL = process.env.NEXT_PUBLIC_ORDER_GAS_URL || 'https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec';
+export const ORDER_GAS_URL = 'https://script.google.com/macros/s/AKfycbxjqEPQo2Cn4d84H9lHDg1n-BbeEnY_TGi-xoOrf700EgLyjTM1mKOu9nnNA5uRmaaf/exec';
 
 
 // --- スプレッドシート本体のURL ---
@@ -33,19 +33,19 @@ export const ORDER_GAS_URL = process.env.NEXT_PUBLIC_ORDER_GAS_URL || 'https://s
  * スタッフ情報が記載されているスプレッドシートのURL。
  * staff/page.tsx のヘッダークリックで開かれます。
  */
-export const STAFF_SHEET_URL = process.env.NEXT_PUBLIC_STAFF_SHEET_URL || 'https://docs.google.com/spreadsheets/d/18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo/edit?usp=sharing';
+export const STAFF_SHEET_URL = 'https://docs.google.com/spreadsheets/d/18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo/edit?usp=sharing';
 
 /**
  * 販売店情報が記載されているスプレッドシートのURL。
  * customers/page.tsx のヘッダークリックで開かれます。
  */
-export const CUSTOMER_SHEET_URL = process.env.NEXT_PUBLIC_CUSTOMER_SHEET_URL || 'https://docs.google.com/spreadsheets/d/1jZdToM75DunESxVU07QjSCbYEsqd_nSwxzjr09a52CA/edit?usp=sharing';
+export const CUSTOMER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1jZdToM75DunESxVU07QjSCbYEsqd_nSwxzjr09a52CA/edit?usp=sharing';
 
 /**
  * 受注情報が記載されているスプレッドシートのURL。
  * orders/page.tsx のヘッダークリックで開かれます。
  */
-export const ORDER_SHEET_URL = process.env.NEXT_PUBLIC_ORDER_SHEET_URL || 'https://docs.google.com/spreadsheets/d/17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s/edit?usp=sharing';
+export const ORDER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s/edit?usp=sharing';
 
 
 // --- その他設定 ---

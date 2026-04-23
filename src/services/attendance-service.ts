@@ -97,6 +97,54 @@ const getDailyAttendanceViaRest = async (date: Date): Promise<string[] | null> =
     return [];
 };
 
+/**
+ * Fetches daily attendance details including scheduled staff using the Firestore REST API.
+ */
+const getDailyAttendanceDetailsViaRest = async (date: Date): Promise<{ staffIds: string[], checkedOutIds: string[], scheduledStaffIds: string[] }> => {
+    const docId = getAttendanceDocId(date);
+    console.log(`[AttendanceService] Attempting REST API fetch details for ${docId}...`);
+
+    const { firestore } = initializeFirebase();
+    // @ts-ignore
+    const pId = firestore?._databaseId?.projectId || firebaseConfig.projectId;
+    // @ts-ignore
+    let dbId = firestore?._databaseId?.database;
+
+    if (!dbId || dbId === '(default)' || dbId === pId) {
+        dbId = '(default)';
+    }
+
+    const projectId = pId;
+    const databaseId = dbId;
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/${COLLECTION_NAME}/${docId}?key=${firebaseConfig.apiKey}`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        if (response.status === 404) {
+            return { staffIds: [], checkedOutIds: [], scheduledStaffIds: [] };
+        }
+        const errorText = await response.text();
+        throw new Error(`REST API fetch details failed: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const fields = data.fields || {};
+
+    const parseArray = (field: any) => {
+        if (field && field.arrayValue && field.arrayValue.values) {
+            return field.arrayValue.values.map((v: any) => v.stringValue);
+        }
+        return [];
+    };
+
+    return {
+        staffIds: parseArray(fields.staffIds),
+        checkedOutIds: parseArray(fields.checkedOutIds),
+        scheduledStaffIds: parseArray(fields.scheduledStaffIds)
+    };
+};
+
 
 /**
  * Fetches attendance data for a whole month.
@@ -430,10 +478,13 @@ export const getDailyAttendanceDetails = async (date: Date): Promise<{ staffIds:
         }
         return { staffIds: [], checkedOutIds: [], scheduledStaffIds: [] };
     } catch (error) {
-        console.warn(`[AttendanceService] SDK fetch details failed, returning empty structure...`, error);
-        // Fallback to purely 'staffIds' from normal getter if we wanted, but for now just return empty or minimal.
-        const simpleIds = await getDailyAttendance(date);
-        return { staffIds: simpleIds || [], checkedOutIds: [], scheduledStaffIds: [] };
+        console.warn(`[AttendanceService] SDK fetch details failed, trying REST fallback...`, error);
+        try {
+            return await getDailyAttendanceDetailsViaRest(date);
+        } catch (restError) {
+            console.error(`[AttendanceService] REST fetch details fallback also failed:`, restError);
+            return { staffIds: [], checkedOutIds: [], scheduledStaffIds: [] };
+        }
     }
 };
 
@@ -474,6 +525,28 @@ export const saveDailyScheduledBatch = async (records: { date: Date; staffIds: s
             console.error('Scheduled Batch save failed, skipping REST fallback for now (complicated for schedule):', batchError);
             throw batchError;
         }
+    }
+};
+
+/**
+ * Saves the list of scheduled staff IDs for a specific date.
+ */
+export const saveDailySchedule = async (date: Date, staffIds: string[]): Promise<void> => {
+    const docId = getAttendanceDocId(date);
+    console.log(`[AttendanceService] Saving schedule for ${date}:`, staffIds);
+    try {
+        const db = getDb();
+        const docRef = doc(db, COLLECTION_NAME, docId);
+        await setDoc(docRef, {
+            id: docId,
+            date: date,
+            scheduledStaffIds: staffIds,
+            updatedAt: serverTimestamp(),
+        }, { merge: true });
+        console.log(`[AttendanceService] SDK schedule save successful for ${docId}`);
+    } catch (error) {
+        console.error(`[AttendanceService] SDK schedule save failed for ${docId}:`, error);
+        throw error;
     }
 };
 

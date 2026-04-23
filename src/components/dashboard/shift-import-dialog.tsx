@@ -16,7 +16,7 @@ import { Label } from '../ui/label';
 import { useToast } from '../../hooks/use-toast';
 import { read, utils } from 'xlsx';
 import { format, parse, isValid } from 'date-fns';
-import { saveDailyAttendanceBatch, saveDailyScheduledBatch, getMonthlyAttendance, getMonthlySchedule } from '../../services/attendance-service';
+import { saveDailyScheduledBatch, getMonthlySchedule } from '../../services/attendance-service';
 import { Loader2, Upload } from 'lucide-react';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';
 import type { WithId, Staff } from '../../lib/types';
@@ -370,7 +370,7 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                 }
 
                 // Execute batch
-                await saveDailyAttendanceBatch(finalBatchRecords);
+                await saveDailyScheduledBatch(finalBatchRecords);
 
                 // Close dialog immediately to prevent UI blocking
                 setIsOpen(false);
@@ -398,7 +398,7 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
 
     const handleTestConnection = async () => {
         try {
-            await saveDailyAttendanceBatch([{ date: new Date('2025-01-01'), staffIds: [] }]);
+            await saveDailyScheduledBatch([{ date: new Date('2025-01-01'), staffIds: [] }]);
             toast({ title: '接続テスト成功', description: 'Firestoreへの書き込みに成功しました。' });
         } catch (e: any) {
             console.error(e);
