@@ -23,15 +23,15 @@ env:
   - variable: NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID
     value: DEMO_MAP_ID
   - variable: GOOGLE_API_KEY
-    value: AIzaSyDfAmBI1EdkkioSggCVhsUTi-oSQBIWdHw
+    value: AIzaSyBBelBzLORqNEmMgDMEi8IiqutIGpxfpto
   - variable: GEMINI_API_KEY
-    value: AIzaSyDfAmBI1EdkkioSggCVhsUTi-oSQBIWdHw
+    value: AIzaSyBBelBzLORqNEmMgDMEi8IiqutIGpxfpto
   - variable: NEXT_PUBLIC_STAFF_GAS_URL
-    value: https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec
+    value: https://script.google.com/macros/s/AKfycbyMJ8Y_-nZz-yWY1ascDwUD8iP1qXmkZTvNBnLXV4bpYT0tyadCDclYnZHZzks4vbLW/exec
   - variable: NEXT_PUBLIC_CUSTOMER_GAS_URL
-    value: https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec
+    value: https://script.google.com/macros/s/AKfycbyMJ8Y_-nZz-yWY1ascDwUD8iP1qXmkZTvNBnLXV4bpYT0tyadCDclYnZHZzks4vbLW/exec
   - variable: NEXT_PUBLIC_ORDER_GAS_URL
-    value: https://script.google.com/macros/s/AKfycbxtBAAbHfVaAA0GS48QOsVlzlCupeGHPNGlO5rLOsS4IHM49nNrJRnj7Pd6f0bPpOaK/exec
+    value: https://script.google.com/macros/s/AKfycbyMJ8Y_-nZz-yWY1ascDwUD8iP1qXmkZTvNBnLXV4bpYT0tyadCDclYnZHZzks4vbLW/exec
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     value: AIzaSyBBelBzLORqNEmMgDMEi8IiqutIGpxfpto
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
@@ -45,8 +45,8 @@ env:
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
     value: 1:152475256065:web:19dcae9d2c7e91fcd0c700
   - variable: NEXT_PUBLIC_STAFF_SHEET_URL
-    value: https://docs.google.com/spreadsheets/d/18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo/edit?usp=sharing
+    value: https://docs.google.com/spreadsheets/d/1IP9wxp-VsctyXVn5UI3oRWeik4gMrFA5DFxt-40HGOk/edit?usp=sharing
   - variable: NEXT_PUBLIC_CUSTOMER_SHEET_URL
-    value: https://docs.google.com/spreadsheets/d/1jZdToM75DunESxVU07QjSCbYEsqd_nSwxzjr09a52CA/edit?usp=sharing
+    value: https://docs.google.com/spreadsheets/d/1IZ2VwJ1AT5NvEkUoU0tL6OJXXI3hfDVQ8_773HZwUJI/edit?usp=sharing
   - variable: NEXT_PUBLIC_ORDER_SHEET_URL
-    value: https://docs.google.com/spreadsheets/d/17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s/edit?usp=sharing
+    value: https://docs.google.com/spreadsheets/d/1A3rbqD87QenOoHx3EYNpnqBujN5TrT2Xn_3tUTCiqmY/edit?usp=sharing

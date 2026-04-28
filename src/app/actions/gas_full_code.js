@@ -1,19 +1,19 @@
 // ↓↓↓↓【要設定】↓↓↓↓
 // 「受注管理」シートがあるスプレッドシートのIDを貼り付けてください
-const ORDER_SPREADSHEET_ID = "17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s";
+const ORDER_SPREADSHEET_ID = "1A3rbqD87QenOoHx3EYNpnqBujN5TrT2Xn_3tUTCiqmY";
 const ORDER_SHEET_NAME = "受注管理";
 // 「スタッフマスタ」シートがあるスプレッドシートのIDを貼り付けてください
-const STAFF_SPREADSHEET_ID = "18vztZhnAqDmQtlCNMERncTsCSe_hfMQ7TvcF-5S6IIo";
+const STAFF_SPREADSHEET_ID = "1IP9wxp-VsctyXVn5UI3oRWeik4gMrFA5DFxt-40HGOk";
 const STAFF_SHEET_NAME = "スタッフマスタ";
 
 // 「販売店情報」シートがあるスプレッドシートのIDを貼り付けてください
-const CUSTOMER_SPREADSHEET_ID = "1jZdToM75DunESxVU07QjSCbYEsqd_nSwxzjr09a52CA";
+const CUSTOMER_SPREADSHEET_ID = "1IZ2VwJ1AT5NvEkUoU0tL6OJXXI3hfDVQ8_773HZwUJI";
 const CUSTOMER_SHEET_NAME = "販売店情報";
 
 const ACTION_LOG_SHEET_NAME = "行動予定"; // 汎用タスク（休憩・移動等）の保存先
 
 // Firebase Realtime Database URL (シグナル用)
-const FIREBASE_DB_URL = "https://workwisebu2-31559534-cd9ee-default-rtdb.firebaseio.com";
+const FIREBASE_DB_URL = "https://workwise-general-v2-kp-default-rtdb.firebaseio.com";
 // ↓↓↓↓【設定はここまで】↓↓↓↓
 /**
  * GET リクエストを処理し、スプレッドシートのデータを JSON で返します
