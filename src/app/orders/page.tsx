@@ -8,6 +8,7 @@ import { AlertCircle, Loader2, ShoppingBag } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useOrder } from '@/contexts/order-context';
 import { useRouter } from 'next/navigation';
+import { ORDER_SHEET_URL } from '@/lib/settings';
 
 export default function OrdersPage() {
   const { orders, isLoading: isLoadingOrders, error: orderError } = useOrder();
@@ -46,7 +47,14 @@ export default function OrdersPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
           <ShoppingBag className="h-6 w-6" />
-          受注管理
+          <a 
+            href={ORDER_SHEET_URL} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:underline hover:text-primary transition-colors"
+          >
+            受注管理
+          </a>
         </h1>
         <p className="text-muted-foreground text-sm">
           Firestoreデータベースとリアルタイム同期 · セルをクリックして直接編集

@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MonthlyShiftTable } from '@/components/staff/monthly-shift-table';
 import { ShiftImportDialog } from '@/components/dashboard/shift-import-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { STAFF_SHEET_URL } from '@/lib/settings';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -50,7 +51,14 @@ export default function StaffPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
             <Users className="h-6 w-6" />
-            スタッフ管理
+            <a 
+              href={STAFF_SHEET_URL} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:underline hover:text-primary transition-colors"
+            >
+              スタッフ管理
+            </a>
           </h1>
           <p className="text-muted-foreground text-sm">
             {profile?.role === 'admin'

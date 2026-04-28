@@ -8,6 +8,7 @@ import { AlertCircle, Loader2, Building2 } from 'lucide-react';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useCustomer } from '@/contexts/customer-context';
 import { useRouter } from 'next/navigation';
+import { CUSTOMER_SHEET_URL } from '@/lib/settings';
 
 export default function CustomersPage() {
   const { customers, isLoading: isLoadingCustomers, error: customerError } = useCustomer();
@@ -46,7 +47,14 @@ export default function CustomersPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
           <Building2 className="h-6 w-6" />
-          販売店情報
+          <a 
+            href={CUSTOMER_SHEET_URL} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hover:underline hover:text-primary transition-colors"
+          >
+            販売店情報
+          </a>
         </h1>
         <p className="text-muted-foreground text-sm">
           Firestoreデータベースとリアルタイム同期 · セルをクリックして直接編集
