@@ -96,6 +96,8 @@ export type Order = {
   latitude?: number;
   longitude?: number;
   raw?: Record<string, any>;
+  // Flags
+  isGeneric?: boolean;
   // Validation metadata
   hasValidationIssues?: boolean;
   validationWarnings?: string[];
