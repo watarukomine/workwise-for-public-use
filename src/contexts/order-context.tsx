@@ -325,6 +325,9 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
 
   // 3. Determine Unassigned Orders
   const unassignedOrders = orders.filter(order => {
+    // Hide generic tasks (travel, work, break, etc.) from the unassigned list
+    if (order.isGeneric) return false;
+
     // Check if already scheduled
     // Use rawOrderId if available for reliable matching, otherwise fallback to ID or SystemID
     const isAlreadyScheduled = (order.rawOrderId && scheduledRawOrderIds.has(order.rawOrderId)) ||
