@@ -369,6 +369,9 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
   const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
 
   const dailyOrders = orders.filter(order => {
+    // Hide ghost/remnant orders (e.g. old generic chips) that lack both customer name and task details
+    if (!order.customerName && !order.taskDetails) return false;
+
     // Show undated tasks
     if (!order.scheduledDate) {
       return true;
