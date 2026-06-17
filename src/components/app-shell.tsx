@@ -148,6 +148,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const { forceMobileView } = useAppShell();
     const isMobile = useIsMobile() || forceMobileView;
     const pathname = usePathname();
+    // Centralized redirection logic
+    React.useEffect(() => {
+        if (isUserLoading) return;
+
+        const isAuthPage = pathname === '/login' || pathname === '/order-form';
+        
+        if (!profile && !isAuthPage) {
+            // 未ログインで認証が必要なページにいる場合はログイン画面へ
+            window.location.href = '/login';
+        } else if (profile && isAuthPage && pathname !== '/order-form') {
+            // ログイン済みでログイン画面にいる場合はダッシュボードへ
+            window.location.href = '/dashboard';
+        }
+    }, [isUserLoading, profile, pathname]);
 
     const handleSignOut = () => {
         setIsAuthLoading(true);

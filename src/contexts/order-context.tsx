@@ -511,8 +511,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     const todayStr = new Date().toISOString().split('T')[0];
     
-    // Initial fetch for today +/- 3 days from Firestore
-    fetchAndProcessData(false, { date: todayStr, range: 3 });
+    // Initial fetch for today +/- 3 days from Firestore (Background/Non-blocking)
+    fetchAndProcessData(true, { date: todayStr, range: 3 });
     
     // Subscribe to real-time updates for today
     console.log(`[OrderProvider] Subscribing to Firestore updates for: ${todayStr}`);
