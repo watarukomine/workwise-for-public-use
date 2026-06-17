@@ -9,6 +9,7 @@ import { ORDER_GAS_URL } from '@/lib/settings';
 import { useSelectedStaff } from './selected-staff-context';
 import { logStaffNotFound, logOldDateDetected, logInvalidDate } from '@/lib/order-validation-logger';
 import { useUserProfile } from '@/hooks/use-user-profile';
+import { OrderService } from '@/services/order-service';
 
 
 const TRAVEL_TIME_MINUTES = 30;
@@ -237,7 +238,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
                 staffId: staffMember.id,
                 tripId,
                 isGeneric: isGenericTask,
-                isAccompany: order.taskDetails.includes('同行')
+                isAccompany: String(order.taskDetails || '').includes('同行')
               });
             }
           }
@@ -383,6 +384,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const [localScheduleEvents, setLocalScheduleEvents] = useState<WithId<ScheduleEvent>[]>([]);
   const [suppressedTripIds, setSuppressedTripIds] = useState<Set<string>>(new Set());
   const { allStaff, isStaffLoading, setAllStaff } = useSelectedStaff();
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
   const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
   const [fetchedDateRanges, setFetchedDateRanges] = useState<Map<string, number>>(new Map()); // Use Map for timestamp-based cache
@@ -464,168 +466,124 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setErrorState(null);
 
     try {
-      // If it's not the initial load, we don't need to fetch master data (Staff/Customers) again
-      const fetchParams = { ...params, ordersOnly: !isInitialLoad };
+      const targetDateStr = params?.date || new Date().toISOString().split('T')[0];
+      console.log(`[OrderProvider] Fetching data from Firestore for date: ${targetDateStr}`);
       
-      console.log(`[OrderProvider] Fetching data: date=${fetchParams.date || 'Today'}, range=${fetchParams.range ?? 3}, ordersOnly=${fetchParams.ordersOnly}`);
-      const result = await fetchGasData(orderGasUrl, fetchParams) as any;
-      if (result.error) throw new Error(result.error);
+      // 1. Fetch from Firestore instead of GAS
+      const firestoreOrders = await OrderService.getOrdersByDate(targetDateStr);
 
-      // Support consolidated response format: { orders, staff } OR legacy array
-      const newRawOrders = result.orders || result.data || result;
-
-      if (Array.isArray(newRawOrders)) {
-        setRawOrdersData(prev => {
-          // Merge based on a unique key to prevent duplicates
-          const orderMap = new Map();
-          
-          // Helper to get a stable ID from raw GAS data - MUST match mapRawToOrder logic
-          const getRawId = (o: any) => {
-            // First try explicit IDs
-            const id = o.SystemID || o.systemId || o.sysId || o['受注ID'] || o['受注 ID'] || o.id;
-            if (id && !String(id).startsWith('temp-') && !String(id).startsWith('ord-0.')) {
-                return String(id);
-            }
-            // Use content-based hash for generic/accpmpanying tasks without IDs
-            // This mirrors mapRawToOrder in utils.ts
-            const cDate = findKey(o, ['作業予定日', 'date']);
-            const cStaff = findKey(o, ['担当者', 'staffName', 'staff']);
-            const cContent = findKey(o, ['業務内容', 'taskDetails', 'title']);
-            if (cDate && cStaff && cContent) {
-                return `gen-${String(cDate)}-${String(cStaff)}-${String(cContent)}`;
-            }
-            return null;
-          };
-
-          // Calculate date range of new focus to avoid accidental deletions of other dates
-          const targetDateStr = params?.date;
-          // range calculation or other range-based optimization could go here in future
-          // for now we use a simple stable ID-based merge.
-
-          // Populate with existing data
-          prev.forEach(o => {
-            const id = getRawId(o);
-            if (!id) return;
-            
-            // If we are refreshing a specific range, we should be careful.
-            // But ID-based merge is generally safer.
-            // Only skip adding to map if it's a conflict we want to overwrite.
-            orderMap.set(id, o);
-          });
-
-          // Update/Add with new data
-          newRawOrders.forEach(o => {
-            const id = getRawId(o);
-            if (id) {
-              orderMap.set(id, o);
-            } else {
-               const tempId = `temp-new-${Math.random()}`;
-               orderMap.set(tempId, o);
-            }
-          });
-
-          // Final safety check: if we are loading "Today", but an item moved to "Tomorrow",
-          // and we later load "Tomorrow", it will be updated.
-          
-          const merged = Array.from(orderMap.values());
-          // Log significant changes to help debugging missing items
-          if (prev.length > 0 && merged.length < prev.length) {
-              console.warn(`[OrderProvider] Warning: Data size decreased during merge! ${prev.length} -> ${merged.length}. Check getRawId logic.`);
-          } else {
-              console.log(`[OrderProvider] Data merged: ${prev.length} -> ${merged.length} items`);
-          }
-          return merged;
+      setRawOrdersData(prev => {
+        const orderMap = new Map();
+        
+        // Populate with existing data
+        prev.forEach(o => {
+          const id = o.id || o.systemId;
+          if (id) orderMap.set(id, o);
         });
 
-        // Record this date range as fetched with timestamp
-        if (params?.date) {
-          setFetchedDateRanges(prev => {
-            const next = new Map(prev);
-            next.set(params.date!, Date.now());
-            return next;
-          });
-        }
+        // Update/Add with new data
+        firestoreOrders.forEach(o => {
+          const id = o.id || o.systemId;
+          if (id) orderMap.set(id, o);
+        });
 
-        // Cache data (Optional: only if it's the main payload or after merging)
-        // Note: Full cache might get large, consider only caching a subset
-        
-        // 統合されたスタッフデータがあれば更新
-        if (result.staff && Array.isArray(result.staff)) {
-          console.log(`[OrderProvider] Consolidated staff data received: ${result.staff.length} items`);
-          // Inline staff processing (processStaffData equivalent)
-          const processedStaff: WithId<Staff>[] = result.staff
-            .filter((s: any) => s && (s.name || s['氏名']))
-            .map((s: any) => ({
-              ...s,
-              id: s.id || s['スタッフID'] || `staff-${Math.random().toString(36).slice(2, 8)}`,
-              name: s.name || s['氏名'] || '',
-              email: s.email || s['メール'] || null,
-              role: s.role || s['ロール'] || 'staff',
-            } as WithId<Staff>));
-          if (processedStaff.length > 0) {
-            setAllStaff(processedStaff);
-          }
-        }
-      } else {
-        throw new Error("Invalid data format received from GAS");
-      }
+        return Array.from(orderMap.values());
+      });
+
+      // Record this date range as fetched with timestamp
+      setFetchedDateRanges(prev => {
+        const next = new Map(prev);
+        next.set(targetDateStr, Date.now());
+        return next;
+      });
+
     } catch (e: any) {
       setErrorState(e.message);
       console.error("Fetch error:", e);
     } finally {
       setIsLoading(false);
     }
-  }, [orderGasUrl, rawOrdersData.length, setAllStaff]);
+  }, [rawOrdersData.length]);
 
-  // Note: Real-time signal listener removed (useDatabase not available in current codebase)
-  // Background polling (below) handles data refresh instead.
-
-  // 2. Fetch data on mount & Background polling
-  const { profile, isLoading: isProfileLoading } = useUserProfile();
-
+  // Realtime subscription setup
   useEffect(() => {
     if (isProfileLoading || !profile) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
     
-    // Initial fetch for today +/- 3 days
+    // Initial fetch for today +/- 3 days from Firestore
     fetchAndProcessData(false, { date: todayStr, range: 3 });
     
-    // Background polling every 30s
-    const interval = setInterval(() => {
-        // Poll Today
-        fetchAndProcessData(true, { date: todayStr, range: 3 });
-        
-        // Poll Viewed Date using Ref to avoid resetting interval on date change
-        const viewedDate = currentViewedDateRef.current;
-        if (viewedDate) {
-            const viewedDateStr = viewedDate.toISOString().split('T')[0];
-            const diffDays = Math.abs(differenceInMinutes(viewedDate, new Date()) / (60 * 24));
-            if (diffDays > 3) {
-                console.log(`[OrderProvider] Polling out-of-range viewed date: ${viewedDateStr}`);
-                fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
-            }
-        }
-    }, 30000); 
-    return () => clearInterval(interval);
-  }, [fetchAndProcessData, profile, isProfileLoading]);
+    // Subscribe to real-time updates for today
+    console.log(`[OrderProvider] Subscribing to Firestore updates for: ${todayStr}`);
+    const unsubscribeToday = OrderService.subscribeToOrders(todayStr, (updatedOrders) => {
+      setRawOrdersData(prev => {
+        const orderMap = new Map();
+        // Keep non-today orders
+        prev.forEach(o => {
+          if (o.scheduledDate !== todayStr && o.scheduledDate !== todayStr.replace(/-/g, '/')) {
+            const id = o.id || o.systemId;
+            if (id) orderMap.set(id, o);
+          }
+        });
+        // Add updated today orders
+        updatedOrders.forEach(o => {
+          const id = o.id || o.systemId;
+          if (id) orderMap.set(id, o);
+        });
+        return Array.from(orderMap.values());
+      });
+    });
 
-  // 2.5 Fetch immediately when currentViewedDate changes to an out-of-range date
-  useEffect(() => {
-    if (!currentViewedDate || isProfileLoading || !profile) return;
-    
-    const diffDays = Math.abs(differenceInMinutes(currentViewedDate, new Date()) / (60 * 24));
-    if (diffDays > 3) {
-      const viewedDateStr = currentViewedDate.toISOString().split('T')[0];
-      const lastFetched = fetchedDateRangesRef.current.get(viewedDateStr);
-      const isStale = !lastFetched || (Date.now() - lastFetched > 10000); // 10s cooldown
-      
-      if (isStale) {
-        console.log(`[OrderProvider] Viewed date changed to ${viewedDateStr}, fetching immediately.`);
-        fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
+    // Handle Viewed Date Subscription
+    let unsubscribeViewed: (() => void) | null = null;
+    const updateViewedSubscription = () => {
+      if (unsubscribeViewed) {
+        unsubscribeViewed();
+        unsubscribeViewed = null;
       }
-    }
-  }, [currentViewedDate, fetchAndProcessData, isProfileLoading, profile]);
+
+      const viewedDate = currentViewedDateRef.current;
+      if (viewedDate) {
+        const viewedDateStr = viewedDate.toISOString().split('T')[0];
+        if (viewedDateStr !== todayStr) {
+          console.log(`[OrderProvider] Subscribing to Firestore updates for viewed date: ${viewedDateStr}`);
+          unsubscribeViewed = OrderService.subscribeToOrders(viewedDateStr, (updatedOrders) => {
+            setRawOrdersData(prev => {
+              const orderMap = new Map();
+              // Keep non-viewed orders
+              prev.forEach(o => {
+                if (o.scheduledDate !== viewedDateStr && o.scheduledDate !== viewedDateStr.replace(/-/g, '/')) {
+                  const id = o.id || o.systemId;
+                  if (id) orderMap.set(id, o);
+                }
+              });
+              // Add updated viewed orders
+              updatedOrders.forEach(o => {
+                const id = o.id || o.systemId;
+                if (id) orderMap.set(id, o);
+              });
+              return Array.from(orderMap.values());
+            });
+          });
+        }
+      }
+    };
+
+    // Initial viewed date subscription
+    updateViewedSubscription();
+
+    // We can monitor currentViewedDate transitions to update subscription
+    const interval = setInterval(() => {
+      updateViewedSubscription();
+    }, 5000); // Check and sync subscription if date changed
+
+    return () => {
+      unsubscribeToday();
+      if (unsubscribeViewed) unsubscribeViewed();
+      clearInterval(interval);
+    };
+  }, [profile, isProfileLoading]);
 
   const saveLocalEvent = (event: WithId<ScheduleEvent>) => {
     setLocalScheduleEvents(prev => {
