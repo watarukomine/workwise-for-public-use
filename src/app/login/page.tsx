@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useRouter } from 'next/navigation';
 import { signInWithEmail, sendPasswordReset } from '@/lib/auth';
 import { useUserProfile } from '@/hooks/use-user-profile';
 
@@ -38,6 +39,7 @@ const loginSchema = z.object({
 type LoginSchema = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = React.useState(false);
   const [isResetting, setIsResetting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -63,7 +65,7 @@ export default function LoginPage() {
         title: 'ログインしました',
         description: 'WorkWiseへようこそ！',
       });
-      window.location.href = '/dashboard';
+      router.push('/dashboard');
     } catch (e: any) {
       setError(e.message || 'ログイン中に不明なエラーが発生しました。');
     } finally {

@@ -149,8 +149,12 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
               setAppliedSelectedStaffIds(parsedIds);
               setPendingSelectedStaffIds(parsedIds);
             } else {
-              setAppliedSelectedStaffIds([]);
-              setPendingSelectedStaffIds([]);
+              const allIds = processedStaff.map(s => s.id);
+              setAppliedSelectedStaffIds(allIds);
+              setPendingSelectedStaffIds(allIds);
+              try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(allIds));
+              } catch (e) {}
             }
           }
         } else {
