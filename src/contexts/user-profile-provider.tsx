@@ -23,39 +23,16 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    // Safety timeout to ensure loading doesn't stick forever
-    const timeoutId = setTimeout(() => {
-      setIsLoading(false);
-    }, 5000);
-
-    const syncProfile = async () => {
-      try {
-        const cachedUser = getCurrentUser();
-        if (cachedUser) {
-          // Initialize Firebase to get Firestore
-          const { firestore } = initializeFirebase();
-          const userDocRef = doc(firestore, 'users', cachedUser.id);
-          const userDoc = await getDoc(userDocRef);
-
-          if (userDoc.exists()) {
-            const latestProfile = { ...userDoc.data() as Staff, id: userDoc.id };
-            handleSetProfile(latestProfile);
-          } else {
-            setProfile(cachedUser);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to sync profile with Firestore:', e);
-        // Fallback to cached user if available
-        const cachedUser = getCurrentUser();
-        if (cachedUser) setProfile(cachedUser);
-      } finally {
-        setIsLoading(false);
-        clearTimeout(timeoutId);
+    try {
+      const cachedUser = getCurrentUser();
+      if (cachedUser) {
+        setProfile(cachedUser);
       }
-    };
-
-    syncProfile();
+    } catch (e) {
+      console.error('Failed to load profile from local storage:', e);
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const handleSetProfile = (user: WithId<Staff> | null) => {
