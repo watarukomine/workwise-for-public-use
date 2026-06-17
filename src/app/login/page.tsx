@@ -63,7 +63,6 @@ export default function LoginPage() {
         title: 'ログインしました',
         description: 'WorkWiseへようこそ！',
       });
-      window.location.href = '/'; 
     } catch (e: any) {
       setError(e.message || 'ログイン中に不明なエラーが発生しました。');
     } finally {
