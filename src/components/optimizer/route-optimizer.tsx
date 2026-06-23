@@ -173,11 +173,28 @@ const PlacesAutocompleteSelector: React.FC<{
     }
   };
 
-  const handlePredefinedSelect = (location: Location) => {
+  const handlePredefinedSelect = async (location: Location) => {
     setValue(location.name, false);
-    onSelect(location);
     setOpen(false);
-  }
+
+    if (!location.latitude || !location.longitude || isNaN(location.latitude) || isNaN(location.longitude)) {
+      try {
+        const results = await getGeocode({ address: location.address });
+        const { lat, lng } = await getLatLng(results[0]);
+        onSelect({
+          ...location,
+          latitude: lat,
+          longitude: lng,
+        });
+      } catch (error) {
+        console.error('Failed to geocode address for predefined location:', error);
+        alert(`店舗「${location.name}」の住所「${location.address}」から座標を取得できませんでした。`);
+        onSelect(null);
+      }
+    } else {
+      onSelect(location);
+    }
+  };
 
   const staffLocations = predefinedLocations.filter(loc => loc.type === 'staff');
   const customerLocations = predefinedLocations.filter(loc => loc.type === 'customer');
@@ -312,8 +329,8 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     }));
 
     const customerLocs = (allCustomers || []).map(c => {
-      let latitude: number | undefined = Number(findKey(c, ['緯度']));
-      let longitude: number | undefined = Number(findKey(c, ['経度']));
+      let latitude = Number(findKey(c, ['緯度']));
+      let longitude = Number(findKey(c, ['経度']));
 
       if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
         const coordsValue = findKey(c, ['緯度・経度', '座標', '緯度経度', '緯度,経度']);
@@ -324,11 +341,15 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
           if (!isNaN(lat) && !isNaN(lon)) {
             latitude = lat;
             longitude = lon;
+          } else {
+            latitude = 0;
+            longitude = 0;
           }
+        } else {
+          latitude = 0;
+          longitude = 0;
         }
       }
-
-      if (latitude === undefined || longitude === undefined) return null;
 
       // Safe ID generation: prefer userCode, then id, then random fallback
       const safeId = c.userCode || c.id || `customer-${Math.random().toString(36).substr(2, 9)}`;
@@ -345,7 +366,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
         type: 'customer' as const,
         orderId: linkedOrder?.id,
       };
-    }).filter((l) => l !== null);
+    });
 
     return [...staffLocs, ...customerLocs];
   }, [staff, staffStatus, allCustomers]);
