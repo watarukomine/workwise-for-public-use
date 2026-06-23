@@ -2104,15 +2104,9 @@ export function ScheduleView({
 
   const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
   const sensors = useSensors(
-    useSensor(MouseSensor, {
+    useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5, // Prevent accidental drag on mouse clicks
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 250, // Require a press delay to support scrolling on touch screens
-        tolerance: 5,
+        distance: 5,
       },
     })
   );
@@ -2859,7 +2853,7 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     `${(!isTravelEvent && (tireSize || honsu)) ? `\n${tireSize ? tireSize : ''}${tireSize && honsu ? ' ' : ''}${honsu ? formatHonsu(honsu) : ''}` : ''}`;
 
   const style: any = isOverlay ?
-    { touchAction: 'none', '--dynamic-width': `${width}px` } :
+    { touchAction: 'none', width: `${width}px` } :
     {
       '--dynamic-left': `${left}px`,
       '--dynamic-width': `${width}px`,
