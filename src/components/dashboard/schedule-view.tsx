@@ -62,6 +62,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { useOrder } from '../../contexts/order-context';
+import { OrderService } from '../../services/order-service';
 import { updateSheetStatus, sendIcsEmail, createTask, updateOrderDateTime } from '../../app/actions/gas-actions';
 import { ORDER_GAS_URL } from '../../lib/settings';
 import { Mail, Pencil, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
@@ -1545,23 +1546,37 @@ export function ScheduleView({
     }
     setIsSaving(true);
     try {
-      const staff = dialogState.mode === 'new' ? getStaffById(dialogState.staffId) : undefined;
-      // For work cancel, we primarily need the order ID.
       let orderId: string | undefined;
       if (dialogState.mode === 'details' || dialogState.mode === 'edit') {
-        orderId = dialogState.event?.rawOrderId;
+        orderId = dialogState.event?.id;
+      } else if (dialogState.mode === 'order-details') {
+        orderId = dialogState.order?.id;
       }
 
       if (orderId) {
-        await updateSheetStatus({
-          gasUrl: ORDER_GAS_URL,
-          eventTitle: `(ID: ${orderId})`,
-          staffName: '', // Unassign
-          statusValue: 'キャンセル',
+        // 1. Primary write to Firestore
+        await OrderService.updateOrder(orderId, {
+          status: 'キャンセル',
           cancelDate: new Date().toISOString(),
-          cancelContact: cancelContact,
-          timestamp: new Date().toISOString()
+          cancelContact: cancelContact
         });
+
+        // 2. Backup update to GAS
+        try {
+          await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: `(ID: ${orderId})`,
+            systemId: orderId,
+            staffName: '', // Unassign staff if assigned
+            statusValue: 'キャンセル',
+            cancelDate: new Date().toISOString(),
+            cancelContact: cancelContact,
+            timestamp: new Date().toISOString()
+          });
+        } catch (gasErr) {
+          console.warn('Failed to update GAS status for cancel:', gasErr);
+        }
+
         toast({ title: "作業キャンセルを記録しました" });
         setIsCancelling(false);
         setCancelContact('');
@@ -1571,6 +1586,44 @@ export function ScheduleView({
     } catch (e: any) {
       console.error(e);
       toast({ variant: 'destructive', title: 'エラー', description: 'キャンセル処理に失敗しました。' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteOrder = async () => {
+    const target = dialogState.mode === 'order-details' ? dialogState.order : (dialogState.mode === 'details' || dialogState.mode === 'edit' ? dialogState.event : undefined);
+    if (!target) return;
+    
+    const orderId = target.id;
+    if (!confirm('この受注データを完全にデータベースから削除しますか？\nこの操作は取り消せません。')) return;
+
+    setIsSaving(true);
+    try {
+      // 1. Primary write to Firestore (Delete)
+      await OrderService.deleteOrder(orderId);
+
+      // 2. Clear from GAS/Spreadsheet backup
+      try {
+        await updateSheetStatus({
+          gasUrl: ORDER_GAS_URL,
+          eventTitle: `(ID: ${orderId})`,
+          systemId: orderId,
+          statusValue: '削除',
+          cancelDate: new Date().toISOString(),
+          cancelContact: '物理削除',
+          timestamp: new Date().toISOString()
+        });
+      } catch (gasErr) {
+        console.warn('Failed to notify GAS of order deletion:', gasErr);
+      }
+
+      toast({ title: "受注データを削除しました" });
+      await refetchOrders();
+      setDialogState({ mode: 'closed' });
+    } catch (e: any) {
+      console.error('Failed to delete order:', e);
+      toast({ variant: 'destructive', title: 'エラー', description: '受注データの削除に失敗しました。' });
     } finally {
       setIsSaving(false);
     }
@@ -2375,6 +2428,11 @@ export function ScheduleView({
                               <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
                                 {isSaving ? '処理中...' : (isGenericTask((dialogState as any).event || (dialogState as any).order) ? 'タスクの削除' : '未割当に戻す')}
                               </Button>
+                              {!isGenericTask((dialogState as any).event || (dialogState as any).order) && (
+                                <Button variant="destructive" onClick={handleDeleteOrder} disabled={isSaving} className="bg-red-900 hover:bg-red-950">
+                                  受注を消去
+                                </Button>
+                              )}
                               <Button variant="destructive" onClick={() => setIsCancelling(true)} disabled={isSaving} className="bg-red-700 hover:bg-red-800">
                                 作業キャンセル
                               </Button>
@@ -2503,82 +2561,111 @@ export function ScheduleView({
                     </div>
                   </div>
                   <DialogFooter className="sm:justify-between pt-4 border-t">
-                    <div className="flex gap-2">
-                      {isEditingOrderDetails ? (
-                        <>
-                          <Button
-                            variant="outline"
-                            onClick={() => {
-                              setIsEditingOrderDetails(false);
-                            }}
-                            disabled={isSaving}
-                          >
-                            キャンセル
-                          </Button>
-                          <Button
-                            onClick={async () => {
-                              if (!dialogState.order) return;
-
-                              setIsSaving(true);
-
-                              try {
-                                const result = await updateSheetStatus({
-                                  gasUrl: ORDER_GAS_URL,
-                                  eventTitle: `(ID: ${dialogState.order.id})`,
-                                  systemId: dialogState.order.id,
-                                  timestamp: new Date().toISOString(),
-                                  ...editOrderForm,
-                                  shouldSendEmail: false
-                                });
-
-                                if (result.status === 'success') {
-                                  toast({
-                                    title: '保存しました',
-                                    description: 'オーダー詳細を更新しました'
-                                  });
-                                  setIsEditingOrderDetails(false);
-                                  await refetchOrders();
-                                  setDialogState({ mode: 'closed' });
-                                } else {
-                                  toast({
-                                    title: 'エラー',
-                                    description: result.message || '更新に失敗しました',
-                                    variant: 'destructive'
-                                  });
-                                }
-                              } catch (error) {
-                                console.error('Failed to update order details:', error);
-                                toast({
-                                  title: 'エラー',
-                                  description: '更新に失敗しました',
-                                  variant: 'destructive'
-                                });
-                              } finally {
-                                setIsSaving(false);
-                              }
-                            }}
-                            disabled={isSaving}
-                          >
-                            {isSaving ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                保存中...
-                              </>
-                            ) : '保存'}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          onClick={() => {
-                            setIsEditingOrderDetails(true);
-                          }}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          編集する
+                    {isCancelling ? (
+                      <div className="flex items-center gap-2 w-full">
+                        <Input
+                          placeholder="キャンセル連絡者名"
+                          value={cancelContact}
+                          onChange={(e) => setCancelContact(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button variant="destructive" onClick={handleWorkCancel} disabled={isSaving}>
+                          確定
                         </Button>
-                      )}
-                    </div>
-                    <DialogClose asChild><Button variant="ghost">閉じる</Button></DialogClose>
+                        <Button variant="ghost" onClick={() => setIsCancelling(false)} disabled={isSaving}>
+                          戻る
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          {isEditingOrderDetails ? (
+                            <>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setIsEditingOrderDetails(false);
+                                }}
+                                disabled={isSaving}
+                              >
+                                キャンセル
+                              </Button>
+                              <Button
+                                onClick={async () => {
+                                  if (!dialogState.order) return;
+
+                                  setIsSaving(true);
+
+                                  try {
+                                    const result = await updateSheetStatus({
+                                      gasUrl: ORDER_GAS_URL,
+                                      eventTitle: `(ID: ${dialogState.order.id})`,
+                                      systemId: dialogState.order.id,
+                                      timestamp: new Date().toISOString(),
+                                      ...editOrderForm,
+                                      shouldSendEmail: false
+                                    });
+
+                                    if (result.status === 'success') {
+                                      toast({
+                                        title: '保存しました',
+                                        description: 'オーダー詳細を更新しました'
+                                      });
+                                      setIsEditingOrderDetails(false);
+                                      await refetchOrders();
+                                      setDialogState({ mode: 'closed' });
+                                    } else {
+                                      toast({
+                                        title: 'エラー',
+                                        description: result.message || '更新に失敗しました',
+                                        variant: 'destructive'
+                                      });
+                                    }
+                                  } catch (error) {
+                                    console.error('Failed to update order details:', error);
+                                    toast({
+                                      title: 'エラー',
+                                      description: '更新に失敗しました',
+                                      variant: 'destructive'
+                                    });
+                                  } finally {
+                                    setIsSaving(false);
+                                  }
+                                }}
+                                disabled={isSaving}
+                              >
+                                {isSaving ? (
+                                  <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    保存中...
+                                  </>
+                                ) : '保存'}
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                onClick={() => {
+                                  setIsEditingOrderDetails(true);
+                                }}
+                              >
+                                <Pencil className="mr-2 h-4 w-4" />
+                                編集する
+                              </Button>
+                              <Button variant="destructive" onClick={() => setIsCancelling(true)} className="bg-red-700 hover:bg-red-800">
+                                受注をキャンセル
+                              </Button>
+                              <Button variant="destructive" onClick={handleDeleteOrder} className="bg-red-900 hover:bg-red-950">
+                                受注を消去
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                        {!isCancelling && (
+                          <DialogClose asChild><Button variant="ghost">閉じる</Button></DialogClose>
+                        )}
+                      </>
+                    )}
                   </DialogFooter>
                 </>
               ) : null}
