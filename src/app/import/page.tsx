@@ -1,7 +1,7 @@
-
 'use client';
 
 import React, { useState, useCallback, useRef } from 'react';
+import { getGeocode, getLatLng } from 'use-places-autocomplete';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -225,6 +225,29 @@ export default function ImportPage() {
             // If it's a generic shift, ensure taskDetails is set
             if (docData._type === 'task' && !docData.taskDetails && docData.customerName) {
                docData.taskDetails = docData.customerName;
+            }
+          }
+
+          if (collName === 'customers') {
+            const address = docData['住所'] || docData.address || '';
+            const latVal = docData['緯度'] || docData.latitude;
+            const lngVal = docData['経度'] || docData.longitude;
+            const hasCoords = latVal && lngVal && !isNaN(Number(latVal)) && !isNaN(Number(lngVal)) && Number(latVal) !== 0 && Number(lngVal) !== 0;
+
+            if (address && !hasCoords) {
+              try {
+                addLog(`🔍 店舗「${docData['店舗'] || docData.name || '名称未設定'}」の住所「${address}」から座標を取得中...`);
+                const results = await getGeocode({ address });
+                const { lat, lng } = await getLatLng(results[0]);
+                docData['緯度'] = lat;
+                docData['経度'] = lng;
+                docData.latitude = lat;
+                docData.longitude = lng;
+                addLog(`✅ 座標取得成功: ${lat}, ${lng}`);
+              } catch (err) {
+                console.error(`Failed to geocode address: ${address}`, err);
+                addLog(`⚠️ 住所「${address}」からの座標取得に失敗しました。座標なしで登録します。`);
+              }
             }
           }
 
