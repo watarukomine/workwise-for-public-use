@@ -450,21 +450,17 @@ const RenderDragOverlay = () => {
   const { active } = useDndContext();
   const { getCustomerByCode, getStaffById } = useScheduleView();
 
-  // Remove manual transform application as DragOverlay handles it
-  // const style: React.CSSProperties = {
-  //   transform: CSS.Translate.toString(delta),
-  // };
-
   if (!active) return null;
 
   const activeItem = active.data.current;
+  const activeIdString = String(active.id);
 
   return (
     <DragOverlay modifiers={undefined} dropAnimation={null}>
       <div>
-        {activeItem && 'estimatedDuration' in activeItem && !('staffId' in activeItem) ? (
+        {activeIdString.startsWith('order-') ? (
           <OrderChip order={activeItem as WithId<Order>} style={{ width: `${minutesToPixels((activeItem as WithId<Order>).estimatedDuration || 60)}px` }} isOverlay={true} />
-        ) : activeItem && 'staffId' in activeItem ? (
+        ) : activeItem ? (
           (() => {
             const staff = getStaffById((activeItem as WithId<ScheduleEvent>).staffId);
             if (!staff) return null;
