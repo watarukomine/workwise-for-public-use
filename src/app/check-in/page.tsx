@@ -183,7 +183,14 @@ function CheckInClient() {
           timestamp: now.toISOString(),
         } as any);
         if (result.status === 'error') throw new Error(result.message);
-
+ 
+        // 2. Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
+        const { OrderService } = await import('@/services/order-service');
+        await OrderService.updateOrder(sysId, {
+          isConfirmed: true,
+          confirmedAt: now.toISOString()
+        });
+ 
         setIsConfirmedOptimistic(true);
         toast({ title: '確認済にしました', description: `${profile.name}として記録しました。` });
         refetchOrders().catch(e => console.error(e));
