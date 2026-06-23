@@ -100,13 +100,24 @@ const timeStringToDate = (timeStr: string, baseDate: Date) => {
   return date;
 };
 
+const safeParseISO = (dateStr: any): Date => {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return dateStr;
+  try {
+    const parsed = parseISO(String(dateStr));
+    if (isValid(parsed)) return parsed;
+  } catch (e) {}
+  const parsedDate = new Date(dateStr);
+  return isValid(parsedDate) ? parsedDate : new Date();
+};
+
 const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
 
 const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
 
 const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
-  const start = typeof eventStart === 'string' ? parseISO(eventStart) : eventStart;
-  const end = typeof eventEnd === 'string' ? parseISO(eventEnd) : eventEnd;
+  const start = typeof eventStart === 'string' ? safeParseISO(eventStart) : eventStart;
+  const end = typeof eventEnd === 'string' ? safeParseISO(eventEnd) : eventEnd;
 
   if (!start || !end || !isValid(start) || !isValid(end)) {
     return { left: 0, width: minutesToPixels(60) };
@@ -355,7 +366,7 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
     if (!order.scheduledDate) {
       return true;
     }
-    const scheduledDate = parseISO(order.scheduledDate);
+    const scheduledDate = safeParseISO(order.scheduledDate);
     if (!isValid(scheduledDate)) return true;
 
     // Show tasks scheduled for today
@@ -1087,8 +1098,8 @@ export function ScheduleView({
 
         const taskEventInTrip = eventsToUpdate.find(e => e.id.endsWith('-task') || !e.tripId) || eventsToUpdate[0];
         const travelEventInTrip = eventsToUpdate.find(e => e.id.endsWith('-travel'));
-        const taskDuration = differenceInMinutes(parseISO(taskEventInTrip.end as string), parseISO(taskEventInTrip.start as string));
-        const travelDuration = travelEventInTrip ? differenceInMinutes(parseISO(travelEventInTrip.end as string), parseISO(travelEventInTrip.start as string)) : TRAVEL_TIME_MINUTES;
+        const taskDuration = differenceInMinutes(safeParseISO(taskEventInTrip.end as string), safeParseISO(taskEventInTrip.start as string));
+        const travelDuration = travelEventInTrip ? differenceInMinutes(safeParseISO(travelEventInTrip.end as string), safeParseISO(travelEventInTrip.start as string)) : TRAVEL_TIME_MINUTES;
 
         let newTaskStart = newStart;
         if (draggedEvent.id.endsWith('-travel')) {
@@ -1111,7 +1122,7 @@ export function ScheduleView({
       (async () => {
         try {
           if (draggedEvent.id.startsWith('event-')) {
-            const duration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+            const duration = differenceInMinutes(safeParseISO(draggedEvent.end as string), safeParseISO(draggedEvent.start as string));
             const updatedEvent = {
               ...draggedEvent,
               staffId: newStaffId,
@@ -1126,8 +1137,8 @@ export function ScheduleView({
             const taskPart = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
             const travelPart = tripEvents.find(e => e.id.endsWith('-travel'));
             
-            const taskDuration = differenceInMinutes(parseISO(taskPart.end as string), parseISO(taskPart.start as string));
-            const travelDuration = travelPart ? differenceInMinutes(parseISO(travelPart.end as string), parseISO(travelPart.start as string)) : 0;
+            const taskDuration = differenceInMinutes(safeParseISO(taskPart.end as string), safeParseISO(taskPart.start as string));
+            const travelDuration = travelPart ? differenceInMinutes(safeParseISO(travelPart.end as string), safeParseISO(travelPart.start as string)) : 0;
 
             let taskStart = newStart;
             if (draggedEvent.id.endsWith('-travel')) {
@@ -1185,11 +1196,11 @@ export function ScheduleView({
               currentTravelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
 
               if (currentTaskEvent) {
-                taskDuration = differenceInMinutes(parseISO(currentTaskEvent.end as string), parseISO(currentTaskEvent.start as string));
+                taskDuration = differenceInMinutes(safeParseISO(currentTaskEvent.end as string), safeParseISO(currentTaskEvent.start as string));
               }
 
               if (currentTravelEvent) {
-                travelDuration = differenceInMinutes(parseISO(currentTravelEvent.end as string), parseISO(currentTravelEvent.start as string));
+                travelDuration = differenceInMinutes(safeParseISO(currentTravelEvent.end as string), safeParseISO(currentTravelEvent.start as string));
               }
 
               // Adjust start time if we dragged the travel event
@@ -1225,7 +1236,7 @@ export function ScheduleView({
 
             } else {
               // Standalone event (unlikely given logic but fallback)
-              taskDuration = differenceInMinutes(parseISO(draggedEvent.end as string), parseISO(draggedEvent.start as string));
+              taskDuration = differenceInMinutes(safeParseISO(draggedEvent.end as string), safeParseISO(draggedEvent.start as string));
               const taskEnd = addMinutes(taskStart, taskDuration);
               const optimisticEvent = {
                 ...draggedEvent,
@@ -1383,7 +1394,7 @@ export function ScheduleView({
                 taskName: ev.title,
                 startTime: ev.start as string,
                 endTime: ev.end as string,
-                estimatedDuration: differenceInMinutes(parseISO(ev.end as string), parseISO(ev.start as string))
+                estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string))
               });
 
               if (res.eventId) {
@@ -1455,13 +1466,13 @@ export function ScheduleView({
                 eventTitle: `(ID: ${order.rawOrderId})`,
                 staffName: staff.name,
                 statusValue: '割当済',
-                scheduledDate: format(parseISO(taskEvent.start as string), 'yyyy/MM/dd'),
-                scheduledTime: format(parseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
-                scheduledEndTime: format(parseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
+                scheduledDate: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
+                scheduledTime: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
+                scheduledEndTime: format(safeParseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
                 estimatedDuration: order.estimatedDuration,
-                "チップ配置作業予定": format(parseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
-                "チップ配置作業完了予定": format(parseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
-                "作業予定日": format(parseISO(taskEvent.start as string), 'yyyy/MM/dd'),
+                "チップ配置作業予定": format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
+                "チップ配置作業完了予定": format(safeParseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
+                "作業予定日": format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
                 "作業時間（分）": order.estimatedDuration,
                 timestamp: new Date().toISOString(),
                 systemId: order.id
@@ -2747,7 +2758,7 @@ interface DraggableEventProps {
 }
 
 const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, getCustomerByCode, onDoubleClick, isOverlay, onDelete }) => {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: targetEvent.id, data: targetEvent });
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: targetEvent.id, data: targetEvent, disabled: isOverlay });
   const { left, width } = getEventDimensions(targetEvent.start, targetEvent.end);
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(targetEvent); };
