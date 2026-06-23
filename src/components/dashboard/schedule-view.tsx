@@ -520,6 +520,7 @@ export function ScheduleView({
 
   const [isClient, setIsClient] = React.useState(false);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
+  const [activeId, setActiveId] = React.useState<string | null>(null);
 
   const [editedEventDetails, setEditedEventDetails] = React.useState<EditedEventDetails>({ title: '', description: '', startTime: '', endTime: '', destination: '' });
   const [isSaving, setIsSaving] = React.useState(false);
@@ -902,6 +903,7 @@ export function ScheduleView({
   }, []);
 
   const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
     staffRowRectsRef.current.clear(); // Drag start becomes ultra light
     
     // Cache the scroll container bounds to avoid layout recalculations during dragging
@@ -1005,6 +1007,7 @@ export function ScheduleView({
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveId(null);
     const { active, over, delta } = event;
     
     // Hide guideline on drag end
@@ -2139,6 +2142,7 @@ export function ScheduleView({
           acceleration: 15,
         }}
         onDragCancel={() => {
+          setActiveId(null);
           const guidelineEl = document.getElementById('drag-guideline');
           if (guidelineEl) {
             guidelineEl.style.display = 'none';
