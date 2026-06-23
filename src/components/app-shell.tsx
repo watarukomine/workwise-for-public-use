@@ -306,7 +306,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </header>
                     <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
                     <div className="fixed bottom-1 right-2 text-[10px] text-muted-foreground/40 pointer-events-none z-50 font-mono">
-                        {`v${process.env.NEXT_PUBLIC_APP_VERSION || '1.7.6-tmp'}`}
+                        {`v${process.env.NEXT_PUBLIC_APP_VERSION || '1.7.7-tmp'}`}
                     </div>
                 </SidebarInset>
             </SidebarProvider>
@@ -368,7 +368,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </header>
             <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
             <div className="fixed bottom-1 right-2 text-[10px] text-muted-foreground/40 pointer-events-none z-50 font-mono">
-                {`v${process.env.NEXT_PUBLIC_APP_VERSION || '1.7.6-tmp'}`}
+                {`v${process.env.NEXT_PUBLIC_APP_VERSION || '1.7.7-tmp'}`}
             </div>
         </div>
     )

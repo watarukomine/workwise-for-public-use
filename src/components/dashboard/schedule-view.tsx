@@ -1026,7 +1026,7 @@ export function ScheduleView({
     if (!item || !item.id) return;
 
     // --- Dropping back to unassigned area ---
-    if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && 'staffId' in item) {
+    if (over.id === UNASSIGNED_TASKS_DROPPABLE_ID && !String(active.id).startsWith('order-')) {
       const scheduleItem = item as WithId<ScheduleEvent>;
       const isRealOrder = !!scheduleItem.customerCode;
 
@@ -1085,7 +1085,7 @@ export function ScheduleView({
     const newStart = getNewStartFromDrop();
 
     // --- Moving an existing event ---
-    if ('staffId' in item) {
+    if (!String(active.id).startsWith('order-')) {
       const draggedEvent = item as WithId<ScheduleEvent>;
       const newStaff = getStaffById(newStaffId);
       if (!newStaff) return;
