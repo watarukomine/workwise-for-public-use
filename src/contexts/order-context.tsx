@@ -129,8 +129,15 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
           }
 
           if (shouldUpdate) {
-            const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';
-            let [lat, lon] = locationStr.split(',').map(s => parseFloat(s.trim()));
+            let lat = rawOrder.latitude !== undefined && rawOrder.latitude !== null ? parseFloat(String(rawOrder.latitude)) : NaN;
+            let lon = rawOrder.longitude !== undefined && rawOrder.longitude !== null ? parseFloat(String(rawOrder.longitude)) : NaN;
+
+            if (isNaN(lat) || isNaN(lon)) {
+              const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';
+              const parts = locationStr.split(',').map(s => parseFloat(s.trim()));
+              lat = parts[0];
+              lon = parts[1];
+            }
 
             if ((isNaN(lat) || isNaN(lon)) && currentStatus.latitude && currentStatus.longitude) {
               lat = currentStatus.latitude;
