@@ -542,55 +542,49 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       });
     });
 
-    // Handle Viewed Date Subscription
-    let unsubscribeViewed: (() => void) | null = null;
-    const updateViewedSubscription = () => {
-      if (unsubscribeViewed) {
-        unsubscribeViewed();
-        unsubscribeViewed = null;
-      }
-
-      const viewedDate = currentViewedDateRef.current;
-      if (viewedDate) {
-        const viewedDateStr = viewedDate.toISOString().split('T')[0];
-        if (viewedDateStr !== todayStr) {
-          console.log(`[OrderProvider] Subscribing to Firestore updates for viewed date: ${viewedDateStr}`);
-          unsubscribeViewed = OrderService.subscribeToOrders(viewedDateStr, (updatedOrders) => {
-            setRawOrdersData(prev => {
-              const orderMap = new Map();
-              // Keep non-viewed orders
-              prev.forEach(o => {
-                if (o.scheduledDate !== viewedDateStr && o.scheduledDate !== viewedDateStr.replace(/-/g, '/')) {
-                  const id = o.id || o.systemId;
-                  if (id) orderMap.set(id, o);
-                }
-              });
-              // Add updated viewed orders
-              updatedOrders.forEach(o => {
-                const id = o.id || o.systemId;
-                if (id) orderMap.set(id, o);
-              });
-              return Array.from(orderMap.values());
-            });
-          });
-        }
-      }
-    };
-
-    // Initial viewed date subscription
-    updateViewedSubscription();
-
-    // We can monitor currentViewedDate transitions to update subscription
-    const interval = setInterval(() => {
-      updateViewedSubscription();
-    }, 5000); // Check and sync subscription if date changed
-
     return () => {
       unsubscribeToday();
-      if (unsubscribeViewed) unsubscribeViewed();
-      clearInterval(interval);
     };
   }, [profile, isProfileLoading]);
+
+  // Handle Viewed Date Subscription and Loading immediately on change
+  useEffect(() => {
+    if (isProfileLoading || !profile || !currentViewedDate) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const viewedDateStr = currentViewedDate.toISOString().split('T')[0];
+
+    if (viewedDateStr === todayStr) return;
+
+    // Load data immediately for the viewed date (Non-blocking background fetch)
+    console.log(`[OrderProvider] Loading data immediately for viewed date: ${viewedDateStr}`);
+    fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
+
+    console.log(`[OrderProvider] Subscribing to Firestore updates for viewed date: ${viewedDateStr}`);
+    const unsubscribeViewed = OrderService.subscribeToOrders(viewedDateStr, (updatedOrders) => {
+      setRawOrdersData(prev => {
+        const orderMap = new Map();
+        // Keep non-viewed orders
+        prev.forEach(o => {
+          if (o.scheduledDate !== viewedDateStr && o.scheduledDate !== viewedDateStr.replace(/-/g, '/')) {
+            const id = o.id || o.systemId;
+            if (id) orderMap.set(id, o);
+          }
+        });
+        // Add updated viewed orders
+        updatedOrders.forEach(o => {
+          const id = o.id || o.systemId;
+          if (id) orderMap.set(id, o);
+        });
+        return Array.from(orderMap.values());
+      });
+    });
+
+    return () => {
+      console.log(`[OrderProvider] Unsubscribing from viewed date: ${viewedDateStr}`);
+      unsubscribeViewed();
+    };
+  }, [profile, isProfileLoading, currentViewedDate]);
 
   const saveLocalEvent = (event: WithId<ScheduleEvent>) => {
     setLocalScheduleEvents(prev => {
