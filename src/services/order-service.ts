@@ -30,7 +30,7 @@ export const OrderService = {
         const colRef = collection(firestore, COLLECTION);
 
         // Try both common formats: yyyy/MM/dd and yyyy-MM-dd
-        const formats = [dateStr, dateStr.replace(/\//g, '-')];
+        const formats = [dateStr, dateStr.replace(/-/g, '/'), dateStr.replace(/\//g, '-')];
         
         const results = await Promise.all(formats.map(async (fmt) => {
             const q = query(colRef, where('scheduledDate', '==', fmt));
@@ -78,7 +78,7 @@ export const OrderService = {
         const colRef = collection(firestore, COLLECTION);
         
         // Use 'in' query to support both date formats in real-time
-        const formats = [dateStr, dateStr.replace(/\//g, '-')];
+        const formats = [dateStr, dateStr.replace(/-/g, '/'), dateStr.replace(/\//g, '-')];
         const q = query(colRef, where('scheduledDate', 'in', formats));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
