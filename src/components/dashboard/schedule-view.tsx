@@ -1648,7 +1648,7 @@ export function ScheduleView({
     const target = dialogState.mode === 'order-details' ? dialogState.order : (dialogState.mode === 'details' || dialogState.mode === 'edit' ? dialogState.event : undefined);
     if (!target) return;
     
-    const orderId = target.id;
+    const orderId = target.systemId || target.rawOrderId || target.id;
     if (!confirm('この受注データを完全にデータベースから削除しますか？\nこの操作は取り消せません。')) return;
 
     setIsSaving(true);
