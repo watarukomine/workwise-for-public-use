@@ -549,13 +549,13 @@ export function ScheduleView({
         tireStatus: findKey(ev.raw, ["タイヤ手配状況", "手配"]) || ev.arrangement || ev.tireStatus || '',
         disposal: findKey(ev.raw, ["廃タイヤ処分", "廃タイヤ"]) || ev.disposal || '',
         specialNotes: findKey(ev.raw, ["特記事項", "備考", "メモ", "特記", "specialNotes"]) || ev.specialNotes || '',
-        startTravelTime: findKey(ev.raw, ['移動開始']) ? formatTime(findKey(ev.raw, ['移動開始'])) : (ev.startTravelTime ? formatTime(ev.startTravelTime) : ''),
-        arrivalTimestamp: findKey(ev.raw, ['現場到着']) ? formatTime(findKey(ev.raw, ['現場到着'])) : (ev.arrivalTimestamp ? formatTime(ev.arrivalTimestamp) : ''),
-        actualStartTime: findKey(ev.raw, ['作業開始', '実績開始']) ? formatTime(findKey(ev.raw, ['作業開始', '実績開始'])) : (ev.actualStartTime ? formatTime(ev.actualStartTime) : ''),
-        actualEndTime: findKey(ev.raw, ['作業完了', '実績完了', '実績終了']) ? formatTime(findKey(ev.raw, ['作業完了', '実績完了', '実績終了'])) : (ev.actualEndTime ? formatTime(ev.actualEndTime) : ''),
+        startTravelTime: ev.startTravelTime ? formatTime(ev.startTravelTime) : (findKey(ev.raw, ['移動開始']) ? formatTime(findKey(ev.raw, ['移動開始'])) : ''),
+        arrivalTimestamp: ev.arrivalTimestamp ? formatTime(ev.arrivalTimestamp) : (findKey(ev.raw, ['現場到着']) ? formatTime(findKey(ev.raw, ['現場到着'])) : ''),
+        actualStartTime: ev.actualStartTime ? formatTime(ev.actualStartTime) : (findKey(ev.raw, ['作業開始', '実績開始']) ? formatTime(findKey(ev.raw, ['作業開始', '実績開始'])) : ''),
+        actualEndTime: ev.actualEndTime ? formatTime(ev.actualEndTime) : (findKey(ev.raw, ['作業完了', '実績完了', '実績終了']) ? formatTime(findKey(ev.raw, ['作業完了', '実績完了', '実績終了'])) : ''),
         actualDuration: findKey(ev.raw, ['作業時間（分）', '所要時間']) || ev.actualDuration || '',
         scheduledDate: (findKey(ev.raw, ['作業予定日']) ? formatDate(findKey(ev.raw, ['作業予定日']), 'yyyy-MM-dd') : '') || (ev.scheduledDate ? (typeof ev.scheduledDate === 'string' ? ev.scheduledDate.split('T')[0] : formatDate(ev.scheduledDate, 'yyyy-MM-dd')) : ''),
-        scheduledTime: formatTime(findKey(ev.raw, ['予定時間', 'チップ配置作業予定'])) || ev.scheduledTime || ''
+        scheduledTime: ev.scheduledTime || formatTime(findKey(ev.raw, ['予定時間', 'チップ配置作業予定'])) || ''
       });
     } else if (dialogState.mode === 'order-details' && dialogState.order) {
       const ord = dialogState.order as any;
@@ -574,13 +574,13 @@ export function ScheduleView({
         tireStatus: findKey(ord.raw, ["タイヤ手配状況", "手配"]) || ord.arrangement || ord.tireStatus || '',
         disposal: findKey(ord.raw, ["廃タイヤ処分", "廃タイヤ"]) || ord.disposal || '',
         specialNotes: findKey(ord.raw, ["特記事項", "備考", "メモ", "特記", "specialNotes"]) || ord.specialNotes || '',
-        startTravelTime: findKey(ord.raw, ['移動開始']) ? formatTime(findKey(ord.raw, ['移動開始'])) : (ord.startTravelTime ? formatTime(ord.startTravelTime) : ''),
-        arrivalTimestamp: findKey(ord.raw, ['現場到着']) ? formatTime(findKey(ord.raw, ['現場到着'])) : (ord.arrivalTimestamp ? formatTime(ord.arrivalTimestamp) : ''),
-        actualStartTime: findKey(ord.raw, ['作業開始', '実績開始']) ? formatTime(findKey(ord.raw, ['作業開始', '実績開始'])) : (ord.actualStartTime ? formatTime(ord.actualStartTime) : ''),
-        actualEndTime: findKey(ord.raw, ['作業完了', '実績完了', '実績終了']) ? formatTime(findKey(ord.raw, ['作業完了', '実績完了', '実績終了'])) : (ord.actualEndTime ? formatTime(ord.actualEndTime) : ''),
+        startTravelTime: ord.startTravelTime ? formatTime(ord.startTravelTime) : (findKey(ord.raw, ['移動開始']) ? formatTime(findKey(ord.raw, ['移動開始'])) : ''),
+        arrivalTimestamp: ord.arrivalTimestamp ? formatTime(ord.arrivalTimestamp) : (findKey(ord.raw, ['現場到着']) ? formatTime(findKey(ord.raw, ['現場到着'])) : ''),
+        actualStartTime: ord.actualStartTime ? formatTime(ord.actualStartTime) : (findKey(ord.raw, ['作業開始', '実績開始']) ? formatTime(findKey(ord.raw, ['作業開始', '実績開始'])) : ''),
+        actualEndTime: ord.actualEndTime ? formatTime(ord.actualEndTime) : (findKey(ord.raw, ['作業完了', '実績完了', '実績終了']) ? formatTime(findKey(ord.raw, ['作業完了', '実績完了', '実績終了'])) : ''),
         actualDuration: findKey(ord.raw, ['作業時間（分）', '所要時間']) || ord.actualDuration || '',
         scheduledDate: (findKey(ord.raw, ['作業予定日']) ? formatDate(findKey(ord.raw, ['作業予定日']), 'yyyy-MM-dd') : '') || (ord.scheduledDate ? (typeof ord.scheduledDate === 'string' ? ord.scheduledDate.split('T')[0] : formatDate(ord.scheduledDate, 'yyyy-MM-dd')) : ''),
-        scheduledTime: formatTime(findKey(ord.raw, ['予定時間', 'チップ配置作業予定'])) || ord.scheduledTime || ''
+        scheduledTime: ord.scheduledTime || formatTime(findKey(ord.raw, ['予定時間', 'チップ配置作業予定'])) || ''
       });
     } else {
       setEditOrderForm({});
@@ -1282,6 +1282,24 @@ export function ScheduleView({
             if (result.status === 'error') {
               throw new Error(result.message);
             }
+
+            // Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
+            try {
+              const { OrderService } = await import('@/services/order-service');
+              await OrderService.updateOrder(finalSystemId, {
+                staffName: newStaff.name,
+                staffId: newStaffId,
+                status: (draggedEvent.staffId !== newStaffId) ? '割当済' : undefined,
+                scheduledDate: format(taskStart, 'yyyy/MM/dd'),
+                scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
+                scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
+                estimatedDuration: taskDuration,
+                updatedAt: new Date().toISOString()
+              } as any);
+            } catch (fsErr) {
+              console.error("Firestore sync error on move:", fsErr);
+            }
+
             toast({ title: "スケジュールを更新しました", duration: 3000 });
             // バックエンドの反映を待ってから再取得
             setTimeout(() => refetchOrders(), 1500);
@@ -1497,6 +1515,24 @@ export function ScheduleView({
               if (res.status === 'error') {
                 throw new Error(res.message);
               }
+
+              // Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
+              try {
+                const { OrderService } = await import('@/services/order-service');
+                await OrderService.updateOrder(targetRawOrderId, {
+                  staffName: staff.name,
+                  staffId: newStaffId,
+                  status: '割当済',
+                  scheduledDate: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
+                  scheduledTime: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
+                  scheduledEndTime: format(safeParseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
+                  estimatedDuration: order.estimatedDuration || 60,
+                  updatedAt: new Date().toISOString()
+                } as any);
+              } catch (fsErr) {
+                console.error("Firestore sync error on assign:", fsErr);
+              }
+
               await refetchOrders();
               toast({ title: "タスクを割り当てました。" });
             }
@@ -2576,6 +2612,10 @@ export function ScheduleView({
                       </div>
                       {renderEditableItem('作業予定日', 'scheduledDate', 'date')}
                       {renderEditableItem('予定時間', 'scheduledTime', 'time')}
+                      {renderEditableItem('移動開始', 'startTravelTime', 'time')}
+                      {renderEditableItem('現場到着', 'arrivalTimestamp', 'time')}
+                      {renderEditableItem('作業開始', 'actualStartTime', 'time')}
+                      {renderEditableItem('作業完了', 'actualEndTime', 'time')}
                     </div>
                   </div>
                   <DialogFooter className="sm:justify-between pt-4 border-t">

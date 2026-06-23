@@ -49,8 +49,13 @@ export const formatDate = (dateString: string | undefined | null, formatString: 
   return dateString || ''; // Return original string if valid
 };
 
-export const formatTime = (date: Date | string) => {
+export const formatTime = (date: Date | string | any) => {
   if (!date) return '';
+
+  // Handle Firestore Timestamp object
+  if (date && typeof date === 'object' && 'seconds' in date) {
+    date = new Date(date.seconds * 1000);
+  }
 
   // Handle cases like "1899-12-29T15:00:00.000Z" which come from Sheets for time-only values
   if (typeof date === 'string' && date.startsWith('1899-12-')) {

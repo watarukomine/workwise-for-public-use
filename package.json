@@ -1,6 +1,6 @@
 {
   "name": "nextn",
-  "version": "1.7.9-tmp",
+  "version": "1.7.10-tmp",
   "private": true,
   "engines": {
     "node": "20.x"
