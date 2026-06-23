@@ -84,9 +84,14 @@ const isGenericTask = (order: any) => {
   if (!order) return false;
   const id = order.id || '';
   const title = order.title || order.taskDetails || '';
+  const type = order._type || order.type;
+  
+  if (type === 'order') return false;
+  if (type === 'task') return true;
+
   return id.startsWith('task-') || id.startsWith('generic-') ||
     ['休憩', '移動', '業務', '研修', '同行', '商談'].includes(title) ||
-    !order.customerCode;
+    (!order.customerCode && !order.customerName);
 };
 
 const timeStringToDate = (timeStr: string, baseDate: Date) => {
@@ -1171,8 +1176,8 @@ export function ScheduleView({
               systemId: draggedEvent.systemId || draggedEvent.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, ''),
               // Fallback search keys: Always use the TASK part's original start time
               oldStaffName: getStaffById(draggedEvent.staffId)?.name || draggedEvent.staffName,
-              oldScheduledTime: typeof taskPart.start === 'string' ? taskPart.start : new Date(taskPart.start).toISOString(),
-              oldScheduledDate: taskPart.scheduledDate || (taskPart.start ? format(new Date(taskPart.start), 'yyyy-MM-dd') : undefined)
+              oldScheduledTime: taskPart.start ? (typeof taskPart.start === 'string' ? taskPart.start : safeParseISO(taskPart.start).toISOString()) : '',
+              oldScheduledDate: taskPart.scheduledDate || (taskPart.start ? format(safeParseISO(taskPart.start), 'yyyy-MM-dd') : undefined)
             });
             if (result.status === 'error') {
               throw new Error(result.message);
@@ -1272,8 +1277,8 @@ export function ScheduleView({
               systemId: finalSystemId,
               // Fallback search keys for backend stability
               oldStaffName: getStaffById(draggedEvent.staffId)?.name || draggedEvent.staffName,
-              oldScheduledTime: typeof currentTaskEvent.start === 'string' ? currentTaskEvent.start : new Date(currentTaskEvent.start).toISOString(),
-              oldScheduledDate: currentTaskEvent.scheduledDate || (currentTaskEvent.start ? format(new Date(currentTaskEvent.start), 'yyyy-MM-dd') : undefined)
+              oldScheduledTime: currentTaskEvent.start ? (typeof currentTaskEvent.start === 'string' ? currentTaskEvent.start : safeParseISO(currentTaskEvent.start).toISOString()) : '',
+              oldScheduledDate: currentTaskEvent.scheduledDate || (currentTaskEvent.start ? format(safeParseISO(currentTaskEvent.start), 'yyyy-MM-dd') : undefined)
             });
             if (result.status === 'error') {
               throw new Error(result.message);
@@ -2854,7 +2859,7 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     `${(!isTravelEvent && (tireSize || honsu)) ? `\n${tireSize ? tireSize : ''}${tireSize && honsu ? ' ' : ''}${honsu ? formatHonsu(honsu) : ''}` : ''}`;
 
   const style: any = isOverlay ?
-    { touchAction: 'none' } :
+    { touchAction: 'none', '--dynamic-width': `${width}px` } :
     {
       '--dynamic-left': `${left}px`,
       '--dynamic-width': `${width}px`,
