@@ -1656,7 +1656,14 @@ export function ScheduleView({
       // 1. Primary write to Firestore (Delete)
       await OrderService.deleteOrder(orderId);
 
-      // 2. Clear from GAS/Spreadsheet backup
+      // 2. Clear from local state immediately to avoid ghost chips
+      deleteLocalEvent(target.id);
+      if (target.tripId) {
+        deleteLocalEvent(`${target.tripId}-travel`);
+        deleteLocalEvent(`${target.tripId}-task`);
+      }
+
+      // 3. Clear from GAS/Spreadsheet backup
       try {
         await updateSheetStatus({
           gasUrl: ORDER_GAS_URL,

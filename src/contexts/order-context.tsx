@@ -492,11 +492,15 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
       setRawOrdersData(prev => {
         const orderMap = new Map();
+        const normTarget = normalizeDateStr(targetDateStr);
         
-        // Populate with existing data
+        // Keep non-target date orders
         prev.forEach(o => {
-          const id = o.id || o.systemId;
-          if (id) orderMap.set(id, o);
+          const normO = normalizeDateStr(o.scheduledDate);
+          if (normO !== normTarget) {
+            const id = o.id || o.systemId;
+            if (id) orderMap.set(id, o);
+          }
         });
 
         // Update/Add with new data
