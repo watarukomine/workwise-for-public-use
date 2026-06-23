@@ -64,7 +64,9 @@ export default function DashboardPage() {
       .map((raw, idx) => mapRawToOrder(raw, `check-${idx}`))
       .filter(o => {
         // Filter out empty rows
-        if (!o.customerCode && !o.customerName && !o.taskDetails) return false;
+        const hasNoCustomer = !o.customerCode || o.customerCode === '00000' || !o.customerName || o.customerName === '（店舗名未設定）';
+        const hasNoDetails = !o.taskDetails && !o.orderNo && !o.regNo && !o.productName;
+        if (hasNoCustomer && hasNoDetails) return false;
 
         // Check scheduledDate
         if (o.scheduledDate === dateStr) return true;

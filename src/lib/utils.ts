@@ -280,7 +280,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     id: String(orderId),
     displayId: visualId ? String(visualId) : undefined,
     rawOrderId: (sysId || visualId) ? String(sysId || visualId) : undefined,
-    customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode', '顧客コード']) || ''),
+    customerCode: String(findKey(rawOrder, ['ユーザーコード', 'usercode', '顧客コード']) || '00000'),
     taskDetails: findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '',
     status: (() => {
       const raw = findKey(rawOrder, ['受注ステータス', 'status']) || '未割当';
@@ -297,7 +297,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     staffName: findKey(rawOrder, ['担当', 'スタッフ名', 'staffName', '氏名', '担当者', 'スタッフ', '名前', '担当者名', '社員名', '配置担当', 'staff']) || '',
     staffId: findKey(rawOrder, ['スタッフID', 'スタッフコード', 'staffId', '担当者ID', '担当ID', '社員ID', '社員コード', 'staff_id']) || '',
     mainStore: findKey(rawOrder, ['主管店舗', 'mainStore', '主管']) || '',
-    customerName: findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '名称', 'お名前', 'Customer', 'storeName']) || '',
+    customerName: findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '名称', 'お名前', 'Customer', 'storeName']) || '（店舗名未設定）',
     address: findKey(rawOrder, ['住所', 'Address', '納品先', 'お届け先', '納品先住所', 'お届け先住所', '現場住所']) || '',
     scheduledEndTime: scheduledEndTime || '',
     actualStartTime: (() => {
