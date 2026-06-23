@@ -14,6 +14,17 @@ import { OrderService } from '@/services/order-service';
 
 const TRAVEL_TIME_MINUTES = 30;
 
+const normalizeDateStr = (dStr: any): string => {
+  if (!dStr) return '';
+  try {
+    const d = new Date(dStr);
+    if (!isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+  } catch (e) {}
+  return String(dStr).replace(/\//g, '-').trim();
+};
+
 interface OrderContextType {
   orders: WithId<Order>[];
   unassignedOrders: WithId<Order>[];
@@ -526,9 +537,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     const unsubscribeToday = OrderService.subscribeToOrders(todayStr, (updatedOrders) => {
       setRawOrdersData(prev => {
         const orderMap = new Map();
+        const normToday = normalizeDateStr(todayStr);
         // Keep non-today orders
         prev.forEach(o => {
-          if (o.scheduledDate !== todayStr && o.scheduledDate !== todayStr.replace(/-/g, '/')) {
+          const normO = normalizeDateStr(o.scheduledDate);
+          if (normO !== normToday) {
             const id = o.id || o.systemId;
             if (id) orderMap.set(id, o);
           }
@@ -556,17 +569,15 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     if (viewedDateStr === todayStr) return;
 
-    // Load data immediately for the viewed date (Non-blocking background fetch)
-    console.log(`[OrderProvider] Loading data immediately for viewed date: ${viewedDateStr}`);
-    fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
-
     console.log(`[OrderProvider] Subscribing to Firestore updates for viewed date: ${viewedDateStr}`);
     const unsubscribeViewed = OrderService.subscribeToOrders(viewedDateStr, (updatedOrders) => {
       setRawOrdersData(prev => {
         const orderMap = new Map();
+        const normViewed = normalizeDateStr(viewedDateStr);
         // Keep non-viewed orders
         prev.forEach(o => {
-          if (o.scheduledDate !== viewedDateStr && o.scheduledDate !== viewedDateStr.replace(/-/g, '/')) {
+          const normO = normalizeDateStr(o.scheduledDate);
+          if (normO !== normViewed) {
             const id = o.id || o.systemId;
             if (id) orderMap.set(id, o);
           }
