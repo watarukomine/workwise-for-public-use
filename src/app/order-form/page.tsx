@@ -228,6 +228,7 @@ export default function OrderFormPage() {
                 ...submissionData,
                 customerCode: submissionData.userCode, // map to expected key
                 customerName: submissionData.storeName, // map to expected key
+                estimatedDuration: 60,
                 _type: 'order', // Explicitly denote as an order
             });
 

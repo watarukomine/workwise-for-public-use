@@ -1367,7 +1367,7 @@ export function ScheduleView({
           id: `${tripId}-task`, tripId,
           title: order.taskDetails,
           staffId: newStaffId, locationId: customer?.userCode || '',
-          start: taskStart.toISOString(), end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
+          start: taskStart.toISOString(), end: addMinutes(taskStart, order.estimatedDuration || 60).toISOString(),
           rawOrderId: order.rawOrderId, raw: order.raw, systemId: order.id,
         };
         newEvents = [travelEvent, taskEvent];
