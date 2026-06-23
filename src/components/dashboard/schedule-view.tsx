@@ -791,7 +791,7 @@ export function ScheduleView({
         });
       }
 
-      await updateSheetStatus({
+      updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: `(ID: ${event.rawOrderId})`,
         staffName: event.staffName,
@@ -800,7 +800,7 @@ export function ScheduleView({
         emergencyFlag: false,
         adminReply: '',
         systemId: event.systemId
-      });
+      }).catch(err => console.warn('Failed to update sheet on emergency recovery:', err));
 
       toast({ title: "緊急ステータスを解除しました" });
       await refetchOrders();
@@ -831,15 +831,14 @@ export function ScheduleView({
       const timestamp = format(new Date(), 'HH:mm');
       const finalReply = `[${timestamp}]: ${replyMessage}`;
 
-      const result = await updateSheetStatus({
+      updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: `(ID: ${rawOrderId})`,
         staffName: staffName,
         adminReply: finalReply,
         emergencyFlag: true, // Keep it active
         systemId: (targetEmergencyEvent as any).systemId
-      });
-      console.log("Send Reply Result:", result);
+      }).catch(err => console.warn('Failed to send reply to sheet:', err));
 
       toast({ title: "返信を送信しました" });
       setReplyDialogOpen(false);
@@ -865,22 +864,18 @@ export function ScheduleView({
         newComment = currentComment.replace(/【緊急】/g, '').trim();
       }
 
-      const result = await updateSheetStatus({
+      updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         systemId: event.id,
         statusValue: event.status,
         emergencyFlag: isEmergency,
-      });
+      }).catch(err => console.warn('Failed to toggle emergency in sheet:', err));
 
-      if (result.status === 'success') {
-        toast({
-          title: isEmergency ? '緊急ステータスに設定しました' : '緊急ステータスを解除しました',
-        });
-        deleteLocalEvent(event.id);
-        await refetchOrders();
-      } else {
-        throw new Error(result.message);
-      }
+      toast({
+        title: isEmergency ? '緊急ステータスに設定しました' : '緊急ステータスを解除しました',
+      });
+      deleteLocalEvent(event.id);
+      await refetchOrders();
     } catch (error) {
       console.error('Failed to toggle emergency status:', error);
       toast({
@@ -980,7 +975,7 @@ export function ScheduleView({
     // recalculates and pushes the new state (including the unassigned list).
 
     try {
-      await updateSheetStatus({
+      updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: `(ID: ${eventToUnassign.rawOrderId})`,
         staffName: "",
@@ -988,7 +983,7 @@ export function ScheduleView({
         scheduledTime: "",
         timestamp: new Date().toISOString(),
         systemId: orderToUnassign.id
-      });
+      }).catch(err => console.warn('Failed to update sheet on unassign:', err));
 
       await refetchOrders();
       toast({ title: 'タスクを未割り当てに戻しました', duration: 3000 });
@@ -1043,19 +1038,15 @@ export function ScheduleView({
         }
       } else {
         if (scheduleItem.rawOrderId) {
-          try {
-            await updateSheetStatus({
-              gasUrl: ORDER_GAS_URL,
-              eventTitle: `(ID: ${scheduleItem.rawOrderId})`,
-              staffName: "",
-              statusValue: "キャンセル",
-              timestamp: new Date().toISOString(),
-              systemId: scheduleItem.id
-            });
-            await refetchOrders();
-          } catch (e) {
-            console.error("Failed to cancel generic task:", e);
-          }
+          updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: `(ID: ${scheduleItem.rawOrderId})`,
+            staffName: "",
+            statusValue: "キャンセル",
+            timestamp: new Date().toISOString(),
+            systemId: scheduleItem.id
+          }).catch(err => console.warn('Failed to cancel generic task in sheet:', err));
+          await refetchOrders();
         }
         deleteLocalEvent(item.id);
         toast({ title: '汎用タスクを削除しました', duration: 3000 });
@@ -1160,7 +1151,7 @@ export function ScheduleView({
             }
 
             // Backend Update
-            const result = await updateSheetStatus({
+            updateSheetStatus({
               gasUrl: ORDER_GAS_URL,
               eventTitle: taskPart.title,
               staffName: newStaff.name,
@@ -1173,14 +1164,10 @@ export function ScheduleView({
               "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
               "作業予定日": format(taskStart, 'yyyy/MM/dd'),
               systemId: draggedEvent.systemId || draggedEvent.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, ''),
-              // Fallback search keys: Always use the TASK part's original start time
               oldStaffName: getStaffById(draggedEvent.staffId)?.name || draggedEvent.staffName,
               oldScheduledTime: taskPart.start ? (typeof taskPart.start === 'string' ? taskPart.start : safeParseISO(taskPart.start).toISOString()) : '',
               oldScheduledDate: taskPart.scheduledDate || (taskPart.start ? format(safeParseISO(taskPart.start), 'yyyy-MM-dd') : undefined)
-            });
-            if (result.status === 'error') {
-              throw new Error(result.message);
-            }
+            }).catch(err => console.warn('Failed to update sheet on task update:', err));
             toast({ title: "タスク時間を更新しました", duration: 3000 });
             // バックエンドの反映を待ってから再取得
             setTimeout(() => refetchOrders(), 1500);
@@ -1260,7 +1247,7 @@ export function ScheduleView({
                 ? mapRawToOrder(draggedEvent.raw).id
                 : draggedEvent.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, ''));
 
-            const result = await updateSheetStatus({
+            updateSheetStatus({
               gasUrl: ORDER_GAS_URL,
               eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
               staffName: newStaff.name,
@@ -1274,14 +1261,10 @@ export function ScheduleView({
               "作業予定日": format(taskStart, 'yyyy/MM/dd'),
               "作業時間（分）": taskDuration,
               systemId: finalSystemId,
-              // Fallback search keys for backend stability
               oldStaffName: getStaffById(draggedEvent.staffId)?.name || draggedEvent.staffName,
               oldScheduledTime: currentTaskEvent.start ? (typeof currentTaskEvent.start === 'string' ? currentTaskEvent.start : safeParseISO(currentTaskEvent.start).toISOString()) : '',
               oldScheduledDate: currentTaskEvent.scheduledDate || (currentTaskEvent.start ? format(safeParseISO(currentTaskEvent.start), 'yyyy-MM-dd') : undefined)
-            });
-            if (result.status === 'error') {
-              throw new Error(result.message);
-            }
+            }).catch(err => console.warn('Failed to update sheet on order move:', err));
 
             // Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
             try {
@@ -1511,10 +1494,7 @@ export function ScheduleView({
                 payload.actualDuration = "";
               }
 
-              const res = await updateSheetStatus(payload);
-              if (res.status === 'error') {
-                throw new Error(res.message);
-              }
+              updateSheetStatus(payload).catch(err => console.warn('Failed to update sheet on assign:', err));
 
               // Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
               try {
@@ -1615,20 +1595,18 @@ export function ScheduleView({
         });
 
         // 2. Backup update to GAS
-        try {
-          await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: `(ID: ${orderId})`,
-            systemId: orderId,
-            staffName: '', // Unassign staff if assigned
-            statusValue: 'キャンセル',
-            cancelDate: new Date().toISOString(),
-            cancelContact: cancelContact,
-            timestamp: new Date().toISOString()
-          });
-        } catch (gasErr) {
+        updateSheetStatus({
+          gasUrl: ORDER_GAS_URL,
+          eventTitle: `(ID: ${orderId})`,
+          systemId: orderId,
+          staffName: '', // Unassign staff if assigned
+          statusValue: 'キャンセル',
+          cancelDate: new Date().toISOString(),
+          cancelContact: cancelContact,
+          timestamp: new Date().toISOString()
+        }).catch(gasErr => {
           console.warn('Failed to update GAS status for cancel:', gasErr);
-        }
+        });
 
         toast({ title: "作業キャンセルを記録しました" });
         setIsCancelling(false);
@@ -1664,19 +1642,17 @@ export function ScheduleView({
       }
 
       // 3. Clear from GAS/Spreadsheet backup
-      try {
-        await updateSheetStatus({
-          gasUrl: ORDER_GAS_URL,
-          eventTitle: `(ID: ${orderId})`,
-          systemId: orderId,
-          statusValue: '削除',
-          cancelDate: new Date().toISOString(),
-          cancelContact: '物理削除',
-          timestamp: new Date().toISOString()
-        });
-      } catch (gasErr) {
+      updateSheetStatus({
+        gasUrl: ORDER_GAS_URL,
+        eventTitle: `(ID: ${orderId})`,
+        systemId: orderId,
+        statusValue: '削除',
+        cancelDate: new Date().toISOString(),
+        cancelContact: '物理削除',
+        timestamp: new Date().toISOString()
+      }).catch(gasErr => {
         console.warn('Failed to notify GAS of order deletion:', gasErr);
-      }
+      });
 
       toast({ title: "受注データを削除しました" });
       await refetchOrders();
@@ -1860,7 +1836,26 @@ export function ScheduleView({
             isUpdate: dialogState.mode === 'edit'
           } : undefined;
 
-          const sheetResult = await updateSheetStatus({
+          // 1. Direct Write to Firestore (Primary) for instant UI updates
+          try {
+            const { OrderService } = await import('@/services/order-service');
+            const updateFields: any = {
+              scheduledDate: format(newStart, 'yyyy/MM/dd'),
+              scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
+              scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
+              estimatedDuration: durationMinutes,
+              updatedAt: new Date().toISOString()
+            };
+            if (overrides.statusValue) {
+              updateFields.status = overrides.statusValue;
+            }
+            await OrderService.updateOrder(eventToUpdate.systemId || eventToUpdate.id, updateFields);
+          } catch (fsErr) {
+            console.error("Firestore sync error on save event:", fsErr);
+          }
+
+          // 2. Backup to GAS (Asynchronous - Background)
+          updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`,
             systemId: eventToUpdate.systemId,
@@ -1878,13 +1873,12 @@ export function ScheduleView({
             staffName: staff?.name,
             shouldSendEmail: !!emailParams,
             emailParams: emailParams
+          }).catch(gasErr => {
+            console.warn('Failed to update sheet on save event:', gasErr);
           });
-
-          if (sheetResult.status === 'error') throw new Error(sheetResult.message);
 
           toast({
             title: '保存完了',
-            description: sheetResult.message
           });
 
           setIsEditingOrderDetails(false);
@@ -1951,9 +1945,9 @@ export function ScheduleView({
           // OPTIMISTIC UI: Immediately remove companion from view state
           setScheduleEvents(prev => prev.filter(e => e.id !== companionTravel.id && e.id !== eventToDelete.id));
 
-          // CRITICAL: Also delete the companion event from GAS Backend
+           // CRITICAL: Also delete the companion event from GAS Backend
           // Even if it doesn't have a task- ID, the fallback search in GAS (by Staff+Time) will catch it.
-          await updateSheetStatus({
+          updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: companionTravel.title,
             staffName: staffName,
@@ -1962,7 +1956,7 @@ export function ScheduleView({
             systemId: companionTravel.id,
             scheduledTime: companionTravel.start instanceof Date ? companionTravel.start.toISOString() : companionTravel.start,
             actionType: 'cancel'
-          });
+          }).catch(err => console.warn('Failed to update sheet on companion travel cancel:', err));
         }
       }
 
@@ -1974,7 +1968,7 @@ export function ScheduleView({
         cleanSystemId = cleanSystemId.replace('trip-', '').replace('-task', '');
       }
 
-      await updateSheetStatus({
+      updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: eventToDelete.title || `(ID: ${eventToDelete.rawOrderId || 'N/A'})`,
         staffName: staffName, // Needed for fallback search
@@ -1983,7 +1977,7 @@ export function ScheduleView({
         systemId: cleanSystemId, // Pass CLEAN stable ID
         scheduledTime: eventToDelete.start instanceof Date ? eventToDelete.start.toISOString() : eventToDelete.start, // Pass Start Time for fallback search
         actionType: 'cancel' // Optional context
-      });
+      }).catch(err => console.warn('Failed to update sheet on generic task delete:', err));
 
       toast({ title: '汎用タスクを削除しました', duration: 3000 });
     } else {
