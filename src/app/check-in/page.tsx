@@ -249,6 +249,31 @@ function CheckInClient() {
           throw new Error(result.message);
         }
 
+        // 2. Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
+        const sysId = (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
+        if (sysId) {
+          const { OrderService } = await import('@/services/order-service');
+          const firestoreFields: any = {
+            status: statusValue,
+            updatedAt: new Date().toISOString()
+          };
+          if (latitude !== null) firestoreFields.latitude = latitude;
+          if (longitude !== null) firestoreFields.longitude = longitude;
+
+          const timeFieldMap: Record<string, string> = {
+            'Start Travel': 'startTravelTime',
+            'Arrive': 'arrivalTimestamp',
+            'Begin Task': 'actualStartTime',
+            'Finish Task': 'actualEndTime',
+          };
+          const mappedField = timeFieldMap[action];
+          if (mappedField) {
+            firestoreFields[mappedField] = now.toISOString();
+          }
+
+          await OrderService.updateOrder(sysId, firestoreFields);
+        }
+
         // Optimistic update done
         setOptimisticStatus(statusValue);
 
