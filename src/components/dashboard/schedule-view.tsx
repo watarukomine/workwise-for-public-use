@@ -2088,9 +2088,15 @@ export function ScheduleView({
 
   const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 5, // 5px movement threshold to prevent accidental drags on touch and low-spec mouse
+        distance: 5, // Prevent accidental drag on mouse clicks
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250, // Require a press delay to support scrolling on touch screens
+        tolerance: 5,
       },
     })
   );
