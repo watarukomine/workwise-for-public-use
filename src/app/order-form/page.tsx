@@ -16,6 +16,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { findKey } from '@/lib/utils';
+import { createOrder as createOrderGas } from '@/app/actions/gas-actions';
 
 // Schema definition
 const orderFormSchema = z.object({
@@ -223,13 +224,54 @@ export default function OrderFormPage() {
                 submissionData.quantity = data.customQuantity;
             }
 
-            // Write to Firestore (Primary) + GAS (Backup) via Dual-Write Service
+            // 1. GAS Side Create (Primary for ID generation)
+            const gasResult = await createOrderGas({
+                gasUrl: ORDER_GAS_URL,
+                userCode: submissionData.userCode,
+                storeName: submissionData.storeName,
+                workType: submissionData.workType,
+                scheduledDate: submissionData.scheduledDate,
+                scheduledTime: submissionData.scheduledTime || '',
+                picName: submissionData.picName || '',
+                orderNo: submissionData.orderNo || '',
+                comment: submissionData.comment || '',
+                carName: submissionData.carName || '',
+                regNo: submissionData.regNo || '',
+                status: '未割当',
+                tireNumber: submissionData.tireNumber || '',
+                tireSize: submissionData.tireSize || '',
+                productName: submissionData.productName || '',
+                quantity: String(submissionData.quantity || ''),
+                sensor: submissionData.sensor || '',
+                arrangement: submissionData.arrangement || '',
+                disposal: submissionData.disposal || '',
+                contact: submissionData.contact || '',
+                specialNotes: submissionData.specialNotes || '',
+                submitter: submissionData.submitter || '',
+            });
+
+            if (gasResult.status === 'error') {
+                throw new Error(`GAS連携エラー: ${gasResult.message}`);
+            }
+
+            const returnedOrderId = gasResult.orderId || (gasResult as any).data?.orderId;
+            if (!returnedOrderId) {
+                throw new Error('GASから受注IDが返却されませんでした。');
+            }
+
+            const displayId = String(gasResult.displayId || (gasResult as any).data?.displayId || '');
+
+            // 2. Write to Firestore (Primary) using GAS ID
             const systemId = await OrderService.createOrder({
                 ...submissionData,
+                id: returnedOrderId,
+                systemId: returnedOrderId,
+                displayId: displayId,
                 customerCode: submissionData.userCode, // map to expected key
                 customerName: submissionData.storeName, // map to expected key
                 estimatedDuration: 60,
                 _type: 'order', // Explicitly denote as an order
+                isGasSynced: true, // Prevent double syncing
             });
 
             if (systemId) {

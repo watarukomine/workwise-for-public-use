@@ -104,8 +104,8 @@ export const OrderService = {
         
         // 1. Generate IDs
         // Only generate a sequential displayId if it's a real order (has customerCode)
-        let displayId = '';
-        if (data.customerCode) {
+        let displayId = data.displayId || '';
+        if (!displayId && data.customerCode) {
           const nextDisplayId = await CounterService.getNextOrderId();
           displayId = String(nextDisplayId);
         }
@@ -126,12 +126,18 @@ export const OrderService = {
           status: data.status || '未割当'
         };
 
+        // Remove temp property before saving
+        delete (orderData as any).isGasSynced;
+
         // 2. Firestore Sync
         await setDoc(docRef, orderData);
 
         // 3. GAS Backup (Non-blocking or background call recommended)
         // Note: For spreadsheet parity, we call the createOrder action in GAS
-        this.backupToGas(orderData as any as Order, 'create');
+        const isGasSynced = (data as any).isGasSynced;
+        if (!isGasSynced) {
+            this.backupToGas(orderData as any as Order, 'create');
+        }
 
         return systemId;
     },

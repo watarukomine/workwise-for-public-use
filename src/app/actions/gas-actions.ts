@@ -10,6 +10,8 @@ interface GasResponse {
     message: string;
     data?: any;
     eventId?: string;
+    orderId?: string;
+    displayId?: string | number;
 }
 
 async function callGasApi(args: GasApiArgs): Promise<GasResponse> {

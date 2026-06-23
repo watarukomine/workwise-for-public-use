@@ -1292,7 +1292,7 @@ export function ScheduleView({
         }
       })();
 
-    } else if ('estimatedDuration' in item) { // --- Creating a new event ---
+    } else if (String(active.id).startsWith('order-') || 'estimatedDuration' in item) { // --- Creating a new event ---
       const order = item as WithId<Order>;
       const staff = getStaffById(newStaffId);
       if (!staff) return;
