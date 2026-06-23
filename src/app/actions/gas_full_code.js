@@ -532,30 +532,34 @@ function createOrder(params) {
 
         const userCode = params.userCode || 'guest';
         const randomStr = Utilities.getUuid().split('-')[0].substring(0, 3);
-        const newSystemId = `${dateStr}_${userCode}_${randomStr}`;
+        const newSystemId = params.systemId || `${dateStr}_${userCode}_${randomStr}`;
         // ---------------------------------------------------------
         // 2. Prepare Data (Static Order ID Calculation)
         // ---------------------------------------------------------
         // 数式の =ROW()-1 ではなく、現在の最大値を取得して +1 した値を固定値としてセットする
         // これにより行の並び替えを行ってもIDが変わらなくなる
 
-        let maxId = 0;
-        const idColIndex = headers.indexOf("受注ID");
-        if (idColIndex !== -1) {
-            const colLetter = String.fromCharCode(65 + idColIndex);
-            // ID列の既存値をすべて取得 (ヘッダー除く 2行目以降)
-            const existingIds = sheet.getRange(`${colLetter}2:${colLetter}`).getValues();
-            for (let i = 0; i < existingIds.length; i++) {
-                const val = existingIds[i][0];
-                const numVal = Number(val);
-                // 数値として有効で、現在の最大値より大きければ記録
-                if (!isNaN(numVal) && numVal > maxId) {
-                    maxId = numVal;
+        let nextId = 0;
+        if (params.displayId) {
+            nextId = Number(params.displayId);
+        } else {
+            let maxId = 0;
+            const idColIndex = headers.indexOf("受注ID");
+            if (idColIndex !== -1) {
+                const colLetter = String.fromCharCode(65 + idColIndex);
+                // ID列の既存値をすべて取得 (ヘッダー除く 2行目以降)
+                const existingIds = sheet.getRange(`${colLetter}2:${colLetter}`).getValues();
+                for (let i = 0; i < existingIds.length; i++) {
+                    const val = existingIds[i][0];
+                    const numVal = Number(val);
+                    // 数値として有効で、現在の最大値より大きければ記録
+                    if (!isNaN(numVal) && numVal > maxId) {
+                        maxId = numVal;
+                    }
                 }
             }
+            nextId = maxId + 1;
         }
-
-        const nextId = maxId + 1;
         const numericId = nextId; // レスポンス用
         // データの書き込み先行を決定 (最終行+1)
         const targetRow = sheet.getLastRow() + 1;

@@ -224,7 +224,7 @@ function createOrder(params) {
 
     const userCode = params.userCode || 'guest';
     const randomStr = Utilities.getUuid().split('-')[0].substring(0, 3);
-    const newSystemId = `${dateStr}_${userCode}_${randomStr}`;
+    const newSystemId = params.systemId || `${dateStr}_${userCode}_${randomStr}`;
 
     // ---------------------------------------------------------
     // ---------------------------------------------------------
@@ -233,24 +233,26 @@ function createOrder(params) {
     // Instead of using formula =ROW()-1, calculate Max(CurrentID) + 1
     // This allows sorting without breaking IDs.
 
-    let maxId = 0;
-    const idColIndex = headers.indexOf("受注ID"); // Find the index of "受注ID"
-    if (idColIndex !== -1) {
-      const colLetter = String.fromCharCode(65 + idColIndex);
-      // Get all values in ID column (exclude header)
-      const existingIds = sheet.getRange(`${colLetter}2:${colLetter}`).getValues();
-      for (let i = 0; i < existingIds.length; i++) {
-        const val = existingIds[i][0];
-        // Check if value is a number (ignore formulas like =ROW()-1 if any left, though unlikely if pasting as values)
-        // Adjust logic: if it's a number, take it.
-        const numVal = Number(val);
-        if (!isNaN(numVal) && numVal > maxId) {
-          maxId = numVal;
+    let nextId = 0;
+    if (params.displayId) {
+      nextId = Number(params.displayId);
+    } else {
+      let maxId = 0;
+      const idColIndex = headers.indexOf("受注ID"); // Find the index of "受注ID"
+      if (idColIndex !== -1) {
+        const colLetter = String.fromCharCode(65 + idColIndex);
+        // Get all values in ID column (exclude header)
+        const existingIds = sheet.getRange(`${colLetter}2:${colLetter}`).getValues();
+        for (let i = 0; i < existingIds.length; i++) {
+          const val = existingIds[i][0];
+          const numVal = Number(val);
+          if (!isNaN(numVal) && numVal > maxId) {
+            maxId = numVal;
+          }
         }
       }
+      nextId = maxId + 1;
     }
-
-    const nextId = maxId + 1;
     const numericId = nextId; // Return value for frontend response
 
     // Determine the row to write to (last row + 1)

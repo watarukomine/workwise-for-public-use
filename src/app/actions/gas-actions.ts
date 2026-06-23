@@ -121,6 +121,8 @@ export async function createTask(args: {
 
 export async function createOrder(args: {
     gasUrl: string;
+    systemId?: string;
+    displayId?: string;
     userCode?: string;
     storeName: string;
     workType: string;

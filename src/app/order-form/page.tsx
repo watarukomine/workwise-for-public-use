@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { OrderService } from '@/services/order-service';
+import { CounterService } from '@/services/counter-service';
 import { useToast } from '@/hooks/use-toast';
 import { useCustomer } from '@/contexts/customer-context';
 import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -224,9 +225,48 @@ export default function OrderFormPage() {
                 submissionData.quantity = data.customQuantity;
             }
 
-            // 1. GAS Side Create (Primary for ID generation)
-            const gasResult = await createOrderGas({
+            // 1. Generate IDs locally
+            const nextDisplayId = await CounterService.getNextOrderId();
+            const displayId = String(nextDisplayId);
+
+            // Generate SystemID: YYYYMMDD_UserCode_Random3 (matches GAS generation format)
+            let targetDate = new Date();
+            if (submissionData.scheduledDate) {
+                const scheduled = new Date(submissionData.scheduledDate);
+                if (!isNaN(scheduled.getTime())) {
+                    targetDate = scheduled;
+                }
+            }
+            const yyyy = targetDate.getFullYear();
+            const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(targetDate.getDate()).padStart(2, '0');
+            const dateStr = `${yyyy}${mm}${dd}`;
+            const userCode = submissionData.userCode || 'guest';
+            const randomStr = Math.random().toString(36).substring(2, 5); // 3 random characters
+            const returnedOrderId = `${dateStr}_${userCode}_${randomStr}`;
+
+            // 2. Write to Firestore (Primary) FIRST
+            const systemId = await OrderService.createOrder({
+                ...submissionData,
+                id: returnedOrderId,
+                systemId: returnedOrderId,
+                displayId: displayId,
+                customerCode: submissionData.userCode, // map to expected key
+                customerName: submissionData.storeName, // map to expected key
+                estimatedDuration: 60,
+                _type: 'order', // Explicitly denote as an order
+                isGasSynced: true, // Prevent double syncing from OrderService
+            });
+
+            if (!systemId) {
+                throw new Error('送信に失敗しました。もう一度お試しください。');
+            }
+
+            // 3. Trigger GAS Backup in background (ASYNCHRONOUS - Do not await!)
+            createOrderGas({
                 gasUrl: ORDER_GAS_URL,
+                systemId: returnedOrderId,
+                displayId: displayId,
                 userCode: submissionData.userCode,
                 storeName: submissionData.storeName,
                 workType: submissionData.workType,
@@ -248,38 +288,13 @@ export default function OrderFormPage() {
                 contact: submissionData.contact || '',
                 specialNotes: submissionData.specialNotes || '',
                 submitter: submissionData.submitter || '',
+            }).catch(gasErr => {
+                console.error('GAS Background sync failed:', gasErr);
             });
 
-            if (gasResult.status === 'error') {
-                throw new Error(`GAS連携エラー: ${gasResult.message}`);
-            }
-
-            const returnedOrderId = gasResult.orderId || (gasResult as any).data?.orderId;
-            if (!returnedOrderId) {
-                throw new Error('GASから受注IDが返却されませんでした。');
-            }
-
-            const displayId = String(gasResult.displayId || (gasResult as any).data?.displayId || '');
-
-            // 2. Write to Firestore (Primary) using GAS ID
-            const systemId = await OrderService.createOrder({
-                ...submissionData,
-                id: returnedOrderId,
-                systemId: returnedOrderId,
-                displayId: displayId,
-                customerCode: submissionData.userCode, // map to expected key
-                customerName: submissionData.storeName, // map to expected key
-                estimatedDuration: 60,
-                _type: 'order', // Explicitly denote as an order
-                isGasSynced: true, // Prevent double syncing
-            });
-
-            if (systemId) {
-                setIsSuccess(true);
-                window.scrollTo(0, 0);
-            } else {
-                throw new Error('送信に失敗しました。もう一度お試しください。');
-            }
+            // Immediately mark as success and return
+            setIsSuccess(true);
+            window.scrollTo(0, 0);
         } catch (error: any) {
             console.error(error);
             toast({
