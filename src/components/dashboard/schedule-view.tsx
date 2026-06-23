@@ -1352,7 +1352,8 @@ export function ScheduleView({
 
         setScheduleEvents(prev => [...prev, ...newEvents]);
       } else {
-        const tripId = `trip-${order.rawOrderId}`;
+        const targetRawOrderId = order.rawOrderId || order.id;
+        const tripId = `trip-${targetRawOrderId}`;
         const customer = getCustomerByCode(order.customerCode);
         const travelEvent: WithId<ScheduleEvent> = {
           ...order,
@@ -1360,7 +1361,7 @@ export function ScheduleView({
           title: '移動',
           staffId: newStaffId, locationId: customer?.userCode || '',
           start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(), end: taskStart.toISOString(),
-          rawOrderId: order.rawOrderId, raw: order.raw, systemId: order.id,
+          rawOrderId: targetRawOrderId, raw: order.raw, systemId: order.id,
         };
         const taskEvent: WithId<ScheduleEvent> = {
           ...order,
@@ -1368,7 +1369,7 @@ export function ScheduleView({
           title: order.taskDetails,
           staffId: newStaffId, locationId: customer?.userCode || '',
           start: taskStart.toISOString(), end: addMinutes(taskStart, order.estimatedDuration || 60).toISOString(),
-          rawOrderId: order.rawOrderId, raw: order.raw, systemId: order.id,
+          rawOrderId: targetRawOrderId, raw: order.raw, systemId: order.id,
         };
         newEvents = [travelEvent, taskEvent];
 
@@ -1377,7 +1378,7 @@ export function ScheduleView({
         saveLocalEvent(travelEvent);
         saveLocalEvent(taskEvent);
 
-        setScheduleEvents(prev => [...prev.filter(e => e.rawOrderId !== order.rawOrderId), ...newEvents]);
+        setScheduleEvents(prev => [...prev.filter(e => e.rawOrderId !== targetRawOrderId), ...newEvents]);
         setUnassignedOrders(prev => prev.filter(o => o.id !== order.id));
       }
 
@@ -1464,20 +1465,21 @@ export function ScheduleView({
             const taskEvent = newEvents.find(e => e.id.endsWith('-task'));
             if (taskEvent) {
               const isNewlyAssigned = order.status === '未割当' || order.status === '入庫待ち' || !order.staffName;
+              const targetRawOrderId = order.rawOrderId || order.id;
 
               const payload: any = {
                 gasUrl: ORDER_GAS_URL,
-                eventTitle: `(ID: ${order.rawOrderId})`,
+                eventTitle: `(ID: ${targetRawOrderId})`,
                 staffName: staff.name,
                 statusValue: '割当済',
                 scheduledDate: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
                 scheduledTime: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
                 scheduledEndTime: format(safeParseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
-                estimatedDuration: order.estimatedDuration,
+                estimatedDuration: order.estimatedDuration || 60,
                 "チップ配置作業予定": format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
                 "チップ配置作業完了予定": format(safeParseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
                 "作業予定日": format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
-                "作業時間（分）": order.estimatedDuration,
+                "作業時間（分）": order.estimatedDuration || 60,
                 timestamp: new Date().toISOString(),
                 systemId: order.id
               };
