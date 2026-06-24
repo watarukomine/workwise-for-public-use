@@ -65,35 +65,66 @@ const COLLECTION_PRESETS = [
 
 // --- Field Mappings for Auto-conversion ---
 const FIELD_MAPPINGS: Record<string, string> = {
+  // 受注データ（orders）用マッピング
+  '受注ID': 'displayId',
+  'SystemID': 'id',
+  'お取引先コード': 'customerCode',
+  '顧客コード': 'customerCode',
+  'お取引先名': 'customerName',
+  '顧客名': 'customerName',
+  '店舗名': 'customerName',
+  '店舗': 'customerName',
+  '主管店舗': 'mainStore',
+  '作業内容': 'taskDetails',
+  '作業': 'taskDetails',
+  '詳細': 'taskDetails',
   '作業予定日': 'scheduledDate',
   '日付': 'scheduledDate',
   '予定日': 'scheduledDate',
+  '予定時間': 'scheduledTime',
   '開始時間': 'scheduledTime',
   '開始': 'scheduledTime',
-  '予定時間': 'scheduledTime',
   '終了時間': 'scheduledEndTime',
   '終了': 'scheduledEndTime',
   '予定終了時間': 'scheduledEndTime',
+  'ご担当者様': 'picName',
+  '担当者名': 'picName',
+  '担当': 'staffName',
   'スタッフ名': 'staffName',
   '担当者': 'staffName',
   'スタッフ': 'staffName',
   'スタッフID': 'staffId',
   'スタッフコード': 'staffId',
-  '作業内容': 'taskDetails',
-  '詳細': 'taskDetails',
-  'お取引先名': 'customerName',
-  '顧客名': 'customerName',
-  '店舗名': 'customerName',
-  'お取引先コード': 'customerCode',
-  '顧客コード': 'customerCode',
+  '注文番号': 'orderNo',
+  '受注No': 'orderNo',
+  '任意コメント': 'comment',
+  '車名': 'carName',
+  '登録ナンバー': 'regNo',
+  '受注ステータス': 'status',
+  '入庫状況': 'status',
+  'タイヤ品番': 'tireNumber',
+  'タイヤサイズ': 'tireSize',
+  '品名': 'productName',
+  '本数': 'quantity',
+  '空気圧センサーパッキン交換': 'sensor',
+  'センサー': 'sensor',
+  'タイヤ手配状況': 'arrangement',
+  '手配': 'arrangement',
+  '廃タイヤ処分': 'disposal',
+  '廃タイヤ': 'disposal',
+  '連絡者名': 'contact',
+  '連絡者': 'contact',
+  '特記事項': 'specialNotes',
+  'フォーム入力者': 'submitter',
+
   // 顧客（販売店）マスタ用
   'ユーザーコード': 'userCode',
-  '店舗': 'storeName',
   '住所': 'address',
   '緯度': 'latitude',
   '経度': 'longitude',
   '母店': 'mainStore',
 };
+
 
 
 // --- Steps ---
@@ -128,11 +159,23 @@ export default function ImportPage() {
     let filename = '';
 
     if (type === 'orders') {
-      headers = ['scheduledDate', 'customerCode', 'customerName', 'address', 'taskDetails', 'serviceType', 'estimatedDuration', 'value', 'staffName', 'regNo', 'disposal'];
-      sampleRow = ['2026/06/24', '05155', '津久井店', '相模原市緑区太井１４１', 'タイヤ交換', '持ち込み', '60', '15000', '山田 太郎', '湘南500あ1234', '有'];
+      headers = [
+        '受注ID', 'SystemID', '顧客コード', 'お取引先名', '主管店舗', '作業内容', 
+        '作業予定日', '予定時間', 'ご担当者様', '注文番号', '任意コメント', 
+        '車名', '登録ナンバー', '受注ステータス', 'タイヤ品番', 'タイヤサイズ', 
+        '品名', '本数', '空気圧センサーパッキン交換', 'タイヤ手配状況', 
+        '廃タイヤ処分', '連絡者名', '特記事項', 'フォーム入力者'
+      ];
+      sampleRow = [
+        '1', '20260624_05155_abc', '05155', '津久井店', '相模原', '販売店店舗内作業',
+        '2026/06/24', '10:00', '担当者名', '12345678', 'コメント',
+        'プリウス', '湘南500あ1234', '入庫待ち', 'T1000', '195/65R15',
+        'エコピア', '4', '無', '定期便で配送手配済',
+        '回収有り：廃タイヤラベル在庫有り', '連絡者名', '特記事項など', 'フォーム入力者名'
+      ];
       filename = '受注データ_テンプレート.csv';
     } else if (type === 'customers') {
-      headers = ['userCode', 'storeName', 'address', '電話番号', '機材有無', 'mainStore'];
+      headers = ['ユーザーコード', '店舗', '住所', '電話番号', '機材有無', '母店'];
       sampleRow = ['05155', '津久井店', '相模原市緑区太井１４１', '042-784-XXXX', '○', '相模原'];
       filename = '販売店情報_テンプレート.csv';
     } else if (type === 'staff') {
@@ -140,6 +183,7 @@ export default function ImportPage() {
       sampleRow = ['山田 太郎', 'yamada@example.com', 'staff', '県央', '厚木', '#EF4444'];
       filename = 'スタッフ登録_テンプレート.csv';
     }
+
 
     const csvContent = [headers, sampleRow].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
