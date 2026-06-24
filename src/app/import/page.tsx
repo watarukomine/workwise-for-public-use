@@ -514,7 +514,7 @@ export default function ImportPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  ※ 同じIDのドキュメントが既にある場合、データが上書き/マージされます。
+                  ※ 同じIDのドキュメントが既にある場合、データが上書き/マージされます。<strong>（販売店情報をCSVで一括更新したい場合は、IDに「ユーザーコード」または「userCode」を指定し、下記のマージモードをオンにしてください）</strong>
                 </p>
               </div>
 
