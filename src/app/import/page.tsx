@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Loader2, Upload, CheckCircle, AlertCircle, Database, FileSpreadsheet,
-  Trash2, Eye, ArrowRight, UploadCloud, X,
+  Trash2, Eye, ArrowRight, UploadCloud, X, Download,
 } from 'lucide-react';
 import { initializeFirebase } from '@/firebase';
 import { collection, doc, writeBatch, getDocs, query, limit } from 'firebase/firestore';
@@ -121,6 +121,35 @@ export default function ImportPage() {
   React.useEffect(() => {
     if (!isProfileLoading && !profile) router.push('/login');
   }, [isProfileLoading, profile, router]);
+
+  const downloadCSVTemplate = (type: 'orders' | 'customers' | 'staff') => {
+    let headers: string[] = [];
+    let sampleRow: string[] = [];
+    let filename = '';
+
+    if (type === 'orders') {
+      headers = ['scheduledDate', 'customerCode', 'customerName', 'address', 'taskDetails', 'serviceType', 'estimatedDuration', 'value', 'staffName', 'regNo', 'disposal'];
+      sampleRow = ['2026/06/24', '05155', '津久井店', '相模原市緑区太井１４１', 'タイヤ交換', '持ち込み', '60', '15000', '山田 太郎', '湘南500あ1234', '有'];
+      filename = '受注データ_テンプレート.csv';
+    } else if (type === 'customers') {
+      headers = ['userCode', 'storeName', 'address', '電話番号', '機材有無', 'mainStore'];
+      sampleRow = ['05155', '津久井店', '相模原市緑区太井１４１', '042-784-XXXX', '○', '相模原'];
+      filename = '販売店情報_テンプレート.csv';
+    } else if (type === 'staff') {
+      headers = ['name', 'email', 'role', 'area', '母店', 'color'];
+      sampleRow = ['山田 太郎', 'yamada@example.com', 'staff', '県央', '厚木', '#EF4444'];
+      filename = 'スタッフ登録_テンプレート.csv';
+    }
+
+    const csvContent = [headers, sampleRow].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const addLog = (msg: string) => {
     setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
@@ -396,6 +425,21 @@ export default function ImportPage() {
                 <li>ダウンロードされたCSVファイルをここにドロップ</li>
               </ol>
               <p className="mt-2">※ 1行目がヘッダー（列名）として扱われます。UTF-8 / Shift-JIS 両対応。</p>
+            </div>
+
+            <div className="mt-6 border-t pt-4">
+              <p className="text-xs font-semibold mb-2 text-muted-foreground flex items-center gap-1">📥 インポート用CSVテンプレートのダウンロード</p>
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={(e) => { e.stopPropagation(); downloadCSVTemplate('customers'); }}>
+                  <Download className="h-3.5 w-3.5" /> 販売店情報テンプレート
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={(e) => { e.stopPropagation(); downloadCSVTemplate('staff'); }}>
+                  <Download className="h-3.5 w-3.5" /> スタッフ登録テンプレート
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={(e) => { e.stopPropagation(); downloadCSVTemplate('orders'); }}>
+                  <Download className="h-3.5 w-3.5" /> 受注データテンプレート
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
