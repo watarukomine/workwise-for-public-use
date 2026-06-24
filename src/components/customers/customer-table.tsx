@@ -38,9 +38,19 @@ const EXCLUDED_FIELDS = new Set([
 
 // Priority fields
 const PRIORITY_FIELDS = [
-  'ユーザーコード', 'userCode', '店舗', 'storeName', '母店', 'mainStore',
-  '住所', 'address', '電話番号', '機材有無', '緯度', 'latitude', '経度', 'longitude',
+  'userCode', 'storeName', 'mainStore', 'address', '電話番号', '機材有無', 'latitude', 'longitude',
 ];
+
+const COLUMN_LABELS: Record<string, string> = {
+  userCode: 'ユーザーコード',
+  storeName: '店舗',
+  mainStore: '母店',
+  address: '住所',
+  '電話番号': '電話番号',
+  '機材有無': '機材有無',
+  latitude: '緯度',
+  longitude: '経度',
+};
 
 const SELECT_FIELDS: Record<string, string[]> = {
   '機材有無': ['○', '−', ''],
@@ -121,8 +131,9 @@ function EditableCell({ value, fieldKey, selectOptions, isEditing, onStartEdit, 
 
 // --- CSV Export ---
 function exportToCSV(customers: any[], columns: string[]) {
+  const headers = columns.map(col => COLUMN_LABELS[col] || col);
   const rows = customers.map(c => columns.map(col => { const v = c[col]; return v !== undefined && v !== null ? String(v) : ''; }));
-  const csvContent = [columns, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const csvContent = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a'); link.href = url; link.download = `販売店一覧_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`; link.click();
@@ -163,7 +174,7 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
 
   const handleSaveCell = React.useCallback(async (customerId: string, fieldKey: string, newValue: string) => {
     await CustomerService.updateCustomer(customerId, { [fieldKey]: newValue });
-    toast({ title: '保存しました', description: `${fieldKey} を更新しました。` });
+    toast({ title: '保存しました', description: `${COLUMN_LABELS[fieldKey] || fieldKey} を更新しました。` });
     setEditingCell(null);
   }, [toast]);
 
@@ -176,7 +187,7 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
 
   const handleAddRow = React.useCallback(async () => {
     setIsCreating(true);
-    try { await CustomerService.createCustomer({ 'ユーザーコード': '', '店舗': '', '住所': '', '電話番号': '', '機材有無': '' }); toast({ title: '新規販売店を追加しました' }); }
+    try { await CustomerService.createCustomer({ userCode: '', storeName: '', address: '', '電話番号': '', '機材有無': '' }); toast({ title: '新規販売店を追加しました' }); }
     catch (e: any) { toast({ variant: 'destructive', title: '追加に失敗', description: e.message }); }
     setIsCreating(false);
   }, [toast]);
@@ -204,7 +215,7 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
                 </PopoverTrigger>
                 <PopoverContent className="w-56 max-h-[400px] overflow-auto p-3" align="end">
                   <p className="text-xs font-semibold mb-2 text-muted-foreground">表示する列を選択</p>
-                  <div className="space-y-1.5">{allColumns.map(col => (<label key={col} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"><Checkbox checked={visibleColumns.has(col)} onCheckedChange={() => toggleColumn(col)} className="h-3.5 w-3.5" /><span className="truncate">{col}</span></label>))}</div>
+                  <div className="space-y-1.5">{allColumns.map(col => (<label key={col} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"><Checkbox checked={visibleColumns.has(col)} onCheckedChange={() => toggleColumn(col)} className="h-3.5 w-3.5" /><span className="truncate">{COLUMN_LABELS[col] || col}</span></label>))}</div>
                 </PopoverContent>
               </Popover>
               <Button variant="outline" size="sm" onClick={() => exportToCSV(filteredCustomers, displayColumns)} disabled={filteredCustomers.length === 0} className="gap-1.5"><Download className="h-3.5 w-3.5" /> CSV出力</Button>
@@ -216,7 +227,7 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                 <TableRow className="hover:bg-transparent">
-                  {displayColumns.map(col => (<TableHead key={col} className="text-xs font-semibold whitespace-nowrap px-2">{col}</TableHead>))}
+                  {displayColumns.map(col => (<TableHead key={col} className="text-xs font-semibold whitespace-nowrap px-2">{COLUMN_LABELS[col] || col}</TableHead>))}
                   {isAdmin && <TableHead className="w-[40px]" />}
                 </TableRow>
               </TableHeader>

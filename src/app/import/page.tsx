@@ -86,7 +86,15 @@ const FIELD_MAPPINGS: Record<string, string> = {
   '店舗名': 'customerName',
   'お取引先コード': 'customerCode',
   '顧客コード': 'customerCode',
+  // 顧客（販売店）マスタ用
+  'ユーザーコード': 'userCode',
+  '店舗': 'storeName',
+  '住所': 'address',
+  '緯度': 'latitude',
+  '経度': 'longitude',
+  '母店': 'mainStore',
 };
+
 
 // --- Steps ---
 type Step = 'upload' | 'preview' | 'importing' | 'done';
@@ -228,19 +236,17 @@ export default function ImportPage() {
             }
           }
 
-          if (collName === 'customers') {
-            const address = docData['住所'] || docData.address || '';
-            const latVal = docData['緯度'] || docData.latitude;
-            const lngVal = docData['経度'] || docData.longitude;
+           if (collName === 'customers') {
+            const address = docData.address || '';
+            const latVal = docData.latitude;
+            const lngVal = docData.longitude;
             const hasCoords = latVal && lngVal && !isNaN(Number(latVal)) && !isNaN(Number(lngVal)) && Number(latVal) !== 0 && Number(lngVal) !== 0;
 
             if (address && !hasCoords) {
               try {
-                addLog(`🔍 店舗「${docData['店舗'] || docData.name || '名称未設定'}」の住所「${address}」から座標を取得中...`);
+                addLog(`🔍 店舗「${docData.storeName || '名称未設定'}」の住所「${address}」から座標を取得中...`);
                 const results = await getGeocode({ address });
                 const { lat, lng } = await getLatLng(results[0]);
-                docData['緯度'] = lat;
-                docData['経度'] = lng;
                 docData.latitude = lat;
                 docData.longitude = lng;
                 addLog(`✅ 座標取得成功: ${lat}, ${lng}`);
@@ -250,6 +256,7 @@ export default function ImportPage() {
               }
             }
           }
+
 
           docData.raw = raw;
           docData._importedAt = new Date().toISOString();

@@ -90,12 +90,31 @@ export const CustomerService = {
      */
     async backupToGas(id: string, data: any, action: string) {
         try {
+            // Map English keys back to Japanese header names for Google Sheets
+            const gasData = {
+                ...data,
+                'ユーザーコード': data.userCode !== undefined ? data.userCode : data['ユーザーコード'],
+                '店舗': data.storeName !== undefined ? data.storeName : data['店舗'],
+                '住所': data.address !== undefined ? data.address : data['住所'],
+                '緯度': data.latitude !== undefined ? data.latitude : data['緯度'],
+                '経度': data.longitude !== undefined ? data.longitude : data['経度'],
+                '母店': data.mainStore !== undefined ? data.mainStore : data['母店'],
+            };
+
+            // Clean up English keys to avoid unused properties in GAS payload
+            delete gasData.userCode;
+            delete gasData.storeName;
+            delete gasData.address;
+            delete gasData.latitude;
+            delete gasData.longitude;
+            delete gasData.mainStore;
+
             fetch(ORDER_GAS_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    ...data,
+                    ...gasData,
                     id: id,
                     action: action
                 }),
@@ -104,6 +123,7 @@ export const CustomerService = {
             console.error("GAS Customer Backup failed:", e);
         }
     },
+
 
     /**
       * Deletes a customer.

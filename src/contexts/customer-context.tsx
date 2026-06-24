@@ -66,22 +66,45 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         const customerData = await CustomerService.getAllCustomers();
 
         if (customerData.length > 0) {
-          // Normalize data: Ensure userCode is 5 digits (zero-padded)
+          // Normalize and Cleanse data: Ensure userCode is 5 digits and unify duplicate keys
           const normalizedData = customerData.map((customer: any) => {
-            const rawCode = customer['ユーザーコード'] || customer.userCode;
-            // Pad to 5 digits if it looks like a number
+            const rawCode = customer['ユーザーコード'] || customer.userCode || '';
             let normalizedCode = rawCode;
-            if (rawCode !== undefined && rawCode !== null && rawCode !== '') {
-              // Ensure it's treated as a string and padded
+            if (rawCode !== '') {
               normalizedCode = String(rawCode).trim().padStart(5, '0');
             }
 
-            return {
+            const storeNameVal = customer.storeName || customer['店舗'] || customer.name || '';
+            const addressVal = customer.address || customer['住所'] || '';
+            
+            const latVal = customer.latitude !== undefined ? customer.latitude : (customer['緯度'] !== undefined ? Number(customer['緯度']) : undefined);
+            const lngVal = customer.longitude !== undefined ? customer.longitude : (customer['経度'] !== undefined ? Number(customer['経度']) : undefined);
+            
+            const mainStoreVal = customer.mainStore || customer['母店'] || '';
+
+            const cleansed: any = {
               ...customer,
               userCode: normalizedCode,
-              'ユーザーコード': normalizedCode,
+              storeName: storeNameVal,
+              address: addressVal,
             };
+
+            if (latVal !== undefined && !isNaN(latVal)) cleansed.latitude = latVal;
+            if (lngVal !== undefined && !isNaN(lngVal)) cleansed.longitude = lngVal;
+            if (mainStoreVal) cleansed.mainStore = mainStoreVal;
+
+            // Remove duplicate Japanese keys to prevent duplicate columns in UI
+            delete cleansed['ユーザーコード'];
+            delete cleansed['店舗'];
+            delete cleansed['住所'];
+            delete cleansed['緯度'];
+            delete cleansed['経度'];
+            delete cleansed['母店'];
+            delete cleansed.name;
+
+            return cleansed;
           });
+
 
           setCustomers(normalizedData);
 
