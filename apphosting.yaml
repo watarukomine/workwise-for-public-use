@@ -26,27 +26,4 @@ env:
     value: AIzaSyBBelBzLORqNEmMgDMEi8IiqutIGpxfpto
   - variable: GEMINI_API_KEY
     value: AIzaSyBBelBzLORqNEmMgDMEi8IiqutIGpxfpto
-  - variable: NEXT_PUBLIC_STAFF_GAS_URL
-    value: https://script.google.com/macros/s/AKfycbyMJ8Y_-nZz-yWY1ascDwUD8iP1qXmkZTvNBnLXV4bpYT0tyadCDclYnZHZzks4vbLW/exec
-  - variable: NEXT_PUBLIC_CUSTOMER_GAS_URL
-    value: https://script.google.com/macros/s/AKfycbyMJ8Y_-nZz-yWY1ascDwUD8iP1qXmkZTvNBnLXV4bpYT0tyadCDclYnZHZzks4vbLW/exec
-  - variable: NEXT_PUBLIC_ORDER_GAS_URL
-    value: https://script.google.com/macros/s/AKfycbyMJ8Y_-nZz-yWY1ascDwUD8iP1qXmkZTvNBnLXV4bpYT0tyadCDclYnZHZzks4vbLW/exec
-  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyBBelBzLORqNEmMgDMEi8IiqutIGpxfpto
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: workwise-general-v2-kp.firebaseapp.com
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: workwise-general-v2-kp
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: workwise-general-v2-kp.firebasestorage.app
-  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "152475256065"
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:152475256065:web:19dcae9d2c7e91fcd0c700
-  - variable: NEXT_PUBLIC_STAFF_SHEET_URL
-    value: https://docs.google.com/spreadsheets/d/1IP9wxp-VsctyXVn5UI3oRWeik4gMrFA5DFxt-40HGOk/edit?usp=sharing
-  - variable: NEXT_PUBLIC_CUSTOMER_SHEET_URL
-    value: https://docs.google.com/spreadsheets/d/1IZ2VwJ1AT5NvEkUoU0tL6OJXXI3hfDVQ8_773HZwUJI/edit?usp=sharing
-  - variable: NEXT_PUBLIC_ORDER_SHEET_URL
-    value: https://docs.google.com/spreadsheets/d/1A3rbqD87QenOoHx3EYNpnqBujN5TrT2Xn_3tUTCiqmY/edit?usp=sharing
+
