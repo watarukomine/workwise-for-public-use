@@ -182,12 +182,33 @@ interface OrderChipProps {
 }
 
 const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverlay }) => {
+  const { customers: allCustomers } = useCustomer();
   const [line1, line2] = String(order.taskDetails || '').split(/\r?\n/);
+
+  // Resolve storeName from master
+  let resolvedStoreName = order.customerName || '';
+  if (resolvedStoreName === '' || resolvedStoreName === '（店舗名未設定）' || resolvedStoreName === '(店舗名未設定)' || resolvedStoreName === '店舗名未設定') {
+    const code = order.customerCode || (order as any).userCode || findKey(order.raw, ["ユーザーコード", "顧客コード"]);
+    if (code && allCustomers) {
+      const paddedCode = String(code).trim().padStart(5, '0');
+      const match = allCustomers.find(c => {
+        const cCode = c.userCode || c['ユーザーコード'] || '';
+        return String(cCode).trim().padStart(5, '0') === paddedCode;
+      });
+      if (match?.storeName) {
+        resolvedStoreName = match.storeName;
+      } else {
+        resolvedStoreName = '(店舗名未設定)';
+      }
+    } else {
+      resolvedStoreName = '(店舗名未設定)';
+    }
+  }
 
   // Convert equipment status to symbol: 有→○, 無/空欄→×, △→△
   const getEquipmentSymbol = (status: string | undefined): string => {
     if (!status || status.trim() === '') return '×';
-    if (status === '有' || status.includes('有')) return '○';
+    if (status === '有' || status.includes('染') || status.includes('有')) return '○';
     if (status === '無' || status.includes('無')) return '×';
     if (status === '△' || status.includes('△')) return '△';
     return '×'; // Default to × for unknown values
@@ -205,7 +226,7 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
     return `${str}本`;
   };
 
-  const titleText = `${order.customerName || line1}` +
+  const titleText = `${resolvedStoreName || line1}` +
     `${!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) ? ` (${equipmentSymbol})` : ''}` +
     `${scheduledTime ? ` ${scheduledTime}` : ''}` +
     `${(order.tireSize || order['本数']) ? `\n${order.tireSize || ''}${order.tireSize && order['本数'] ? ' ' : ''}${order['本数'] ? formatHonsu(order['本数']) : ''}` : ''}`;
@@ -221,9 +242,9 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
 
       <div className="flex justify-between items-center w-full overflow-hidden">
         <span className="font-bold truncate mr-1 flex-1">
-          {order.customerName || (order as any).title || line1 || <span className="text-xs font-normal opacity-70">ID:{order.rawOrderId || order.id}</span>}
+          {resolvedStoreName || (order as any).title || line1 || <span className="text-xs font-normal opacity-70">ID:{order.rawOrderId || order.id}</span>}
           {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) &&
-            (order.customerName || (order as any).title) && `(${equipmentSymbol})`}
+            (resolvedStoreName || (order as any).title) && `(${equipmentSymbol})`}
         </span>
         <span className="shrink-0 font-medium">{scheduledTime}</span>
       </div>
@@ -361,7 +382,14 @@ function GenericTasks() {
 }
 
 function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date, onDoubleClickOrder: (order: WithId<Order>) => void }) {
-  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => customers?.find(c => c.userCode === code);
+  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => {
+    if (!code) return undefined;
+    const paddedCode = String(code).trim().padStart(5, '0');
+    return customers?.find(c => {
+      const cCode = c.userCode || c['ユーザーコード'] || '';
+      return String(cCode).trim().padStart(5, '0') === paddedCode;
+    });
+  };
   const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
 
   const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
