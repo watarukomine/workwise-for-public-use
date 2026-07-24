@@ -72,9 +72,15 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
     isAccompany: boolean;
   }[] = [];
 
-  // Initialize statuses
+  // Initialize statuses with staff user document fields
   allStaff.forEach(sf => {
-    staffStatusMap.set(sf.id, { staffId: sf.id, status: '待機中', lastAction: '情報なし' });
+    staffStatusMap.set(sf.id, {
+      staffId: sf.id,
+      status: sf.currentStatus || '待機中',
+      lastAction: '情報なし',
+      estimatedArrivalTime: sf.estimatedArrivalTime,
+      nextDestination: sf.nextDestination,
+    });
   });
 
   // --- PASS 1: Parse Data, Update Status, Collect Schedulable Items ---
@@ -153,6 +159,9 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
             lon = currentStatus.longitude;
           }
 
+          const eta = order.estimatedArrivalTime || currentStatus.estimatedArrivalTime || staffMember.estimatedArrivalTime;
+          const dest = order.nextDestination || currentStatus.nextDestination || staffMember.nextDestination;
+
           staffStatusMap.set(staffMember.id, {
             staffId: staffMember.id,
             status: status,
@@ -160,6 +169,8 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
             latitude: !isNaN(lat) ? lat : undefined,
             longitude: !isNaN(lon) ? lon : undefined,
             lastUpdate: lastUpdate.toISOString(),
+            estimatedArrivalTime: eta,
+            nextDestination: dest,
           });
         }
       }

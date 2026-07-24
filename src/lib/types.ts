@@ -157,6 +157,8 @@ export type StaffStatus = {
   longitude?: number;
   lastUpdate?: string;
   message?: string;
+  estimatedArrivalTime?: string;
+  nextDestination?: string;
 };
 
 export type DailyAttendance = {

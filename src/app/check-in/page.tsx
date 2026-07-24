@@ -319,28 +319,58 @@ function CheckInClient() {
         const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
         const sysId = (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || '';
 
-        // 1. Direct Write to Staff User Document in Firestore (Primary for Staff Location)
-        if (profile?.id && latitude !== null && longitude !== null) {
+        // 1. Direct Write to Staff User Document in Firestore (Primary for Staff Location & Status & ETA)
+        if (profile?.id) {
           try {
             const { doc, updateDoc, setDoc } = await import('firebase/firestore');
             const { initializeFirebase } = await import('@/firebase');
             const { firestore: db } = initializeFirebase();
             const userRef = doc(db, 'users', profile.id);
-            await updateDoc(userRef, {
+
+            let etaStr: string | undefined = undefined;
+            let destStr: string | undefined = undefined;
+
+            if (action === 'Clock Out') {
+              const travelMin = calculateTravelTimeMinutes(
+                latitude,
+                longitude,
+                DEFAULT_OFFICE_LOCATION.latitude,
+                DEFAULT_OFFICE_LOCATION.longitude
+              );
+              const etaDate = new Date(now.getTime() + travelMin * 60000);
+              destStr = DEFAULT_OFFICE_LOCATION.name;
+              etaStr = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            } else if (action === 'Start Travel') {
+              const todayStr = formatDate(now.toISOString(), 'yyyy-MM-dd');
+              const nextOrder = orders.find(o => {
+                const oDate = o.scheduledDate ? formatDate(o.scheduledDate, 'yyyy-MM-dd') : '';
+                return oDate === todayStr && o.status !== '作業完了' && o.status !== 'キャンセル' && o.id !== currentOrder?.id;
+              });
+
+              if (nextOrder) {
+                destStr = nextOrder.customerName || (nextOrder as any).storeName || '次の現場';
+                const destLat = nextOrder.latitude || DEFAULT_OFFICE_LOCATION.latitude;
+                const destLng = nextOrder.longitude || DEFAULT_OFFICE_LOCATION.longitude;
+                const travelMin = calculateTravelTimeMinutes(latitude, longitude, destLat, destLng);
+                const etaDate = new Date(now.getTime() + travelMin * 60000);
+                etaStr = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+              }
+            }
+
+            const staffFields: any = {
               latitude,
               longitude,
               lastLocationUpdatedAt: new Date().toISOString(),
               currentStatus: statusValue
-            }).catch(async () => {
-              await setDoc(userRef, {
-                latitude,
-                longitude,
-                lastLocationUpdatedAt: new Date().toISOString(),
-                currentStatus: statusValue
-              }, { merge: true });
+            };
+            if (etaStr) staffFields.estimatedArrivalTime = etaStr;
+            if (destStr) staffFields.nextDestination = destStr;
+
+            await updateDoc(userRef, staffFields).catch(async () => {
+              await setDoc(userRef, staffFields, { merge: true });
             });
           } catch (staffLocErr) {
-            console.warn("Failed to update staff user location:", staffLocErr);
+            console.warn("Failed to update staff user location & ETA:", staffLocErr);
           }
         }
 
