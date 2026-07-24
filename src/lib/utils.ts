@@ -525,3 +525,46 @@ export function lightenColor(color: string, amount: number): string {
 
   return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
 }
+
+// Default Office / Base Location (e.g. Headquarters / Main Store in Kanagawa)
+export const DEFAULT_OFFICE_LOCATION = {
+  name: '自拠点（事務所）',
+  latitude: 35.4437,
+  longitude: 139.6380
+};
+
+/**
+ * Calculates estimated driving travel time in minutes between two lat/lng coordinates.
+ * Uses Haversine distance with road curvature factor and average driving speed fallback.
+ */
+export function calculateTravelTimeMinutes(
+  originLat: number | null | undefined,
+  originLng: number | null | undefined,
+  destLat: number | null | undefined,
+  destLng: number | null | undefined
+): number {
+  if (!originLat || !originLng || !destLat || !destLng) {
+    return 30; // Default estimate 30 min if coordinates are unknown
+  }
+
+  const R = 6371; // Earth radius in km
+  const dLat = (destLat - originLat) * (Math.PI / 180);
+  const dLng = (destLng - originLng) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(originLat * (Math.PI / 180)) *
+      Math.cos(destLat * (Math.PI / 180)) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const straightDistanceKm = R * c;
+
+  // Road distance estimation: straight distance * 1.35 (winding factor)
+  const roadDistanceKm = straightDistanceKm * 1.35;
+
+  // Average urban/suburban driving speed: 28 km/h
+  const travelHours = roadDistanceKm / 28;
+  const travelMinutes = Math.max(5, Math.round(travelHours * 60)); // Minimum 5 min
+
+  return travelMinutes;
+}

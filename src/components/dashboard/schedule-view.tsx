@@ -2459,14 +2459,18 @@ export function ScheduleView({
                           <td className="p-3 text-muted-foreground">{order.staffName || <span className="text-yellow-600 font-semibold">未割り当て</span>}</td>
                           <td className="p-3">
                             <span className={cn(
-                              "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border",
+                              "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold border whitespace-nowrap",
                               order.status === '作業完了' && "bg-green-50 text-green-700 border-green-200",
                               order.status === '作業中' && "bg-blue-50 text-blue-700 border-blue-200",
                               order.status === '移動中' && "bg-purple-50 text-purple-700 border-purple-200",
+                              order.status === '帰社中' && "bg-indigo-50 text-indigo-700 border-indigo-200",
+                              order.status === '待機中' && "bg-slate-100 text-slate-700 border-slate-200",
                               order.status === '割当済' && "bg-yellow-50 text-yellow-700 border-yellow-200",
                               order.status === '未割当' && "bg-gray-50 text-gray-700 border-gray-200"
                             )}>
-                              {order.status || '未割当'}
+                              {order.status === '帰社中' ? `🏢 帰社中${order.estimatedArrivalTime ? ` (帰社予定 ${order.estimatedArrivalTime})` : ''}` :
+                               order.status === '移動中' && order.estimatedArrivalTime ? `🚚 移動中 (${order.nextDestination ? order.nextDestination + ' ' : ''}到着予定 ${order.estimatedArrivalTime})` :
+                               order.status || '未割当'}
                             </span>
                           </td>
                           <td className="p-3 text-[11px]">

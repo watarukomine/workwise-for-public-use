@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw, BadgeCheck } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw, BadgeCheck, Truck, Building, PauseCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -13,7 +13,7 @@ import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
 import { updateStaffStatus } from '@/services/attendance-service';
-import { cn, findKey } from '@/lib/utils';
+import { cn, findKey, calculateTravelTimeMinutes, DEFAULT_OFFICE_LOCATION, formatDate } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
 import {
@@ -48,6 +48,93 @@ function CheckInClient() {
   const [optimisticStatus, setOptimisticStatus] = React.useState<string | null>(null);
   const [emergencyMessage, setEmergencyMessage] = React.useState('');
   const [isConfirmedOptimistic, setIsConfirmedOptimistic] = React.useState<boolean | null>(null);
+  const [isNextStepDialogOpen, setIsNextStepDialogOpen] = React.useState(false);
+  const [isProcessingNextStep, setIsProcessingNextStep] = React.useState(false);
+
+  const handleNextStepAction = async (step: 'next_task' | 'return_office' | 'wait') => {
+    setIsProcessingNextStep(true);
+    try {
+      const now = new Date();
+      let newStatus = '待機中';
+      let nextDest = '';
+      let etaStr = '';
+
+      // Get current GPS location if available
+      let currentLat: number | null = null;
+      let currentLng: number | null = null;
+      if (navigator.geolocation) {
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+          });
+          currentLat = pos.coords.latitude;
+          currentLng = pos.coords.longitude;
+        } catch (err) {
+          console.warn("GPS lookup failed for next step:", err);
+        }
+      }
+
+      if (step === 'wait') {
+        newStatus = '待機中';
+      } else if (step === 'return_office') {
+        newStatus = '帰社中';
+        nextDest = DEFAULT_OFFICE_LOCATION.name;
+        const travelMin = calculateTravelTimeMinutes(
+          currentLat,
+          currentLng,
+          DEFAULT_OFFICE_LOCATION.latitude,
+          DEFAULT_OFFICE_LOCATION.longitude
+        );
+        const etaDate = new Date(now.getTime() + travelMin * 60000);
+        etaStr = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      } else if (step === 'next_task') {
+        newStatus = '移動中';
+        // Find next scheduled order for today
+        const todayStr = formatDate(now.toISOString(), 'yyyy-MM-dd');
+        const nextOrder = orders.find(o => {
+          const oDate = o.scheduledDate ? formatDate(o.scheduledDate, 'yyyy-MM-dd') : '';
+          return oDate === todayStr && o.status !== '作業完了' && o.status !== 'キャンセル' && o.id !== currentOrder?.id;
+        });
+
+        if (nextOrder) {
+          nextDest = nextOrder.customerName || (nextOrder as any).storeName || '次の現場';
+          const destLat = nextOrder.latitude || DEFAULT_OFFICE_LOCATION.latitude;
+          const destLng = nextOrder.longitude || DEFAULT_OFFICE_LOCATION.longitude;
+          const travelMin = calculateTravelTimeMinutes(currentLat, currentLng, destLat, destLng);
+          const etaDate = new Date(now.getTime() + travelMin * 60000);
+          etaStr = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        } else {
+          nextDest = '次の現場';
+          etaStr = new Date(now.getTime() + 30 * 60000).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+        }
+      }
+
+      // Update Firestore
+      const sysId = (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
+      if (sysId) {
+        const { OrderService } = await import('@/services/order-service');
+        const updateData: any = {
+          status: newStatus,
+          updatedAt: now.toISOString()
+        };
+        if (nextDest) updateData.nextDestination = nextDest;
+        if (etaStr) updateData.estimatedArrivalTime = etaStr;
+        await OrderService.updateOrder(sysId, updateData);
+      }
+
+      setOptimisticStatus(newStatus);
+      toast({
+        title: `「${newStatus}」に更新しました`,
+        description: etaStr ? `予定時刻: ${etaStr} (${nextDest})` : undefined
+      });
+      refetchOrders().catch(e => console.error(e));
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '更新エラー', description: e.message });
+    } finally {
+      setIsProcessingNextStep(false);
+      setIsNextStepDialogOpen(false);
+    }
+  };
 
   const currentOrder = React.useMemo(() => {
     if (!orderId) return null;
@@ -294,6 +381,10 @@ function CheckInClient() {
         if (isManual && isCorrectionMode) {
           setIsCorrectionMode(false);
           setManualTime('');
+        }
+
+        if (action === 'Finish Task') {
+          setIsNextStepDialogOpen(true);
         }
 
         // Refetch in background
@@ -650,6 +741,71 @@ function CheckInClient() {
               決定
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 作業完了後のネクストステップ選択ダイアログ */}
+      <Dialog open={isNextStepDialogOpen} onOpenChange={setIsNextStepDialogOpen}>
+        <DialogContent className="sm:max-w-md bg-card border shadow-xl rounded-2xl">
+          <DialogHeader className="text-center">
+            <DialogTitle className="text-xl font-bold flex items-center justify-center gap-2 text-foreground">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+              作業完了のお疲れ様でした！
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              次の業務のアクションを選択してください。Google Mapsと連動して予定時間を自動計算します。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col gap-3 py-4">
+            <Button
+              variant="default"
+              size="lg"
+              disabled={isProcessingNextStep}
+              onClick={() => handleNextStepAction('next_task')}
+              className="h-16 flex items-center justify-start px-4 gap-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-md rounded-xl transition-all"
+            >
+              <div className="bg-white/20 p-2.5 rounded-lg">
+                <Truck className="h-6 w-6 text-white" />
+              </div>
+              <div className="text-left">
+                <div className="font-bold text-sm">次の現場へ移動</div>
+                <div className="text-[11px] opacity-80 font-normal">次の現場までの移動所要時間を計測・到着予定を通知</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={isProcessingNextStep}
+              onClick={() => handleNextStepAction('return_office')}
+              className="h-16 flex items-center justify-start px-4 gap-4 border-2 border-purple-200 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/30 text-purple-900 dark:text-purple-100 rounded-xl transition-all"
+            >
+              <div className="bg-purple-100 dark:bg-purple-900/50 p-2.5 rounded-lg">
+                <Building className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <div className="text-left">
+                <div className="font-bold text-sm">帰社する</div>
+                <div className="text-[11px] text-muted-foreground font-normal">事務所（自拠点）までの帰社予定時刻を自動計算</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              size="lg"
+              disabled={isProcessingNextStep}
+              onClick={() => handleNextStepAction('wait')}
+              className="h-14 flex items-center justify-start px-4 gap-4 border text-muted-foreground hover:bg-muted rounded-xl transition-all"
+            >
+              <div className="bg-muted p-2 rounded-lg">
+                <PauseCircle className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="text-left">
+                <div className="font-bold text-xs">待機する</div>
+                <div className="text-[10px] opacity-70 font-normal">次の指示や案件をその場で待機</div>
+              </div>
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

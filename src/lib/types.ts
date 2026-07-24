@@ -22,6 +22,9 @@ export type Staff = {
   calendarId?: string;
   'コントローラー'?: string;
   controller?: string;
+  currentStatus?: string;
+  estimatedArrivalTime?: string;
+  nextDestination?: string;
 };
 
 export type Customer = {
@@ -96,6 +99,8 @@ export type Order = {
   systemId?: string; // Legacy ID or generated system ID
   latitude?: number;
   longitude?: number;
+  estimatedArrivalTime?: string;
+  nextDestination?: string;
   raw?: Record<string, any>;
   // Flags
   isGeneric?: boolean;
