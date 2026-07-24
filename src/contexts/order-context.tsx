@@ -72,6 +72,16 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
     isAccompany: boolean;
   }[] = [];
 
+  // Pre-build normalized staff map for instant O(1) lookup (avoids 90,000+ inner loops)
+  const staffMapByName = new Map<string, WithId<Staff>>();
+  allStaff.forEach(sf => {
+    if (sf.name) {
+      staffMapByName.set(sf.name, sf);
+      const norm = sf.name.replace(/\s+/g, '').toLowerCase();
+      staffMapByName.set(norm, sf);
+    }
+  });
+
   // Initialize statuses with staff user document fields
   allStaff.forEach(sf => {
     staffStatusMap.set(sf.id, {
@@ -100,18 +110,10 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
       orders.push(order);
     }
 
-    // 1. Process Staff Status
-    const normalizeName = (n: any) => {
-      if (typeof n !== 'string') return '';
-      return n.replace(/\s+/g, '').toLowerCase();
-    };
-
-    const staffMember = order.staffName
-      ? allStaff.find(s => {
-        if (s.name === order.staffName) return true;
-        return normalizeName(s.name) === normalizeName(order.staffName);
-      })
-      : undefined;
+    // 1. Process Staff Status (O(1) Instant Lookup)
+    const staffNameStr = order.staffName ? String(order.staffName).trim() : '';
+    const normStaffName = staffNameStr.replace(/\s+/g, '').toLowerCase();
+    const staffMember = staffNameStr ? (staffMapByName.get(staffNameStr) || staffMapByName.get(normStaffName)) : undefined;
 
     if (staffMember) {
       const lastUpdateStr = order.updatedAt || findKey(rawOrder, ['最終更新日時']);
@@ -362,18 +364,11 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
 
     if (isAlreadyScheduled) return false;
 
-    // If order has both staffName and scheduledTime, check if the staff actually exists
+    // If order has both staffName and scheduledTime, check if the staff actually exists (O(1) lookup)
     if (order.staffName) {
-      const normalizeName = (n: string | undefined) => {
-        if (!n || typeof n !== 'string') return '';
-        return n.replace(/\s+/g, '').toLowerCase();
-      };
-
-      const staffExists = allStaff.find(s => {
-        if (!s.name) return false;
-        if (s.name === order.staffName) return true;
-        return normalizeName(s.name) === normalizeName(order.staffName);
-      });
+      const sName = String(order.staffName).trim();
+      const nName = sName.replace(/\s+/g, '').toLowerCase();
+      const staffExists = staffMapByName.get(sName) || staffMapByName.get(nName);
 
       // If staff doesn't exist in master, treat as unassigned (keep in list)
       if (!staffExists) {
@@ -688,15 +683,17 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     statuses,
     loadOrders: async (date: Date) => {
       const dateStr = date.toISOString().split('T')[0];
-      const lastFetched = fetchedDateRanges.get(dateStr);
-      const isStale = lastFetched ? (Date.now() - lastFetched > 60000) : true; // Refresh if > 1 min
+      const lastFetched = fetchedDateRangesRef.current.get(dateStr);
+      const isStale = lastFetched ? (Date.now() - lastFetched > 120000) : true; // Cache for 2 mins
 
       if (!isStale) {
-        console.log(`[OrderProvider] Date ${dateStr} recently fetched, skipping loadOrders`);
+        console.log(`[OrderProvider] Date ${dateStr} in cache, instant load.`);
         return;
       }
-      console.log(`[OrderProvider] Loading/Refreshing data for: ${dateStr}`);
-      await fetchAndProcessData(true, { date: dateStr, range: 1 });
+      console.log(`[OrderProvider] Non-blocking background fetch for date: ${dateStr}`);
+      fetchAndProcessData(false, { date: dateStr, range: 1 }).catch(err => {
+        console.warn(`[OrderProvider] Background fetch error for ${dateStr}:`, err);
+      });
     },
     syncOrders: async () => { await fetchAndProcessData(false); },
     isLoading,
