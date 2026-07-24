@@ -317,28 +317,63 @@ function CheckInClient() {
 
       try {
         const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
+        const sysId = (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || '';
 
-        const result = await updateSheetStatus({
-          gasUrl: ORDER_GAS_URL,
-          eventTitle: eventTitleForUpdate,
-          staffName: profile.name,
-          statusValue: statusValue,
-          timestamp: new Date().toISOString(), // Log timestamp is ALWAYS "real now"
-          latitude: latitude,
-          longitude: longitude,
-          actionType: action as any,
-          actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
-          comment: (action as string) === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
-          emergencyFlag: (action as string) === 'Emergency' ? true : undefined,
-          systemId: (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '')
-        });
+        let result: any = { status: 'success', message: '位置情報を更新しました。' };
+        try {
+          result = await updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: eventTitleForUpdate,
+            staffName: profile.name,
+            statusValue: statusValue,
+            timestamp: new Date().toISOString(), // Log timestamp is ALWAYS "real now"
+            latitude: latitude,
+            longitude: longitude,
+            actionType: action as any,
+            actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
+            comment: (action as string) === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
+            emergencyFlag: (action as string) === 'Emergency' ? true : undefined,
+            systemId: sysId
+          });
+        } catch (gasErr: any) {
+          // Suppress GAS sheet error if no order ID is bound or if it's a routine location update (Wait)
+          if (!sysId || action === 'Wait') {
+            console.warn("GAS update skipped/warned for unassigned location update:", gasErr);
+          } else {
+            throw gasErr;
+          }
+        }
 
-        if (result.status === 'error') {
+        if (result?.status === 'error' && sysId && action !== 'Wait') {
           throw new Error(result.message);
         }
 
-        // 2. Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
-        const sysId = (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
+        // Direct Write to Staff User Document in Firestore (Primary for Staff Location)
+        if (profile?.id && latitude !== null && longitude !== null) {
+          try {
+            const { doc, updateDoc, setDoc } = await import('firebase/firestore');
+            const { initializeFirebase } = await import('@/firebase');
+            const { firestore: db } = initializeFirebase();
+            const userRef = doc(db, 'users', profile.id);
+            await updateDoc(userRef, {
+              latitude,
+              longitude,
+              lastLocationUpdatedAt: new Date().toISOString(),
+              currentStatus: statusValue
+            }).catch(async () => {
+              await setDoc(userRef, {
+                latitude,
+                longitude,
+                lastLocationUpdatedAt: new Date().toISOString(),
+                currentStatus: statusValue
+              }, { merge: true });
+            });
+          } catch (staffLocErr) {
+            console.warn("Failed to update staff user location:", staffLocErr);
+          }
+        }
+
+        // 2. Direct Write to Order Firestore Document (if order is assigned)
         if (sysId) {
           const { OrderService } = await import('@/services/order-service');
           const firestoreFields: any = {
