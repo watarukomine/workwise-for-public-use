@@ -514,6 +514,17 @@ export function ScheduleView({
   const { toast } = useToast();
   const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, toggleTripSuppression, setCurrentViewedDate } = useOrder();
 
+  // Filter orders to only show those scheduled for currentDate
+  const dailyOrders = React.useMemo(() => {
+    if (!orders) return [];
+    const targetDateStr = formatDate(currentDate.toISOString(), 'yyyy-MM-dd');
+    const targetDateStrSlash = formatDate(currentDate.toISOString(), 'yyyy/MM/dd');
+    return orders.filter(order => {
+      const orderDate = order.scheduledDate ? formatDate(order.scheduledDate, 'yyyy-MM-dd') : '';
+      return orderDate === targetDateStr || orderDate === targetDateStrSlash;
+    });
+  }, [orders, currentDate]);
+
   const [isClient, setIsClient] = React.useState(false);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [activeId, setActiveId] = React.useState<string | null>(null);
@@ -2346,7 +2357,7 @@ export function ScheduleView({
                 <p className="text-xs text-muted-foreground mt-0.5">この日（{formatDate(currentDate.toISOString(), 'yyyy/MM/dd')}）に作業予定がある受注の一覧です。行をクリックすると詳細ダイアログが開き、チップと連動して確認・編集が可能です。</p>
               </div>
               <div className="text-xs font-semibold px-2.5 py-1 bg-primary/10 text-primary rounded-full">
-                計 {orders.length} 件
+                計 {dailyOrders.length} 件
               </div>
             </div>
             
@@ -2366,14 +2377,14 @@ export function ScheduleView({
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {orders.length === 0 ? (
+                  {dailyOrders.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="p-8 text-center text-muted-foreground">
                         この日の受注予定はありません。
                       </td>
                     </tr>
                   ) : (
-                    orders.map((order) => {
+                    dailyOrders.map((order) => {
                       // マスタ解決された店舗名を取得
                       let storeName = order.customerName || '';
                       if (storeName === '' || storeName === '（店舗名未設定）' || storeName === '(店舗名未設定)' || storeName === '店舗名未設定') {
