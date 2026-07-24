@@ -136,7 +136,7 @@ const EXPORT_HEADERS = [
 const EXPORT_MAPPING: Record<string, string> = {
   '受注 No': 'orderNo',
   'SystemID': 'id',
-  'ユーザーコード': 'userCode',
+  'ユーザーコード': 'customerCode',
   '店舗名': 'customerName',
   '主管店舗': 'mainStore',
   '機材有無': 'equipmentStatus',

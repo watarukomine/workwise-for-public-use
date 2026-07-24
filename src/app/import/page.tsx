@@ -351,7 +351,13 @@ export default function ImportPage() {
             raw[h] = val; // Store original raw data
 
             // Apply mapping
-            const mappedField = FIELD_MAPPINGS[h] || h;
+            let mappedField = FIELD_MAPPINGS[h] || h;
+            if (collName === 'orders' && mappedField === 'userCode') {
+              mappedField = 'customerCode';
+            }
+            if (collName === 'customers' && mappedField === 'customerCode') {
+              mappedField = 'userCode';
+            }
             
             // Try to convert numbers for specific fields or if it looks like a number
             if (val !== '' && !isNaN(Number(val)) && val.length < 15 && !['scheduledTime', 'scheduledEndTime', 'scheduledDate', 'staffId', 'userCode', 'customerCode'].includes(mappedField)) {
