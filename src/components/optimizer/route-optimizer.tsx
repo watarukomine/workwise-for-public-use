@@ -310,14 +310,17 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
   const predefinedLocations = React.useMemo(() => {
     const staffWithLocation = staff.map(s => {
       const status = staffStatus.find(ss => ss.staffId === s.id);
-      return status ? { ...s, ...status } : s;
-    }).filter((s): s is (Staff & StaffStatus) => {
-      return s !== null &&
-        'latitude' in s &&
-        'longitude' in s &&
-        s.latitude !== undefined &&
-        s.longitude !== undefined;
-    });
+      const lat = status?.latitude !== undefined && status?.latitude !== null ? Number(status.latitude) : ((s as any).latitude !== undefined && (s as any).latitude !== null ? Number((s as any).latitude) : undefined);
+      const lng = status?.longitude !== undefined && status?.longitude !== null ? Number(status.longitude) : ((s as any).longitude !== undefined && (s as any).longitude !== null ? Number((s as any).longitude) : undefined);
+      return {
+        ...s,
+        ...status,
+        name: s.name || (s as any)['氏名'] || (s as any)['名前'] || (s as any)['担当'] || '名前未設定',
+        latitude: lat,
+        longitude: lng,
+        lastAction: status?.lastAction || (s as any).currentStatus || '現在地'
+      };
+    }).filter(s => s.latitude !== undefined && s.longitude !== undefined && !isNaN(s.latitude) && !isNaN(s.longitude));
 
     const staffLocs: Location[] = staffWithLocation.map(s => ({
       id: s.id,

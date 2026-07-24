@@ -119,32 +119,31 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
             disableDefaultUI={true}
             mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID"}
           >
-            {staff.map((s) =>
-              s.latitude && s.longitude ? (
-                <AdvancedMarker key={`staff-${s.id}`} position={{ lat: s.latitude, lng: s.longitude }}>
+            {staff.map((s) => {
+              const lat = Number(s.latitude);
+              const lng = Number(s.longitude);
+              const displayName = s.name || (s as any)['氏名'] || (s as any)['名前'] || (s as any)['担当'] || '名前未設定';
+              const markerColor = s.color || '#3b82f6';
+
+              return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 ? (
+                <AdvancedMarker key={`staff-${s.id}`} position={{ lat, lng }}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      {(() => {
-                        const markerStyle = { borderColor: s.color };
-                        return (
-                          <div
-                            className="w-8 h-8 rounded-full bg-white border-2 flex items-center justify-center"
-                            // eslint-disable-next-line react-dom/no-unsafe-inline-style
-                            style={markerStyle}
-                          >
-                            <User className="w-5 h-5" style={{ color: s.color }} />
-                          </div>
-                        );
-                      })()}
+                      <div
+                        className="w-8 h-8 rounded-full bg-white border-2 flex items-center justify-center shadow-md cursor-pointer hover:scale-110 transition-transform"
+                        style={{ borderColor: markerColor }}
+                      >
+                        <User className="w-5 h-5" style={{ color: markerColor }} />
+                      </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="font-bold">{s.name}</p>
-                      <p>{s.lastAction}</p>
+                      <p className="font-bold">{displayName}</p>
+                      <p className="text-xs">{s.lastAction || '現在地'}</p>
                     </TooltipContent>
                   </Tooltip>
                 </AdvancedMarker>
-              ) : null
-            )}
+              ) : null;
+            })}
             {customers.map((c) =>
               c.latitude && c.longitude ? (
                 <AdvancedMarker

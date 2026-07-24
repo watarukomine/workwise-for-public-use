@@ -73,19 +73,21 @@ function OptimizerPageContent() {
   }, [filteredStaffFromSelection, contextStatuses]);
 
   const staffWithLocation = React.useMemo(() => {
-    return filteredStaffFromSelection.filter(staffMember => {
+    return filteredStaffFromSelection.map(staffMember => {
       const status = statuses.find(s => s.staffId === staffMember.id);
 
-      // Filter out stale location data (not from today)
-      if (status?.lastUpdate) {
-        const lastUpdateDate = new Date(status.lastUpdate);
-        if (!isToday(lastUpdateDate)) {
-          return false;
-        }
-      }
+      const lat = status?.latitude !== undefined && status?.latitude !== null ? Number(status.latitude) : ((staffMember as any).latitude !== undefined && (staffMember as any).latitude !== null ? Number((staffMember as any).latitude) : undefined);
+      const lng = status?.longitude !== undefined && status?.longitude !== null ? Number(status.longitude) : ((staffMember as any).longitude !== undefined && (staffMember as any).longitude !== null ? Number((staffMember as any).longitude) : undefined);
 
-      return status && status.latitude && status.longitude;
-    });
+      return {
+        ...staffMember,
+        ...status,
+        name: staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定',
+        latitude: lat,
+        longitude: lng,
+        lastAction: status?.lastAction || (staffMember as any).currentStatus || '位置情報あり'
+      };
+    }).filter(s => s.latitude !== undefined && s.longitude !== undefined && !isNaN(s.latitude) && !isNaN(s.longitude));
   }, [filteredStaffFromSelection, statuses]);
 
 
