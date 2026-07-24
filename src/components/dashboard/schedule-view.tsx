@@ -532,10 +532,28 @@ export function ScheduleView({
   }, [currentDate, setCurrentViewedDate]);
 
   React.useEffect(() => {
+    const getResolvedStoreName = (entity: any) => {
+      let name = findKey(entity.raw, ["お取引先名", "店舗", "店舗名", "名称", "店舗名称", "Customer", "お名前"]) || entity.customerName || entity.storeName || '';
+      if (name === '' || name === '（店舗名未設定）' || name === '(店舗名未設定)' || name === '店舗名未設定') {
+        const code = entity.customerCode || entity.userCode || findKey(entity.raw, ["ユーザーコード", "顧客コード"]);
+        if (code && allCustomers) {
+          const paddedCode = String(code).trim().padStart(5, '0');
+          const match = allCustomers.find(c => {
+            const cCode = c.userCode || c['ユーザーコード'] || '';
+            return String(cCode).trim().padStart(5, '0') === paddedCode;
+          });
+          if (match?.storeName) {
+            name = match.storeName;
+          }
+        }
+      }
+      return name;
+    };
+
     if ((dialogState.mode === 'details' || dialogState.mode === 'edit') && dialogState.event) {
       const ev = dialogState.event as any;
       setEditOrderForm({
-        storeName: findKey(ev.raw, ["お取引先名", "店舗", "店舗名", "名称", "店舗名称", "Customer", "お名前"]) || ev.customerName || ev.storeName || '',
+        storeName: getResolvedStoreName(ev),
         equipmentStatus: findKey(ev.raw, ["機材有無"]) || ev.equipmentStatus || '',
         carName: findKey(ev.raw, ["車名", "車両", "車種"]) || ev.carName || '',
         regNo: findKey(ev.raw, ["登録ナンバー(下４桁)", "登録ナンバー", "ナンバー", "車番", "登録番号"]) || ev.regNo || '',
@@ -560,7 +578,7 @@ export function ScheduleView({
     } else if (dialogState.mode === 'order-details' && dialogState.order) {
       const ord = dialogState.order as any;
       setEditOrderForm({
-        storeName: findKey(ord.raw, ["お取引先名", "店舗", "店舗名", "名称", "店舗名称", "Customer", "お名前"]) || ord.customerName || ord.storeName || '',
+        storeName: getResolvedStoreName(ord),
         equipmentStatus: findKey(ord.raw, ["機材有無"]) || ord.equipmentStatus || '',
         carName: findKey(ord.raw, ["車名", "車両", "車種"]) || ord.carName || '',
         regNo: findKey(ord.raw, ["登録ナンバー(下４桁)", "登録ナンバー", "ナンバー", "車番", "登録番号"]) || ord.regNo || '',
@@ -585,7 +603,7 @@ export function ScheduleView({
     } else {
       setEditOrderForm({});
     }
-  }, [dialogState]);
+  }, [dialogState, allCustomers]);
 
   const getCustomerByCode = React.useCallback((code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code), [allCustomers]);
   // Use allStaff instead of filtered staffData for lookup

@@ -65,11 +65,21 @@ export const formatTime = (date: Date | string | any) => {
     }
   }
 
-  const d = typeof date === 'string' ? parseISO(date) : date;
+  let d = date;
+  if (typeof date === 'string') {
+    // Try to normalize slash dates to ISO format
+    const normalizedStr = date.replace(/\//g, '-').replace(' ', 'T');
+    d = parseISO(normalizedStr);
+    if (!isValid(d)) {
+      d = new Date(date);
+    }
+  }
+
   if (!d || !isValid(d) || isNaN(d.getTime())) {
     if (typeof date === 'string') {
       const today = new Date();
-      const [hours, minutes] = date.split(':');
+      const timePart = date.includes(' ') ? date.split(' ')[1] : date;
+      const [hours, minutes] = timePart.split(':');
       if (hours && minutes) {
         today.setHours(parseInt(hours, 10), parseInt(minutes, 10));
         if (isValid(today)) {
@@ -346,10 +356,6 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     chipWorkCompleted: findKey(rawOrder, ['チップ配置作業完了予定', 'chipWorkCompleted']) || '',
     clockIn: findKey(rawOrder, ['出勤ボタン', 'clockIn']) || '',
     readConfirmation: findKey(rawOrder, ['既読確認', 'readConfirmation']) || '',
-    startTravel: findKey(rawOrder, ['移動開始', 'startTravel']) || '',
-    arrival: findKey(rawOrder, ['現場到着', 'arrival']) || '',
-    startWork: findKey(rawOrder, ['作業開始', 'startWork']) || '',
-    completeWork: findKey(rawOrder, ['作業完了', 'completeWork']) || '',
     workDuration: findKey(rawOrder, ['作業所要時間', 'workDuration']) || '',
     clockOut: findKey(rawOrder, ['退勤ボタン', 'clockOut']) || '',
     travelTime: (() => {
