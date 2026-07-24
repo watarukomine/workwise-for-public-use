@@ -185,9 +185,10 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
   const { customers: allCustomers } = useCustomer();
   const [line1, line2] = String(order.taskDetails || '').split(/\r?\n/);
 
-  // Resolve storeName from master
+  // Resolve storeName from master (skip for generic tasks like Break, Travel, etc.)
   let resolvedStoreName = order.customerName || '';
-  if (resolvedStoreName === '' || resolvedStoreName === '（店舗名未設定）' || resolvedStoreName === '(店舗名未設定)' || resolvedStoreName === '店舗名未設定') {
+  const isGeneric = ['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t));
+  if (!isGeneric && (resolvedStoreName === '' || resolvedStoreName === '（店舗名未設定）' || resolvedStoreName === '(店舗名未設定)' || resolvedStoreName === '店舗名未設定')) {
     const code = order.customerCode || (order as any).userCode || findKey(order.raw, ["ユーザーコード", "顧客コード"]);
     if (code && allCustomers) {
       const paddedCode = String(code).trim().padStart(5, '0');
