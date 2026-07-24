@@ -319,36 +319,7 @@ function CheckInClient() {
         const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
         const sysId = (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || '';
 
-        let result: any = { status: 'success', message: '位置情報を更新しました。' };
-        try {
-          result = await updateSheetStatus({
-            gasUrl: ORDER_GAS_URL,
-            eventTitle: eventTitleForUpdate,
-            staffName: profile.name,
-            statusValue: statusValue,
-            timestamp: new Date().toISOString(), // Log timestamp is ALWAYS "real now"
-            latitude: latitude,
-            longitude: longitude,
-            actionType: action as any,
-            actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
-            comment: (action as string) === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
-            emergencyFlag: (action as string) === 'Emergency' ? true : undefined,
-            systemId: sysId
-          });
-        } catch (gasErr: any) {
-          // Suppress GAS sheet error if no order ID is bound or if it's a routine location update (Wait)
-          if (!sysId || action === 'Wait') {
-            console.warn("GAS update skipped/warned for unassigned location update:", gasErr);
-          } else {
-            throw gasErr;
-          }
-        }
-
-        if (result?.status === 'error' && sysId && action !== 'Wait') {
-          throw new Error(result.message);
-        }
-
-        // Direct Write to Staff User Document in Firestore (Primary for Staff Location)
+        // 1. Direct Write to Staff User Document in Firestore (Primary for Staff Location)
         if (profile?.id && latitude !== null && longitude !== null) {
           try {
             const { doc, updateDoc, setDoc } = await import('firebase/firestore');
@@ -373,7 +344,7 @@ function CheckInClient() {
           }
         }
 
-        // 2. Direct Write to Order Firestore Document (if order is assigned)
+        // 2. Direct Write to Order Firestore Document (Primary for Order Status & ETA)
         if (sysId) {
           const { OrderService } = await import('@/services/order-service');
           const firestoreFields: any = {
@@ -425,6 +396,24 @@ function CheckInClient() {
           await OrderService.updateOrder(sysId, firestoreFields);
         }
 
+        // 3. Async Background Backup to GAS Spreadsheet (non-blocking)
+        updateSheetStatus({
+          gasUrl: ORDER_GAS_URL,
+          eventTitle: eventTitleForUpdate,
+          staffName: profile.name,
+          statusValue: statusValue,
+          timestamp: new Date().toISOString(), // Log timestamp is ALWAYS "real now"
+          latitude: latitude,
+          longitude: longitude,
+          actionType: action as any,
+          actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
+          comment: (action as string) === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
+          emergencyFlag: (action as string) === 'Emergency' ? true : undefined,
+          systemId: sysId
+        }).catch(gasErr => {
+          console.warn("GAS background sync skipped or warning:", gasErr);
+        });
+
         // Optimistic update done
         setOptimisticStatus(statusValue);
 
@@ -433,7 +422,7 @@ function CheckInClient() {
 
         toast({
           title: (action as string) === 'Emergency' ? '緊急連絡を送信しました' : (isManual ? 'ステータス時間を修正しました' : 'ステータスを更新しました'),
-          description: result.message,
+          description: `ステータスを「${statusValue}」に更新しました。`,
           variant: (action as string) === 'Emergency' ? 'destructive' : 'default',
         });
 
