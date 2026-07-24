@@ -319,11 +319,17 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
       }
       formInit[h] = val !== undefined && val !== null ? val : '';
     });
+    // Ensure '受注 No' and '受注No(ﾘﾏｰｸ1 8ｹﾀ)' are always synchronized
+    const remark1Val = formInit['受注 No'] || formInit['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || order.orderNo || order.orderNoRemark || '';
+    formInit['受注 No'] = remark1Val;
+    formInit['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] = remark1Val;
+
     // Explicit mappings for non-standard or custom fields
     formInit['isEmergency'] = order.isEmergency || false;
     formInit['emergencyMessage'] = order.emergencyMessage || '';
     formInit['adminReply'] = order.adminReply || '';
-    formInit['comment'] = order.comment || '';
+    formInit['comment'] = order.comment || formInit['任意コメント(ﾘﾏｰｸ2　10ｹﾀ)'] || '';
+    formInit['任意コメント(ﾘﾏｰｸ2　10ｹﾀ)'] = formInit['comment'];
 
     // Auto-resolve storeName from customerMaster on details dialog load
     const currentStoreName = formInit['店舗名'] || '';
@@ -365,15 +371,21 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
         }
       });
       
+      const remark1Val = editForm['受注 No'] || editForm['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || '';
+      updateData.orderNo = remark1Val;
+      updateData.orderNoRemark = remark1Val;
+
       updateData.isEmergency = editForm['isEmergency'] || false;
       updateData.emergencyMessage = editForm['emergencyMessage'] || '';
       updateData.adminReply = editForm['adminReply'] || '';
-      updateData.comment = editForm['comment'] || '';
+      updateData.comment = editForm['comment'] || editForm['任意コメント(ﾘﾏｰｸ2　10ｹﾀ)'] || '';
 
       const updatedRaw = { ...(selectedOrder.raw || {}) };
       EXPORT_HEADERS.forEach(h => {
         updatedRaw[h] = editForm[h];
       });
+      updatedRaw['受注 No'] = remark1Val;
+      updatedRaw['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] = remark1Val;
       updateData.raw = updatedRaw;
 
       await OrderService.updateOrder(selectedOrder.id, updateData);
@@ -549,8 +561,12 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     <Label htmlFor="orderNo">受注 No</Label>
                     <Input
                       id="orderNo"
-                      value={editForm['受注 No'] || ''}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, '受注 No': e.target.value }))}
+                      value={editForm['受注 No'] || editForm['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ 
+                        ...prev, 
+                        '受注 No': e.target.value,
+                        '受注No(ﾘﾏｰｸ1 8ｹﾀ)': e.target.value 
+                      }))}
                     />
                   </div>
                   <div className="space-y-2">
@@ -894,8 +910,12 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     <Label htmlFor="orderNoRemark">受注No(ﾘﾏｰｸ1 8ｹﾀ)</Label>
                     <Input
                       id="orderNoRemark"
-                      value={editForm['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || ''}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, '受注No(ﾘﾏｰｸ1 8ｹﾀ)': e.target.value }))}
+                      value={editForm['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || editForm['受注 No'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ 
+                        ...prev, 
+                        '受注No(ﾘﾏｰｸ1 8ｹﾀ)': e.target.value,
+                        '受注 No': e.target.value 
+                      }))}
                     />
                   </div>
                   <div className="space-y-2">

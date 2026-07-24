@@ -212,10 +212,6 @@ export default function OrderFormPage() {
     const onSubmit = async (data: OrderFormValues) => {
         setIsSubmitting(true);
         try {
-            if (!ORDER_GAS_URL) {
-                throw new Error('システム設定エラー: 連携URLが設定されていません。');
-            }
-
             // Handle 'その他' values
             const submissionData = { ...data } as any;
             if (data.workType === 'その他' && data.otherWorkType) {
@@ -251,6 +247,8 @@ export default function OrderFormPage() {
                 id: returnedOrderId,
                 systemId: returnedOrderId,
                 displayId: displayId,
+                orderNo: submissionData.orderNo || '',
+                orderNoRemark: submissionData.orderNo || '',
                 customerCode: submissionData.userCode, // map to expected key
                 customerName: submissionData.storeName, // map to expected key
                 estimatedDuration: 60,
