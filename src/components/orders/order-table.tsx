@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
-import { Search, MoreHorizontal } from 'lucide-react';
+import { Search, MoreHorizontal, Download } from 'lucide-react';
 import { cn, findKey } from '@/lib/utils';
 import { format, isValid, parseISO, startOfToday, isAfter, isEqual } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -65,6 +65,103 @@ const ORDER_KEYS: Record<string, string[]> = {
   '担当': ['担当', 'staffName'],
   '受注ステータス': ['受注ステータス', 'status'],
 };
+
+const EXPORT_HEADERS = [
+  '受注 No',
+  'SystemID',
+  'ユーザーコード',
+  '店舗名',
+  '主管店舗',
+  '機材有無',
+  '作業予定日',
+  '予定時間',
+  'ご担当者様',
+  'キャンセル日時',
+  'キャンセル連絡者',
+  '作業',
+  '受注No(ﾘﾏｰｸ1 8ｹﾀ)',
+  '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)',
+  '車名',
+  '登録ナンバー(下４桁)',
+  '入庫状況',
+  'タイヤ品番',
+  'タイヤサイズ',
+  '品名',
+  '作業内容',
+  '本数',
+  '空気圧センサーパッキン交換',
+  'タイヤ手配状況',
+  '廃タイヤ処分',
+  '連絡先',
+  '受注ステータス',
+  '担当',
+  '最終更新日時',
+  '特記事項',
+  'フォーム入力者',
+  '最終位置情報（緯度,経度）',
+  'チップ配置作業予定',
+  'チップ配置作業完了予定',
+  '出勤ボタン',
+  '既読確認',
+  '移動開始',
+  '現場到着',
+  '作業開始',
+  '作業完了',
+  '作業所要時間',
+  '退勤ボタン',
+  '緊急フラグ',
+  '緊急連絡',
+  '管理者返信'
+];
+
+const EXPORT_MAPPING: Record<string, string> = {
+  '受注 No': 'orderNo',
+  'SystemID': 'id',
+  'ユーザーコード': 'userCode',
+  '店舗名': 'customerName',
+  '主管店舗': 'mainStore',
+  '機材有無': 'equipmentStatus',
+  '作業予定日': 'scheduledDate',
+  '予定時間': 'scheduledTime',
+  'ご担当者様': 'picName',
+  'キャンセル日時': 'cancelDate',
+  'キャンセル連絡者': 'cancelContact',
+  '作業': 'taskDetails',
+  '受注No(ﾘﾏｰｸ1 8ｹﾀ)': 'orderNoRemark',
+  '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': 'comment',
+  '車名': 'carName',
+  '登録ナンバー(下４桁)': 'regNo',
+  '入庫状況': 'entryStatus',
+  'タイヤ品番': 'tireNumber',
+  'タイヤサイズ': 'tireSize',
+  '品名': 'productName',
+  '作業内容': 'serviceType',
+  '本数': 'quantity',
+  '空気圧センサーパッキン交換': 'sensor',
+  'タイヤ手配状況': 'arrangement',
+  '廃タイヤ処分': 'disposal',
+  '連絡先': 'contact',
+  '受注ステータス': 'status',
+  '担当': 'staffName',
+  '最終更新日時': 'updatedAt',
+  '特記事項': 'specialNotes',
+  'フォーム入力者': 'submitter',
+  '最終位置情報（緯度,経度）': 'lastLocation',
+  'チップ配置作業予定': 'chipWorkScheduled',
+  'チップ配置作業完了予定': 'chipWorkCompleted',
+  '出勤ボタン': 'clockIn',
+  '既読確認': 'readConfirmation',
+  '移動開始': 'startTravel',
+  '現場到着': 'arrival',
+  '作業開始': 'startWork',
+  '作業完了': 'completeWork',
+  '作業所要時間': 'workDuration',
+  '退勤ボタン': 'clockOut',
+  '緊急フラグ': 'isEmergency',
+  '緊急連絡': 'emergencyMessage',
+  '管理者返信': 'adminReply'
+};
+
 
 export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -162,6 +259,51 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     }
   };
 
+  const handleExportCSV = () => {
+    const escapeCell = (val: string) => {
+      let cellStr = val || '';
+      if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n') || cellStr.includes('\r')) {
+        cellStr = `"${cellStr.replace(/"/g, '""')}"`;
+      }
+      return cellStr;
+    };
+
+    const headerRow = EXPORT_HEADERS.map(h => escapeCell(h)).join(',');
+    const dataRows = (rawOrders || []).map(order => {
+      const raw = order.raw || {};
+      const rowValues = EXPORT_HEADERS.map(h => {
+        // 1. Prefer raw original data
+        if (raw[h] !== undefined && raw[h] !== null) {
+          return String(raw[h]);
+        }
+        // 2. Check mapped key
+        const key = EXPORT_MAPPING[h];
+        let val = key ? order[key] : undefined;
+        
+        // Restore formatted values if needed
+        if (key === 'scheduledDate' && val) {
+          if (typeof val === 'string') {
+            val = val.replace(/-/g, '/');
+          }
+        }
+        
+        return val !== undefined && val !== null ? String(val) : '';
+      });
+      return rowValues.map(v => escapeCell(v)).join(',');
+    });
+
+    const csvContent = [headerRow, ...dataRows].join('\n');
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStr = format(new Date(), 'yyyyMMdd_HHmmss');
+    link.href = url;
+    link.download = `受注データバックアップ_${dateStr}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
 
   return (
     <Card>
@@ -187,6 +329,15 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                 <SelectItem value="scheduledDate">作業予定日順</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              onClick={handleExportCSV}
+              disabled={isLoading || !rawOrders || rawOrders.length === 0}
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              CSVエクスポート
+            </Button>
           </div>
         </div>
         <ScrollArea className="h-[60vh] rounded-md border">
