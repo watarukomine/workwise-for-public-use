@@ -94,6 +94,26 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
         const specialNotes = raw ? findKey(raw, ['特記事項', '詳細', '連絡事項']) : (event as any).specialNotes;
         const hasOrderDetails = !isTravel && (carName || regNo || tireSize || tireNumber || arrangement || disposal || serviceType || specialNotes);
 
+        // Resolve clean storeName for CardTitle
+        let resolvedStoreName = customer?.storeName || (event as any).customerName || '';
+        if (!resolvedStoreName || resolvedStoreName === '（店舗名未設定）' || resolvedStoreName === '(店舗名未設定)' || resolvedStoreName === '店舗名未設定') {
+          const code = (event as any).customerCode || (event as any).userCode || (raw ? findKey(raw, ['ユーザーコード', '顧客コード']) : undefined);
+          if (code && customers) {
+            const paddedCode = String(code).trim().padStart(5, '0');
+            const match = customers.find(c => {
+              const cCode = c.userCode || c['ユーザーコード'] || '';
+              return String(cCode).trim().padStart(5, '0') === paddedCode;
+            });
+            if (match?.storeName) {
+              resolvedStoreName = match.storeName;
+            }
+          }
+        }
+
+        const displayTitle = (resolvedStoreName && resolvedStoreName !== '（店舗名未設定）' && resolvedStoreName !== '(店舗名未設定)' && resolvedStoreName !== '店舗名未設定')
+          ? resolvedStoreName
+          : (event.title && !event.title.includes('店舗名未設定') ? event.title : '店舗名未設定');
+
         const eventCard = (
           <Card className={cn(
             "cursor-pointer hover:bg-muted/50 relative overflow-hidden",
@@ -123,13 +143,12 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
 
             <CardHeader className="p-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg leading-tight">{event.title}</CardTitle>
+                <CardTitle className="text-lg leading-tight font-bold">{displayTitle}</CardTitle>
                 <div
                   className="w-3 h-10 rounded-full dynamic-bg"
                   {...{ 'style': { '--dynamic-bg-color': staffMember?.color || 'gray' } as any }}
                 />
               </div>
-              {customer && <CardDescription>{customer.storeName}</CardDescription>}
             </CardHeader>
             <CardContent className="p-4 pt-0 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
