@@ -111,6 +111,20 @@ export type Order = {
   updatedAt?: string | Date;
   createdAt?: string | Date; // Added for tracking
   _type?: 'order' | 'task'; // Added for isolation
+  // A to AS missing columns
+  orderNoRemark?: string;
+  entryStatus?: string;
+  lastLocation?: string;
+  chipWorkScheduled?: string;
+  chipWorkCompleted?: string;
+  clockIn?: string;
+  readConfirmation?: string;
+  startTravel?: string;
+  arrival?: string;
+  startWork?: string;
+  completeWork?: string;
+  workDuration?: string | number;
+  clockOut?: string;
 };
 
 export type ScheduleEvent = WithId<Order> & {

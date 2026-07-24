@@ -27,33 +27,62 @@ import { Label } from '@/components/ui/label';
 
 // --- CSV Parser ---
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
-  const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-  if (lines.length === 0) return { headers: [], rows: [] };
+  const result: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let inQuotes = false;
 
-  const parseLine = (line: string): string[] => {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (inQuotes) {
-        if (char === '"' && line[i + 1] === '"') { current += '"'; i++; }
-        else if (char === '"') { inQuotes = false; }
-        else { current += char; }
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (nextChar === '"') {
+          cell += '"';
+          i++; // Skip the next quote
+        } else {
+          inQuotes = false;
+        }
       } else {
-        if (char === '"') { inQuotes = true; }
-        else if (char === ',') { result.push(current.trim()); current = ''; }
-        else { current += char; }
+        cell += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ',') {
+        row.push(cell.trim());
+        cell = '';
+      } else if (char === '\n' || char === '\r') {
+        if (char === '\r' && nextChar === '\n') {
+          i++; // Skip the \n in \r\n
+        }
+        row.push(cell.trim());
+        if (row.length > 0 || cell !== '') {
+          result.push(row);
+        }
+        row = [];
+        cell = '';
+      } else {
+        cell += char;
       }
     }
-    result.push(current.trim());
-    return result;
-  };
+  }
 
-  const headers = parseLine(lines[0]);
-  const rows = lines.slice(1).map(line => parseLine(line));
+  // Handle the last cell and row if not empty
+  if (cell !== '' || row.length > 0) {
+    row.push(cell.trim());
+    result.push(row);
+  }
+
+  if (result.length === 0) return { headers: [], rows: [] };
+
+  // Clean headers (remove newlines and excess whitespace)
+  const headers = result[0].map(h => h.replace(/[\r\n]/g, '').replace(/\s+/g, ' '));
+  const rows = result.slice(1);
   return { headers, rows };
 }
+
 
 // --- Collection Presets ---
 const COLLECTION_PRESETS = [
@@ -66,6 +95,7 @@ const COLLECTION_PRESETS = [
 // --- Field Mappings for Auto-conversion ---
 const FIELD_MAPPINGS: Record<string, string> = {
   // 受注データ（orders）用マッピング
+  '受注 ID': 'displayId',
   '受注ID': 'displayId',
   'SystemID': 'id',
   'お取引先コード': 'customerCode',
@@ -75,8 +105,8 @@ const FIELD_MAPPINGS: Record<string, string> = {
   '店舗名': 'customerName',
   '店舗': 'customerName',
   '主管店舗': 'mainStore',
-  '作業内容': 'taskDetails',
-  '作業': 'taskDetails',
+  '作業内容': 'serviceType', // CSV 20列: 作業内容
+  '作業': 'taskDetails',     // CSV 11列: 作業
   '詳細': 'taskDetails',
   '作業予定日': 'scheduledDate',
   '日付': 'scheduledDate',
@@ -89,29 +119,31 @@ const FIELD_MAPPINGS: Record<string, string> = {
   '予定終了時間': 'scheduledEndTime',
   'ご担当者様': 'picName',
   '担当者名': 'picName',
-  '担当': 'staffName',
+  '担当': 'staffName', // CSV 27列: 担当
   'スタッフ名': 'staffName',
   '担当者': 'staffName',
   'スタッフ': 'staffName',
   'スタッフID': 'staffId',
   'スタッフコード': 'staffId',
   '注文番号': 'orderNo',
+  '受注 No': 'orderNo', // CSV 0列: 受注 No
   '受注No': 'orderNo',
   '任意コメント': 'comment',
   '車名': 'carName',
   '登録ナンバー': 'regNo',
-  '受注ステータス': 'status',
-  '入庫状況': 'status',
+  '登録ナンバー(下４桁)': 'regNo',
+  '受注ステータス': 'status', // CSV 26列: 受注ステータス
+  '入庫状況': 'entryStatus', // CSV 16列: 入庫状況
   'タイヤ品番': 'tireNumber',
   'タイヤサイズ': 'tireSize',
   '品名': 'productName',
   '本数': 'quantity',
   '空気圧センサーパッキン交換': 'sensor',
-  'センサー': 'sensor',
   'タイヤ手配状況': 'arrangement',
   '手配': 'arrangement',
   '廃タイヤ処分': 'disposal',
   '廃タイヤ': 'disposal',
+  '連絡先': 'contact',
   '連絡者名': 'contact',
   '連絡者': 'contact',
   '特記事項': 'specialNotes',
@@ -123,7 +155,30 @@ const FIELD_MAPPINGS: Record<string, string> = {
   '緯度': 'latitude',
   '経度': 'longitude',
   '母店': 'mainStore',
+
+  // A〜AS列追加分
+  'キャンセル日時': 'cancelDate',
+  'キャンセル連絡者': 'cancelContact',
+  '受注No(ﾘﾏｰｸ1 8ｹﾀ)': 'orderNoRemark',
+  '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': 'comment',
+  '最終更新日時': 'updatedAt',
+  '最終位置情報（緯度,経度）': 'lastLocation',
+  'チップ配置作業予定': 'chipWorkScheduled',
+  'チップ配置作業完了予定': 'chipWorkCompleted',
+  '出勤ボタン': 'clockIn',
+  '既読確認': 'readConfirmation',
+  '移動開始': 'startTravel',
+  '現場到着': 'arrival',
+  '作業開始': 'startWork',
+  '作業完了': 'completeWork',
+  '作業所要時間': 'workDuration',
+  '退勤ボタン': 'clockOut',
+  '緊急フラグ': 'isEmergency',
+  '緊急連絡': 'emergencyMessage',
+  '管理者返信': 'adminReply',
+  '機材有無': 'equipmentStatus'
 };
+
 
 
 
