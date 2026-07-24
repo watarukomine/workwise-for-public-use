@@ -294,7 +294,8 @@ function CheckInClient() {
     const statusMap: Partial<Record<string, string>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '作業完了',
+      'Finish Task': '待機中',
+      'Clock Out': '帰社中',
       'Wait': '待機中',
       'Arrive': '作業待ち',
       'Emergency': '緊急',
@@ -346,6 +347,34 @@ function CheckInClient() {
           };
           if (latitude !== null) firestoreFields.latitude = latitude;
           if (longitude !== null) firestoreFields.longitude = longitude;
+
+          // Calculate ETA for Clock Out (帰社中) or Start Travel (移動中)
+          if (action === 'Clock Out') {
+            const travelMin = calculateTravelTimeMinutes(
+              latitude,
+              longitude,
+              DEFAULT_OFFICE_LOCATION.latitude,
+              DEFAULT_OFFICE_LOCATION.longitude
+            );
+            const etaDate = new Date(now.getTime() + travelMin * 60000);
+            firestoreFields.nextDestination = DEFAULT_OFFICE_LOCATION.name;
+            firestoreFields.estimatedArrivalTime = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+          } else if (action === 'Start Travel') {
+            const todayStr = formatDate(now.toISOString(), 'yyyy-MM-dd');
+            const nextOrder = orders.find(o => {
+              const oDate = o.scheduledDate ? formatDate(o.scheduledDate, 'yyyy-MM-dd') : '';
+              return oDate === todayStr && o.status !== '作業完了' && o.status !== 'キャンセル' && o.id !== currentOrder?.id;
+            });
+
+            if (nextOrder) {
+              firestoreFields.nextDestination = nextOrder.customerName || (nextOrder as any).storeName || '次の現場';
+              const destLat = nextOrder.latitude || DEFAULT_OFFICE_LOCATION.latitude;
+              const destLng = nextOrder.longitude || DEFAULT_OFFICE_LOCATION.longitude;
+              const travelMin = calculateTravelTimeMinutes(latitude, longitude, destLat, destLng);
+              const etaDate = new Date(now.getTime() + travelMin * 60000);
+              firestoreFields.estimatedArrivalTime = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            }
+          }
 
           const timeFieldMap: Record<string, string> = {
             'Start Travel': 'startTravelTime',
@@ -472,7 +501,7 @@ function CheckInClient() {
     { action: 'Arrive', label: '現場到着', icon: MapPin },
     { action: 'Begin Task', label: '作業開始', icon: Clock },
     { action: 'Finish Task', label: '作業完了', icon: CheckCircle },
-    { action: 'Clock Out', label: '退勤', icon: LogOut },
+    { action: 'Clock Out', label: '帰社', icon: Building },
     { action: 'Wait', label: '位置情報更新', icon: RefreshCw },
   ];
 
@@ -741,71 +770,6 @@ function CheckInClient() {
               決定
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 作業完了後のネクストステップ選択ダイアログ */}
-      <Dialog open={isNextStepDialogOpen} onOpenChange={setIsNextStepDialogOpen}>
-        <DialogContent className="sm:max-w-md bg-card border shadow-xl rounded-2xl">
-          <DialogHeader className="text-center">
-            <DialogTitle className="text-xl font-bold flex items-center justify-center gap-2 text-foreground">
-              <CheckCircle className="h-6 w-6 text-green-600" />
-              作業完了のお疲れ様でした！
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground mt-1">
-              次の業務のアクションを選択してください。Google Mapsと連動して予定時間を自動計算します。
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-3 py-4">
-            <Button
-              variant="default"
-              size="lg"
-              disabled={isProcessingNextStep}
-              onClick={() => handleNextStepAction('next_task')}
-              className="h-16 flex items-center justify-start px-4 gap-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:opacity-90 shadow-md rounded-xl transition-all"
-            >
-              <div className="bg-white/20 p-2.5 rounded-lg">
-                <Truck className="h-6 w-6 text-white" />
-              </div>
-              <div className="text-left">
-                <div className="font-bold text-sm">次の現場へ移動</div>
-                <div className="text-[11px] opacity-80 font-normal">次の現場までの移動所要時間を計測・到着予定を通知</div>
-              </div>
-            </Button>
-
-            <Button
-              variant="outline"
-              size="lg"
-              disabled={isProcessingNextStep}
-              onClick={() => handleNextStepAction('return_office')}
-              className="h-16 flex items-center justify-start px-4 gap-4 border-2 border-purple-200 hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-950/30 text-purple-900 dark:text-purple-100 rounded-xl transition-all"
-            >
-              <div className="bg-purple-100 dark:bg-purple-900/50 p-2.5 rounded-lg">
-                <Building className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div className="text-left">
-                <div className="font-bold text-sm">帰社する</div>
-                <div className="text-[11px] text-muted-foreground font-normal">事務所（自拠点）までの帰社予定時刻を自動計算</div>
-              </div>
-            </Button>
-
-            <Button
-              variant="outline"
-              size="lg"
-              disabled={isProcessingNextStep}
-              onClick={() => handleNextStepAction('wait')}
-              className="h-14 flex items-center justify-start px-4 gap-4 border text-muted-foreground hover:bg-muted rounded-xl transition-all"
-            >
-              <div className="bg-muted p-2 rounded-lg">
-                <PauseCircle className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="text-left">
-                <div className="font-bold text-xs">待機する</div>
-                <div className="text-[10px] opacity-70 font-normal">次の指示や案件をその場で待機</div>
-              </div>
-            </Button>
-          </div>
         </DialogContent>
       </Dialog>
     </div>
