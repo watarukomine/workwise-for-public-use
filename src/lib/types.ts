@@ -84,6 +84,7 @@ export type Order = {
   cancelDate?: string;
   cancelContact?: string;
   '本数'?: string;
+  quantity?: string | number;
   arrivalStatus?: string;
   productName?: string;
   sensor?: string;

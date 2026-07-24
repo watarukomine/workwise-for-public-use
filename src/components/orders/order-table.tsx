@@ -316,6 +316,22 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     formInit['emergencyMessage'] = order.emergencyMessage || '';
     formInit['adminReply'] = order.adminReply || '';
     formInit['comment'] = order.comment || '';
+
+    // Auto-resolve storeName from customerMaster on details dialog load
+    const currentStoreName = formInit['店舗名'] || '';
+    if (currentStoreName === '' || currentStoreName === '（店舗名未設定）' || currentStoreName === '(店舗名未設定)' || currentStoreName === '店舗名未設定') {
+      const code = formInit['ユーザーコード'] || '';
+      if (code && customers) {
+        const paddedCode = String(code).trim().padStart(5, '0');
+        const match = customers.find(c => {
+          const cCode = c.userCode || c['ユーザーコード'] || '';
+          return String(cCode).trim().padStart(5, '0') === paddedCode;
+        });
+        if (match && match.storeName) {
+          formInit['店舗名'] = match.storeName;
+        }
+      }
+    }
     
     setEditForm(formInit);
     setIsDialogOpen(true);
