@@ -31,6 +31,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { OrderService } from "@/services/order-service";
+
 
 interface OrderTableProps {
   orders: any[]; // Use any[] to be flexible with raw GAS data
@@ -167,6 +185,13 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [sortType, setSortType] = React.useState<'spreadsheet' | 'scheduledDate'>('spreadsheet');
+  
+  // Dialog States
+  const [selectedOrder, setSelectedOrder] = React.useState<any | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const [editForm, setEditForm] = React.useState<Record<string, any>>({});
+  const [isSaving, setIsSaving] = React.useState(false);
+
   const { profile } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
 
@@ -254,10 +279,65 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   }, [rawOrders, debouncedSearch, sortType, headers, getFormattedValue]);
     
   const handleRowClick = (order: any) => {
-    if (isAdmin && order && order.Order_URL) {
-      window.open(order.Order_URL, '_blank', 'noopener,noreferrer');
+    setSelectedOrder(order);
+    const formInit: Record<string, any> = {};
+    EXPORT_HEADERS.forEach(h => {
+      const key = EXPORT_MAPPING[h];
+      const val = key ? order[key] : undefined;
+      formInit[h] = val !== undefined && val !== null ? val : '';
+    });
+    // Explicit mappings for non-standard or custom fields
+    formInit['isEmergency'] = order.isEmergency || false;
+    formInit['emergencyMessage'] = order.emergencyMessage || '';
+    formInit['adminReply'] = order.adminReply || '';
+    formInit['comment'] = order.comment || '';
+    
+    setEditForm(formInit);
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!selectedOrder) return;
+    setIsSaving(true);
+    try {
+      const updateData: Record<string, any> = {};
+      
+      EXPORT_HEADERS.forEach(h => {
+        const key = EXPORT_MAPPING[h];
+        if (key) {
+          const val = editForm[h];
+          if (val === '') {
+            updateData[key] = '';
+          } else if (['quantity'].includes(key)) {
+            updateData[key] = Number(val);
+          } else {
+            updateData[key] = val;
+          }
+        }
+      });
+      
+      updateData.isEmergency = editForm['isEmergency'] || false;
+      updateData.emergencyMessage = editForm['emergencyMessage'] || '';
+      updateData.adminReply = editForm['adminReply'] || '';
+      updateData.comment = editForm['comment'] || '';
+
+      const updatedRaw = { ...(selectedOrder.raw || {}) };
+      EXPORT_HEADERS.forEach(h => {
+        updatedRaw[h] = editForm[h];
+      });
+      updateData.raw = updatedRaw;
+
+      await OrderService.updateOrder(selectedOrder.id, updateData);
+      setIsDialogOpen(false);
+      alert('受注データを更新しました。');
+    } catch (e: any) {
+      console.error(e);
+      alert(`更新に失敗しました: ${e.message}`);
+    } finally {
+      setIsSaving(false);
     }
   };
+
 
   const handleExportCSV = () => {
     const escapeCell = (val: string) => {
@@ -306,7 +386,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
 
   return (
-    <Card>
+    <>
+      <Card>
       <CardContent className="pt-6">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-4">
           <div className="relative w-full max-w-sm">
@@ -356,12 +437,11 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                 </TableRow>
               ) : filteredAndSortedOrders.length > 0 ? (
                 filteredAndSortedOrders.map((order, index) => {
-                  const hasUrl = !!order.Order_URL;
                   return (
                     <TableRow 
                       key={order.id || index}
                       onDoubleClick={() => handleRowClick(order)}
-                      className={cn(isAdmin && hasUrl && "cursor-pointer hover:bg-muted/50")}
+                      className={cn(isAdmin && "cursor-pointer hover:bg-muted/50")}
                     >
                       {headers.map(header => {
                         const cellValue = getFormattedValue(order, header);
@@ -388,5 +468,444 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
         </ScrollArea>
       </CardContent>
     </Card>
+
+    {/* 受注詳細・編集ダイアログ */}
+    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold flex items-center justify-between">
+            <span>受注詳細・編集</span>
+            {selectedOrder && (
+              <span className="text-sm font-normal text-muted-foreground mr-6">
+                ID: {selectedOrder.id}
+              </span>
+            )}
+          </DialogTitle>
+        </DialogHeader>
+
+        {selectedOrder && (
+          <Tabs defaultValue="general" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="general">基本情報</TabsTrigger>
+              <TabsTrigger value="task">作業・車両</TabsTrigger>
+              <TabsTrigger value="status">進行状況</TabsTrigger>
+              <TabsTrigger value="other">緊急・その他</TabsTrigger>
+            </TabsList>
+
+            <div className="mt-4 space-y-4">
+              {/* 1. 基本情報タブ */}
+              <TabsContent value="general" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="orderNo">受注 No</Label>
+                    <Input
+                      id="orderNo"
+                      value={editForm['受注 No'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '受注 No': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="SystemID">SystemID</Label>
+                    <Input
+                      id="SystemID"
+                      value={editForm['SystemID'] || ''}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="userCode">ユーザーコード</Label>
+                    <Input
+                      id="userCode"
+                      value={editForm['ユーザーコード'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'ユーザーコード': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customerName">店舗名</Label>
+                    <Input
+                      id="customerName"
+                      value={editForm['店舗名'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '店舗名': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="mainStore">主管店舗</Label>
+                    <Input
+                      id="mainStore"
+                      value={editForm['主管店舗'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '主管店舗': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="picName">ご担当者様</Label>
+                    <Input
+                      id="picName"
+                      value={editForm['ご担当者様'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'ご担当者様': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="scheduledDate">作業予定日 (yyyy/MM/dd)</Label>
+                    <Input
+                      id="scheduledDate"
+                      value={editForm['作業予定日'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '作業予定日': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="scheduledTime">予定時間 (HH:mm)</Label>
+                    <Input
+                      id="scheduledTime"
+                      value={editForm['予定時間'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '予定時間': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="staffName">担当スタッフ</Label>
+                    <Input
+                      id="staffName"
+                      value={editForm['担当'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '担当': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status">受注ステータス</Label>
+                    <Select
+                      value={editForm['受注ステータス'] || '未割当'}
+                      onValueChange={(val) => setEditForm(prev => ({ ...prev, '受注ステータス': val }))}
+                    >
+                      <SelectTrigger id="status">
+                        <SelectValue placeholder="ステータスを選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="未割当">未割当</SelectItem>
+                        <SelectItem value="作業待ち">作業待ち</SelectItem>
+                        <SelectItem value="移動中">移動中</SelectItem>
+                        <SelectItem value="作業中">作業中</SelectItem>
+                        <SelectItem value="作業完了">作業完了</SelectItem>
+                        <SelectItem value="キャンセル">キャンセル</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* 2. 作業・車両詳細タブ */}
+              <TabsContent value="task" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="task">作業</Label>
+                    <Input
+                      id="task"
+                      value={editForm['作業'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '作業': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="serviceType">作業内容</Label>
+                    <Input
+                      id="serviceType"
+                      value={editForm['作業内容'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '作業内容': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="productName">品名</Label>
+                    <Input
+                      id="productName"
+                      value={editForm['品名'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '品名': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tireNumber">タイヤ品番</Label>
+                    <Input
+                      id="tireNumber"
+                      value={editForm['タイヤ品番'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'タイヤ品番': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tireSize">タイヤサイズ</Label>
+                    <Input
+                      id="tireSize"
+                      value={editForm['タイヤサイズ'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'タイヤサイズ': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="quantity">本数</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      value={editForm['本数'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '本数': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sensor">空気圧センサーパッキン交換</Label>
+                    <Input
+                      id="sensor"
+                      value={editForm['空気圧センサーパッキン交換'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '空気圧センサーパッキン交換': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="arrangement">タイヤ手配状況</Label>
+                    <Input
+                      id="arrangement"
+                      value={editForm['タイヤ手配状況'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'タイヤ手配状況': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="disposal">廃タイヤ処分</Label>
+                    <Input
+                      id="disposal"
+                      value={editForm['廃タイヤ処分'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '廃タイヤ処分': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="equipmentStatus">機材有無</Label>
+                    <Input
+                      id="equipmentStatus"
+                      value={editForm['機材有無'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '機材有無': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="contact">連絡先</Label>
+                    <Input
+                      id="contact"
+                      value={editForm['連絡先'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '連絡先': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="carName">車名</Label>
+                    <Input
+                      id="carName"
+                      value={editForm['車名'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '車名': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="regNo">登録ナンバー(下４桁)</Label>
+                    <Input
+                      id="regNo"
+                      value={editForm['登録ナンバー(下４桁)'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '登録ナンバー(下４桁)': e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* 3. 進行状況タブ */}
+              <TabsContent value="status" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="entryStatus">入庫状況</Label>
+                    <Input
+                      id="entryStatus"
+                      value={editForm['入庫状況'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '入庫状況': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="readConfirmation">既読確認</Label>
+                    <Input
+                      id="readConfirmation"
+                      value={editForm['既読確認'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '既読確認': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clockIn">出勤ボタン</Label>
+                    <Input
+                      id="clockIn"
+                      value={editForm['出勤ボタン'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '出勤ボタン': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="startTravel">移動開始</Label>
+                    <Input
+                      id="startTravel"
+                      value={editForm['移動開始'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '移動開始': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="arrival">現場到着</Label>
+                    <Input
+                      id="arrival"
+                      value={editForm['現場到着'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '現場到着': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="startWork">作業開始</Label>
+                    <Input
+                      id="startWork"
+                      value={editForm['作業開始'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '作業開始': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="completeWork">作業完了</Label>
+                    <Input
+                      id="completeWork"
+                      value={editForm['作業完了'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '作業完了': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="workDuration">作業所要時間</Label>
+                    <Input
+                      id="workDuration"
+                      value={editForm['作業所要時間'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '作業所要時間': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clockOut">退勤ボタン</Label>
+                    <Input
+                      id="clockOut"
+                      value={editForm['退勤ボタン'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '退勤ボタン': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastLocation">最終位置情報（緯度,経度）</Label>
+                    <Input
+                      id="lastLocation"
+                      value={editForm['最終位置情報（緯度,経度）'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '最終位置情報（緯度,経度）': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="chipWorkScheduled">チップ配置作業予定</Label>
+                    <Input
+                      id="chipWorkScheduled"
+                      value={editForm['チップ配置作業予定'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'チップ配置作業予定': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="chipWorkCompleted">チップ配置作業完了予定</Label>
+                    <Input
+                      id="chipWorkCompleted"
+                      value={editForm['チップ配置作業完了予定'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'チップ配置作業完了予定': e.target.value }))}
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* 4. 緊急・その他タブ */}
+              <TabsContent value="other" className="space-y-4">
+                <div className="flex items-center space-x-2 py-2">
+                  <Switch
+                    id="isEmergency"
+                    checked={editForm['isEmergency'] || false}
+                    onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, 'isEmergency': checked }))}
+                  />
+                  <Label htmlFor="isEmergency" className="font-bold text-destructive">緊急フラグ</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="emergencyMessage">緊急連絡内容</Label>
+                  <Textarea
+                    id="emergencyMessage"
+                    value={editForm['emergencyMessage'] || ''}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, 'emergencyMessage': e.target.value }))}
+                    placeholder="緊急時の連絡事項を入力..."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="adminReply">管理者返信</Label>
+                  <Textarea
+                    id="adminReply"
+                    value={editForm['adminReply'] || ''}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, 'adminReply': e.target.value }))}
+                    placeholder="管理者からの指示や返信を入力..."
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="comment">任意コメント(ﾘﾏｰｸ2 10ｹﾀ)</Label>
+                    <Input
+                      id="comment"
+                      value={editForm['任意コメント(ﾘﾏｰｸ2　10ｹﾀ)'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="orderNoRemark">受注No(ﾘﾏｰｸ1 8ｹﾀ)</Label>
+                    <Input
+                      id="orderNoRemark"
+                      value={editForm['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '受注No(ﾘﾏｰｸ1 8ｹﾀ)': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="submitter">フォーム入力者</Label>
+                    <Input
+                      id="submitter"
+                      value={editForm['フォーム入力者'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'フォーム入力者': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cancelDate">キャンセル日時</Label>
+                    <Input
+                      id="cancelDate"
+                      value={editForm['キャンセル日時'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'キャンセル日時': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cancelContact">キャンセル連絡者</Label>
+                    <Input
+                      id="cancelContact"
+                      value={editForm['キャンセル連絡者'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'キャンセル連絡者': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="specialNotes">特記事項</Label>
+                    <Textarea
+                      id="specialNotes"
+                      value={editForm['特記事項'] || ''}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '特記事項': e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="updatedAt">最終更新日時</Label>
+                    <Input
+                      id="updatedAt"
+                      value={editForm['最終更新日時'] || ''}
+                      disabled
+                      className="bg-muted"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            </div>
+          </Tabs>
+        )}
+
+        <DialogFooter className="mt-6">
+          <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>
+            キャンセル
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="min-w-[80px]">
+            {isSaving ? '保存中...' : '保存'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }
