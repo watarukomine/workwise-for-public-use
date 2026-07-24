@@ -302,9 +302,13 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const handleRowClick = (order: any) => {
     setSelectedOrder(order);
     const formInit: Record<string, any> = {};
+    const raw = order.raw || {};
     EXPORT_HEADERS.forEach(h => {
-      const key = EXPORT_MAPPING[h];
-      const val = key ? order[key] : undefined;
+      let val = raw[h];
+      if (val === undefined || val === null || val === '') {
+        const key = EXPORT_MAPPING[h];
+        val = key ? order[key] : undefined;
+      }
       formInit[h] = val !== undefined && val !== null ? val : '';
     });
     // Explicit mappings for non-standard or custom fields
