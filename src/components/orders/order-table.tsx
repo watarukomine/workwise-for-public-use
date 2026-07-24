@@ -304,7 +304,15 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     const formInit: Record<string, any> = {};
     const raw = order.raw || {};
     EXPORT_HEADERS.forEach(h => {
-      let val = raw[h];
+      const normalize = (s: string) => s.replace(/[\s\u3000]+/g, '').replace(/[\r\n]/g, '').toLowerCase();
+      const normH = normalize(h);
+      let val = undefined;
+      for (const rawKey in raw) {
+        if (normalize(rawKey) === normH) {
+          val = raw[rawKey];
+          break;
+        }
+      }
       if (val === undefined || val === null || val === '') {
         const key = EXPORT_MAPPING[h];
         val = key ? order[key] : undefined;
