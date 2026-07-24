@@ -534,8 +534,38 @@ export const DEFAULT_OFFICE_LOCATION = {
 };
 
 /**
+ * Asynchronously fetches real-time driving travel time in minutes via Google Maps Distance Matrix API.
+ * Fallbacks to refined Haversine distance if API fails or coordinates missing.
+ */
+export async function fetchRealtimeTravelMinutes(
+  originLat: number | null | undefined,
+  originLng: number | null | undefined,
+  destLat: number | null | undefined,
+  destLng: number | null | undefined
+): Promise<number> {
+  if (!originLat || !originLng || !destLat || !destLng) {
+    return 30;
+  }
+
+  try {
+    const res = await fetch(`/api/distance-matrix?originLat=${originLat}&originLng=${originLng}&destLat=${destLat}&destLng=${destLng}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.durationMinutes && typeof data.durationMinutes === 'number') {
+        console.log(`[Google Maps Distance Matrix] Real-time duration: ${data.durationMinutes} mins (${data.durationText})`);
+        return data.durationMinutes;
+      }
+    }
+  } catch (err) {
+    console.warn("Distance Matrix API fetch failed, falling back to refined estimate:", err);
+  }
+
+  return calculateTravelTimeMinutes(originLat, originLng, destLat, destLng);
+}
+
+/**
  * Calculates estimated driving travel time in minutes between two lat/lng coordinates.
- * Uses Haversine distance with road curvature factor and average driving speed fallback.
+ * Refined fallback with 1.45 winding factor and 20km/h urban speed.
  */
 export function calculateTravelTimeMinutes(
   originLat: number | null | undefined,
@@ -559,11 +589,11 @@ export function calculateTravelTimeMinutes(
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const straightDistanceKm = R * c;
 
-  // Road distance estimation: straight distance * 1.35 (winding factor)
-  const roadDistanceKm = straightDistanceKm * 1.35;
+  // Road distance estimation: straight distance * 1.45 (winding factor)
+  const roadDistanceKm = straightDistanceKm * 1.45;
 
-  // Average urban/suburban driving speed: 28 km/h
-  const travelHours = roadDistanceKm / 28;
+  // Real-world urban driving speed considering traffic & lights: 20 km/h
+  const travelHours = roadDistanceKm / 20;
   const travelMinutes = Math.max(5, Math.round(travelHours * 60)); // Minimum 5 min
 
   return travelMinutes;

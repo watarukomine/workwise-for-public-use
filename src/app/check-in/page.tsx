@@ -13,7 +13,7 @@ import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
 import { updateStaffStatus } from '@/services/attendance-service';
-import { cn, findKey, calculateTravelTimeMinutes, DEFAULT_OFFICE_LOCATION, formatDate } from '@/lib/utils';
+import { cn, findKey, calculateTravelTimeMinutes, fetchRealtimeTravelMinutes, DEFAULT_OFFICE_LOCATION, formatDate } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
 import {
@@ -331,7 +331,7 @@ function CheckInClient() {
             let destStr: string | undefined = undefined;
 
             if (action === 'Clock Out') {
-              const travelMin = calculateTravelTimeMinutes(
+              const travelMin = await fetchRealtimeTravelMinutes(
                 latitude,
                 longitude,
                 DEFAULT_OFFICE_LOCATION.latitude,
@@ -351,7 +351,7 @@ function CheckInClient() {
                 destStr = nextOrder.customerName || (nextOrder as any).storeName || '次の現場';
                 const destLat = nextOrder.latitude || DEFAULT_OFFICE_LOCATION.latitude;
                 const destLng = nextOrder.longitude || DEFAULT_OFFICE_LOCATION.longitude;
-                const travelMin = calculateTravelTimeMinutes(latitude, longitude, destLat, destLng);
+                const travelMin = await fetchRealtimeTravelMinutes(latitude, longitude, destLat, destLng);
                 const etaDate = new Date(now.getTime() + travelMin * 60000);
                 etaStr = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
               }
@@ -386,7 +386,7 @@ function CheckInClient() {
 
           // Calculate ETA for Clock Out (帰社中) or Start Travel (移動中)
           if (action === 'Clock Out') {
-            const travelMin = calculateTravelTimeMinutes(
+            const travelMin = await fetchRealtimeTravelMinutes(
               latitude,
               longitude,
               DEFAULT_OFFICE_LOCATION.latitude,
@@ -406,7 +406,7 @@ function CheckInClient() {
               firestoreFields.nextDestination = nextOrder.customerName || (nextOrder as any).storeName || '次の現場';
               const destLat = nextOrder.latitude || DEFAULT_OFFICE_LOCATION.latitude;
               const destLng = nextOrder.longitude || DEFAULT_OFFICE_LOCATION.longitude;
-              const travelMin = calculateTravelTimeMinutes(latitude, longitude, destLat, destLng);
+              const travelMin = await fetchRealtimeTravelMinutes(latitude, longitude, destLat, destLng);
               const etaDate = new Date(now.getTime() + travelMin * 60000);
               firestoreFields.estimatedArrivalTime = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
             }
