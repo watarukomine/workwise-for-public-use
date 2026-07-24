@@ -145,9 +145,31 @@ export default function DashboardPage() {
     // Filter by Management/Controller visibility
     if (!showManagement) {
       selectedStaff = selectedStaff.filter(staff => {
-        const isController = staff['コントローラー'] === '⚪︎' || staff.controller === '⚪︎';
-        const isAdmin = staff.role === 'admin';
-        return !isController && !isAdmin;
+        const roleStr = String(staff.role || '').toLowerCase().trim();
+        const rawRole = String((staff as any)['ロール'] || (staff as any)['役職'] || '').toLowerCase().trim();
+        const staffName = staff.name || (staff as any)['氏名'] || (staff as any)['名前'] || '';
+
+        // Check if user is an Admin/Staff dual role (e.g. "admin/staff", "admin_staff", or 杉山和彦)
+        const isAdminStaff = (roleStr.includes('admin') && roleStr.includes('staff')) ||
+                             (rawRole.includes('admin') && rawRole.includes('staff')) ||
+                             rawRole.includes('兼任') ||
+                             staffName.includes('杉山和彦');
+
+        if (isAdminStaff) {
+          // Keep Admin/Staff dual roles visible even when showManagement is OFF
+          return true;
+        }
+
+        // Pure Admin or Controller
+        const isController = staff['コントローラー'] === '⚪︎' || staff.controller === '⚪︎' || staff['コントローラー'] === '○' || staff.controller === '○';
+        const isPureAdmin = roleStr === 'admin';
+
+        if (isController || isPureAdmin) {
+          // Hide pure Admin / Controllers when showManagement is OFF
+          return false;
+        }
+
+        return true;
       });
     }
 
