@@ -2854,7 +2854,9 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
   const arrangement = targetEvent.raw ? findKey(targetEvent.raw, ["タイヤ手配状況", "手配"]) : undefined;
   const disposal = targetEvent.raw ? findKey(targetEvent.raw, ["廃タイヤ処分", "廃タイヤ"]) : undefined;
 
-  const customerName = isTravelEvent ? '移動' : (targetEvent.customerName || (targetEvent.raw ? findKey(targetEvent.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined) || customer?.storeName || targetEvent.title || line1);
+  const rawCustomerName = targetEvent.customerName || (targetEvent.raw ? findKey(targetEvent.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined);
+  const cleanCustomerName = (rawCustomerName && rawCustomerName !== '（店舗名未設定）' && rawCustomerName !== '(店舗名未設定)' && rawCustomerName !== '店舗名未設定') ? rawCustomerName : undefined;
+  const customerName = isTravelEvent ? '移動' : (cleanCustomerName || customer?.storeName || targetEvent.title || line1);
   const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(targetEvent.status || '')) || !!targetEvent.actualEndTime;
 
   const eventContent = (

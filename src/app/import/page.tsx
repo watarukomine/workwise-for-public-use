@@ -24,6 +24,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { CustomerService } from '@/services/customer-service';
+
 
 // --- CSV Parser ---
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -323,6 +325,17 @@ export default function ImportPage() {
     let failed = 0;
     const errors: string[] = [];
 
+    // Load customer master data if target is orders
+    let customerMaster: any[] = [];
+    if (collName === 'orders') {
+      try {
+        customerMaster = await CustomerService.getAllCustomers();
+        addLog(`ℹ️ 顧客マスタから ${customerMaster.length} 件の販売店情報をロードしました。`);
+      } catch (err: any) {
+        console.warn("Failed to fetch customer master for auto-resolving names:", err);
+      }
+    }
+
     try {
       for (let i = 0; i < rows.length; i += BATCH_SIZE) {
         const batch = writeBatch(firestore);
@@ -361,6 +374,39 @@ export default function ImportPage() {
             // If it's a generic shift, ensure taskDetails is set
             if (docData._type === 'task' && !docData.taskDetails && docData.customerName) {
                docData.taskDetails = docData.customerName;
+            }
+
+            // Auto-resolve customer details from master using customerCode
+            const userCode = docData.customerCode || '';
+            const currentName = docData.customerName || '';
+            if (userCode !== '') {
+              const paddedCode = String(userCode).trim().padStart(5, '0');
+              docData.customerCode = paddedCode;
+
+              if (currentName === '' || currentName === '（店舗名未設定）' || currentName === '(店舗名未設定)' || currentName === '店舗名未設定') {
+                const match = customerMaster.find(c => {
+                  const cCode = c.userCode || c['ユーザーコード'] || '';
+                  return String(cCode).trim().padStart(5, '0') === paddedCode;
+                });
+                if (match) {
+                  const storeName = match.storeName || match['店舗'] || match.name || '';
+                  if (storeName) {
+                    docData.customerName = storeName;
+                    raw['店舗名'] = storeName;
+                    raw['お取引先名'] = storeName;
+                  }
+                  const mainStore = match.mainStore || match['母店'] || '';
+                  if (mainStore && !docData.mainStore) {
+                    docData.mainStore = mainStore;
+                    raw['主管店舗'] = mainStore;
+                  }
+                  const address = match.address || match['住所'] || '';
+                  if (address && !docData.address) {
+                    docData.address = address;
+                    raw['住所'] = address;
+                  }
+                }
+              }
             }
           }
 

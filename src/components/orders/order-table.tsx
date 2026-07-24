@@ -48,6 +48,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { OrderService } from "@/services/order-service";
+import { useCustomer } from '@/contexts/customer-context';
 
 
 interface OrderTableProps {
@@ -194,6 +195,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
   const { profile } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
+  const { customers } = useCustomer();
 
   React.useEffect(() => {
     const handler = setTimeout(() => {
@@ -210,6 +212,25 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     const keys = ORDER_KEYS[header] || [header];
     let value = findKey(order, keys);
     
+    if (header === 'お取引先名') {
+      const currentName = value !== undefined && value !== null ? String(value) : '';
+      if (currentName && currentName !== '（店舗名未設定）' && currentName !== '(店舗名未設定)' && currentName !== '店舗名未設定') {
+        return currentName;
+      }
+      const customerCode = findKey(order, ['お取引先コード', '顧客コード', 'customerCode', 'ユーザーコード']);
+      if (customerCode && customers) {
+        const paddedCode = String(customerCode).trim().padStart(5, '0');
+        const match = customers.find(c => {
+          const cCode = c.userCode || c['ユーザーコード'] || '';
+          return String(cCode).trim().padStart(5, '0') === paddedCode;
+        });
+        if (match && match.storeName) {
+          return match.storeName;
+        }
+      }
+      return '(店舗名未設定)';
+    }
+
     if (header === '作業予定日') {
         value = formatDate(value);
     }
@@ -222,7 +243,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     }
     
     return value !== undefined && value !== null ? String(value) : '';
-  }, []);
+  }, [customers]);
 
   const filteredAndSortedOrders = React.useMemo(() => {
     const today = startOfToday();
