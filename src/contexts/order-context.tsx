@@ -108,62 +108,59 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
       : undefined;
 
     if (staffMember) {
-      const lastUpdateStr = findKey(rawOrder, ['最終更新日時']);
-      if (lastUpdateStr) {
-        const lastUpdate = new Date(lastUpdateStr);
-        const currentStatus = staffStatusMap.get(staffMember.id)!;
-        const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
+      const lastUpdateStr = order.updatedAt || findKey(rawOrder, ['最終更新日時']);
+      const lastUpdate = lastUpdateStr ? new Date(lastUpdateStr) : new Date();
+      const currentStatus = staffStatusMap.get(staffMember.id)!;
+      const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
 
-        if (!isNaN(lastUpdate.getTime())) {
-          const status = findKey(rawOrder, ['受注ステータス']) || '待機中';
-          const actionText = order.rawOrderId ? `[${order.rawOrderId}]` : '[汎用タスク]';
-          // ... (simplified status update logic for brevity if needed, but keeping full logic is safer)
+      if (!isNaN(lastUpdate.getTime())) {
+        const status = order.status || findKey(rawOrder, ['受注ステータス']) || '待機中';
+        const actionText = order.rawOrderId ? `[${order.rawOrderId}]` : '[受注]';
 
-          const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着'];
-          const passiveStatuses = ['未着手', '未割当', '待機中'];
+        const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着', '帰社中'];
+        const passiveStatuses = ['未着手', '未割当', '待機中'];
 
-          const isNewer = lastUpdate.getTime() >= currentUpdate.getTime();
-          const isCandidateActive = activeStatuses.includes(status);
-          const isCurrentActive = activeStatuses.includes(currentStatus.status || '');
-          const isCandidatePassive = passiveStatuses.includes(status);
-          const isCurrentPassive = passiveStatuses.includes(currentStatus.status || '');
+        const isNewer = lastUpdate.getTime() >= currentUpdate.getTime();
+        const isCandidateActive = activeStatuses.includes(status);
+        const isCurrentActive = activeStatuses.includes(currentStatus.status || '');
+        const isCandidatePassive = passiveStatuses.includes(status);
+        const isCurrentPassive = passiveStatuses.includes(currentStatus.status || '');
 
-          let shouldUpdate = false;
-          if (isNewer) {
-            if (isCandidatePassive && isCurrentActive) {
-              shouldUpdate = false;
-            } else {
-              shouldUpdate = true;
-            }
+        let shouldUpdate = false;
+        if (isNewer) {
+          if (isCandidatePassive && isCurrentActive) {
+            shouldUpdate = false;
           } else {
-            if (isCandidateActive && isCurrentPassive) shouldUpdate = true;
+            shouldUpdate = true;
+          }
+        } else {
+          if (isCandidateActive && isCurrentPassive) shouldUpdate = true;
+        }
+
+        if (shouldUpdate) {
+          let lat = order.latitude !== undefined && order.latitude !== null ? parseFloat(String(order.latitude)) : (rawOrder?.latitude !== undefined ? parseFloat(String(rawOrder.latitude)) : NaN);
+          let lon = order.longitude !== undefined && order.longitude !== null ? parseFloat(String(order.longitude)) : (rawOrder?.longitude !== undefined ? parseFloat(String(rawOrder.longitude)) : NaN);
+
+          if (isNaN(lat) || isNaN(lon)) {
+            const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';
+            const parts = locationStr.split(',').map(s => parseFloat(s.trim()));
+            lat = parts[0];
+            lon = parts[1];
           }
 
-          if (shouldUpdate) {
-            let lat = rawOrder.latitude !== undefined && rawOrder.latitude !== null ? parseFloat(String(rawOrder.latitude)) : NaN;
-            let lon = rawOrder.longitude !== undefined && rawOrder.longitude !== null ? parseFloat(String(rawOrder.longitude)) : NaN;
-
-            if (isNaN(lat) || isNaN(lon)) {
-              const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';
-              const parts = locationStr.split(',').map(s => parseFloat(s.trim()));
-              lat = parts[0];
-              lon = parts[1];
-            }
-
-            if ((isNaN(lat) || isNaN(lon)) && currentStatus.latitude && currentStatus.longitude) {
-              lat = currentStatus.latitude;
-              lon = currentStatus.longitude;
-            }
-
-            staffStatusMap.set(staffMember.id, {
-              staffId: staffMember.id,
-              status: status,
-              lastAction: `${actionText} ${status}`,
-              latitude: !isNaN(lat) ? lat : undefined,
-              longitude: !isNaN(lon) ? lon : undefined,
-              lastUpdate: lastUpdate.toISOString(),
-            });
+          if ((isNaN(lat) || isNaN(lon)) && currentStatus.latitude && currentStatus.longitude) {
+            lat = currentStatus.latitude;
+            lon = currentStatus.longitude;
           }
+
+          staffStatusMap.set(staffMember.id, {
+            staffId: staffMember.id,
+            status: status,
+            lastAction: `${actionText} ${status}`,
+            latitude: !isNaN(lat) ? lat : undefined,
+            longitude: !isNaN(lon) ? lon : undefined,
+            lastUpdate: lastUpdate.toISOString(),
+          });
         }
       }
 
