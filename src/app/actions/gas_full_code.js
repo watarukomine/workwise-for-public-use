@@ -1,6 +1,6 @@
 // ↓↓↓↓【要設定】↓↓↓↓
 // 「受注管理」シートがあるスプレッドシートのIDを貼り付けてください
-const ORDER_SPREADSHEET_ID = "1A3rbqD87QenOoHx3EYNpnqBujN5TrT2Xn_3tUTCiqmY";
+const ORDER_SPREADSHEET_ID = "1D888FVgFcvMN8v31ZX4KC-8RTHEm_9wkGRVlMLUtvEg";
 const ORDER_SHEET_NAME = "受注管理";
 // 「スタッフマスタ」シートがあるスプレッドシートのIDを貼り付けてください
 const STAFF_SPREADSHEET_ID = "1IP9wxp-VsctyXVn5UI3oRWeik4gMrFA5DFxt-40HGOk";
