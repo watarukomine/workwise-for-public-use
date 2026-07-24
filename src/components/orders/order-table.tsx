@@ -86,7 +86,7 @@ const ORDER_KEYS: Record<string, string[]> = {
 };
 
 const EXPORT_HEADERS = [
-  '受注 No',
+  '受注行番号',
   'SystemID',
   'ユーザーコード',
   '店舗名',
@@ -134,7 +134,8 @@ const EXPORT_HEADERS = [
 ];
 
 const EXPORT_MAPPING: Record<string, string> = {
-  '受注 No': 'orderNo',
+  '受注行番号': 'displayId',
+  '受注 No': 'displayId',
   'SystemID': 'id',
   'ユーザーコード': 'customerCode',
   '店舗名': 'customerName',
@@ -146,7 +147,7 @@ const EXPORT_MAPPING: Record<string, string> = {
   'キャンセル日時': 'cancelDate',
   'キャンセル連絡者': 'cancelContact',
   '作業': 'taskDetails',
-  '受注No(ﾘﾏｰｸ1 8ｹﾀ)': 'orderNoRemark',
+  '受注No(ﾘﾏｰｸ1 8ｹﾀ)': 'orderNo',
   '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': 'comment',
   '車名': 'carName',
   '登録ナンバー(下４桁)': 'regNo',
@@ -319,10 +320,14 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
       }
       formInit[h] = val !== undefined && val !== null ? val : '';
     });
-    // Ensure '受注 No' and '受注No(ﾘﾏｰｸ1 8ｹﾀ)' are always synchronized
-    const remark1Val = formInit['受注 No'] || formInit['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || order.orderNo || order.orderNoRemark || '';
-    formInit['受注 No'] = remark1Val;
+    // Explicit mapping for displayId (A column) and orderNo (M column)
+    const displayIdVal = order.displayId || formInit['受注行番号'] || formInit['受注 No'] || '';
+    const remark1Val = order.orderNo || order.orderNoRemark || formInit['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || '';
+    formInit['受注行番号'] = displayIdVal;
+    formInit['受注 No'] = displayIdVal;
     formInit['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] = remark1Val;
+    formInit['orderNo'] = remark1Val;
+    formInit['orderNoRemark'] = remark1Val;
 
     // Explicit mappings for non-standard or custom fields
     formInit['isEmergency'] = order.isEmergency || false;
@@ -371,7 +376,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
         }
       });
       
-      const remark1Val = editForm['受注 No'] || editForm['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || '';
+      const remark1Val = editForm['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || editForm['orderNo'] || editForm['orderNoRemark'] || '';
       updateData.orderNo = remark1Val;
       updateData.orderNoRemark = remark1Val;
 
@@ -558,14 +563,14 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
               <TabsContent value="general" className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="orderNo">受注 No</Label>
+                    <Label htmlFor="displayId">受注行番号</Label>
                     <Input
-                      id="orderNo"
-                      value={editForm['受注 No'] || editForm['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || ''}
+                      id="displayId"
+                      value={editForm['受注行番号'] || editForm['受注 No'] || editForm['displayId'] || selectedOrder.displayId || ''}
                       onChange={(e) => setEditForm(prev => ({ 
                         ...prev, 
-                        '受注 No': e.target.value,
-                        '受注No(ﾘﾏｰｸ1 8ｹﾀ)': e.target.value 
+                        '受注行番号': e.target.value,
+                        '受注 No': e.target.value 
                       }))}
                     />
                   </div>
@@ -910,11 +915,12 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     <Label htmlFor="orderNoRemark">受注No(ﾘﾏｰｸ1 8ｹﾀ)</Label>
                     <Input
                       id="orderNoRemark"
-                      value={editForm['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || editForm['受注 No'] || ''}
+                      value={editForm['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || editForm['orderNo'] || editForm['orderNoRemark'] || selectedOrder.orderNo || ''}
                       onChange={(e) => setEditForm(prev => ({ 
                         ...prev, 
                         '受注No(ﾘﾏｰｸ1 8ｹﾀ)': e.target.value,
-                        '受注 No': e.target.value 
+                        'orderNo': e.target.value,
+                        'orderNoRemark': e.target.value 
                       }))}
                     />
                   </div>

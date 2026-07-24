@@ -95,10 +95,10 @@ export const formatTime = (date: Date | string | any) => {
 };
 
 export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order> => {
-  // Try to find the robust System ID first
+  // Try to find the robust System ID first (B column)
   const sysId = findKey(rawOrder, ['SystemID', 'systemId', 'sysId']);
-  // Find the visual ID (Row Number)
-  const visualId = findKey(rawOrder, ['受注 ID', '受注id', '受注ID', 'id']);
+  // Find the visual ID / Row Number (A column: 受注行番号 / 受注 No)
+  const visualId = findKey(rawOrder, ['受注行番号', '通し番号', '受注 No', '受注 ID', '受注id', '受注ID', 'displayId']);
 
   // Generate a deterministic ID based on content if System/Visual IDs are missing
   // This is crucial for "Accompanying" (同行) tasks to have stable IDs across refreshes, preventing "resurrection" after deletion
@@ -342,9 +342,9 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     description: findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '',
     quantity: findKey(rawOrder, ['本数', 'honsu', '数量', 'Qty', 'Quantity', '本', 'quantity']) || '',
     serviceType: findKey(rawOrder, ['作業内容', '作業区分', 'サービス種別', 'サービス区分', 'serviceType']) || '',
-    orderNo: String(findKey(rawOrder, ['受注No(ﾘﾏｰｸ1 8ｹﾀ)', '受注No(リマーク1 8ケタ)', '受注 No', '受注No', 'orderNo', 'orderNoRemark']) || rawOrder.orderNo || rawOrder.orderNoRemark || ''),
+    orderNo: String(findKey(rawOrder, ['受注No(ﾘﾏｰｸ1 8ｹﾀ)', '受注No(リマーク1 8ケタ)', '受注No(リマーク1)', 'orderNoRemark', 'orderNo']) || rawOrder.orderNo || rawOrder.orderNoRemark || ''),
     picName: findKey(rawOrder, ['ご担当者様', 'picName', '担当者名']) || '',
-    orderNoRemark: String(findKey(rawOrder, ['受注No(ﾘﾏｰｸ1 8ｹﾀ)', '受注No(リマーク1 8ケタ)', '受注 No', '受注No', 'orderNoRemark', 'orderNo']) || rawOrder.orderNoRemark || rawOrder.orderNo || ''),
+    orderNoRemark: String(findKey(rawOrder, ['受注No(ﾘﾏｰｸ1 8ｹﾀ)', '受注No(リマーク1 8ケタ)', '受注No(リマーク1)', 'orderNoRemark', 'orderNo']) || rawOrder.orderNoRemark || rawOrder.orderNo || ''),
     entryStatus: findKey(rawOrder, ['入庫状況', 'entryStatus']) || '',
     productName: findKey(rawOrder, ['品名', 'productName']) || '',
     sensor: findKey(rawOrder, ['空気圧センサーパッキン交換', 'sensor']) || '',
