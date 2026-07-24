@@ -315,11 +315,11 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     address: findKey(rawOrder, ['住所', 'Address', '納品先', 'お届け先', '納品先住所', 'お届け先住所', '現場住所']) || '',
     scheduledEndTime: scheduledEndTime || '',
     actualStartTime: (() => {
-      const val = findKey(rawOrder, ['作業開始', '作業開始時間', '開始時間', 'startTime', 'startedAt', 'actualStartTime']);
+      const val = findKey(rawOrder, ['作業開始', '作業開始時間', '開始時間', 'startTime', 'startedAt', 'actualStartTime', 'startWork']);
       return parseDateTimeValue(val);
     })(),
     actualEndTime: (() => {
-      const val = findKey(rawOrder, ['作業完了', '作業完了時間', '作業終了時間', '終了時間', 'completionTime', 'completedAt', 'actualEndTime', 'finishedAt']);
+      const val = findKey(rawOrder, ['作業完了', '作業完了時間', '作業終了時間', '終了時間', 'completionTime', 'completedAt', 'actualEndTime', 'finishedAt', 'completeWork']);
       return parseDateTimeValue(val);
     })(),
     startTravelTime: (() => {
@@ -327,7 +327,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
       return parseDateTimeValue(val);
     })(),
     arrivalTimestamp: (() => {
-      const val = findKey(rawOrder, ['現場到着', '現場到着時間', '現場到着日時', 'arrive', 'arrivalTimestamp']);
+      const val = findKey(rawOrder, ['現場到着', '現場到着時間', '現場到着日時', 'arrive', 'arrival', 'arrivalTimestamp']);
       return parseDateTimeValue(val);
     })(),
     cancelDate: findKey(rawOrder, ['キャンセル日時', 'cancelDate']),
