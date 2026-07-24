@@ -2338,6 +2338,125 @@ export function ScheduleView({
             </div>
           </div>
 
+          {/* 当日の受注一覧テーブル */}
+          <div className="mt-6 bg-card rounded-xl border shadow-sm overflow-hidden">
+            <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-sm text-foreground">当日作業の受注一覧</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">この日（{formatDate(currentDate.toISOString(), 'yyyy/MM/dd')}）に作業予定がある受注の一覧です。行をクリックすると詳細ダイアログが開き、チップと連動して確認・編集が可能です。</p>
+              </div>
+              <div className="text-xs font-semibold px-2.5 py-1 bg-primary/10 text-primary rounded-full">
+                計 {orders.length} 件
+              </div>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead>
+                  <tr className="border-b bg-muted/10 text-muted-foreground font-semibold uppercase tracking-wider text-[10px]">
+                    <th className="p-3 pl-4">受注 No</th>
+                    <th className="p-3">時間</th>
+                    <th className="p-3">お取引先名</th>
+                    <th className="p-3">作業担当</th>
+                    <th className="p-3">ステータス</th>
+                    <th className="p-3">車名 / ナンバー</th>
+                    <th className="p-3">作業内容</th>
+                    <th className="p-3">タイヤ品番/サイズ/本数</th>
+                    <th className="p-3 pr-4 text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {orders.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                        この日の受注予定はありません。
+                      </td>
+                    </tr>
+                  ) : (
+                    orders.map((order) => {
+                      // マスタ解決された店舗名を取得
+                      let storeName = order.customerName || '';
+                      if (storeName === '' || storeName === '（店舗名未設定）' || storeName === '(店舗名未設定)' || storeName === '店舗名未設定') {
+                        const paddedCode = String(order.customerCode).trim().padStart(5, '0');
+                        const match = allCustomers?.find(c => {
+                          const cCode = c.userCode || c['ユーザーコード'] || '';
+                          return String(cCode).trim().padStart(5, '0') === paddedCode;
+                        });
+                        if (match?.storeName) {
+                          storeName = match.storeName;
+                        } else {
+                          storeName = '(店舗名未設定)';
+                        }
+                      }
+
+                      // 時間のフォーマット
+                      const timeStr = order.scheduledTime ? formatTime(order.scheduledTime) : '未定';
+
+                      // チップへの連動クリック
+                      const handleRowClick = () => {
+                        const tripId = `trip-${order.id}`;
+                        const taskEvent = scheduleEvents.find(e => e.tripId === tripId || e.rawOrderId === order.id);
+                        if (taskEvent) {
+                          setDialogState({ mode: 'details', event: taskEvent });
+                        } else {
+                          setDialogState({ mode: 'order-details', order });
+                        }
+                      };
+
+                      return (
+                        <tr 
+                          key={order.id} 
+                          className="hover:bg-muted/30 transition-colors cursor-pointer"
+                          onClick={handleRowClick}
+                        >
+                          <td className="p-3 pl-4 font-semibold text-foreground">{order.orderNo || '-'}</td>
+                          <td className="p-3">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                              {timeStr}
+                            </span>
+                          </td>
+                          <td className="p-3 font-semibold text-foreground">{storeName}</td>
+                          <td className="p-3 text-muted-foreground">{order.staffName || <span className="text-yellow-600 font-semibold">未割り当て</span>}</td>
+                          <td className="p-3">
+                            <span className={cn(
+                              "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium border",
+                              order.status === '作業完了' && "bg-green-50 text-green-700 border-green-200",
+                              order.status === '作業中' && "bg-blue-50 text-blue-700 border-blue-200",
+                              order.status === '移動中' && "bg-purple-50 text-purple-700 border-purple-200",
+                              order.status === '割当済' && "bg-yellow-50 text-yellow-700 border-yellow-200",
+                              order.status === '未割当' && "bg-gray-50 text-gray-700 border-gray-200"
+                            )}>
+                              {order.status || '未割当'}
+                            </span>
+                          </td>
+                          <td className="p-3 text-[11px]">
+                            <div className="font-semibold text-foreground">{order.carName || '-'}</div>
+                            <div className="text-muted-foreground">{order.regNo ? `(${order.regNo})` : ''}</div>
+                          </td>
+                          <td className="p-3 text-[11px] text-muted-foreground truncate max-w-[150px]" title={order.serviceType || order.taskDetails}>
+                            {order.serviceType || order.taskDetails || '-'}
+                          </td>
+                          <td className="p-3 text-[11px]">
+                            <div className="text-foreground font-semibold">{order.tireSize || '-'}</div>
+                            <div className="text-muted-foreground flex gap-2">
+                              {order.tireNumber && <span>{order.tireNumber}</span>}
+                              {order.quantity && <span className="font-bold text-blue-600">{order.quantity}本</span>}
+                            </div>
+                          </td>
+                          <td className="p-3 pr-4 text-right">
+                            <Button variant="ghost" size="sm" className="h-7 text-[10px] hover:bg-muted font-semibold">
+                              詳細
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <Dialog open={dialogState.mode !== 'closed'} onOpenChange={() => setDialogState({ mode: 'closed' })}>
             <DialogContent
               className={cn((dialogState.mode === 'details' || dialogState.mode === 'order-details') ? "max-w-[95vw] md:max-w-3xl lg:max-w-5xl" : "max-w-lg")}
