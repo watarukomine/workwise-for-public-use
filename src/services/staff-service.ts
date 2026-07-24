@@ -10,6 +10,7 @@ import {
     deleteDoc,
     query,
     where,
+    onSnapshot,
     serverTimestamp
 } from 'firebase/firestore';
 import type { Staff, WithId } from '@/lib/types';
@@ -17,6 +18,25 @@ import type { Staff, WithId } from '@/lib/types';
 const COLLECTION = 'users';
 
 export const StaffService = {
+    /**
+     * Subscribes to real-time updates for all staff members (users).
+     */
+    subscribeToStaff(callback: (staff: WithId<Staff>[]) => void): () => void {
+        const { firestore } = initializeFirebase();
+        const colRef = collection(firestore, COLLECTION);
+        const q = query(colRef, where('_type', '!=', 'order'));
+
+        return onSnapshot(q, (snapshot) => {
+            const staffList = snapshot.docs.map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data()
+            } as WithId<Staff>));
+            callback(staffList);
+        }, (error) => {
+            console.error("[StaffService] Error in staff realtime subscription:", error);
+        });
+    },
+
     /**
      * Fetches all staff members (users).
      * Typically used by Admin.

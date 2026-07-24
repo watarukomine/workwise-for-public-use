@@ -87,91 +87,66 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const loadStaff = async () => {
-      setError(null);
-      setIsLoading(true);
-
-      // Step 1: Load cached data immediately (optimistic)
-      if (!initialLoadDone.current) {
-        try {
-          const cachedData = localStorage.getItem(STAFF_CACHE_KEY);
-          if (cachedData) {
-            const { staffList: cachedStaff } = JSON.parse(cachedData);
-            if (cachedStaff && cachedStaff.length > 0) {
-              setAllStaffState(cachedStaff);
-
-              const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
-              if (savedIds) {
-                const parsedIds = JSON.parse(savedIds);
-                setAppliedSelectedStaffIds(parsedIds);
-                setPendingSelectedStaffIds(parsedIds);
-              }
-              // Show UI immediately with cached data
-              setIsLoading(false);
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to load cached staff data:', e);
-        }
-        initialLoadDone.current = true;
-      }
-
-      // Step 2: Fetch fresh data from Firestore
+    // Step 1: Load cached data immediately (optimistic)
+    if (!initialLoadDone.current) {
       try {
-        if (allStaff.length === 0) setIsLoading(true);
-
-        const staffList = await StaffService.getAllStaff();
-
-        if (staffList && staffList.length > 0) {
-          // Apply fallback colors if missing
-          const processedStaff = staffList.map(s => ({
-            ...s,
-            color: s.color || `hsl(${simpleHash(s.id) % 360}, 70%, 60%)`
-          }));
-
-          setAllStaffState(processedStaff);
-
-          // Cache the fresh data
-          try {
-            localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify({
-              staffList: processedStaff,
-              timestamp: Date.now()
-            }));
-          } catch (e) {
-            console.warn('Failed to cache staff data:', e);
+        const cachedData = localStorage.getItem(STAFF_CACHE_KEY);
+        if (cachedData) {
+          const { staffList: cachedStaff } = JSON.parse(cachedData);
+          if (cachedStaff && cachedStaff.length > 0) {
+            setAllStaffState(cachedStaff);
+            setIsLoading(false);
           }
+        }
+      } catch (e) {
+        console.warn('Failed to load cached staff data:', e);
+      }
+    }
 
-          // Update selection if no selection exists
-          if (appliedSelectedStaffIds.length === 0) {
-            const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
-            if (savedIds) {
+    // Step 2: Subscribe to Realtime Staff Updates from Firestore (onSnapshot)
+    console.log('[SelectedStaffContext] Subscribing to realtime staff updates...');
+    const unsubscribe = StaffService.subscribeToStaff((staffList) => {
+      if (staffList && staffList.length > 0) {
+        const processedStaff = staffList.map(s => ({
+          ...s,
+          name: s.name || (s as any)['氏名'] || (s as any)['名前'] || (s as any)['担当'] || '名前未設定',
+          color: s.color || `hsl(${simpleHash(s.id) % 360}, 70%, 60%)`,
+        }));
+
+        setAllStaffState(processedStaff);
+
+        // Cache fresh staff list
+        try {
+          localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify({
+            staffList: processedStaff,
+            timestamp: Date.now()
+          }));
+        } catch (e) {}
+
+        // Initial selection setup
+        if (!initialLoadDone.current) {
+          initialLoadDone.current = true;
+          const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
+          if (savedIds) {
+            try {
               const parsedIds = JSON.parse(savedIds);
               setAppliedSelectedStaffIds(parsedIds);
               setPendingSelectedStaffIds(parsedIds);
-            } else {
-              const allIds = processedStaff.map(s => s.id);
-              setAppliedSelectedStaffIds(allIds);
-              setPendingSelectedStaffIds(allIds);
-              try {
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(allIds));
-              } catch (e) {}
-            }
+            } catch (e) {}
+          } else {
+            const allIds = processedStaff.map(s => s.id);
+            setAppliedSelectedStaffIds(prev => prev.length === 0 ? allIds : prev);
+            setPendingSelectedStaffIds(prev => prev.length === 0 ? allIds : prev);
           }
-        } else {
-          console.log("No staff found in Firestore.");
         }
-
-      } catch (e: any) {
-        if (allStaff.length === 0) {
-          setError(`スタッフ情報の取得に失敗しました: ${e.message}`);
-        }
-        console.error("Failed to load staff from Firestore:", e);
-      } finally {
-        setIsLoading(false);
       }
+      setIsLoading(false);
+    });
+
+    return () => {
+      unsubscribe();
     };
-    loadStaff();
-  }, [allStaff.length, user, isUserLoading]); // Re-run when auth state changes
+  }, [user, isUserLoading]);
 
   const setAllStaff = React.useCallback((staff: WithId<Staff>[]) => {
     setAllStaffState(staff);
