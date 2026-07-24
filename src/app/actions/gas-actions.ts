@@ -145,7 +145,35 @@ export async function createOrder(args: {
     specialNotes?: string;
     submitter?: string;
 }): Promise<GasResponse> {
-    return callGasApi({ ...args, action: 'createOrder' });
+    return callGasApi({ 
+        ...args, 
+        action: 'createOrder',
+        operation: 'createOrder',
+        SystemID: args.systemId,
+        '受注 No': args.displayId || args.orderNo,
+        '受注行番号': args.displayId,
+        'ユーザーコード': args.userCode,
+        '店舗名': args.storeName,
+        '作業区分': args.workType,
+        '作業予定日': args.scheduledDate,
+        '予定時間': args.scheduledTime,
+        'ご担当者様': args.picName,
+        '受注No(ﾘﾏｰｸ1 8ｹﾀ)': args.orderNo,
+        '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': args.comment,
+        '車名': args.carName,
+        '登録ナンバー(下４桁)': args.regNo,
+        '受注ステータス': args.status || '未割当',
+        'タイヤ品番': args.tireNumber,
+        'タイヤサイズ': args.tireSize,
+        '品名': args.productName,
+        '本数': args.quantity,
+        '空気圧センサーパッキン交換': args.sensor,
+        'タイヤ手配状況': args.arrangement,
+        '廃タイヤ処分': args.disposal,
+        '連絡先': args.contact,
+        '特記事項': args.specialNotes,
+        'フォーム入力者': args.submitter
+    });
 }
 
 export async function updateOrderDateTime(args: {
