@@ -133,6 +133,16 @@ export const formatTime = (date: Date | string | any): string => {
   const str = String(date).trim();
   if (!str || str === 'null' || str === 'undefined') return '';
 
+  // Handle ISO date-time strings containing 'T' or 'Z' or full dates (e.g. "2026-07-29T06:00:00.000Z" -> JST 15:00)
+  if (str.includes('T') || str.includes('Z') || (str.includes('-') && str.length > 10) || (str.includes('/') && str.length > 10)) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+  }
+
   if (str.includes('1899') || str.includes('1900')) {
     const d = new Date(str);
     if (!isNaN(d.getTime())) {
@@ -142,8 +152,8 @@ export const formatTime = (date: Date | string | any): string => {
     }
   }
 
-  // Regex match for HH:mm or H:mm or H時M分
-  const match = str.match(/(\d{1,2})[:：時](\d{1,2})?/);
+  // Regex match for plain HH:mm or H:mm strings (e.g. "15:00", "09:30")
+  const match = str.match(/^(\d{1,2})[:：時](\d{1,2})?/);
   if (match) {
     const h = String(parseInt(match[1], 10)).padStart(2, '0');
     const m = String(parseInt(match[2] || '0', 10)).padStart(2, '0');
