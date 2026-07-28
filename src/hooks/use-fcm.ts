@@ -8,7 +8,7 @@ import { useUserProfile } from '@/hooks/use-user-profile';
 import { useToast } from '@/hooks/use-toast';
 
 // VAPIDキー（Firebaseコンソールから取得が必要）
-const VAPID_KEY = 'BORdd3TgnHTsUUfH_wtTd2JKJSywHyHVw_8-kG71KhcbIJloemep4ggJ6fy8KgvOaiMDkYxPeY4vXsIPNnukIQs';
+const VAPID_KEY = process.env.NEXT_PUBLIC_FCM_VAPID_KEY || '';
 
 export function useFcm() {
   const firebase = useFirebase() as any;

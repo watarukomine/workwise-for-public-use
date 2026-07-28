@@ -1,8 +1,22 @@
+const requiredEnvVars = [
+  'NEXT_PUBLIC_FIREBASE_API_KEY',
+  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+] as const;
+
+// Warn in development if critical env vars are missing
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  requiredEnvVars.forEach(key => {
+    if (!process.env[key]) {
+      console.warn(`[Firebase Config] ⚠️ 環境変数 ${key} が未設定です。.env.local を確認してください。`);
+    }
+  });
+}
+
 export const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyBBelBzLORqNEmMgDMEi8IiqutIGpxfpto",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "workwise-general-v2-kp.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "workwise-general-v2-kp",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "workwise-general-v2-kp.firebasestorage.app",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "152475256065",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:152475256065:web:19dcae9d2c7e91fcd0c700"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || ""
 };

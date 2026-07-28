@@ -1,6 +1,6 @@
 import { initializeFirebase } from '../firebase';
 import { doc, getDoc, setDoc, serverTimestamp, writeBatch, collection, query, where, getDocs } from 'firebase/firestore';
-// import { getAuth } from 'firebase/auth'; // Import for REST Auth -> Removed
+import { getAuth } from 'firebase/auth';
 import { firebaseConfig } from '../firebase/config'; // Import project config
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 
@@ -9,6 +9,24 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 const getDb = () => {
     const { firestore } = initializeFirebase();
     return firestore;
+};
+
+/**
+ * Gets the current user's Firebase Auth ID token for REST API authentication.
+ * Returns null if no user is authenticated.
+ */
+const getAuthToken = async (): Promise<string | null> => {
+    try {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        if (user) {
+            return await user.getIdToken();
+        }
+        return null;
+    } catch (e) {
+        console.warn('[AttendanceService] Failed to get auth token:', e);
+        return null;
+    }
 };
 
 const COLLECTION_NAME = 'daily_attendance';
@@ -76,7 +94,12 @@ const getDailyAttendanceViaRest = async (date: Date): Promise<string[] | null> =
     // Construct REST URL
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/${collectionName}/${docId}?key=${firebaseConfig.apiKey}`;
 
-    const response = await fetch(url);
+    const authToken = await getAuthToken();
+    const headers: Record<string, string> = {};
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    const response = await fetch(url, { headers });
 
     if (!response.ok) {
         if (response.status === 404) {
@@ -118,7 +141,12 @@ const getDailyAttendanceDetailsViaRest = async (date: Date): Promise<{ staffIds:
     const databaseId = dbId;
     const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/${COLLECTION_NAME}/${docId}?key=${firebaseConfig.apiKey}`;
 
-    const response = await fetch(url);
+    const authToken = await getAuthToken();
+    const headers: Record<string, string> = {};
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+    const response = await fetch(url, { headers });
 
     if (!response.ok) {
         if (response.status === 404) {
@@ -227,9 +255,15 @@ const getMonthlyAttendanceViaRest = async (year: number, month: number): Promise
         }
     };
 
+    const authToken = await getAuthToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(queryBody)
     });
 
@@ -342,9 +376,15 @@ const getMonthlyScheduleViaRest = async (year: number, month: number): Promise<{
         }
     };
 
+    const authToken = await getAuthToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(queryBody)
     });
 
@@ -384,9 +424,8 @@ const saveDailyAttendanceViaRest = async (date: Date, staffIds: string[]): Promi
     const docId = getAttendanceDocId(date);
     console.log(`[AttendanceService] Attempting REST API save for ${docId}...`);
 
-    // We use a custom auth system (spreadsheet based), so we don't have a Firebase Auth token.
-    // The Firestore rules are set to public for this collection during development to allow this.
-    // We rely on the API Key in the URL for project identification.
+    // Authentication: Uses Firebase Auth ID token when available.
+    // Falls back to API key-only access if no user is signed in.
 
     const { firestore } = initializeFirebase();
     // @ts-ignore
@@ -420,11 +459,15 @@ const saveDailyAttendanceViaRest = async (date: Date, staffIds: string[]): Promi
         }
     };
 
+    const authToken = await getAuthToken();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(url, {
         method: 'PATCH',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify(body)
     });
 

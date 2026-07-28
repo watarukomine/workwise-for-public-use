@@ -119,7 +119,7 @@ export const StaffService = {
         const staffData = {
             id: newId,
             name: data.name || '新規スタッフ',
-            email: data.email || `${newId.toLowerCase()}@toyota-mp.co.jp`,
+            email: data.email || `${newId.toLowerCase()}@${process.env.NEXT_PUBLIC_STAFF_EMAIL_DOMAIN || 'example.com'}`,
             role: data.role || 'staff',
             area: data.area || '県央',
             '母店': data['母店'] || '横浜店',
