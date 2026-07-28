@@ -21,6 +21,26 @@ import { ORDER_GAS_URL } from '@/lib/settings';
 
 const COLLECTION = 'orders';
 
+function generateDateFormats(dateStr: string): string[] {
+    const cleanStr = dateStr.split('T')[0];
+    const parts = cleanStr.includes('-') ? cleanStr.split('-') : cleanStr.split('/');
+    if (parts.length === 3) {
+        const year = parts[0];
+        const month = String(parseInt(parts[1], 10));
+        const day = String(parseInt(parts[2], 10));
+        const padMonth = month.padStart(2, '0');
+        const padDay = day.padStart(2, '0');
+
+        return Array.from(new Set([
+            `${year}-${padMonth}-${padDay}`,
+            `${year}/${padMonth}/${padDay}`,
+            `${year}-${month}-${day}`,
+            `${year}/${month}/${day}`
+        ]));
+    }
+    return [dateStr, dateStr.replace(/-/g, '/'), dateStr.replace(/\//g, '-')];
+}
+
 export const OrderService = {
     /**
      * Fetches orders for a specific date (or all if not specified).
@@ -29,8 +49,7 @@ export const OrderService = {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
 
-        // Try both common formats: yyyy/MM/dd and yyyy-MM-dd
-        const formats = [dateStr, dateStr.replace(/-/g, '/'), dateStr.replace(/\//g, '-')];
+        const formats = generateDateFormats(dateStr);
         
         const results = await Promise.all(formats.map(async (fmt) => {
             const q = query(colRef, where('scheduledDate', '==', fmt));
@@ -56,9 +75,10 @@ export const OrderService = {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
 
+        const formats = generateDateFormats(dateStr);
         const q = query(
             colRef, 
-            where('scheduledDate', '==', dateStr),
+            where('scheduledDate', 'in', formats),
             where('_type', '==', 'task')
         );
         const snapshot = await getDocs(q);
@@ -71,14 +91,14 @@ export const OrderService = {
 
     /**
      * Real-time subscription to both orders and tasks for a date.
-     * Supports both yyyy/MM/dd and yyyy-MM-dd formats.
+     * Supports yyyy/MM/dd, yyyy-MM-dd, yyyy/M/d, yyyy-M-d formats in real-time.
      */
     subscribeToOrders(dateStr: string, callback: (orders: WithId<Order>[]) => void): () => void {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
         
-        // Use 'in' query to support both date formats in real-time
-        const formats = [dateStr, dateStr.replace(/-/g, '/'), dateStr.replace(/\//g, '-')];
+        const formats = generateDateFormats(dateStr);
+        // Firestore 'in' operator supports up to 30 elements
         const q = query(colRef, where('scheduledDate', 'in', formats));
 
         const unsubscribe = onSnapshot(q, (snapshot) => {

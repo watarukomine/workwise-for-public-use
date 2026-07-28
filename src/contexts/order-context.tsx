@@ -577,6 +577,29 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     if (viewedDateStr === todayStr) return;
 
     console.log(`[OrderProvider] Subscribing to Firestore updates for viewed date: ${viewedDateStr}`);
+    
+    // Immediate direct fetch for the viewed date to guarantee 1st-click instant rendering
+    OrderService.getOrdersByDate(viewedDateStr).then(directOrders => {
+      if (directOrders && directOrders.length > 0) {
+        setRawOrdersData(prev => {
+          const orderMap = new Map();
+          const normViewed = normalizeDateStr(viewedDateStr);
+          prev.forEach(o => {
+            const normO = normalizeDateStr(o.scheduledDate);
+            if (normO !== normViewed) {
+              const id = o.id || o.systemId;
+              if (id) orderMap.set(id, o);
+            }
+          });
+          directOrders.forEach(o => {
+            const id = o.id || o.systemId;
+            if (id) orderMap.set(id, o);
+          });
+          return Array.from(orderMap.values());
+        });
+      }
+    }).catch(err => console.warn('Direct fetch for viewed date failed:', err));
+
     const unsubscribeViewed = OrderService.subscribeToOrders(viewedDateStr, (updatedOrders) => {
       setRawOrdersData(prev => {
         const orderMap = new Map();
