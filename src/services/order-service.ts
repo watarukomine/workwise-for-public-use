@@ -321,7 +321,7 @@ export const OrderService = {
             contact: contactVal,
             specialNotes: specialNotesVal,
             submitter: submitterVal,
-            // Japanese column names for GAS Script compatibility
+            // Japanese column names matching exact Sheet headers (including newline variants)
             SystemID: order.systemId || order.id,
             '受注 No': (order as any).displayId || orderNoVal || '',
             '受注行番号': (order as any).displayId || '',
@@ -331,12 +331,19 @@ export const OrderService = {
             'お取引先名': storeNameVal,
             '作業区分': workTypeVal,
             '作業': workTypeVal,
+            '作業内容': workTypeVal,
             '作業予定日': scheduledDateVal,
             '予定時間': scheduledTimeVal,
             'ご担当者様': picNameVal,
+            // Remark 1 (with and without newline)
+            '受注No\n(ﾘﾏｰｸ1 8ｹﾀ)': orderNoVal,
             '受注No(ﾘﾏｰｸ1 8ｹﾀ)': orderNoVal,
+            // Remark 2 (with and without newline)
+            '任意コメント\n(ﾘﾏｰｸ2　10ｹﾀ)': commentVal,
             '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': commentVal,
             '車名': carNameVal,
+            // Reg No (with and without newline)
+            '登録ナンバー\n(下４桁)': regNoVal,
             '登録ナンバー(下４桁)': regNoVal,
             '受注ステータス': statusVal,
             '入庫状況': statusVal,
@@ -344,6 +351,8 @@ export const OrderService = {
             'タイヤサイズ': tireSizeVal,
             '品名': productNameVal,
             '本数': quantityVal,
+            // Sensor (with and without newline)
+            '空気圧センサー\nパッキン交換': sensorVal,
             '空気圧センサーパッキン交換': sensorVal,
             'タイヤ手配状況': arrangementVal,
             '廃タイヤ処分': disposalVal,
