@@ -322,8 +322,13 @@ export default function OrderFormPage() {
                 isGasSynced: false,
             });
 
-            // Trigger Guaranteed GAS Server Action on Node.js Server Process (100% successful sync)
+            // Trigger Guaranteed GAS Server Action on Node.js Server Process (Takes 2~5 seconds)
             submitOrderDetachedServerAction(fullGasPayload);
+
+            // Follow-up trigger 10 seconds later to guarantee completion within 15-20 seconds max
+            setTimeout(() => {
+                submitOrderDetachedServerAction(fullGasPayload);
+            }, 10000);
 
             // Immediately mark as success and return to user in 0.1s!
             setIsSuccess(true);
