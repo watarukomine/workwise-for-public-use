@@ -77,10 +77,8 @@ function parseCSV(text: string): { headers: string[]; rows: string[][] } {
     result.push(row);
   }
 
-  if (result.length === 0) return { headers: [], rows: [] };
-
-  // Clean headers (remove newlines and excess whitespace)
-  const headers = result[0].map(h => h.replace(/[\r\n]/g, '').replace(/\s+/g, ' '));
+  // Clean headers (remove UTF-8 BOM, newlines, and excess whitespace)
+  const headers = result[0].map(h => h.replace(/^\uFEFF/, '').replace(/[\r\n]/g, '').trim());
   const rows = result.slice(1);
   return { headers, rows };
 }
@@ -384,11 +382,33 @@ export default function ImportPage() {
             }
           });
 
-          // Post-processing for normalization
+          // Post-processing for normalization and robust attribute recovery
           if (collName === 'orders') {
+            // Robust Attribute Recovery: Resolve essential fields regardless of CSV column header variations
+            if (!docData.id) {
+              const idVal = raw['SystemID'] || raw['systemId'] || raw['ID'] || raw['id'] || docData.displayId;
+              if (idVal) docData.id = idVal;
+            }
+            if (!docData.scheduledDate) {
+              const dateVal = raw['作業予定日'] || raw['予定日'] || raw['日付'] || raw['scheduledDate'] || raw['作業日'];
+              if (dateVal) docData.scheduledDate = String(dateVal).replace(/-/g, '/');
+            }
+            if (!docData.customerCode && !docData.userCode) {
+              const codeVal = raw['お取引先コード'] || raw['顧客コード'] || raw['ユーザーコード'] || raw['customerCode'] || raw['userCode'];
+              if (codeVal) docData.customerCode = String(codeVal).trim().padStart(5, '0');
+            }
+            if (!docData.customerName && !docData.storeName) {
+              const nameVal = raw['お取引先名'] || raw['顧客名'] || raw['店舗名'] || raw['店舗'] || raw['customerName'] || raw['storeName'];
+              if (nameVal) docData.customerName = nameVal;
+            }
+            if (!docData.scheduledTime) {
+              const timeVal = raw['予定時間'] || raw['開始時間'] || raw['時間'] || raw['scheduledTime'];
+              if (timeVal) docData.scheduledTime = timeVal;
+            }
+
             // Normalize Date: yyyy-MM-dd or yyyy/MM/dd -> yyyy/MM/dd
             if (docData.scheduledDate) {
-              docData.scheduledDate = docData.scheduledDate.replace(/-/g, '/');
+              docData.scheduledDate = String(docData.scheduledDate).replace(/-/g, '/');
             }
             // Ensure type
             if (!docData._type) {
@@ -400,8 +420,8 @@ export default function ImportPage() {
             }
 
             // Auto-resolve customer details from master using customerCode
-            const userCode = docData.customerCode || '';
-            const currentName = docData.customerName || '';
+            const userCode = docData.customerCode || docData.userCode || '';
+            const currentName = docData.customerName || docData.storeName || '';
             if (userCode !== '') {
               const paddedCode = String(userCode).trim().padStart(5, '0');
               docData.customerCode = paddedCode;
