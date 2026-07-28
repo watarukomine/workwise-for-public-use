@@ -241,24 +241,64 @@ export default function OrderFormPage() {
             const randomStr = Math.random().toString(36).substring(2, 5); // 3 random characters
             const returnedOrderId = `${dateStr}_${userCode}_${randomStr}`;
 
-              // 2. Write to Firestore (Primary) FIRST & automatically sync to GAS via OrderService
-            const systemId = await OrderService.createOrder({
-                ...submissionData,
-                id: returnedOrderId,
+            // 2. Direct GAS Server Action Payload with exact headers for 100% Google Sheet Sync
+            const formattedDate = submissionData.scheduledDate ? submissionData.scheduledDate.replace(/-/g, '/') : '';
+            const gasPayload = {
+                action: 'createOrder',
+                operation: 'createOrder',
+                SystemID: returnedOrderId,
                 systemId: returnedOrderId,
-                displayId: displayId,
-                orderNo: submissionData.orderNo || '',
-                orderNoRemark: submissionData.orderNo || '',
-                customerCode: submissionData.userCode, // map to expected key
-                customerName: submissionData.storeName, // map to expected key
-                estimatedDuration: 60,
-                _type: 'order', // Explicitly denote as an order
-                isGasSynced: false, // Trigger backupToGas in OrderService automatically
-            });
+                orderId: returnedOrderId,
+                '受注 No': displayId,
+                'ユーザーコード': submissionData.userCode || '',
+                'お取引先コード': submissionData.userCode || '',
+                '店舗名': submissionData.storeName || '',
+                'お取引先名': submissionData.storeName || '',
+                '作業区分': submissionData.workType || '',
+                '作業': submissionData.workType || '',
+                '作業内容': submissionData.workType || '',
+                '作業予定日': formattedDate,
+                '予定時間': submissionData.scheduledTime || '',
+                'ご担当者様': submissionData.picName || '',
+                '受注No\n(ﾘﾏｰｸ1 8ｹﾀ)': submissionData.orderNo || '',
+                '受注No(ﾘﾏｰｸ1 8ｹﾀ)': submissionData.orderNo || '',
+                '任意コメント\n(ﾘﾏｰｸ2　10ｹﾀ)': submissionData.comment || '',
+                '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': submissionData.comment || '',
+                '車名': submissionData.carName || '',
+                '登録ナンバー\n(下４桁)': submissionData.regNo || '',
+                '登録ナンバー(下４桁)': submissionData.regNo || '',
+                '入庫状況': submissionData.status || '未割当',
+                '受注ステータス': submissionData.status || '未割当',
+                'タイヤ品番': submissionData.tireNumber || '',
+                'タイヤサイズ': submissionData.tireSize || '',
+                '品名': submissionData.productName || '',
+                '本数': String(submissionData.quantity || ''),
+                '空気圧センサー\nパッキン交換': submissionData.sensor || '',
+                '空気圧センサーパッキン交換': submissionData.sensor || '',
+                'タイヤ手配状況': submissionData.arrangement || '',
+                '廃タイヤ処分': submissionData.disposal || '',
+                '連絡先': submissionData.contact || '',
+                '特記事項': submissionData.specialNotes || '',
+                'フォーム入力者': submissionData.submitter || '',
+            };
 
-            if (!systemId) {
-                throw new Error('送信に失敗しました。もう一度お試しください。');
-            }
+            // 3. Perform guaranteed dual-write to Firestore + Direct GAS Server Action
+            await Promise.allSettled([
+                OrderService.createOrder({
+                    ...submissionData,
+                    id: returnedOrderId,
+                    systemId: returnedOrderId,
+                    displayId: displayId,
+                    orderNo: submissionData.orderNo || '',
+                    orderNoRemark: submissionData.orderNo || '',
+                    customerCode: submissionData.userCode,
+                    customerName: submissionData.storeName,
+                    estimatedDuration: 60,
+                    _type: 'order',
+                    isGasSynced: true,
+                }),
+                createOrderGas(gasPayload as any)
+            ]);
 
             // Immediately mark as success and return
             setIsSuccess(true);
