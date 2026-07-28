@@ -218,11 +218,10 @@ export const OrderService = {
         // 2. Firestore Sync
         await setDoc(docRef, orderData);
 
-        // 3. GAS Backup (Non-blocking or background call recommended)
-        // Note: For spreadsheet parity, we call the createOrder action in GAS
+        // 3. GAS Backup (Synchronous await to guarantee real-time spreadsheet write)
         const isGasSynced = (data as any).isGasSynced;
         if (!isGasSynced) {
-            this.backupToGas(orderData as any as Order, 'create');
+            await this.backupToGas(orderData as any as Order, 'create');
         }
 
         return systemId;
@@ -246,7 +245,7 @@ export const OrderService = {
         // Fetch full data for GAS backup update
         const fullDoc = await getDoc(docRef);
         if (fullDoc.exists()) {
-            this.backupToGas(fullDoc.data() as Order, 'update');
+            await this.backupToGas(fullDoc.data() as Order, 'update');
         }
     },
 
@@ -287,16 +286,13 @@ export const OrderService = {
                 submitter: (order as any).submitter || '',
             };
 
-            // Call Server Action asynchronously to avoid blocking UI while ensuring reliable logging & error handling
-            updateSheetStatus(payload)
-                .then(res => {
-                    if (res.status === 'error') {
-                        console.warn('[OrderService] GAS backup returned error status:', res.message);
-                    } else {
-                        console.log('[OrderService] GAS backup successful for order:', order.id || order.systemId);
-                    }
-                })
-                .catch(e => console.warn('[OrderService] GAS backup Server Action failed:', e));
+            // Call Server Action synchronously to guarantee real-time spreadsheet write before returning
+            const res = await updateSheetStatus(payload);
+            if (res.status === 'error') {
+                console.warn('[OrderService] GAS backup returned error status:', res.message);
+            } else {
+                console.log('[OrderService] GAS backup successful for order:', order.id || order.systemId);
+            }
 
         } catch (e) {
             console.error('[OrderService] Failed to trigger GAS backup:', e);
