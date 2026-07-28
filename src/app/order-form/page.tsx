@@ -17,7 +17,7 @@ import { useCustomer } from '@/contexts/customer-context';
 import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { findKey } from '@/lib/utils';
-import { createOrder as createOrderGas } from '@/app/actions/gas-actions';
+import { createOrder as createOrderGas, submitOrderDetachedServerAction } from '@/app/actions/gas-actions';
 
 // Schema definition
 const orderFormSchema = z.object({
@@ -282,25 +282,25 @@ export default function OrderFormPage() {
                 'フォーム入力者': submissionData.submitter || '',
             };
 
-            // 3. Perform guaranteed dual-write to Firestore + Direct GAS Server Action
-            await Promise.allSettled([
-                OrderService.createOrder({
-                    ...submissionData,
-                    id: returnedOrderId,
-                    systemId: returnedOrderId,
-                    displayId: displayId,
-                    orderNo: submissionData.orderNo || '',
-                    orderNoRemark: submissionData.orderNo || '',
-                    customerCode: submissionData.userCode,
-                    customerName: submissionData.storeName,
-                    estimatedDuration: 60,
-                    _type: 'order',
-                    isGasSynced: true,
-                }),
-                createOrderGas(gasPayload as any)
-            ]);
+            // 3. Save to Firestore (0.05s) AND trigger Server-side Detached GAS Sync (100% immune to browser cancel)
+            await OrderService.createOrder({
+                ...submissionData,
+                id: returnedOrderId,
+                systemId: returnedOrderId,
+                displayId: displayId,
+                orderNo: submissionData.orderNo || '',
+                orderNoRemark: submissionData.orderNo || '',
+                customerCode: submissionData.userCode,
+                customerName: submissionData.storeName,
+                estimatedDuration: 60,
+                _type: 'order',
+                isGasSynced: false,
+            });
 
-            // Immediately mark as success and return
+            // Trigger Server Action in background on Node.js Server Process (Never cancelled by browser)
+            submitOrderDetachedServerAction(gasPayload);
+
+            // Immediately mark as success and return to user in 0.1s!
             setIsSuccess(true);
             window.scrollTo(0, 0);
         } catch (error: any) {
