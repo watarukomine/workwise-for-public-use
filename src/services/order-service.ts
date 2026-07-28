@@ -218,11 +218,9 @@ export const OrderService = {
           _type: 'order' as const,
           createdAt: now,
           updatedAt: now,
-          status: data.status || '未割当'
+          status: data.status || '未割当',
+          isGasSynced: false
         };
-
-        // Remove temp property before saving
-        delete (orderData as any).isGasSynced;
 
         // 2. Firestore Sync
         await setDoc(docRef, orderData);
@@ -266,77 +264,125 @@ export const OrderService = {
     },
 
     /**
-     * Backs up data to Google Sheets via GAS Server Action.
+     * Backs up data to Google Sheets via GAS Server Action with automatic retries.
      */
-    async backupToGas(order: Order, action: 'create' | 'update') {
-        try {
-            const payload = {
-                ...order,
-                gasUrl: ORDER_GAS_URL,
-                action: action === 'create' ? 'createOrder' : 'updateOrderSchedule',
-                operation: action === 'create' ? 'createOrder' : 'updateOrderSchedule',
-                systemId: order.systemId || order.id,
-                orderId: order.systemId || order.id || (order as any).displayId,
-                displayId: (order as any).displayId || '',
-                userCode: order.customerCode || (order as any).userCode || '',
-                customerCode: order.customerCode || (order as any).userCode || '',
-                storeName: order.customerName || (order as any).storeName || '',
-                customerName: order.customerName || (order as any).storeName || '',
-                workType: order.workType || '',
-                scheduledDate: formatDateYMD(order.scheduledDate),
-                scheduledTime: order.scheduledTime || '',
-                picName: order.picName || '',
-                orderNo: order.orderNo || (order as any).orderNoRemark || '',
-                comment: order.comment || '',
-                carName: order.carName || '',
-                regNo: order.regNo || '',
-                status: order.status || '未割当',
-                tireNumber: order.tireNumber || '',
-                tireSize: order.tireSize || '',
-                productName: order.productName || '',
-                quantity: String(order.quantity || ''),
-                sensor: order.sensor || '',
-                arrangement: order.arrangement || '',
-                disposal: order.disposal || '',
-                contact: order.contact || '',
-                specialNotes: order.specialNotes || '',
-                submitter: (order as any).submitter || '',
-                // Japanese column names for GAS Script compatibility
-                SystemID: order.systemId || order.id,
-                '受注 No': (order as any).displayId || order.orderNo || '',
-                '受注行番号': (order as any).displayId || '',
-                'ユーザーコード': order.customerCode || (order as any).userCode || '',
-                '店舗名': order.customerName || (order as any).storeName || '',
-                '作業区分': order.workType || '',
-                '作業予定日': formatDateYMD(order.scheduledDate),
-                '予定時間': order.scheduledTime || '',
-                'ご担当者様': order.picName || '',
-                '受注No(ﾘﾏｰｸ1 8ｹﾀ)': order.orderNo || (order as any).orderNoRemark || '',
-                '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': order.comment || '',
-                '車名': order.carName || '',
-                '登録ナンバー(下４桁)': order.regNo || '',
-                '受注ステータス': order.status || '未割当',
-                'タイヤ品番': order.tireNumber || '',
-                'タイヤサイズ': order.tireSize || '',
-                '品名': order.productName || '',
-                '本数': String(order.quantity || ''),
-                '空気圧センサーパッキン交換': order.sensor || '',
-                'タイヤ手配状況': order.arrangement || '',
-                '廃タイヤ処分': order.disposal || '',
-                '連絡先': order.contact || '',
-                '特記事項': order.specialNotes || '',
-                'フォーム入力者': (order as any).submitter || '',
-            };
+    async backupToGas(order: Order, action: 'create' | 'update', maxRetries = 3): Promise<{ status: string, message?: string }> {
+        const payload = {
+            ...order,
+            gasUrl: ORDER_GAS_URL,
+            action: action === 'create' ? 'createOrder' : 'updateOrderSchedule',
+            operation: action === 'create' ? 'createOrder' : 'updateOrderSchedule',
+            systemId: order.systemId || order.id,
+            orderId: order.systemId || order.id || (order as any).displayId,
+            displayId: (order as any).displayId || '',
+            userCode: order.customerCode || (order as any).userCode || '',
+            customerCode: order.customerCode || (order as any).userCode || '',
+            storeName: order.customerName || (order as any).storeName || '',
+            customerName: order.customerName || (order as any).storeName || '',
+            workType: order.workType || '',
+            scheduledDate: formatDateYMD(order.scheduledDate),
+            scheduledTime: order.scheduledTime || '',
+            picName: order.picName || '',
+            orderNo: order.orderNo || (order as any).orderNoRemark || '',
+            comment: order.comment || '',
+            carName: order.carName || '',
+            regNo: order.regNo || '',
+            status: order.status || '未割当',
+            tireNumber: order.tireNumber || '',
+            tireSize: order.tireSize || '',
+            productName: order.productName || '',
+            quantity: String(order.quantity || ''),
+            sensor: order.sensor || '',
+            arrangement: order.arrangement || '',
+            disposal: order.disposal || '',
+            contact: order.contact || '',
+            specialNotes: order.specialNotes || '',
+            submitter: (order as any).submitter || '',
+            // Japanese column names for GAS Script compatibility
+            SystemID: order.systemId || order.id,
+            '受注 No': (order as any).displayId || order.orderNo || '',
+            '受注行番号': (order as any).displayId || '',
+            'ユーザーコード': order.customerCode || (order as any).userCode || '',
+            '店舗名': order.customerName || (order as any).storeName || '',
+            '作業区分': order.workType || '',
+            '作業予定日': formatDateYMD(order.scheduledDate),
+            '予定時間': order.scheduledTime || '',
+            'ご担当者様': order.picName || '',
+            '受注No(ﾘﾏｰｸ1 8ｹﾀ)': order.orderNo || (order as any).orderNoRemark || '',
+            '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': order.comment || '',
+            '車名': order.carName || '',
+            '登録ナンバー(下４桁)': order.regNo || '',
+            '受注ステータス': order.status || '未割当',
+            'タイヤ品番': order.tireNumber || '',
+            'タイヤサイズ': order.tireSize || '',
+            '品名': order.productName || '',
+            '本数': String(order.quantity || ''),
+            '空気圧センサーパッキン交換': order.sensor || '',
+            'タイヤ手配状況': order.arrangement || '',
+            '廃タイヤ処分': order.disposal || '',
+            '連絡先': order.contact || '',
+            '特記事項': order.specialNotes || '',
+            'フォーム入力者': (order as any).submitter || '',
+        };
 
-            const res = await updateSheetStatus(payload);
-            if (res.status === 'error') {
-                console.warn('[OrderService] GAS backup returned error status:', res.message);
-            } else {
-                console.log('[OrderService] GAS backup successful for order:', order.id || order.systemId);
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`[OrderService] Triggering GAS backup (attempt ${attempt}/${maxRetries}) for ${order.id || order.systemId}`);
+                const res = await updateSheetStatus(payload);
+                if (res.status === 'success' || (res.status as string) === 'ok') {
+                    console.log('[OrderService] GAS backup successful for order:', order.id || order.systemId);
+                    
+                    // Update isGasSynced = true in Firestore
+                    try {
+                        const { firestore } = initializeFirebase();
+                        const docRef = doc(firestore, COLLECTION, order.systemId || order.id);
+                        await updateDoc(docRef, { isGasSynced: true });
+                    } catch (fsErr) {
+                        console.warn('[OrderService] Failed to mark isGasSynced:', fsErr);
+                    }
+                    return res;
+                } else {
+                    console.warn(`[OrderService] GAS backup attempt ${attempt} returned non-success:`, res.message);
+                }
+            } catch (e) {
+                console.error(`[OrderService] GAS backup attempt ${attempt} threw error:`, e);
+            }
+            if (attempt < maxRetries) {
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+        return { status: 'error', message: 'Maximum retries reached for GAS backup.' };
+    },
+
+    /**
+     * Auto-recovers and syncs any orders that failed or missed initial GAS sync.
+     */
+    async syncUnsyncedOrders(): Promise<number> {
+        try {
+            const { firestore } = initializeFirebase();
+            const colRef = collection(firestore, COLLECTION);
+            const q = query(colRef, where('isGasSynced', '==', false));
+            const snapshot = await getDocs(q);
+
+            if (snapshot.empty) {
+                return 0;
             }
 
+            console.log(`[OrderService] Auto-recovering ${snapshot.size} unsynced orders...`);
+            let syncedCount = 0;
+
+            for (const docSnap of snapshot.docs) {
+                const orderData = { id: docSnap.id, ...docSnap.data() } as Order;
+                const res = await this.backupToGas(orderData, 'create', 2);
+                if (res.status === 'success' || res.status === 'ok') {
+                    syncedCount++;
+                }
+            }
+            console.log(`[OrderService] Auto-recovered ${syncedCount}/${snapshot.size} orders to GAS.`);
+            return syncedCount;
         } catch (e) {
-            console.error('[OrderService] Failed to trigger GAS backup:', e);
+            console.error('[OrderService] Error during syncUnsyncedOrders:', e);
+            return 0;
         }
     },
 

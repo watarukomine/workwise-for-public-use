@@ -389,6 +389,22 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Background Auto-Recovery Sync Worker (Ensures 100% GAS sync reliability)
+  useEffect(() => {
+    OrderService.syncUnsyncedOrders().catch(err => {
+      console.warn('[OrderProvider] Auto syncUnsyncedOrders error:', err);
+    });
+
+    const interval = setInterval(() => {
+      OrderService.syncUnsyncedOrders().catch(err => {
+        console.warn('[OrderProvider] Auto syncUnsyncedOrders periodic error:', err);
+      });
+    }, 180000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+
   const toggleTripSuppression = useCallback((tripId: string) => {
     setSuppressedTripIds(prev => {
       const next = new Set(prev);
