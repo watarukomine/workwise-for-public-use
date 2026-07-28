@@ -555,23 +555,19 @@ function createOrderSingleSheet(targetSsId, params) {
         const newSystemId = params.systemId || `${dateStr}_${userCode}_${randomStr}`;
 
         let nextId = 0;
-        if (params.displayId) {
+        if (params.displayId && !isNaN(Number(params.displayId))) {
             nextId = Number(params.displayId);
         } else {
             let maxId = 0;
-            const idColIndex = headers.indexOf("受注ID");
-            if (idColIndex !== -1) {
-                const colLetter = String.fromCharCode(65 + idColIndex);
-                const existingIds = sheet.getRange(`${colLetter}2:${colLetter}`).getValues();
-                for (let i = 0; i < existingIds.length; i++) {
-                    const val = existingIds[i][0];
-                    const numVal = Number(val);
-                    if (!isNaN(numVal) && numVal > maxId) {
-                        maxId = numVal;
-                    }
+            const existingIds = sheet.getRange(2, 1, Math.max(sheet.getLastRow() - 1, 1), 1).getValues();
+            for (let i = 0; i < existingIds.length; i++) {
+                const val = existingIds[i][0];
+                const numVal = Number(val);
+                if (!isNaN(numVal) && numVal > maxId) {
+                    maxId = numVal;
                 }
             }
-            nextId = maxId + 1;
+            nextId = maxId > 0 ? maxId + 1 : 1951;
         }
 
         // Find actual last populated row based on non-empty values in Column A/B instead of sheet.getLastRow()
@@ -589,8 +585,8 @@ function createOrderSingleSheet(targetSsId, params) {
         const newRow = [];
         headers.forEach(header => {
             const h = String(header).trim();
-            if (h === "受注ID") {
-                newRow.push(nextId);
+            if (h === "受注ID" || h === "受注 No" || h === "受注 N o" || h === "受注行番号" || h === "通し番号" || h.startsWith("受注")) {
+                newRow.push(nextId || (targetRow - 1));
             } else if (h === "SystemID") {
                 newRow.push(newSystemId);
             } else if (h === "顧客コード" || h === "ユーザーコード") {
