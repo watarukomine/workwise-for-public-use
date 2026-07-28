@@ -441,7 +441,11 @@ function CheckInClient() {
           actionTimestamp: now.toISOString(), // Action Timestamp is real or corrected
           comment: (action as string) === 'Emergency' ? emergencyMessage : (isManual ? '【修正】' : ''),
           emergencyFlag: (action as string) === 'Emergency' ? true : undefined,
-          systemId: sysId
+          systemId: sysId,
+          startTravelTime: action === 'Start Travel' ? now.toISOString() : (currentOrder as any)?.startTravelTime,
+          arrivalTimestamp: action === 'Arrive' ? now.toISOString() : (currentOrder as any)?.arrivalTimestamp,
+          actualStartTime: action === 'Begin Task' ? now.toISOString() : (currentOrder as any)?.actualStartTime,
+          actualEndTime: action === 'Finish Task' ? now.toISOString() : (currentOrder as any)?.actualEndTime,
         }).catch(gasErr => {
           console.warn("GAS background sync skipped or warning:", gasErr);
         });

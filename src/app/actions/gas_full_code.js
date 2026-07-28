@@ -435,7 +435,9 @@ function confirmReadOrder(params) {
         let targetRowNum = -1;
         for (let i = 1; i < data.length; i++) {
             const cellVal = String(data[i][sysIdColIndex]).trim();
-            if (cellVal === String(systemId).trim()) {
+            const cleanCell = cellVal.replace(/-/g, '');
+            const cleanTarget = String(systemId).trim().replace(/-/g, '');
+            if (cellVal === String(systemId).trim() || (cleanCell && cleanTarget && (cleanCell === cleanTarget || cleanCell.includes(cleanTarget) || cleanTarget.includes(cleanCell)))) {
                 targetRowNum = i + 1;
                 break;
             }
