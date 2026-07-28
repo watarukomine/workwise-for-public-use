@@ -261,23 +261,25 @@ function CheckInClient() {
           orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
         if (!sysId || !profile?.name) throw new Error('受注IDまたはユーザー情報が取得できません');
 
-        const { updateSheetStatus } = await import('@/app/actions/gas-actions');
-        const result = await updateSheetStatus({
-          gasUrl: ORDER_GAS_URL,
-          action: 'confirmRead',
-          systemId: sysId,
-          staffName: profile.name,
-          timestamp: now.toISOString(),
-        } as any);
-        if (result.status === 'error') throw new Error(result.message);
- 
-        // 2. Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
+        // 1. Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
         const { OrderService } = await import('@/services/order-service');
         await OrderService.updateOrder(sysId, {
           isConfirmed: true,
           confirmedAt: now.toISOString()
         });
- 
+
+        // 2. Async Background Backup to GAS Spreadsheet (non-blocking)
+        const { updateSheetStatus } = await import('@/app/actions/gas-actions');
+        updateSheetStatus({
+          gasUrl: ORDER_GAS_URL,
+          action: 'confirmRead',
+          systemId: sysId,
+          staffName: profile.name,
+          timestamp: now.toISOString(),
+        } as any).catch(gasErr => {
+          console.warn("GAS background sync skipped or warning for confirmRead:", gasErr);
+        });
+
         setIsConfirmedOptimistic(true);
         toast({ title: '確認済にしました', description: `${profile.name}として記録しました。` });
         refetchOrders().catch(e => console.error(e));
