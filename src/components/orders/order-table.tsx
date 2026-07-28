@@ -59,7 +59,7 @@ interface OrderTableProps {
 
 
 const ORDER_KEYS: Record<string, string[]> = {
-  '受注ID': ['systemId', 'SystemID', 'displayId', '受注 No', '受注 ID', '受注id', 'id', '受注ID'],
+  '受注ID': ['systemId', 'SystemID', 'id'],
   'お取引先名': ['お取引先名', '店舗', 'customerName'],
   '機材有無': ['機材有無', 'equipmentStatus'],
   '作業予定日': ['作業予定日', 'scheduledDate'],
@@ -196,6 +196,11 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   ], []);
 
   const getFormattedValue = React.useCallback((order: any, header: string) => {
+    if (header === '受注ID') {
+      const sysId = findKey(order, ['systemId', 'SystemID', 'id']) || order.systemId || order.SystemID || order.id || '';
+      return String(sysId);
+    }
+
     const keys = ORDER_KEYS[header] || [header];
     let value = findKey(order, keys);
     
