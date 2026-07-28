@@ -257,7 +257,11 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     } else if (!showPastOrders) {
         // If not searching AND showPastOrders is false, filter to only show today and future orders
         ordersToDisplay = ordersToDisplay.filter(order => {
-            const workDateRaw = findKey(order, ['作業予定日', 'scheduledDate']);
+            const workDateRaw = findKey(order, [
+              '作業予定日', 'scheduledDate', '日付', '予定日', 'date', 
+              'workScheduledDate', 'シフト日', '勤務日', '出勤日'
+            ]) || (order.raw ? findKey(order.raw, ['作業予定日', 'scheduledDate', '日付']) : undefined);
+
             if (!workDateRaw) return true; // Keep undated tasks as current/new tasks
             const normWorkDate = normalizeDateStr(workDateRaw);
             if (!normWorkDate) return true;
