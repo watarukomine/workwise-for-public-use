@@ -8,12 +8,10 @@ import {
     setDoc,
     updateDoc,
     deleteDoc,
-    query,
-    where,
     serverTimestamp
 } from 'firebase/firestore';
 import type { Customer, WithId } from '@/lib/types';
-import { ORDER_GAS_URL } from '@/lib/settings';
+import { CUSTOMER_GAS_URL } from '@/lib/settings';
 
 const COLLECTION = 'customers';
 
@@ -109,7 +107,7 @@ export const CustomerService = {
             delete gasData.longitude;
             delete gasData.mainStore;
 
-            fetch(ORDER_GAS_URL, {
+            fetch(CUSTOMER_GAS_URL, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: { 'Content-Type': 'application/json' },

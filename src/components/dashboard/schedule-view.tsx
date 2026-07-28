@@ -1236,7 +1236,11 @@ export function ScheduleView({
               oldStaffName: getStaffById(draggedEvent.staffId)?.name || draggedEvent.staffName,
               oldScheduledTime: taskPart.start ? (typeof taskPart.start === 'string' ? taskPart.start : safeParseISO(taskPart.start).toISOString()) : '',
               oldScheduledDate: taskPart.scheduledDate || (taskPart.start ? format(safeParseISO(taskPart.start), 'yyyy-MM-dd') : undefined)
-            }).catch(err => console.warn('Failed to update sheet on task update:', err));
+            }).catch(err => {
+              console.warn('Failed to update sheet on task update:', err);
+              deleteLocalEvent(updatedTask.id);
+              if (travelPart) deleteLocalEvent(travelPart.id);
+            });
             toast({ title: "タスク時間を更新しました", duration: 3000 });
             // バックエンドの反映を待ってから再取得
             setTimeout(() => refetchOrders(), 1500);
@@ -1333,7 +1337,12 @@ export function ScheduleView({
               oldStaffName: getStaffById(draggedEvent.staffId)?.name || draggedEvent.staffName,
               oldScheduledTime: currentTaskEvent.start ? (typeof currentTaskEvent.start === 'string' ? currentTaskEvent.start : safeParseISO(currentTaskEvent.start).toISOString()) : '',
               oldScheduledDate: currentTaskEvent.scheduledDate || (currentTaskEvent.start ? format(safeParseISO(currentTaskEvent.start), 'yyyy-MM-dd') : undefined)
-            }).catch(err => console.warn('Failed to update sheet on order move:', err));
+            }).catch(err => {
+              console.warn('Failed to update sheet on order move:', err);
+              if (currentTaskEvent) deleteLocalEvent(currentTaskEvent.id);
+              if (currentTravelEvent) deleteLocalEvent(currentTravelEvent.id);
+              if (!currentTaskEvent && !currentTravelEvent) deleteLocalEvent(draggedEvent.id);
+            });
 
             // Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
             try {
@@ -1563,7 +1572,10 @@ export function ScheduleView({
                 payload.actualDuration = "";
               }
 
-              updateSheetStatus(payload).catch(err => console.warn('Failed to update sheet on assign:', err));
+              updateSheetStatus(payload).catch(err => {
+                console.warn('Failed to update sheet on assign:', err);
+                newEvents.forEach(e => deleteLocalEvent(e.id));
+              });
 
               // Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
               try {

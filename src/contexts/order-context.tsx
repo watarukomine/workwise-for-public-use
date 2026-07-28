@@ -1,13 +1,11 @@
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
-import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
 import { findKey, mapRawToOrder, normalizeDateStr, formatTime } from '@/lib/utils';
-import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes, addDays } from 'date-fns';
+import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes } from 'date-fns';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { useSelectedStaff } from './selected-staff-context';
-import { logStaffNotFound, logOldDateDetected, logInvalidDate } from '@/lib/order-validation-logger';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { OrderService } from '@/services/order-service';
 
@@ -490,7 +488,20 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     console.log(`[OrderProvider] Subscribing to ALL Firestore orders in real-time...`);
     const unsubscribeAll = OrderService.subscribeAllOrders((allOrders) => {
-      setRawOrdersData(allOrders);
+      setRawOrdersData(prev => {
+        const orderMap = new Map();
+        // Keep existing data as base
+        prev.forEach(o => {
+          const id = o.id || o.systemId;
+          if (id) orderMap.set(id, o);
+        });
+        // Update/overwrite with fresh data from subscription
+        allOrders.forEach(o => {
+          const id = o.id || o.systemId;
+          if (id) orderMap.set(id, o);
+        });
+        return Array.from(orderMap.values());
+      });
       setIsLoading(false);
     });
 
@@ -601,7 +612,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     const finalUnassigned = processedData.unassignedOrders.filter(o => !localAssignedOrderIds.has(o.rawOrderId || o.id));
     setUnassignedOrders(finalUnassigned);
-  }, [processedData, localScheduleEvents]);
+
+    try {
+      localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify({ orders: rawOrdersData, timestamp: Date.now() }));
+    } catch (e) { /* quota exceeded - ignore */ }
+  }, [processedData, localScheduleEvents, rawOrdersData]);
 
   const value: OrderContextType = {
     orders,
