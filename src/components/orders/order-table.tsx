@@ -187,7 +187,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [sortType, setSortType] = React.useState<'spreadsheet' | 'scheduledDate'>('spreadsheet');
-  const [showPastOrders, setShowPastOrders] = React.useState(false);
+  const [showPastOrders, setShowPastOrders] = React.useState(true);
   
   // Dialog States
   const [selectedOrder, setSelectedOrder] = React.useState<any | null>(null);
