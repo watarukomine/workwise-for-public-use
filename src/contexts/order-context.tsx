@@ -324,6 +324,12 @@ const processOrderData = (
   const unassignedOrders = orders.filter(order => {
     if (order.isGeneric) return false;
 
+    // Filter out completed or cancelled orders
+    const status = String(order.status || (order as any)['受注ステータス'] || '').trim();
+    if (['作業完了', '完了', 'キャンセル', '完了済', '作業終了'].includes(status)) {
+      return false;
+    }
+
     // Filter out test/guest submissions
     const cCode = String(order.customerCode || (order as any).userCode || '').trim();
     if (cCode === 'guest') {

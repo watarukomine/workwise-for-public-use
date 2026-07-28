@@ -397,7 +397,10 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
 
   const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
 
-  const dailyOrders = orders;
+  const dailyOrders = orders.filter(order => {
+    const status = String(order.status || (order as any)['受注ステータス'] || '').trim();
+    return !['作業完了', '完了', 'キャンセル', '完了済', '作業終了'].includes(status);
+  });
 
   return (
     <Card
