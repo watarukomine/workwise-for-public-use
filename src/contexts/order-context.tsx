@@ -100,8 +100,20 @@ const processOrderData = (
     }
 
     const staffNameStr = order.staffName ? String(order.staffName).trim() : '';
-    const normStaffName = staffNameStr.replace(/\s+/g, '').toLowerCase();
-    const staffMember = staffNameStr ? (staffMapByName.get(staffNameStr) || staffMapByName.get(normStaffName)) : undefined;
+    let staffMember: WithId<Staff> | undefined = undefined;
+    if (staffNameStr) {
+      const norm = staffNameStr.replace(/\s+/g, '').toLowerCase();
+      staffMember = staffMapByName.get(staffNameStr) || staffMapByName.get(norm);
+
+      if (!staffMember) {
+        // Fallback to partial / surname matching (e.g. "岡本" matches "岡本正博")
+        staffMember = allStaff.find(sf => {
+          if (!sf.name) return false;
+          const sfNorm = sf.name.replace(/\s+/g, '').toLowerCase();
+          return sfNorm.includes(norm) || norm.includes(sfNorm);
+        });
+      }
+    }
 
     if (staffMember) {
       // Ensure staffStatusMap entry exists before accessing
@@ -177,11 +189,11 @@ const processOrderData = (
 
         try {
           const val = String(order.scheduledTime).trim();
-          if (val && val !== '00:00' && val !== '00:00:00' && val !== '0:00') {
+          if (val) {
             const formattedTime = formatTime(val);
             if (formattedTime && formattedTime.includes(':')) {
               const parsed = parseISO(`${dateStr}T${formattedTime}:00`);
-              if (isValid(parsed) && parsed.getHours() >= 7 && parsed.getHours() <= 21) {
+              if (isValid(parsed)) {
                 scheduledTime = parsed;
               }
             }
