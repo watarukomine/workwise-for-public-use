@@ -52,34 +52,42 @@ export const signInWithEmail = async (identifier: string, password: string): Pro
     }
   }
 
-  console.log(`[Auth] Attempting sign-in for: ${targetEmail}`);
+  let staffProfile: WithId<Staff> | null = null;
 
   try {
     const userCredential = await signInWithEmailAndPassword(auth, targetEmail, password);
     const user = userCredential.user;
-
     console.log(`[Auth] Firebase Auth success, fetching profile for: ${user.email}`);
-    const staffMember = await StaffService.getStaffByEmail(user.email!);
-
-    if (!staffMember) {
-      console.error(`[Auth] Profile NOT found in Firestore 'users' collection for email: ${user.email}`);
-      throw new Error('認証は成功しましたが、システム内にスタッフ情報が見つかりません。管理者にアカウントの有効化を依頼してください。');
-    }
-
-    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffMember));
-    console.log(`[Auth] Login complete for: ${staffMember.name} (${staffMember.role})`);
-    return staffMember;
-
+    staffProfile = await StaffService.getStaffByEmail(user.email!);
   } catch (error: any) {
-    console.error('[Auth] Sign-in error:', error);
-    if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-email') {
-      throw new Error('ID/メールアドレス または パスワードが正しくありません。');
+    console.warn('[Auth] Firebase Auth sign-in failed, trying Firestore profile fallback...', error);
+    
+    // Fallback: Check if profile exists directly by ID or Email in Firestore 'users'
+    let userSnap = await getDoc(doc(firestore, 'users', cleanInput.toUpperCase()));
+    if (!userSnap.exists()) {
+      userSnap = await getDoc(doc(firestore, 'users', cleanInput));
     }
-    if (error.message.includes('スタッフ情報が見つかりません')) {
-      throw error;
+    
+    if (userSnap.exists()) {
+      const data = userSnap.data();
+      staffProfile = { id: userSnap.id, ...data } as WithId<Staff>;
+      console.log(`[Auth] Firestore fallback profile found for ID '${cleanInput}': ${staffProfile.name}`);
+    } else {
+      const profileByEmail = await StaffService.getStaffByEmail(targetEmail);
+      if (profileByEmail) {
+        staffProfile = profileByEmail;
+        console.log(`[Auth] Firestore fallback profile found for email '${targetEmail}': ${staffProfile.name}`);
+      }
     }
-    throw new Error(error.message || 'ログイン中に予期せぬエラーが発生しました。');
   }
+
+  if (staffProfile) {
+    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffProfile));
+    console.log(`[Auth] Login complete for: ${staffProfile.name} (${staffProfile.role})`);
+    return staffProfile;
+  }
+
+  throw new Error('ID/メールアドレス または パスワードが正しくありません。');
 };
 
 /**
