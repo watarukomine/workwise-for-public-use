@@ -88,23 +88,31 @@ export function findKey(item: any, possibleKeys: string[]) {
 
 export const formatDate = (dateString: string | undefined | null, formatString: string = 'yyyy/MM/dd'): string => {
   if (!dateString) return '';
+  const str = String(dateString).trim();
+  if (!str || str === 'null' || str === 'undefined' || str === 'N/A') return '';
+
   try {
-    // Try strict ISO first
-    let date = parseISO(dateString);
+    // Fast path: already YYYY/MM/DD or YYYY-MM-DD
+    if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(str)) {
+      const parts = str.split(/[\/\-]/);
+      return `${parts[0]}/${parts[1].padStart(2, '0')}/${parts[2].padStart(2, '0')}`;
+    }
+
+    let date = parseISO(str);
     if (!isValid(date)) {
-      // Fallback: standard JS Date parsing (handles "YYYY/MM/DD" etc.)
-      date = new Date(dateString);
+      date = new Date(str);
     }
 
     if (isValid(date)) {
-      // Ignore 1970 and 1899 dates coming from GAS timestamp zero bugs
       if (date.getFullYear() <= 1970) return '';
-      return format(date, formatString);
+      const formatted = format(date, formatString);
+      if (!formatted.includes('NaN')) {
+        return formatted;
+      }
     }
-  } catch (e) {
-    // Fallback for non-ISO strings if necessary
-  }
-  return dateString || ''; // Return original string if valid
+  } catch (e) {}
+
+  return str.includes('NaN') ? '' : str.replace(/-/g, '/');
 };
 
 export const formatTime = (date: Date | string | any) => {
