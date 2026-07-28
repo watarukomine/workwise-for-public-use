@@ -14,6 +14,8 @@ import { ShiftImportDialog } from '@/components/dashboard/shift-import-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { STAFF_SHEET_URL } from '@/lib/settings';
 
+import { AddStaffDialog } from '@/components/staff/add-staff-dialog';
+
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, isLoading: isStaffLoading, error } = useSelectedStaff();
@@ -67,7 +69,10 @@ export default function StaffPage() {
           </p>
         </div>
         {profile?.role === 'admin' && (
-          <ShiftImportDialog onUpload={handleUpload} />
+          <div className="flex items-center gap-2">
+            <AddStaffDialog onCreated={handleUpload} />
+            <ShiftImportDialog onUpload={handleUpload} />
+          </div>
         )}
       </div>
 

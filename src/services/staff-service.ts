@@ -105,6 +105,37 @@ export const StaffService = {
     },
 
     /**
+     * Creates a new staff member in Firestore.
+     */
+    async createStaff(data: Partial<Staff>): Promise<string> {
+        const { firestore } = initializeFirebase();
+        const colRef = collection(firestore, COLLECTION);
+
+        const staffDocs = await getDocs(query(colRef, where('_type', '!=', 'order')));
+        const nextIndex = staffDocs.size + 1;
+        const newId = data.id || `STAFF${String(nextIndex).padStart(3, '0')}`;
+
+        const docRef = doc(colRef, newId);
+        const staffData = {
+            id: newId,
+            name: data.name || '新規スタッフ',
+            email: data.email || `${newId.toLowerCase()}@toyota-mp.co.jp`,
+            role: data.role || 'staff',
+            area: data.area || '県央',
+            '母店': data['母店'] || '横浜店',
+            color: data.color || '#3B82F6',
+            currentStatus: '待機中',
+            _type: 'staff' as const,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            ...data,
+        };
+
+        await setDoc(docRef, staffData, { merge: true });
+        return newId;
+    },
+
+    /**
      * Creates or overwrites a staff member.
      */
     async saveStaff(id: string, data: Staff): Promise<void> {
