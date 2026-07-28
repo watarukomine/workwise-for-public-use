@@ -97,8 +97,8 @@ export const OrderService = {
     subscribeAllOrders(callback: (orders: WithId<Order>[], removedIds?: string[]) => void): () => void {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
-        // Optimize from 3000 to latest 600 orders to ensure instant initial load and low memory usage
-        const q = query(colRef, limit(600));
+        // Fetch all orders (up to 4000) so all current and future orders like 8/27 are loaded
+        const q = query(colRef, limit(4000));
         
         return onSnapshot(q, (snapshot) => {
             const orders = snapshot.docs.map(doc => ({
