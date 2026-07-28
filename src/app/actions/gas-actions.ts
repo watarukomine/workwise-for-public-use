@@ -26,7 +26,7 @@ async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
 
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout for GAS execution
 
         console.log("Sending request to GAS with body:", bodyPayload);
 
