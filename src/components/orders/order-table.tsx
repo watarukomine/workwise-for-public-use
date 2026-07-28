@@ -273,13 +273,18 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     }
     
     if (sortType === 'scheduledDate') {
-        // Sort by 作業予定日
+        // Sort by 作業予定日 (safely handle slash and hyphen date strings)
         ordersToDisplay.sort((a, b) => {
             const dateKeys = ORDER_KEYS['作業予定日'] || ['作業予定日'];
-            const dateA = parseISO(findKey(a, dateKeys) || '0');
-            const dateB = parseISO(findKey(b, dateKeys) || '0');
-            if (dateA < dateB) return -1;
-            if (dateA > dateB) return 1;
+            const valA = normalizeDateStr(findKey(a, dateKeys) || '');
+            const valB = normalizeDateStr(findKey(b, dateKeys) || '');
+            
+            if (!valA && !valB) return a._originalIndex - b._originalIndex;
+            if (!valA) return 1;
+            if (!valB) return -1;
+            
+            const cmp = valA.localeCompare(valB);
+            if (cmp !== 0) return cmp;
             return a._originalIndex - b._originalIndex;
         });
     } else {
