@@ -212,44 +212,73 @@ export default function DashboardPage() {
     total: isLoading
   });
 
-  const handleDateChange = (direction: 'next' | 'prev' | 'today' | number) => {
-    setIsSyncing(true);
-    setCurrentDate(current => {
-      if (direction === 'today' || direction === 0) return startOfToday();
-      if (typeof direction === 'number') return addDays(current, direction);
-      return direction === 'next' ? addDays(current, 1) : subDays(current, 1);
+  const handleDateChange = React.useCallback((direction: 'next' | 'prev' | 'today' | number) => {
+    React.startTransition(() => {
+      setCurrentDate(current => {
+        let nextDate: Date;
+        if (direction === 'today' || direction === 0) nextDate = startOfToday();
+        else if (typeof direction === 'number') nextDate = addDays(current, direction);
+        else nextDate = direction === 'next' ? addDays(current, 1) : subDays(current, 1);
+
+        // Instantly notify OrderProvider of viewed date change synchronously
+        setCurrentViewedDate(nextDate);
+        return nextDate;
+      });
     });
-  };
+  }, [setCurrentViewedDate]);
+
+  // Keyboard navigation shortcuts (Left Arrow: Prev, Right Arrow: Next, T: Today)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if active element is an input, textarea, or contentEditable
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleDateChange(-1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleDateChange(1);
+      } else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault();
+        handleDateChange('today');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleDateChange]);
 
   // Sync attendance when date changes
   const lastSyncedDate = useRef<Date | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     const syncAttendance = async () => {
       // Determine if we are mounting (Refresh) or switching dates
-      // If lastSyncedDate is null, this is the first sync (Mount/Refresh).
       const isMount = lastSyncedDate.current === null;
-      // Real Date Switch: We were already synced to a date, and now current is different.
       const isRealDateSwitch = lastSyncedDate.current !== null && !isSameDay(currentDate, lastSyncedDate.current);
-
       const isDateChange = isMount || isRealDateSwitch;
 
       if (isDateChange) {
-        // Immediately sync viewed date to OrderProvider so unassigned tasks for currentDate calculate synchronously
-        setCurrentViewedDate(currentDate);
-
         if (isRealDateSwitch) {
           isDateLoading.current = true;
-          setIsSyncing(true);
         }
         lastSyncedDate.current = currentDate;
-
-        // Clear cached statuses when date changes
         setCheckedOutStaffIds(new Set());
       }
 
       // 0. Identify staff with orders for this day
-      // (This logic remains synonymous for both mount and switch)
       const staffWithOrders = new Set<string>();
       if (scheduleEvents) {
         scheduleEvents.forEach(event => {
@@ -270,54 +299,53 @@ export default function DashboardPage() {
       }
 
       // OPTIMISTIC UPDATE
-      // If It's a Real Date Switch or Initial Mount: Set Selected Staff immediately
       if (isRealDateSwitch || isMount) {
         if (staffWithOrders.size > 0) {
           setSelectedStaffIds(Array.from(staffWithOrders));
         } else if (allStaff && allStaff.length > 0) {
-          // Default to all staff on initial load if no specific orders scheduled
           setSelectedStaffIds(allStaff.map(s => s.id));
         }
       }
 
       try {
-        // 1. Fetch explicitly attended staff from Firestore with details
         const { staffIds: attendedStaffIds, checkedOutIds = [], scheduledStaffIds: scheduledIds = [] } = await getDailyAttendanceDetails(currentDate);
+        
+        // Prevent race condition if user switched date while fetching
+        if (cancelled) return;
+
         setCheckedOutStaffIds(new Set(checkedOutIds));
         setPresentStaffIds(new Set(attendedStaffIds));
         setScheduledStaffIds(new Set(scheduledIds));
 
-        // 3. Merge lists
         const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...scheduledIds, ...Array.from(staffWithOrders)]));
 
         if (combinedStaffIds.length > 0) {
           if (isRealDateSwitch || isMount) {
-            // On Mount/Refresh OR Real Date Switch: Force set to new day's attendance / all staff
             setSelectedStaffIds(combinedStaffIds);
           } else {
-            // On Same Day Update (Background Poll):
-            // MERGE with existing selection to preserve localStorage state or manual changes
             setSelectedStaffIds(prev => Array.from(new Set([...prev, ...combinedStaffIds])));
           }
         } else if (isRealDateSwitch) {
-          // If switching date and no staff found, CLEAR the selection
           setSelectedStaffIds([]);
         } else if (isMount && allStaff && allStaff.length > 0) {
           setSelectedStaffIds(allStaff.map(s => s.id));
         }
       } catch (e) {
-        console.error("Failed to sync attendance:", e);
+        if (!cancelled) console.error("Failed to sync attendance:", e);
       } finally {
-        if (isDateChange) {
+        if (!cancelled && isDateChange) {
           isDateLoading.current = false;
           setIsSyncing(false);
-          
-          // CRITICAL: Fetch additional data for this date if not already in context
           loadOrders(currentDate);
         }
       }
     };
+
     syncAttendance();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentDate, setSelectedStaffIds, scheduleEvents, loadOrders, setCurrentViewedDate]);
 
   // Selection state is persisted in localStorage via SelectedStaffContext.
@@ -496,34 +524,39 @@ export default function DashboardPage() {
           {/* Controls Row (Date + Mobile Buttons) */}
           <div className="flex items-center gap-2 w-full md:w-auto justify-between md:justify-start">
             {/* Date Controls */}
-            <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1">
+            <div className="flex items-center gap-1.5 bg-muted/60 rounded-lg p-1 border shadow-inner">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => handleDateChange(-1)}
-                className="h-7 w-7 hover:bg-background shadow-sm transition-all"
+                title="前日へ (← キー)"
+                aria-label="前日へ"
+                className="h-8 w-8 hover:bg-background active:scale-90 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none"
               >
-                <ChevronLeft className="h-4 w-4" />
+                <ChevronLeft className="h-4.5 w-4.5" />
               </Button>
-              <div className="px-2 sm:px-3 py-1 min-w-[80px] sm:min-w-[120px] text-center font-medium bg-background rounded-md shadow-sm border text-sm">
+              <div className="px-2.5 sm:px-3.5 py-1 min-w-[90px] sm:min-w-[130px] text-center font-semibold bg-background rounded-md shadow-sm border text-sm select-none transition-all flex items-center justify-center gap-1">
                 <span className="hidden sm:inline">{format(currentDate, 'yyyy年MM月dd日', { locale: ja })}</span>
                 <span className="sm:hidden">{format(currentDate, 'M/d(EEE)', { locale: ja })}</span>
-                {(isSyncing || isAutoRefreshing) && <Loader2 className="inline ml-1 sm:ml-2 h-3 w-3 animate-spin text-muted-foreground" />}
+                {(isSyncing || isAutoRefreshing) && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => handleDateChange(1)}
-                className="h-7 w-7 hover:bg-background shadow-sm transition-all"
+                title="翌日へ (→ キー)"
+                aria-label="翌日へ"
+                className="h-8 w-8 hover:bg-background active:scale-90 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none"
               >
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4.5 w-4.5" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleDateChange(0)}
                 disabled={isToday(currentDate)}
-                className="ml-1 h-7 px-3 text-xs font-medium hover:bg-background shadow-sm transition-all"
+                title="今日へ移動 (T キー)"
+                className="ml-0.5 h-8 px-3 text-xs font-medium hover:bg-background active:scale-95 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none disabled:opacity-40"
               >
                 今日
               </Button>
@@ -533,9 +566,11 @@ export default function DashboardPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 hover:bg-background shadow-sm transition-all"
+                    title="日付を選択"
+                    aria-label="カレンダーで日付選択"
+                    className="h-8 w-8 hover:bg-background active:scale-90 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none"
                   >
-                    <CalendarIcon className="h-4 w-4" />
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -544,8 +579,10 @@ export default function DashboardPage() {
                     selected={currentDate}
                     onSelect={(date: Date | undefined) => {
                       if (date) {
-                        setIsSyncing(true);
-                        setCurrentDate(date);
+                        React.startTransition(() => {
+                          setCurrentDate(date);
+                          setCurrentViewedDate(date);
+                        });
                       }
                     }}
                     initialFocus
