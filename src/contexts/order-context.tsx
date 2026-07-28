@@ -17,7 +17,20 @@ const TRAVEL_TIME_MINUTES = 30;
 const normalizeDateStr = (dStr: any): string => {
   if (!dStr) return '';
   try {
-    const d = new Date(dStr);
+    const s = String(dStr).trim();
+    if (s.includes('T')) {
+      const datePart = s.split('T')[0];
+      const parts = datePart.split(/[-/]/);
+      if (parts.length === 3) {
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+    }
+    const clean = s.replace(/\//g, '-').split(' ')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+    }
+    const d = new Date(s);
     if (!isNaN(d.getTime())) {
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
@@ -344,17 +357,6 @@ const processOrderData = (
       newScheduleEvents.some(e => e.id === order.id || e.systemId === order.id);
 
     if (isAlreadyScheduled) return false;
-
-    // If order has staffName AND scheduledTime, and is already assigned in master, don't show in unassigned
-    if (order.staffName && order.scheduledTime) {
-      const sName = String(order.staffName).trim();
-      const nName = sName.replace(/\s+/g, '').toLowerCase();
-      const staffExists = staffMapByName.get(sName) || staffMapByName.get(nName);
-
-      if (staffExists) {
-        return false;
-      }
-    }
 
     return true;
   });
