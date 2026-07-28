@@ -656,19 +656,39 @@ export function ScheduleView({
   const dailySchedule = React.useMemo(() => {
     if (!scheduleEvents) return [];
     
-    // Cache the target date strings to avoid date-fns overhead in loop
-    const targetStart = startOfDay(currentDate).getTime();
+    const targetYmd = format(currentDate, 'yyyy-MM-dd');
     
     return scheduleEvents.filter(event => {
-      // Fast path for ISO strings
-      if (typeof event.start === 'string') {
-        const d = new Date(event.start);
-        return d.getTime() && new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() === targetStart;
+      if (!event) return false;
+
+      // 1. Primary check: event's scheduledDate property
+      if (event.scheduledDate) {
+        const normScheduledDate = normalizeDateStr(event.scheduledDate);
+        if (normScheduledDate && normScheduledDate === targetYmd) {
+          return true;
+        }
       }
-      
-      // Fallback
-      const eventDate = event.start;
-      return isValid(eventDate) && isEqual(startOfDay(eventDate as Date), startOfDay(currentDate));
+
+      // 2. Secondary check: event.start string
+      if (event.start) {
+        const normStartDate = normalizeDateStr(event.start);
+        if (normStartDate && normStartDate === targetYmd) {
+          return true;
+        }
+
+        // 3. Fallback: Parse Date object and format in local time
+        try {
+          const d = new Date(event.start);
+          if (!isNaN(d.getTime())) {
+            const localYmd = format(d, 'yyyy-MM-dd');
+            if (localYmd === targetYmd) {
+              return true;
+            }
+          }
+        } catch {}
+      }
+
+      return false;
     });
   }, [scheduleEvents, currentDate]);
 
