@@ -18,7 +18,6 @@ import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { findKey } from '@/lib/utils';
 import { createOrder as createOrderGas, submitOrderDetachedServerAction } from '@/app/actions/gas-actions';
-import { appendOrderDirectServerAction } from '@/app/actions/sheet-direct-actions';
 
 // Schema definition
 const orderFormSchema = z.object({
