@@ -187,6 +187,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [sortType, setSortType] = React.useState<'spreadsheet' | 'scheduledDate'>('spreadsheet');
+  const [showPastOrders, setShowPastOrders] = React.useState(false);
   
   // Dialog States
   const [selectedOrder, setSelectedOrder] = React.useState<any | null>(null);
@@ -268,8 +269,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
             return matchesDisplayed || matchesRaw;
         });
-    } else {
-        // If not searching, filter to only show today and future orders
+    } else if (!showPastOrders) {
+        // If not searching AND showPastOrders is false, filter to only show today and future orders
         ordersToDisplay = ordersToDisplay.filter(order => {
             const workDateStr = findKey(order, ['作業予定日', 'scheduledDate']);
             if (!workDateStr) return false;
@@ -496,10 +497,20 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
               className="pl-10"
             />
           </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+            <div className="flex items-center gap-2 border px-3 py-1.5 rounded-md bg-muted/30">
+              <Switch
+                id="show-past-orders"
+                checked={showPastOrders}
+                onCheckedChange={setShowPastOrders}
+              />
+              <Label htmlFor="show-past-orders" className="text-xs cursor-pointer font-medium whitespace-nowrap">
+                過去データも表示 ({showPastOrders ? '全件表示中' : '本日以降のみ'})
+              </Label>
+            </div>
             <span className="text-sm text-muted-foreground whitespace-nowrap">並び順:</span>
             <Select value={sortType} onValueChange={(value: 'spreadsheet' | 'scheduledDate') => setSortType(value)}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[160px]">
                 <SelectValue placeholder="並び順を選択" />
               </SelectTrigger>
               <SelectContent>

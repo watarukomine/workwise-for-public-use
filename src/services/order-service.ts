@@ -43,6 +43,39 @@ function generateDateFormats(dateStr: string): string[] {
 
 export const OrderService = {
     /**
+     * Fetches all orders from Firestore (with optional limit).
+     */
+    async getAllOrders(limitCount = 3000): Promise<WithId<Order>[]> {
+        const { firestore } = initializeFirebase();
+        const colRef = collection(firestore, COLLECTION);
+        const q = query(colRef, limit(limitCount));
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        } as WithId<Order>));
+    },
+
+    /**
+     * Subscribes to all orders in real-time.
+     */
+    subscribeAllOrders(callback: (orders: WithId<Order>[]) => void): () => void {
+        const { firestore } = initializeFirebase();
+        const colRef = collection(firestore, COLLECTION);
+        const q = query(colRef, limit(3000));
+        
+        return onSnapshot(q, (snapshot) => {
+            const orders = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            } as WithId<Order>));
+            callback(orders);
+        }, (error) => {
+            console.error(`[OrderService] Subscribe all orders error:`, error);
+        });
+    },
+
+    /**
      * Fetches orders for a specific date (or all if not specified).
      */
     async getOrdersByDate(dateStr: string): Promise<WithId<Order>[]> {

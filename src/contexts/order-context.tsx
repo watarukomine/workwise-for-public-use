@@ -530,40 +530,17 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, [rawOrdersData.length]);
 
-  // Realtime subscription setup
+  // Realtime subscription setup for ALL orders
   useEffect(() => {
     if (isProfileLoading || !profile) return;
 
-    const todayStr = new Date().toISOString().split('T')[0];
-    
-    // Initial fetch for today +/- 3 days from Firestore (Background/Non-blocking)
-    fetchAndProcessData(true, { date: todayStr, range: 3 });
-    
-    // Subscribe to real-time updates for today
-    console.log(`[OrderProvider] Subscribing to Firestore updates for: ${todayStr}`);
-    const unsubscribeToday = OrderService.subscribeToOrders(todayStr, (updatedOrders) => {
-      setRawOrdersData(prev => {
-        const orderMap = new Map();
-        const normToday = normalizeDateStr(todayStr);
-        // Keep non-today orders
-        prev.forEach(o => {
-          const normO = normalizeDateStr(o.scheduledDate);
-          if (normO !== normToday) {
-            const id = o.id || o.systemId;
-            if (id) orderMap.set(id, o);
-          }
-        });
-        // Add updated today orders
-        updatedOrders.forEach(o => {
-          const id = o.id || o.systemId;
-          if (id) orderMap.set(id, o);
-        });
-        return Array.from(orderMap.values());
-      });
+    console.log(`[OrderProvider] Subscribing to ALL Firestore updates`);
+    const unsubscribeAll = OrderService.subscribeAllOrders((updatedOrders) => {
+      setRawOrdersData(updatedOrders);
     });
 
     return () => {
-      unsubscribeToday();
+      unsubscribeAll();
     };
   }, [profile, isProfileLoading]);
 
