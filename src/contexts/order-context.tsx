@@ -52,7 +52,12 @@ interface OrderContextType {
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppressedTripIds: Set<string>) => {
+const processOrderData = (
+  rawOrdersData: any[],
+  allStaff: WithId<Staff>[],
+  suppressedTripIds: Set<string>,
+  targetDate?: Date | string | null
+) => {
   if (!rawOrdersData || !Array.isArray(rawOrdersData)) {
     return { orders: [], scheduleEvents: [], statuses: [], unassignedOrders: [] };
   }
@@ -83,34 +88,24 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
   });
 
   // Initialize statuses with staff user document fields
-  allStaff.forEach(sf => {
-    staffStatusMap.set(sf.id, {
-      staffId: sf.id,
-      status: sf.currentStatus || '待機中',
-      lastAction: '情報なし',
-      estimatedArrivalTime: sf.estimatedArrivalTime,
-      nextDestination: sf.nextDestination,
-    });
-  });
+  const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着', '帰社中'];
+  const passiveStatuses = ['未着手', '未割当', '待機中'];
 
   // --- PASS 1: Parse Data, Update Status, Collect Schedulable Items ---
   rawOrdersData.forEach((rawOrder, index) => {
-    // Basic Mapping using utility - PASS STABLE FALLBACK ID (row index based)
     const mappedOrder = mapRawToOrder(rawOrder, `ord-row-${index}`);
     const order: WithId<Order> = {
       ...mappedOrder,
-      id: mappedOrder.id, // mappedOrder.id is now guaranteed stable
+      id: mappedOrder.id,
       raw: rawOrder
     };
 
     const isGenericTask = order.id.startsWith('task-');
 
-    // Filter out generic tasks from the main orders list
     if (!isGenericTask) {
       orders.push(order);
     }
 
-    // 1. Process Staff Status (O(1) Instant Lookup)
     const staffNameStr = order.staffName ? String(order.staffName).trim() : '';
     const normStaffName = staffNameStr.replace(/\s+/g, '').toLowerCase();
     const staffMember = staffNameStr ? (staffMapByName.get(staffNameStr) || staffMapByName.get(normStaffName)) : undefined;
@@ -123,11 +118,6 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
 
       if (!isNaN(lastUpdate.getTime())) {
         const status = order.status || findKey(rawOrder, ['受注ステータス']) || '待機中';
-        const actionText = order.rawOrderId ? `[${order.rawOrderId}]` : '[受注]';
-
-        const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着', '帰社中'];
-        const passiveStatuses = ['未着手', '未割当', '待機中'];
-
         const isNewer = lastUpdate.getTime() >= currentUpdate.getTime();
         const isCandidateActive = activeStatuses.includes(status);
         const isCurrentActive = activeStatuses.includes(currentStatus.status || '');
@@ -146,38 +136,29 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         }
 
         if (shouldUpdate) {
-          let lat = order.latitude !== undefined && order.latitude !== null ? parseFloat(String(order.latitude)) : (rawOrder?.latitude !== undefined ? parseFloat(String(rawOrder.latitude)) : NaN);
-          let lon = order.longitude !== undefined && order.longitude !== null ? parseFloat(String(order.longitude)) : (rawOrder?.longitude !== undefined ? parseFloat(String(rawOrder.longitude)) : NaN);
+            let lat = order.latitude !== undefined && order.latitude !== null ? parseFloat(String(order.latitude)) : NaN;
+            let lon = order.longitude !== undefined && order.longitude !== null ? parseFloat(String(order.longitude)) : NaN;
+            
+            if (isNaN(lat) || isNaN(lon)) {
+                const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';
+                const parts = locationStr.split(',').map(s => parseFloat(s.trim()));
+                lat = parts[0];
+                lon = parts[1];
+            }
 
-          if (isNaN(lat) || isNaN(lon)) {
-            const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';
-            const parts = locationStr.split(',').map(s => parseFloat(s.trim()));
-            lat = parts[0];
-            lon = parts[1];
-          }
-
-          if ((isNaN(lat) || isNaN(lon)) && currentStatus.latitude && currentStatus.longitude) {
-            lat = currentStatus.latitude;
-            lon = currentStatus.longitude;
-          }
-
-          const eta = order.estimatedArrivalTime || currentStatus.estimatedArrivalTime || staffMember.estimatedArrivalTime;
-          const dest = order.nextDestination || currentStatus.nextDestination || staffMember.nextDestination;
-
-          staffStatusMap.set(staffMember.id, {
-            staffId: staffMember.id,
-            status: status,
-            lastAction: `${actionText} ${status}`,
-            latitude: !isNaN(lat) ? lat : undefined,
-            longitude: !isNaN(lon) ? lon : undefined,
-            lastUpdate: lastUpdate.toISOString(),
-            estimatedArrivalTime: eta,
-            nextDestination: dest,
-          });
+            staffStatusMap.set(staffMember.id, {
+                staffId: staffMember.id,
+                status: status,
+                lastAction: `[受注] ${status}`,
+                latitude: !isNaN(lat) ? lat : undefined,
+                longitude: !isNaN(lon) ? lon : undefined,
+                lastUpdate: lastUpdate.toISOString(),
+                estimatedArrivalTime: order.estimatedArrivalTime,
+                nextDestination: order.nextDestination,
+            });
         }
       }
 
-      // 2. Prepare Scheduled Event Data (Parsing)
       if (order.scheduledTime) {
         let scheduledTime: Date | null = null;
         let dateStr = order.scheduledDate;
@@ -186,11 +167,9 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
           dateStr = format(new Date(), 'yyyy-MM-dd');
         }
 
-        // Robust Time Parsing
         try {
           const val = order.scheduledTime as any;
           if (val instanceof Date) {
-            // Fix for Google Sheets time-only cells appearing as 1899/12/30
             if (val.getFullYear() < 2000) {
               const timeStr = format(val, 'HH:mm:ss');
               scheduledTime = parseISO(`${dateStr}T${timeStr}`);
@@ -198,9 +177,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
               scheduledTime = val;
             }
           } else if (typeof val === 'string') {
-            // Check for old dates (1899/1900) from Google Sheets time-only cells
             if (val.includes('1899') || val.includes('1900')) {
-              // Extract time from old date and combine with scheduledDate
               logOldDateDetected(order.id, order.taskDetails || '不明', 'scheduledTime', val, 'order-context');
               const oldDate = new Date(val);
               if (isValid(oldDate)) {
@@ -210,43 +187,45 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
             } else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
               scheduledTime = parseISO(`${dateStr}T${val}`);
             } else {
-              const d = new Date(val);
-              if (isValid(d)) {
-                if (val.includes('/') || val.includes('-')) scheduledTime = d;
-                else scheduledTime = parseISO(`${dateStr}T${format(d, 'HH:mm:ss')}`);
-              } else {
-                scheduledTime = parseISO(val);
-              }
+              scheduledTime = parseISO(val);
             }
-          } else {
-            // Fallback for unknown types (e.g. number timestamp)
-            scheduledTime = new Date(val as any);
           }
-        } catch (e) { }
+
+          if (scheduledTime && !isValid(scheduledTime)) {
+            scheduledTime = null;
+          }
+        } catch {
+          scheduledTime = null;
+        }
 
         if (scheduledTime && isValid(scheduledTime)) {
           let taskEndTime: Date | null = null;
-
           if (order.scheduledEndTime) {
             try {
-              const eVal = order.scheduledEndTime as any;
-              if (eVal instanceof Date) {
-                if (eVal.getFullYear() < 2000) {
-                  const timeStr = format(eVal, 'HH:mm:ss');
+              const endVal = order.scheduledEndTime as any;
+              if (endVal instanceof Date) {
+                if (endVal.getFullYear() < 2000) {
+                  const timeStr = format(endVal, 'HH:mm:ss');
                   taskEndTime = parseISO(`${dateStr}T${timeStr}`);
                 } else {
-                  taskEndTime = eVal;
+                  taskEndTime = endVal;
                 }
-              } else if (typeof eVal === 'string') {
-                if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(eVal)) {
-                  taskEndTime = parseISO(`${dateStr}T${eVal}`);
+              } else if (typeof endVal === 'string') {
+                if (endVal.includes('1899') || endVal.includes('1900')) {
+                  const oldDate = new Date(endVal);
+                  if (isValid(oldDate)) {
+                    const timeStr = `${String(oldDate.getHours()).padStart(2, '0')}:${String(oldDate.getMinutes()).padStart(2, '0')}:${String(oldDate.getSeconds()).padStart(2, '0')}`;
+                    taskEndTime = parseISO(`${dateStr}T${timeStr}`);
+                  }
+                } else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(endVal)) {
+                  taskEndTime = parseISO(`${dateStr}T${endVal}`);
                 } else {
-                  const ed = new Date(eVal);
-                  if (isValid(ed)) taskEndTime = ed;
-                  else taskEndTime = parseISO(eVal);
+                  taskEndTime = parseISO(endVal);
                 }
               }
-            } catch (e) { }
+            } catch {
+              taskEndTime = null;
+            }
           }
 
           if (!taskEndTime || !isValid(taskEndTime)) {
@@ -254,7 +233,6 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
           }
 
           if (isValid(taskEndTime)) {
-            // Only add to timeline if scheduled time is 09:00 or later
             if (scheduledTime.getHours() >= 9) {
               if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
 
@@ -278,7 +256,6 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
   // --- PASS 2: Sort & Generate Events with Auto-Suppression ---
   const newScheduleEvents: WithId<ScheduleEvent>[] = [];
 
-  // Group by staff
   const staffGroups = new Map<string, typeof explicitScheduleItems>();
   explicitScheduleItems.forEach(item => {
     if (!staffGroups.has(item.staffId)) staffGroups.set(item.staffId, []);
@@ -286,13 +263,11 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
   });
 
   staffGroups.forEach((items, staffId) => {
-    // Sort items by Start Time
     items.sort((a, b) => a.start.getTime() - b.start.getTime());
 
     let lastEndTime: Date | null = null;
 
     items.forEach(item => {
-      // Logic for Task Event
       const taskEvent: WithId<ScheduleEvent> = {
         ...item.order,
         id: `${item.tripId}-task`,
@@ -303,26 +278,19 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         start: item.start.toISOString(),
         end: item.end.toISOString(),
         rawOrderId: item.order.rawOrderId,
-        systemId: item.order.id, // Explicitly carry the clean SystemID
+        systemId: item.order.id,
       };
 
-      // Logic for Travel Event
-      // If it's a generic task and NOT accompany, no travel event is needed (usually).
       if (item.isGeneric && !item.isAccompany) {
         newScheduleEvents.push(taskEvent);
       } else {
-        // Decide whether to suppress Travel
         let shouldSuppress = false;
 
-        // Manual Suppression Check
         if (suppressedTripIds.has(item.tripId)) {
           shouldSuppress = true;
-        }
-        // Auto Suppression Check: "Changeover"
-        // If current start is within 1 minute of last task's end, it's a consecutive task -> No travel
-        else if (lastEndTime) {
+        } else if (lastEndTime) {
           const gapMinutes = differenceInMinutes(item.start, lastEndTime);
-          if (Math.abs(gapMinutes) <= 1) { // -1 to 1 min tolerance
+          if (Math.abs(gapMinutes) <= 1) {
             shouldSuppress = true;
           }
         }
@@ -338,7 +306,7 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
             start: subMinutes(item.start, TRAVEL_TIME_MINUTES).toISOString(),
             end: item.start.toISOString(),
             rawOrderId: item.order.rawOrderId,
-            systemId: item.order.id, // Explicitly carry the clean SystemID
+            systemId: item.order.id,
           };
           newScheduleEvents.push(travelEvent);
         }
@@ -346,19 +314,30 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         newScheduleEvents.push(taskEvent);
       }
 
-      // Update lastEndTime
       lastEndTime = item.end;
     });
   });
 
+  // 3. Determine Unassigned Orders for Current Viewed Date
+  const targetDateStr = targetDate ? (typeof targetDate === 'string' ? targetDate : format(targetDate, 'yyyy-MM-dd')) : format(new Date(), 'yyyy-MM-dd');
 
-  // 3. Determine Unassigned Orders
   const unassignedOrders = orders.filter(order => {
-    // Hide generic tasks (travel, work, break, etc.) from the unassigned list
     if (order.isGeneric) return false;
 
-    // Check if already scheduled
-    // Use rawOrderId if available for reliable matching, otherwise fallback to ID or SystemID
+    const cCode = String(order.customerCode || (order as any).userCode || '').trim();
+    const cName = String(order.customerName || (order as any).storeName || '').trim();
+    if (cCode === 'guest' || cName === '(店舗名未設定)' || cName === '（店舗名未設定）' || cName === '店舗名未設定' || !cName) {
+      return false;
+    }
+
+    if (order.scheduledDate) {
+      const normOrderDate = normalizeDateStr(order.scheduledDate);
+      const normTargetDate = normalizeDateStr(targetDateStr);
+      if (normOrderDate && normTargetDate && normOrderDate !== normTargetDate) {
+        return false;
+      }
+    }
+
     const isAlreadyScheduled = (order.rawOrderId && scheduledRawOrderIds.has(order.rawOrderId)) ||
       newScheduleEvents.some(e => e.id === order.id || e.systemId === order.id);
 
@@ -376,8 +355,6 @@ const processOrderData = (rawOrdersData: any[], allStaff: WithId<Staff>[], suppr
         return true;
       }
 
-      // If staff exists, but it wasn't added to scheduleEvents (e.g. invalid time), it should be here.
-      // Since we already returned false for isAlreadyScheduled, we just return true here.
       return true;
     }
 
@@ -629,7 +606,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     if (isLoading && !rawOrdersData.length) return; // Wait if loading initial
 
     try {
-      const { orders, scheduleEvents: backendEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff, suppressedTripIds);
+      const { orders, scheduleEvents: backendEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff, suppressedTripIds, currentViewedDate);
       console.log(`[OrderProvider] Processed: ${orders.length} orders, ${backendEvents.length} events, ${unassignedOrders.length} unassigned.`);
 
       setOrders(orders);
