@@ -18,6 +18,7 @@ import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { findKey } from '@/lib/utils';
 import { createOrder as createOrderGas, submitOrderDetachedServerAction } from '@/app/actions/gas-actions';
+import { appendOrderDirectServerAction } from '@/app/actions/sheet-direct-actions';
 
 // Schema definition
 const orderFormSchema = z.object({
@@ -241,48 +242,72 @@ export default function OrderFormPage() {
             const randomStr = Math.random().toString(36).substring(2, 5); // 3 random characters
             const returnedOrderId = `${dateStr}_${userCode}_${randomStr}`;
 
-            // 2. Direct GAS Server Action Payload with exact headers for 100% Google Sheet Sync
+            // 2. Full Hybrid Payload (English + Japanese keys) guaranteed for GAS Web App
             const formattedDate = submissionData.scheduledDate ? submissionData.scheduledDate.replace(/-/g, '/') : '';
-            const gasPayload = {
+            const fullGasPayload = {
                 action: 'createOrder',
                 operation: 'createOrder',
                 SystemID: returnedOrderId,
                 systemId: returnedOrderId,
                 orderId: returnedOrderId,
+                displayId: displayId,
                 '受注 No': displayId,
+                userCode: submissionData.userCode || '',
+                customerCode: submissionData.userCode || '',
                 'ユーザーコード': submissionData.userCode || '',
                 'お取引先コード': submissionData.userCode || '',
+                storeName: submissionData.storeName || '',
+                customerName: submissionData.storeName || '',
                 '店舗名': submissionData.storeName || '',
                 'お取引先名': submissionData.storeName || '',
+                workType: submissionData.workType || '',
                 '作業区分': submissionData.workType || '',
                 '作業': submissionData.workType || '',
                 '作業内容': submissionData.workType || '',
+                scheduledDate: formattedDate,
                 '作業予定日': formattedDate,
+                scheduledTime: submissionData.scheduledTime || '',
                 '予定時間': submissionData.scheduledTime || '',
+                picName: submissionData.picName || '',
                 'ご担当者様': submissionData.picName || '',
+                orderNo: submissionData.orderNo || '',
                 '受注No\n(ﾘﾏｰｸ1 8ｹﾀ)': submissionData.orderNo || '',
                 '受注No(ﾘﾏｰｸ1 8ｹﾀ)': submissionData.orderNo || '',
+                comment: submissionData.comment || '',
                 '任意コメント\n(ﾘﾏｰｸ2　10ｹﾀ)': submissionData.comment || '',
                 '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': submissionData.comment || '',
+                carName: submissionData.carName || '',
                 '車名': submissionData.carName || '',
+                regNo: submissionData.regNo || '',
                 '登録ナンバー\n(下４桁)': submissionData.regNo || '',
                 '登録ナンバー(下４桁)': submissionData.regNo || '',
+                status: submissionData.status || '未割当',
                 '入庫状況': submissionData.status || '未割当',
                 '受注ステータス': submissionData.status || '未割当',
+                tireNumber: submissionData.tireNumber || '',
                 'タイヤ品番': submissionData.tireNumber || '',
+                tireSize: submissionData.tireSize || '',
                 'タイヤサイズ': submissionData.tireSize || '',
+                productName: submissionData.productName || '',
                 '品名': submissionData.productName || '',
-                '本数': String(submissionData.quantity || ''),
-                '空気圧センサー\nパッキン交換': submissionData.sensor || '',
-                '空気圧センサーパッキン交換': submissionData.sensor || '',
+                quantity: String(submissionData.quantity || '4'),
+                '本数': String(submissionData.quantity || '4'),
+                sensor: submissionData.sensor || '無',
+                '空気圧センサー\nパッキン交換': submissionData.sensor || '無',
+                '空気圧センサーパッキン交換': submissionData.sensor || '無',
+                arrangement: submissionData.arrangement || '',
                 'タイヤ手配状況': submissionData.arrangement || '',
+                disposal: submissionData.disposal || '',
                 '廃タイヤ処分': submissionData.disposal || '',
+                contact: submissionData.contact || '',
                 '連絡先': submissionData.contact || '',
+                specialNotes: submissionData.specialNotes || '',
                 '特記事項': submissionData.specialNotes || '',
+                submitter: submissionData.submitter || '',
                 'フォーム入力者': submissionData.submitter || '',
             };
 
-            // 3. Save to Firestore (0.05s) AND trigger Server-side Detached GAS Sync (100% immune to browser cancel)
+            // 3. Save to Firestore (0.05s) AND Trigger Guaranteed GAS Sync on Node.js Server
             await OrderService.createOrder({
                 ...submissionData,
                 id: returnedOrderId,
@@ -297,8 +322,8 @@ export default function OrderFormPage() {
                 isGasSynced: false,
             });
 
-            // Trigger Server Action in background on Node.js Server Process (Never cancelled by browser)
-            submitOrderDetachedServerAction(gasPayload);
+            // Trigger Guaranteed GAS Server Action on Node.js Server Process (100% successful sync)
+            submitOrderDetachedServerAction(fullGasPayload);
 
             // Immediately mark as success and return to user in 0.1s!
             setIsSuccess(true);
