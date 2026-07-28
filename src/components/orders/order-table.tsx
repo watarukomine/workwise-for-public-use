@@ -336,6 +336,37 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     formInit['comment'] = order.comment || formInit['任意コメント(ﾘﾏｰｸ2　10ｹﾀ)'] || '';
     formInit['任意コメント(ﾘﾏｰｸ2　10ｹﾀ)'] = formInit['comment'];
 
+    // Progress fields fallback from Order object & Firestore
+    const formatTimeVal = (val: any) => {
+      if (!val) return '';
+      if (typeof val === 'string' && val.includes('T')) {
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+      }
+      return String(val);
+    };
+
+    const formatDateVal = (val: any) => {
+      if (!val) return '';
+      if (typeof val === 'string' && val.includes('T')) {
+        const d = new Date(val);
+        if (!isNaN(d.getTime())) return d.toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+      }
+      return String(val);
+    };
+
+    formInit['既読確認'] = formInit['既読確認'] || formatDateVal(order.confirmedAt) || order.readConfirmation || '';
+    formInit['移動開始'] = formInit['移動開始'] || formatTimeVal(order.startTravelTime) || order.startTravel || '';
+    formInit['現場到着'] = formInit['現場到着'] || formatTimeVal(order.arrivalTimestamp) || order.arrival || '';
+    formInit['作業開始'] = formInit['作業開始'] || formatTimeVal(order.actualStartTime) || order.startWork || '';
+    formInit['作業完了'] = formInit['作業完了'] || formatTimeVal(order.actualEndTime) || order.completeWork || '';
+    formInit['作業所要時間'] = formInit['作業所要時間'] || order.actualDuration || order.workDuration || '';
+    formInit['出勤ボタン'] = formInit['出勤ボタン'] || order.clockIn || '';
+    formInit['退勤ボタン'] = formInit['退勤ボタン'] || order.clockOut || '';
+    formInit['最終位置情報（緯度,経度）'] = formInit['最終位置情報（緯度,経度）'] || order.lastLocation || (order.latitude && order.longitude ? `${order.latitude}, ${order.longitude}` : '');
+    formInit['チップ配置作業予定'] = formInit['チップ配置作業予定'] || order.chipWorkScheduled || '';
+    formInit['チップ配置作業完了予定'] = formInit['チップ配置作業完了予定'] || order.chipWorkCompleted || '';
+
     // Auto-resolve storeName from customerMaster on details dialog load
     const currentStoreName = formInit['店舗名'] || '';
     if (currentStoreName === '' || currentStoreName === '（店舗名未設定）' || currentStoreName === '(店舗名未設定)' || currentStoreName === '店舗名未設定') {
