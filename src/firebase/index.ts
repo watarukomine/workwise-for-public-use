@@ -8,7 +8,6 @@ import { getFunctions } from 'firebase/functions';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
-  console.log('[Firebase] Initializing with config:', firebaseConfig);
   // Debug toggle: Use a named app in development to decouple from default instance
   // and ensure our custom Firestore settings (experimentalForceLongPolling) are applied.
   if (process.env.NODE_ENV === 'development') {

@@ -18,6 +18,7 @@ import {
 import type { Order, WithId } from '@/lib/types';
 import { CounterService } from './counter-service';
 import { ORDER_GAS_URL } from '@/lib/settings';
+import { updateSheetStatus } from '@/app/actions/gas-actions';
 
 const COLLECTION = 'orders';
 
@@ -218,27 +219,29 @@ export const OrderService = {
     },
 
     /**
-     * Backs up data to Google Sheets via GAS.
+     * Backs up data to Google Sheets via GAS Server Action.
      */
     async backupToGas(order: Order, action: 'create' | 'update') {
         try {
-            // We can't directly call "use server" actions easily from here if this runs on client.
-            // But we can perform a simple fetch to the GAS URL.
             const payload = {
                 ...order,
                 gasUrl: ORDER_GAS_URL,
                 action: action === 'create' ? 'createOrder' : 'updateOrderSchedule',
             };
 
-            // Non-blocking fetch
-            fetch(ORDER_GAS_URL, {
-                method: 'POST',
-                body: JSON.stringify(payload),
-                mode: 'no-cors' // Simple fire and forget
-            }).catch(e => console.warn('GAS backup background fetch failed:', e));
-            
+            // Call Server Action asynchronously to avoid blocking UI while ensuring reliable logging & error handling
+            updateSheetStatus(payload)
+                .then(res => {
+                    if (res.status === 'error') {
+                        console.warn('[OrderService] GAS backup returned error status:', res.message);
+                    } else {
+                        console.log('[OrderService] GAS backup successful for order:', order.id || order.systemId);
+                    }
+                })
+                .catch(e => console.warn('[OrderService] GAS backup Server Action failed:', e));
+
         } catch (e) {
-            console.error('Failed to trigger GAS backup:', e);
+            console.error('[OrderService] Failed to trigger GAS backup:', e);
         }
     },
 

@@ -57,7 +57,7 @@ export const signInWithEmail = async (identifier: string, password: string): Pro
   // 2. Validate password against Firestore master record if found
   if (staffProfile) {
     const storedPass = String((staffProfile as any).password || (staffProfile as any)['パスワード'] || (staffProfile as any).pass || '').trim();
-    if (storedPass && (storedPass === cleanPassword || cleanPassword === 'Ab113' || cleanPassword === 'admin')) {
+    if (storedPass && storedPass === cleanPassword) {
       console.log(`[Auth] Master password match success for: ${staffProfile.name} (${staffProfile.id})`);
       sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffProfile));
       return staffProfile;
@@ -82,13 +82,6 @@ export const signInWithEmail = async (identifier: string, password: string): Pro
     }
   } catch (fbErr: any) {
     console.warn('[Auth] Firebase Auth sign-in failed:', fbErr?.code || fbErr?.message);
-  }
-
-  // 4. Final fallback: If staffProfile exists in Firestore master, grant session
-  if (staffProfile) {
-    sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffProfile));
-    console.log(`[Auth] Fallback login granted for staff: ${staffProfile.name}`);
-    return staffProfile;
   }
 
   throw new Error('ID/メールアドレス または パスワードが正しくありません。');

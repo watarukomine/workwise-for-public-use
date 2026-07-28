@@ -9,6 +9,39 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Normalizes a date string to 'yyyy-MM-dd' format.
+ * Handles ISO strings, slash-separated dates, and various formats from GAS/Firestore.
+ * Uses string parsing first to avoid timezone issues with new Date().
+ */
+export const normalizeDateStr = (dStr: any): string => {
+  if (!dStr) return '';
+  try {
+    const s = String(dStr).trim();
+
+    // Fast path: already in yyyy-MM-dd format
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    // Handle ISO timestamp strings (e.g. "2026-07-28T15:00:00.000Z")
+    // Extract date part directly from string to avoid timezone conversion issues
+    if (s.includes('T')) {
+      const datePart = s.split('T')[0];
+      const parts = datePart.split(/[-/]/);
+      if (parts.length === 3 && parts[0].length === 4) {
+        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+    }
+
+    // Handle slash-separated dates (e.g. "2026/7/28")
+    const clean = s.replace(/\//g, '-').split(' ')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+    }
+  } catch (e) {}
+  return String(dStr).replace(/\//g, '-').trim();
+};
+
 export function findKey(item: any, possibleKeys: string[]) {
   if (!item || typeof item !== 'object') {
     return undefined;

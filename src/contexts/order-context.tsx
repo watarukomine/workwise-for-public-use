@@ -3,7 +3,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
-import { findKey, mapRawToOrder } from '@/lib/utils';
+import { findKey, mapRawToOrder, normalizeDateStr } from '@/lib/utils';
 import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes, addDays } from 'date-fns';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { useSelectedStaff } from './selected-staff-context';
@@ -14,26 +14,7 @@ import { OrderService } from '@/services/order-service';
 
 const TRAVEL_TIME_MINUTES = 30;
 
-const normalizeDateStr = (dStr: any): string => {
-  if (!dStr) return '';
-  try {
-    const s = String(dStr).trim();
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${day}`;
-    }
 
-    const clean = s.replace(/\//g, '-').split(' ')[0];
-    const parts = clean.split('-');
-    if (parts.length === 3 && parts[0].length === 4) {
-      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-    }
-  } catch (e) {}
-  return String(dStr).replace(/\//g, '-').trim();
-};
 
 interface OrderContextType {
   orders: WithId<Order>[];
@@ -121,6 +102,15 @@ const processOrderData = (
     const staffMember = staffNameStr ? (staffMapByName.get(staffNameStr) || staffMapByName.get(normStaffName)) : undefined;
 
     if (staffMember) {
+      // Ensure staffStatusMap entry exists before accessing
+      if (!staffStatusMap.has(staffMember.id)) {
+        staffStatusMap.set(staffMember.id, {
+          staffId: staffMember.id,
+          status: '待機中',
+          lastAction: '',
+          lastUpdate: new Date(0).toISOString(),
+        });
+      }
       const lastUpdateStr = order.updatedAt || findKey(rawOrder, ['最終更新日時']);
       const lastUpdate = lastUpdateStr ? new Date(lastUpdateStr) : new Date();
       const currentStatus = staffStatusMap.get(staffMember.id)!;
@@ -502,7 +492,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [rawOrdersData.length]);
+  }, []);
 
   // Realtime subscription setup for fast dashboard chip operations
   useEffect(() => {
@@ -666,7 +656,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error("Error processing orders:", e);
     }
-  }, [rawOrdersData, allStaff, localScheduleEvents, suppressedTripIds, isLoading]);
+  }, [rawOrdersData, allStaff, localScheduleEvents, suppressedTripIds, isLoading, currentViewedDate]);
 
   const value: OrderContextType = {
     orders,
