@@ -15,11 +15,8 @@ const CUSTOMER_SHEET_NAME = "販売店情報";
 const ACTION_LOG_SHEET_NAME = "行動予定"; // 汎用タスク（休憩・移動等）の保存先
 
 function getTargetSpreadsheetIds() {
-    const ids = [ORDER_SPREADSHEET_ID];
-    if (typeof SECONDARY_ORDER_SPREADSHEET_ID !== 'undefined' && SECONDARY_ORDER_SPREADSHEET_ID && SECONDARY_ORDER_SPREADSHEET_ID !== ORDER_SPREADSHEET_ID) {
-        ids.push(SECONDARY_ORDER_SPREADSHEET_ID);
-    }
-    return ids;
+    // Only write new/updated orders to the new DB spreadsheet (1D888...) to keep legacy master intact
+    return [ORDER_SPREADSHEET_ID];
 }
 
 // Firebase Realtime Database URL (シグナル用)

@@ -504,17 +504,37 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, [rawOrdersData.length]);
 
-  // Realtime subscription setup for ALL orders
+  // Realtime subscription setup for fast dashboard chip operations
   useEffect(() => {
     if (isProfileLoading || !profile) return;
 
-    console.log(`[OrderProvider] Subscribing to ALL Firestore updates`);
-    const unsubscribeAll = OrderService.subscribeAllOrders((updatedOrders) => {
-      setRawOrdersData(updatedOrders);
+    const todayStr = new Date().toISOString().split('T')[0];
+    
+    // Initial fast fetch for today +/- 7 days from Firestore
+    fetchAndProcessData(true, { date: todayStr, range: 7 });
+    
+    console.log(`[OrderProvider] Fast subscribing to Firestore updates for: ${todayStr}`);
+    const unsubscribeToday = OrderService.subscribeToOrders(todayStr, (updatedOrders) => {
+      setRawOrdersData(prev => {
+        const orderMap = new Map();
+        const normToday = normalizeDateStr(todayStr);
+        prev.forEach(o => {
+          const normO = normalizeDateStr(o.scheduledDate);
+          if (normO !== normToday) {
+            const id = o.id || o.systemId;
+            if (id) orderMap.set(id, o);
+          }
+        });
+        updatedOrders.forEach(o => {
+          const id = o.id || o.systemId;
+          if (id) orderMap.set(id, o);
+        });
+        return Array.from(orderMap.values());
+      });
     });
 
     return () => {
-      unsubscribeAll();
+      unsubscribeToday();
     };
   }, [profile, isProfileLoading]);
 
