@@ -12,7 +12,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
 import { Search, MoreHorizontal, Download } from 'lucide-react';
-import { cn, findKey } from '@/lib/utils';
+import { cn, findKey, formatDate, formatTime, normalizeDateStr } from '@/lib/utils';
 import { format, isValid, parseISO, startOfToday, isAfter, isEqual } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Badge } from '@/components/ui/badge';
@@ -56,22 +56,7 @@ interface OrderTableProps {
   isLoading: boolean;
 }
 
-const formatDate = (dateString: string | undefined): string => {
-    if (!dateString) return '';
-    try {
-        const date = parseISO(dateString);
-        return format(date, 'yyyy/MM/dd');
-    } catch {
-        return dateString;
-    }
-};
 
-const formatTime = (date: Date | string) => {
-  if (!date) return '';
-  const d = typeof date === 'string' ? parseISO(date) : date;
-  if (!d || !isValid(d)) return '';
-  return format(d, 'HH:mm');
-};
 
 const ORDER_KEYS: Record<string, string[]> = {
   '受注ID': ['受注 ID', '受注id', 'id', '受注ID'],
@@ -187,7 +172,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const [searchTerm, setSearchTerm] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [sortType, setSortType] = React.useState<'spreadsheet' | 'scheduledDate'>('spreadsheet');
-  const [showPastOrders, setShowPastOrders] = React.useState(true);
+  const [showPastOrders, setShowPastOrders] = React.useState(false); // Default to showing today & future orders
   
   // Dialog States
   const [selectedOrder, setSelectedOrder] = React.useState<any | null>(null);
@@ -248,8 +233,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   }, [customers]);
 
   const filteredAndSortedOrders = React.useMemo(() => {
-    const today = startOfToday();
     const searchLower = debouncedSearch.trim().toLowerCase();
+    const todayStr = normalizeDateStr(new Date());
 
     // Map to include original index for stable sorting
     let ordersToDisplay = (rawOrders || []).map((order, index) => ({ ...order, _originalIndex: index }));
@@ -272,14 +257,11 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     } else if (!showPastOrders) {
         // If not searching AND showPastOrders is false, filter to only show today and future orders
         ordersToDisplay = ordersToDisplay.filter(order => {
-            const workDateStr = findKey(order, ['作業予定日', 'scheduledDate']);
-            if (!workDateStr) return false;
-            try {
-                const workDate = parseISO(workDateStr);
-                return isValid(workDate) && (isAfter(workDate, today) || isEqual(workDate, today));
-            } catch {
-                return false;
-            }
+            const workDateRaw = findKey(order, ['作業予定日', 'scheduledDate']);
+            if (!workDateRaw) return true; // Keep undated tasks as current/new tasks
+            const normWorkDate = normalizeDateStr(workDateRaw);
+            if (!normWorkDate) return true;
+            return normWorkDate >= todayStr;
         });
     }
     
