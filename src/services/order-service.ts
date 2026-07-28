@@ -92,10 +92,14 @@ export const OrderService = {
     /**
      * Subscribes to all orders in real-time.
      */
+    /**
+     * Subscribes to recent orders (latest 500) for high performance without fetching 3,000+ docs.
+     */
     subscribeAllOrders(callback: (orders: WithId<Order>[]) => void): () => void {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
-        const q = query(colRef, limit(3000));
+        // Optimize from 3000 to latest 600 orders to ensure instant initial load and low memory usage
+        const q = query(colRef, limit(600));
         
         return onSnapshot(q, (snapshot) => {
             const orders = snapshot.docs.map(doc => ({

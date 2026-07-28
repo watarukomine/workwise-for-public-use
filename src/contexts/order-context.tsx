@@ -577,57 +577,31 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setLocalScheduleEvents(prev => prev.filter(e => e.id !== eventId));
   };
 
-  // Process data when raw data or staff changes
-  useEffect(() => {
-    console.log(`[OrderProvider] Processing. rawOrders: ${rawOrdersData?.length}, isLoading: ${isLoading}, allStaff: ${allStaff?.length}`);
-
-    if (isLoading && !rawOrdersData.length) return; // Wait if loading initial
-
-    try {
-      const { orders, scheduleEvents: backendEvents, statuses, unassignedOrders } = processOrderData(rawOrdersData, allStaff, suppressedTripIds, currentViewedDate);
-      console.log(`[OrderProvider] Processed: ${orders.length} orders, ${backendEvents.length} events, ${unassignedOrders.length} unassigned.`);
-
-      setOrders(orders);
-
-      const localIds = new Set(localScheduleEvents.map(e => e.id));
-      const filteredBackendEvents = backendEvents.filter(e => !localIds.has(e.id));
-
-      setScheduleEvents([...filteredBackendEvents, ...localScheduleEvents.filter(e => e.staffId !== '__DELETED__')]);
-      setStatuses(statuses);
-
-      const localUnassignedEvents = localScheduleEvents.filter(e => !e.staffId && e.rawOrderId);
-      const localAssignedOrderIds = new Set(
-        localScheduleEvents
-          .filter(e => e.staffId && e.rawOrderId)
-          .map(e => String(e.rawOrderId))
-      );
-
-      let finalUnassignedOrders = unassignedOrders.filter(o => {
-        if (o.rawOrderId && localAssignedOrderIds.has(o.rawOrderId)) return false;
-        if (localIds.has(o.id)) return false;
-        return true;
-      });
-
-      if (localUnassignedEvents.length > 0) {
-        const existingIds = new Set(finalUnassignedOrders.map(o => String(o.id)));
-        const existingRawIds = new Set(finalUnassignedOrders.map(o => String(o.rawOrderId)).filter(Boolean));
-
-        const localOrders = localUnassignedEvents
-          .filter(e => e.raw)
-          .map(e => mapRawToOrder(e.raw, String(e.rawOrderId || e.id)))
-          .filter(o => {
-            if (existingIds.has(String(o.id))) return false;
-            if (o.rawOrderId && existingRawIds.has(String(o.rawOrderId))) return false;
-            return true;
-          });
-
-        finalUnassignedOrders = [...finalUnassignedOrders, ...localOrders];
-      }
-      setUnassignedOrders(finalUnassignedOrders);
-    } catch (e) {
-      console.error("Error processing orders:", e);
+  // Process data using useMemo for high performance & 0-lag rendering
+  const processedData = React.useMemo(() => {
+    if (!rawOrdersData || !rawOrdersData.length) {
+      return { orders: [], scheduleEvents: [], statuses: [], unassignedOrders: [] };
     }
-  }, [rawOrdersData, allStaff, localScheduleEvents, suppressedTripIds, isLoading, currentViewedDate]);
+    return processOrderData(rawOrdersData, allStaff, suppressedTripIds, currentViewedDate);
+  }, [rawOrdersData, allStaff, suppressedTripIds, currentViewedDate]);
+
+  useEffect(() => {
+    setOrders(processedData.orders);
+    
+    const localIds = new Set(localScheduleEvents.map(e => e.id));
+    const filteredBackendEvents = processedData.scheduleEvents.filter(e => !localIds.has(e.id));
+    setScheduleEvents([...filteredBackendEvents, ...localScheduleEvents.filter(e => e.staffId !== '__DELETED__')]);
+    setStatuses(processedData.statuses);
+
+    const localAssignedOrderIds = new Set(
+      localScheduleEvents
+        .filter(e => e.staffId && e.staffId !== '__DELETED__')
+        .map(e => e.rawOrderId || e.id)
+    );
+
+    const finalUnassigned = processedData.unassignedOrders.filter(o => !localAssignedOrderIds.has(o.rawOrderId || o.id));
+    setUnassignedOrders(finalUnassigned);
+  }, [processedData, localScheduleEvents]);
 
   const value: OrderContextType = {
     orders,
