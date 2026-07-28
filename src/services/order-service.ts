@@ -268,6 +268,7 @@ export const OrderService = {
                 ...order,
                 gasUrl: ORDER_GAS_URL,
                 action: action === 'create' ? 'createOrder' : 'updateOrderSchedule',
+                operation: action === 'create' ? 'createOrder' : 'updateOrderSchedule',
                 systemId: order.systemId || order.id,
                 orderId: order.systemId || order.id || (order as any).displayId,
                 displayId: (order as any).displayId || '',
@@ -294,9 +295,33 @@ export const OrderService = {
                 contact: order.contact || '',
                 specialNotes: order.specialNotes || '',
                 submitter: (order as any).submitter || '',
+                // Japanese column names for GAS Script compatibility
+                SystemID: order.systemId || order.id,
+                '受注 No': (order as any).displayId || order.orderNo || '',
+                '受注行番号': (order as any).displayId || '',
+                'ユーザーコード': order.customerCode || (order as any).userCode || '',
+                '店舗名': order.customerName || (order as any).storeName || '',
+                '作業区分': order.workType || '',
+                '作業予定日': formatDateYMD(order.scheduledDate),
+                '予定時間': order.scheduledTime || '',
+                'ご担当者様': order.picName || '',
+                '受注No(ﾘﾏｰｸ1 8ｹﾀ)': order.orderNo || (order as any).orderNoRemark || '',
+                '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': order.comment || '',
+                '車名': order.carName || '',
+                '登録ナンバー(下４桁)': order.regNo || '',
+                '受注ステータス': order.status || '未割当',
+                'タイヤ品番': order.tireNumber || '',
+                'タイヤサイズ': order.tireSize || '',
+                '品名': order.productName || '',
+                '本数': String(order.quantity || ''),
+                '空気圧センサーパッキン交換': order.sensor || '',
+                'タイヤ手配状況': order.arrangement || '',
+                '廃タイヤ処分': order.disposal || '',
+                '連絡先': order.contact || '',
+                '特記事項': order.specialNotes || '',
+                'フォーム入力者': (order as any).submitter || '',
             };
 
-            // Call Server Action synchronously to guarantee real-time spreadsheet write before returning
             const res = await updateSheetStatus(payload);
             if (res.status === 'error') {
                 console.warn('[OrderService] GAS backup returned error status:', res.message);

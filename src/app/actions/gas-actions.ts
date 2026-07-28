@@ -14,10 +14,13 @@ interface GasResponse {
     displayId?: string | number;
 }
 
+import { ORDER_GAS_URL } from '@/lib/settings';
+
 async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
     const { gasUrl, ...bodyPayload } = args;
+    const targetUrl = gasUrl || ORDER_GAS_URL || 'https://script.google.com/macros/s/AKfycbwYhwK50z_vFldzSxVuTA31vTZhyOPzZ43iFzqJApNf7j79Dbx5TyB9-tSgRlAjuLTc/exec';
 
-    if (!gasUrl) {
+    if (!targetUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };
     }
 
@@ -27,7 +30,7 @@ async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
 
         console.log("Sending request to GAS with body:", bodyPayload);
 
-        const response = await fetch(gasUrl, {
+        const response = await fetch(targetUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
