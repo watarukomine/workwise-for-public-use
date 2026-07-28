@@ -285,6 +285,8 @@ function doPost(e) {
             return updateMasterSheet(CUSTOMER_SPREADSHEET_ID, CUSTOMER_SHEET_NAME, "顧客コード", params.id, params);
         } else if (params.action === 'cleanupSheetBlankRows') {
             return cleanupSheetBlankRows();
+        } else if (params.action === 'cleanupColumnA') {
+            return cleanupColumnAAndTestRows();
         } else if (params.eventTitle || params.systemId || params.orderId) { // 既存更新
             return updateSheetWithOrderInfo(params);
         } else {
@@ -588,7 +590,7 @@ function createOrderSingleSheet(targetSsId, params) {
         headers.forEach(header => {
             const h = String(header).trim();
             if (h === "受注ID" || h === "受注 No" || h === "受注 N o" || h === "受注行番号" || h === "通し番号" || h.startsWith("受注")) {
-                newRow.push(nextId || (targetRow - 1));
+                newRow.push("");
             } else if (h === "SystemID") {
                 newRow.push(newSystemId);
             } else if (h === "顧客コード" || h === "ユーザーコード") {
@@ -1551,4 +1553,45 @@ function formatDateToYMD(dateInput) {
     }
 
     return str;
+}
+
+/**
+ * A列（受注No列）の不要な自動生成数値（9999, 10000等）を一括消去（空欄化）し、テスト行を整理する関数
+ */
+function cleanupColumnAAndTestRows() {
+    try {
+        const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+        const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
+        if (!sheet) return errorResponse("シートが見つかりません。");
+
+        const dataRange = sheet.getDataRange();
+        const values = dataRange.getValues();
+
+        if (values.length <= 1) return successResponse("データ行がありません。");
+
+        const headers = values[0];
+
+        // Clear column A values for data rows (row 2 down to last row)
+        for (let i = 1; i < values.length; i++) {
+            sheet.getRange(i + 1, 1).setValue("");
+        }
+
+        // Delete test rows (SystemID starts with test_)
+        let sysIdColIdx = headers.map(h => String(h).trim()).indexOf("SystemID");
+        if (sysIdColIdx !== -1) {
+            for (let i = values.length - 1; i >= 1; i--) {
+                const sysId = String(values[i][sysIdColIdx] || "").trim();
+                if (sysId.startsWith("test_") || sysId.startsWith("test_action_")) {
+                    sheet.deleteRow(i + 1);
+                }
+            }
+        }
+
+        SpreadsheetApp.flush();
+        sendFirebaseSignal('update');
+        return successResponse("A列（受注No）の不要な数値をすべて削除（空欄化）し、テスト行を整理しました。");
+    } catch (e) {
+        console.error("cleanupColumnAAndTestRows error:", e);
+        return errorResponse("クリーンアップ中にエラーが発生しました: " + e.message);
+    }
 }
