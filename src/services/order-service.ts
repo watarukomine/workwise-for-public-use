@@ -227,14 +227,12 @@ export const OrderService = {
         // 2. Firestore Sync
         await setDoc(docRef, orderData);
 
-        // 3. GAS Backup (Awaited to ensure request completes before page/component unmount)
+        // 3. GAS Backup (Trigger asynchronously in background so user doesn't wait)
         const isGasSynced = (data as any).isGasSynced;
         if (!isGasSynced) {
-            try {
-                await this.backupToGas(orderData as any as Order, 'create');
-            } catch (e) {
-                console.warn('[OrderService] GAS backup warning:', e);
-            }
+            this.backupToGas(orderData as any as Order, 'create').catch(e => {
+                console.warn('[OrderService] Non-blocking GAS backup warning:', e);
+            });
         }
 
         return systemId;
@@ -255,15 +253,16 @@ export const OrderService = {
 
         await updateDoc(docRef, updateData);
 
-        // Await GAS backup to guarantee spreadsheet update
-        try {
-            const fullDoc = await getDoc(docRef);
+        // Trigger GAS backup asynchronously in background so user doesn't wait
+        getDoc(docRef).then(fullDoc => {
             if (fullDoc.exists()) {
-                await this.backupToGas(fullDoc.data() as Order, 'update');
+                this.backupToGas(fullDoc.data() as Order, 'update').catch(e => {
+                    console.warn('[OrderService] Non-blocking GAS update backup warning:', e);
+                });
             }
-        } catch (e) {
-            console.warn('[OrderService] GAS update backup warning:', e);
-        }
+        }).catch(e => {
+            console.warn('[OrderService] Non-blocking getDoc for GAS update warning:', e);
+        });
     },
 
     /**
