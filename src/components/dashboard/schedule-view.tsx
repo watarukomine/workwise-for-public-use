@@ -2440,7 +2440,9 @@ export function ScheduleView({
                           className="hover:bg-muted/30 transition-colors cursor-pointer"
                           onClick={handleRowClick}
                         >
-                          <td className="p-3 pl-4 font-semibold text-foreground">{order.orderNo || '-'}</td>
+                          <td className="p-3 pl-4 font-semibold text-foreground font-mono text-xs">
+                            {order.id || order.rawOrderId || (order.raw ? findKey(order.raw, ['SystemID', 'systemId']) : '') || order.displayId || '-'}
+                          </td>
                           <td className="p-3">
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
                               {timeStr}
