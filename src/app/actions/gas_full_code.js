@@ -268,6 +268,8 @@ function doPost(e) {
             return sendIcsEmail(params);
         } else if (params.action === 'createTask') { // 新規: 汎用タスク作成
             return createTask(params);
+        } else if (params.action === 'createOrder') { // 新規注文
+            return createOrder(params);
         } else if (params.action === 'updateOrderSchedule') { // 新規: 受注の日時更新
             return updateOrderSchedule(params);
         } else if (params.action === 'confirmRead') { // 既読確認
@@ -278,8 +280,6 @@ function doPost(e) {
             return updateMasterSheet(CUSTOMER_SPREADSHEET_ID, CUSTOMER_SHEET_NAME, "顧客コード", params.id, params);
         } else if (params.eventTitle || params.systemId || params.orderId) { // 既存更新
             return updateSheetWithOrderInfo(params);
-        } else if (params.action === 'createOrder') { // 新規注文
-            return createOrder(params);
         } else {
             return errorResponse("必要なパラメータ (eventTitle, action, または operation) がありません");
         }
