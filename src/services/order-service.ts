@@ -12,7 +12,6 @@ import {
     serverTimestamp,
     Timestamp,
     onSnapshot,
-    orderBy,
     limit
 } from 'firebase/firestore';
 import type { Order, WithId } from '@/lib/types';

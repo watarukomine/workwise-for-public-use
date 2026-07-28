@@ -4,8 +4,7 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import type { Staff, WithId } from '@/lib/types';
 import { getCurrentUser } from '@/lib/auth';
-import { initializeFirebase } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+
 
 interface UserProfileContextType {
   profile: WithId<Staff> | null;

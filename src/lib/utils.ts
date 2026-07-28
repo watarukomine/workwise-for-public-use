@@ -515,7 +515,7 @@ export function getContrastingTextColor(hexColor: string): string {
   return (yiq >= 128) ? '#000000' : '#FFFFFF';
 }
 
-export function darkenColor(color: string, amount: number): string {
+export function hexToHsl(color: string): { h: number, s: number, l: number } | null {
   let r = 0, g = 0, b = 0;
 
   if (color.startsWith('#')) {
@@ -537,7 +537,7 @@ export function darkenColor(color: string, amount: number): string {
       b = parseInt(match[2]);
     }
   } else {
-    return color;
+    return null;
   }
 
   r /= 255; g /= 255; b /= 255;
@@ -554,52 +554,24 @@ export function darkenColor(color: string, amount: number): string {
     }
     h /= 6;
   }
+  return { h, s, l };
+}
 
+export function darkenColor(color: string, amount: number): string {
+  const hsl = hexToHsl(color);
+  if (!hsl) return color;
+  
+  let { h, s, l } = hsl;
   l = Math.max(0, l * (1 - amount));
 
   return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
 }
 
 export function lightenColor(color: string, amount: number): string {
-  let r = 0, g = 0, b = 0;
-
-  if (color.startsWith('#')) {
-    const hex = color.slice(1);
-    if (hex.length === 3) {
-      r = parseInt(hex[0] + hex[0], 16);
-      g = parseInt(hex[1] + hex[1], 16);
-      b = parseInt(hex[2] + hex[2], 16);
-    } else if (hex.length === 6) {
-      r = parseInt(hex.substring(0, 2), 16);
-      g = parseInt(hex.substring(2, 4), 16);
-      b = parseInt(hex.substring(4, 6), 16);
-    }
-  } else if (color.startsWith('rgb')) {
-    const match = color.match(/\d+/g);
-    if (match) {
-      r = parseInt(match[0]);
-      g = parseInt(match[1]);
-      b = parseInt(match[2]);
-    }
-  } else {
-    return color;
-  }
-
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
-
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
-    }
-    h /= 6;
-  }
-
+  const hsl = hexToHsl(color);
+  if (!hsl) return color;
+  
+  let { h, s, l } = hsl;
   // Lighten logic: Increase lightness towards 1.0
   l = Math.min(1, l + (1 - l) * amount);
 
