@@ -32,7 +32,7 @@ import { signInWithEmail, sendPasswordReset } from '@/lib/auth';
 import { useUserProfile } from '@/hooks/use-user-profile';
 
 const loginSchema = z.object({
-  email: z.string().email({ message: '有効なメールアドレスを入力してください。' }),
+  email: z.string().min(1, { message: 'IDまたはメールアドレスを入力してください。' }),
   password: z.string().min(1, { message: 'パスワードを入力してください。' }),
 });
 
@@ -114,9 +114,9 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>メールアドレス</FormLabel>
+                    <FormLabel>ID または メールアドレス</FormLabel>
                     <FormControl>
-                      <Input placeholder="admin@example.com" {...field} />
+                      <Input placeholder="例: STAFF001 または メールアドレス" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

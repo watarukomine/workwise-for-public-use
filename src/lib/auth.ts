@@ -20,16 +20,44 @@ const USER_SESSION_KEY = 'workwise-user-profile';
  * @param password The user's password.
  * @returns A promise that resolves with the user's profile from Firestore if successful.
  */
-export const signInWithEmail = async (email: string, password: string): Promise<WithId<Staff>> => {
-  const normalizedEmail = email.trim().toLowerCase();
-  console.log(`[Auth] Attempting sign-in for: ${normalizedEmail}`);
-  const { auth } = initializeFirebase();
-  
+export const signInWithEmail = async (identifier: string, password: string): Promise<WithId<Staff>> => {
+  const cleanInput = identifier.trim();
+  const { auth, firestore } = initializeFirebase();
+  const { doc, getDoc, collection, query, where, getDocs } = await import('firebase/firestore');
+
+  let targetEmail = cleanInput.toLowerCase();
+
+  // If input is NOT an email (e.g. "STAFF001" or "DEMO1"), resolve email from Firestore 'users'
+  if (!cleanInput.includes('@')) {
+    console.log(`[Auth] Identifier '${cleanInput}' is not an email. Resolving staff ID from Firestore...`);
+    
+    // 1. Try exact doc ID match
+    let userSnap = await getDoc(doc(firestore, 'users', cleanInput));
+    if (!userSnap.exists()) {
+      // 2. Try uppercase doc ID match
+      userSnap = await getDoc(doc(firestore, 'users', cleanInput.toUpperCase()));
+    }
+    
+    if (userSnap.exists() && userSnap.data()?.email) {
+      targetEmail = String(userSnap.data()!.email).trim().toLowerCase();
+      console.log(`[Auth] Resolved staff ID '${cleanInput}' to email: ${targetEmail}`);
+    } else {
+      // 3. Try querying userCode field
+      const q = query(collection(firestore, 'users'), where('userCode', '==', cleanInput));
+      const querySnap = await getDocs(q);
+      if (!querySnap.empty && querySnap.docs[0].data()?.email) {
+        targetEmail = String(querySnap.docs[0].data()!.email).trim().toLowerCase();
+        console.log(`[Auth] Resolved userCode '${cleanInput}' to email: ${targetEmail}`);
+      }
+    }
+  }
+
+  console.log(`[Auth] Attempting sign-in for: ${targetEmail}`);
+
   try {
-    const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
+    const userCredential = await signInWithEmailAndPassword(auth, targetEmail, password);
     const user = userCredential.user;
 
-    // Fetch additional profile info from Firestore
     console.log(`[Auth] Firebase Auth success, fetching profile for: ${user.email}`);
     const staffMember = await StaffService.getStaffByEmail(user.email!);
 
@@ -38,18 +66,15 @@ export const signInWithEmail = async (email: string, password: string): Promise<
       throw new Error('認証は成功しましたが、システム内にスタッフ情報が見つかりません。管理者にアカウントの有効化を依頼してください。');
     }
 
-    // On successful login, save profile to session storage
     sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffMember));
-
     console.log(`[Auth] Login complete for: ${staffMember.name} (${staffMember.role})`);
     return staffMember;
 
   } catch (error: any) {
     console.error('[Auth] Sign-in error:', error);
     if (error.code === 'auth/invalid-credential' || error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-email') {
-      throw new Error('メールアドレスまたはパスワードが正しくありません。');
+      throw new Error('ID/メールアドレス または パスワードが正しくありません。');
     }
-    // Forward the specific profile-missing error
     if (error.message.includes('スタッフ情報が見つかりません')) {
       throw error;
     }
