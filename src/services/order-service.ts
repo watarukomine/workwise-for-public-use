@@ -36,10 +36,42 @@ function generateDateFormats(dateStr: string): string[] {
             `${year}-${padMonth}-${padDay}`,
             `${year}/${padMonth}/${padDay}`,
             `${year}-${month}-${day}`,
-            `${year}/${month}/${day}`
         ]));
     }
     return [dateStr, dateStr.replace(/-/g, '/'), dateStr.replace(/\//g, '-')];
+}
+
+function formatDateYMD(dateStr?: string): string {
+    if (!dateStr) return '';
+    const cleanStr = String(dateStr).trim();
+    if (!cleanStr) return '';
+
+    if (cleanStr.includes('T') || cleanStr.includes('Z')) {
+        const d = new Date(cleanStr);
+        if (!isNaN(d.getTime())) {
+            const jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+            const yyyy = jst.getUTCFullYear();
+            const mm = String(jst.getUTCMonth() + 1).padStart(2, '0');
+            const dd = String(jst.getUTCDate()).padStart(2, '0');
+            return `${yyyy}/${mm}/${dd}`;
+        }
+    }
+
+    if (cleanStr.includes('-')) {
+        const parts = cleanStr.split('-');
+        if (parts.length === 3) {
+            return `${parts[0]}/${parts[1].padStart(2, '0')}/${parts[2].padStart(2, '0')}`;
+        }
+    }
+
+    if (cleanStr.includes('/')) {
+        const parts = cleanStr.split('/');
+        if (parts.length === 3) {
+            return `${parts[0]}/${parts[1].padStart(2, '0')}/${parts[2].padStart(2, '0')}`;
+        }
+    }
+
+    return cleanStr;
 }
 
 export const OrderService = {
@@ -235,7 +267,7 @@ export const OrderService = {
                 storeName: order.customerName || (order as any).storeName || '',
                 customerName: order.customerName || (order as any).storeName || '',
                 workType: order.workType || '',
-                scheduledDate: order.scheduledDate || '',
+                scheduledDate: formatDateYMD(order.scheduledDate),
                 scheduledTime: order.scheduledTime || '',
                 picName: order.picName || '',
                 orderNo: order.orderNo || (order as any).orderNoRemark || '',

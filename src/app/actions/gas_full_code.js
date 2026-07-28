@@ -600,7 +600,7 @@ function createOrderSingleSheet(targetSsId, params) {
             } else if (h === "作業内容" || h === "作業") {
                 newRow.push(params.workType || "");
             } else if (h === "作業予定日") {
-                newRow.push(params.scheduledDate || "");
+                newRow.push(formatDateToYMD(params.scheduledDate));
             } else if (h === "予定時間") {
                 newRow.push(params.scheduledTime || "");
             } else if (h === "ご担当者様" || h === "担当者名") {
@@ -1507,4 +1507,48 @@ function cleanupSheetBlankRows() {
         console.error("cleanupSheetBlankRows error:", e);
         return errorResponse("クリーンアップ中にエラーが発生しました: " + e.message);
     }
+}
+
+/**
+ * 日付文字列を YYYY/MM/DD 形式に統一するヘルパー関数
+ */
+function formatDateToYMD(dateInput) {
+    if (!dateInput) return "";
+    var str = String(dateInput).trim();
+    if (!str) return "";
+
+    if (str.indexOf('T') !== -1 || str.indexOf('Z') !== -1) {
+        var d = new Date(str);
+        if (!isNaN(d.getTime())) {
+            var jst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+            var yyyy = jst.getUTCFullYear();
+            var mm = String(jst.getUTCMonth() + 1).padStart(2, '0');
+            var dd = String(jst.getUTCDate()).padStart(2, '0');
+            return yyyy + '/' + mm + '/' + dd;
+        }
+    }
+
+    if (str.indexOf('-') !== -1) {
+        var parts = str.split('-');
+        if (parts.length === 3) {
+            return parts[0] + '/' + String(parts[1]).padStart(2, '0') + '/' + String(parts[2]).padStart(2, '0');
+        }
+    }
+
+    if (str.indexOf('/') !== -1) {
+        var parts = str.split('/');
+        if (parts.length === 3) {
+            return parts[0] + '/' + String(parts[1]).padStart(2, '0') + '/' + String(parts[2]).padStart(2, '0');
+        }
+    }
+
+    var d2 = new Date(str);
+    if (!isNaN(d2.getTime())) {
+        var yyyy2 = d2.getFullYear();
+        var mm2 = String(d2.getMonth() + 1).padStart(2, '0');
+        var dd2 = String(d2.getDate()).padStart(2, '0');
+        return yyyy2 + '/' + mm2 + '/' + dd2;
+    }
+
+    return str;
 }
