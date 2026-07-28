@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { mapRawToOrder } from '../../lib/utils';
+import { mapRawToOrder, normalizeDateStr, findKey, cn } from '../../lib/utils';
 import { ScheduleView } from '../../components/dashboard/schedule-view';
 import { Staff, StaffStatus, WithId } from '../../lib/types';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';
@@ -187,6 +187,19 @@ export default function DashboardPage() {
     const selectedStaff = staffToUse.filter(s => appliedSelectedStaffIds.includes(s.id));
     return selectedStaff.map(s => s.name).join('、');
   }, [allStaff, appliedSelectedStaffIds, profile]);
+
+  const orderCountsByDate = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    (orders || []).forEach(order => {
+      if (order.isGeneric) return;
+      const dRaw = order.scheduledDate || (order.raw ? findKey(order.raw, ['作業予定日', 'scheduledDate', '日付']) : '');
+      const d = normalizeDateStr(dRaw);
+      if (d) {
+        counts[d] = (counts[d] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [orders]);
 
   const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading || isLoadingCustomers;
 
@@ -526,7 +539,7 @@ export default function DashboardPage() {
                   <Calendar
                     mode="single"
                     selected={currentDate}
-                    onSelect={(date) => {
+                    onSelect={(date: Date | undefined) => {
                       if (date) {
                         setIsSyncing(true);
                         setCurrentDate(date);
@@ -534,6 +547,29 @@ export default function DashboardPage() {
                     }}
                     initialFocus
                     locale={ja}
+                    components={{
+                      DayContent: (dayProps: any) => {
+                        const date = dayProps.date;
+                        if (!date) return null;
+                        const dateStr = normalizeDateStr(date);
+                        const count = orderCountsByDate[dateStr] || 0;
+                        const isSelected = isSameDay(date, currentDate);
+
+                        return (
+                          <div className="relative flex flex-col items-center justify-center w-full h-full py-0.5">
+                            <span className="text-xs font-semibold">{date.getDate()}</span>
+                            {count > 0 && (
+                              <span className={cn(
+                                "mt-0.5 px-1 py-0.2 text-[9px] font-bold rounded-full leading-none shadow-sm min-w-[14px] text-center transition-all",
+                                isSelected ? "bg-white text-blue-700" : "bg-blue-600 text-white"
+                              )}>
+                                {count}件
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+                    } as any}
                   />
                 </PopoverContent>
               </Popover>
