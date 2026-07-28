@@ -168,16 +168,17 @@ const processOrderData = (
         }
 
         try {
-          const val = order.scheduledTime as any;
-          const formattedTime = formatTime(val);
-          if (formattedTime && formattedTime.includes(':')) {
-            scheduledTime = parseISO(`${dateStr}T${formattedTime}:00`);
+          const val = String(order.scheduledTime).trim();
+          if (val && val !== '00:00' && val !== '00:00:00' && val !== '0:00') {
+            const formattedTime = formatTime(val);
+            if (formattedTime && formattedTime.includes(':')) {
+              const parsed = parseISO(`${dateStr}T${formattedTime}:00`);
+              if (isValid(parsed) && parsed.getHours() >= 7 && parsed.getHours() <= 21) {
+                scheduledTime = parsed;
+              }
+            }
           }
         } catch {
-          scheduledTime = null;
-        }
-
-        if (scheduledTime && !isValid(scheduledTime)) {
           scheduledTime = null;
         }
 
@@ -199,20 +200,18 @@ const processOrderData = (
           }
 
           if (isValid(taskEndTime)) {
-            if (scheduledTime.getHours() >= 6) {
-              if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
+            if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
 
-              const tripId = `trip-${order.rawOrderId || order.id}`;
-              explicitScheduleItems.push({
-                order,
-                start: scheduledTime,
-                end: taskEndTime!,
-                staffId: staffMember.id,
-                tripId,
-                isGeneric: isGenericTask,
-                isAccompany: String(order.taskDetails || '').includes('同行')
-              });
-            }
+            const tripId = `trip-${order.rawOrderId || order.id}`;
+            explicitScheduleItems.push({
+              order,
+              start: scheduledTime,
+              end: taskEndTime!,
+              staffId: staffMember.id,
+              tripId,
+              isGeneric: isGenericTask,
+              isAccompany: String(order.taskDetails || '').includes('同行')
+            });
           }
         }
       }
@@ -250,18 +249,16 @@ const processOrderData = (
       if (item.isGeneric && !item.isAccompany) {
         newScheduleEvents.push(taskEvent);
       } else {
-        let shouldSuppress = false;
+        let shouldSuppress = true; // Default suppress redundant travel events
 
-        if (suppressedTripIds.has(item.tripId)) {
-          shouldSuppress = true;
-        } else if (lastEndTime) {
+        if (lastEndTime) {
           const gapMinutes = differenceInMinutes(item.start, lastEndTime);
-          if (Math.abs(gapMinutes) <= 1) {
-            shouldSuppress = true;
+          if (gapMinutes > 15 && gapMinutes < 180) {
+            shouldSuppress = false;
           }
         }
 
-        if (!shouldSuppress) {
+        if (!shouldSuppress && !suppressedTripIds.has(item.tripId)) {
           const travelEvent: WithId<ScheduleEvent> = {
             ...item.order,
             id: `${item.tripId}-travel`,
@@ -280,7 +277,7 @@ const processOrderData = (
         newScheduleEvents.push(taskEvent);
       }
 
-        lastEndTime = item.end;
+      lastEndTime = item.end;
     });
   });
 
