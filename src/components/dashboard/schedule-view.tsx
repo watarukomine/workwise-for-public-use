@@ -532,7 +532,7 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { allStaff } = useSelectedStaff(); // Get full list
   const { toast } = useToast();
-  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, toggleTripSuppression, setCurrentViewedDate } = useOrder();
+  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, deleteOrder, toggleTripSuppression, setCurrentViewedDate } = useOrder();
 
   // Filter orders to only show those scheduled for currentDate (JST local date format)
   const dailyOrders = React.useMemo(() => {
@@ -1712,8 +1712,8 @@ export function ScheduleView({
 
     setIsSaving(true);
     try {
-      // 1. Primary write to Firestore (Delete)
-      await OrderService.deleteOrder(orderId);
+      // 1. Primary write to Firestore (Delete) & Context clean-up
+      await deleteOrder(orderId);
 
       // 2. Clear from local state immediately to avoid ghost chips
       deleteLocalEvent(target.id);

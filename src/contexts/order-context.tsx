@@ -29,6 +29,7 @@ interface OrderContextType {
   error: string | null;
   saveLocalEvent: (event: WithId<ScheduleEvent>) => void;
   deleteLocalEvent: (eventId: string) => void;
+  deleteOrder: (id: string) => Promise<void>;
   refetchOrders: () => Promise<void>;
   rawOrdersData: WithId<Order>[];
   orderGasUrl: string;
@@ -487,7 +488,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     if (isProfileLoading || !profile) return;
 
     console.log(`[OrderProvider] Subscribing to ALL Firestore orders in real-time...`);
-    const unsubscribeAll = OrderService.subscribeAllOrders((allOrders) => {
+    const unsubscribeAll = OrderService.subscribeAllOrders((allOrders, removedIds) => {
       setRawOrdersData(prev => {
         const orderMap = new Map();
         // Keep existing data as base
@@ -495,6 +496,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           const id = o.id || o.systemId;
           if (id) orderMap.set(id, o);
         });
+        // Explicitly delete documents removed from Firestore
+        if (removedIds && removedIds.length > 0) {
+          removedIds.forEach(id => orderMap.delete(id));
+        }
         // Update/overwrite with fresh data from subscription
         allOrders.forEach(o => {
           const id = o.id || o.systemId;
@@ -543,7 +548,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       }
     }).catch(err => console.warn('Direct fetch for viewed date failed:', err));
 
-    const unsubscribeViewed = OrderService.subscribeToOrders(viewedDateStr, (updatedOrders) => {
+    const unsubscribeViewed = OrderService.subscribeToOrders(viewedDateStr, (updatedOrders, removedIds) => {
       setRawOrdersData(prev => {
         const orderMap = new Map();
         const normViewed = normalizeDateStr(viewedDateStr);
@@ -555,6 +560,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
             if (id) orderMap.set(id, o);
           }
         });
+        // Explicitly delete removed IDs
+        if (removedIds && removedIds.length > 0) {
+          removedIds.forEach(id => orderMap.delete(id));
+        }
         // Add updated viewed orders
         updatedOrders.forEach(o => {
           const id = o.id || o.systemId;
@@ -618,6 +627,19 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     } catch (e) { /* quota exceeded - ignore */ }
   }, [processedData, localScheduleEvents, rawOrdersData]);
 
+  const deleteOrder = useCallback(async (id: string) => {
+    // 1. Primary delete from Firestore
+    await OrderService.deleteOrder(id);
+
+    // 2. Remove immediately from rawOrdersData
+    setRawOrdersData(prev => prev.filter(o => o.id !== id && o.systemId !== id));
+
+    // 3. Remove immediately from localScheduleEvents
+    deleteLocalEvent(id);
+    deleteLocalEvent(`${id}-travel`);
+    deleteLocalEvent(`${id}-task`);
+  }, [deleteLocalEvent]);
+
   const value: OrderContextType = {
     orders,
     unassignedOrders,
@@ -645,6 +667,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     error,
     saveLocalEvent,
     deleteLocalEvent,
+    deleteOrder,
     refetchOrders: async () => {
       const todayStr = new Date().toISOString().split('T')[0];
       await fetchAndProcessData(true, { date: todayStr, range: 3 });

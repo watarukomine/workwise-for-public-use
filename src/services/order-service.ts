@@ -94,7 +94,7 @@ export const OrderService = {
     /**
      * Subscribes to recent orders (latest 500) for high performance without fetching 3,000+ docs.
      */
-    subscribeAllOrders(callback: (orders: WithId<Order>[]) => void): () => void {
+    subscribeAllOrders(callback: (orders: WithId<Order>[], removedIds?: string[]) => void): () => void {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
         // Optimize from 3000 to latest 600 orders to ensure instant initial load and low memory usage
@@ -105,7 +105,10 @@ export const OrderService = {
                 id: doc.id,
                 ...doc.data()
             } as WithId<Order>));
-            callback(orders);
+            const removedIds = snapshot.docChanges()
+                .filter(change => change.type === 'removed')
+                .map(change => change.doc.id);
+            callback(orders, removedIds);
         }, (error) => {
             console.error(`[OrderService] Subscribe all orders error:`, error);
         });
@@ -162,7 +165,7 @@ export const OrderService = {
      * Real-time subscription to both orders and tasks for a date.
      * Supports yyyy/MM/dd, yyyy-MM-dd, yyyy/M/d, yyyy-M-d formats in real-time.
      */
-    subscribeToOrders(dateStr: string, callback: (orders: WithId<Order>[]) => void): () => void {
+    subscribeToOrders(dateStr: string, callback: (orders: WithId<Order>[], removedIds?: string[]) => void): () => void {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
         
@@ -175,8 +178,11 @@ export const OrderService = {
                 id: doc.id,
                 ...doc.data()
             } as WithId<Order>));
-            console.log(`[OrderService] Real-time update: ${orders.length} orders found for formats:`, formats);
-            callback(orders);
+            const removedIds = snapshot.docChanges()
+                .filter(change => change.type === 'removed')
+                .map(change => change.doc.id);
+            console.log(`[OrderService] Real-time update: ${orders.length} orders found for formats:`, formats, `Removed:`, removedIds);
+            callback(orders, removedIds);
         }, (error) => {
             console.error(`[OrderService] Subscription error:`, error);
         });
