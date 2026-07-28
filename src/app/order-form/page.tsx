@@ -241,7 +241,7 @@ export default function OrderFormPage() {
             const randomStr = Math.random().toString(36).substring(2, 5); // 3 random characters
             const returnedOrderId = `${dateStr}_${userCode}_${randomStr}`;
 
-            // 2. Write to Firestore (Primary) FIRST
+              // 2. Write to Firestore (Primary) FIRST & automatically sync to GAS via OrderService
             const systemId = await OrderService.createOrder({
                 ...submissionData,
                 id: returnedOrderId,
@@ -253,60 +253,12 @@ export default function OrderFormPage() {
                 customerName: submissionData.storeName, // map to expected key
                 estimatedDuration: 60,
                 _type: 'order', // Explicitly denote as an order
-                isGasSynced: true, // Prevent double syncing from OrderService
+                isGasSynced: false, // Trigger backupToGas in OrderService automatically
             });
 
             if (!systemId) {
                 throw new Error('送信に失敗しました。もう一度お試しください。');
             }
-
-            // 3. Trigger GAS Backup in background
-            const gasPayload = {
-                gasUrl: ORDER_GAS_URL,
-                systemId: returnedOrderId,
-                displayId: displayId,
-                userCode: submissionData.userCode,
-                storeName: submissionData.storeName,
-                workType: submissionData.workType,
-                scheduledDate: submissionData.scheduledDate,
-                scheduledTime: submissionData.scheduledTime || '',
-                picName: submissionData.picName || '',
-                orderNo: submissionData.orderNo || '',
-                comment: submissionData.comment || '',
-                carName: submissionData.carName || '',
-                regNo: submissionData.regNo || '',
-                status: '未割当',
-                tireNumber: submissionData.tireNumber || '',
-                tireSize: submissionData.tireSize || '',
-                productName: submissionData.productName || '',
-                quantity: String(submissionData.quantity || ''),
-                sensor: submissionData.sensor || '',
-                arrangement: submissionData.arrangement || '',
-                disposal: submissionData.disposal || '',
-                contact: submissionData.contact || '',
-                specialNotes: submissionData.specialNotes || '',
-                submitter: submissionData.submitter || '',
-            };
-
-            createOrderGas(gasPayload).then(res => {
-                if (res.status === 'error') {
-                    console.warn('GAS creation returned error, attempting fallback fetch:', res.message);
-                    fetch(ORDER_GAS_URL, {
-                        method: 'POST',
-                        body: JSON.stringify({ ...gasPayload, action: 'createOrder' }),
-                        mode: 'no-cors'
-                    }).catch(e => console.error('Fallback GAS fetch error:', e));
-                } else {
-                    console.log('GAS order created successfully:', res);
-                }
-            }).catch(gasErr => {
-                console.error('GAS Background sync failed:', gasErr);
-                fetch(ORDER_GAS_URL, {
-                    method: 'POST',
-                    body: JSON.stringify({ ...gasPayload, action: 'createOrder' }),
-                    mode: 'no-cors'
-                }).catch(e => console.error('Fallback GAS fetch error:', e));
-            });
 
             // Immediately mark as success and return
             setIsSuccess(true);
