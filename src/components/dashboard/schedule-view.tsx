@@ -395,21 +395,7 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
 
   const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
 
-  const dailyOrders = orders.filter(order => {
-    // Show undated tasks
-    if (!order.scheduledDate) {
-      return true;
-    }
-    const scheduledDate = safeParseISO(order.scheduledDate);
-    if (!isValid(scheduledDate)) return true;
-
-    // Show tasks scheduled for today
-    if (isEqual(startOfDay(scheduledDate), startOfDay(date))) {
-      return true;
-    }
-
-    return false;
-  });
+  const dailyOrders = orders;
 
   return (
     <Card
