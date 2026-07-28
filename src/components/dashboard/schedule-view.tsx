@@ -395,7 +395,7 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
   };
   const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
 
-  const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
+  const titleText = '未割り当て受注タスク（今日・未来全件）';
 
   const dailyOrders = orders;
 

@@ -330,12 +330,12 @@ const processOrderData = (
       return false;
     }
 
-    // Filter to only match current viewed date (if date is specified)
+    // Include today and all future dates (normOrderDate >= normTodayDate) so all upcoming chips appear instantly
+    const normTodayDate = normalizeDateStr(new Date());
     if (order.scheduledDate) {
       const normOrderDate = normalizeDateStr(order.scheduledDate);
-      const normTargetDate = normalizeDateStr(targetDateStr);
-      if (normOrderDate && normTargetDate && normOrderDate !== normTargetDate) {
-        return false;
+      if (normOrderDate && normTodayDate && normOrderDate < normTodayDate) {
+        return false; // Filter out past dates only
       }
     }
 
