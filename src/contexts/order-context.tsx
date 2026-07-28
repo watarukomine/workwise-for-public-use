@@ -314,7 +314,7 @@ const processOrderData = (
         newScheduleEvents.push(taskEvent);
       }
 
-      lastEndTime = item.end;
+        lastEndTime = item.end;
     });
   });
 
@@ -324,12 +324,13 @@ const processOrderData = (
   const unassignedOrders = orders.filter(order => {
     if (order.isGeneric) return false;
 
+    // Filter out test/guest submissions
     const cCode = String(order.customerCode || (order as any).userCode || '').trim();
-    const cName = String(order.customerName || (order as any).storeName || '').trim();
-    if (cCode === 'guest' || cName === '(店舗名未設定)' || cName === '（店舗名未設定）' || cName === '店舗名未設定' || !cName) {
+    if (cCode === 'guest') {
       return false;
     }
 
+    // Filter to only match current viewed date (if date is specified)
     if (order.scheduledDate) {
       const normOrderDate = normalizeDateStr(order.scheduledDate);
       const normTargetDate = normalizeDateStr(targetDateStr);
@@ -338,24 +339,21 @@ const processOrderData = (
       }
     }
 
+    // Check if already scheduled on timeline
     const isAlreadyScheduled = (order.rawOrderId && scheduledRawOrderIds.has(order.rawOrderId)) ||
       newScheduleEvents.some(e => e.id === order.id || e.systemId === order.id);
 
     if (isAlreadyScheduled) return false;
 
-    // If order has both staffName and scheduledTime, check if the staff actually exists (O(1) lookup)
-    if (order.staffName) {
+    // If order has staffName AND scheduledTime, and is already assigned in master, don't show in unassigned
+    if (order.staffName && order.scheduledTime) {
       const sName = String(order.staffName).trim();
       const nName = sName.replace(/\s+/g, '').toLowerCase();
       const staffExists = staffMapByName.get(sName) || staffMapByName.get(nName);
 
-      // If staff doesn't exist in master, treat as unassigned (keep in list)
-      if (!staffExists) {
-        logStaffNotFound(order.id, order.taskDetails || '不明', order.staffName || '', 'order-context');
-        return true;
+      if (staffExists) {
+        return false;
       }
-
-      return true;
     }
 
     return true;
