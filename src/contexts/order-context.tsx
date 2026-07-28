@@ -330,12 +330,12 @@ const processOrderData = (
       return false;
     }
 
-    // Include today and all future dates (normOrderDate >= normTodayDate) so all upcoming chips appear instantly
-    const normTodayDate = normalizeDateStr(new Date());
+    // Filter to match current viewed date (targetDateStr) for dashboard unassigned tasks
     if (order.scheduledDate) {
       const normOrderDate = normalizeDateStr(order.scheduledDate);
-      if (normOrderDate && normTodayDate && normOrderDate < normTodayDate) {
-        return false; // Filter out past dates only
+      const normTargetDate = normalizeDateStr(targetDateStr);
+      if (normOrderDate && normTargetDate && normOrderDate !== normTargetDate) {
+        return false;
       }
     }
 
