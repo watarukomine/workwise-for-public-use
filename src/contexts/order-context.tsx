@@ -18,21 +18,18 @@ const normalizeDateStr = (dStr: any): string => {
   if (!dStr) return '';
   try {
     const s = String(dStr).trim();
-    if (s.includes('T')) {
-      const datePart = s.split('T')[0];
-      const parts = datePart.split(/[-/]/);
-      if (parts.length === 3) {
-        return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-      }
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
     }
+
     const clean = s.replace(/\//g, '-').split(' ')[0];
     const parts = clean.split('-');
     if (parts.length === 3 && parts[0].length === 4) {
       return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-    }
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) {
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
   } catch (e) {}
   return String(dStr).replace(/\//g, '-').trim();
