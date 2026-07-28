@@ -62,18 +62,18 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
             // Capture all staff names found in the file
             const foundStaffNames = new Set<string>();
 
-            // Helper to parse specific Japanese date format "D日" using selected month
+            // Helper to parse specific Japanese date format "D日" or "D" using selected month
             const parseJapaneseDay = (val: any): Date | null => {
-                if (typeof val !== 'string') return null;
-                const match = val.trim().match(/^(\d+)日$/);
+                if (val === null || val === undefined) return null;
+                const str = String(val).trim();
+                const match = str.match(/^(\d{1,2})(日)?$/);
                 if (match) {
                     const day = parseInt(match[1]);
-                    // Create date with selected Year/Month
                     const [tYearStr, tMonthStr] = month.split('-');
                     const targetYear = parseInt(tYearStr);
                     const targetMonthIdx = parseInt(tMonthStr) - 1;
 
-                    if (!isNaN(selectedDate.getTime()) && day > 0 && day <= 31) {
+                    if (!isNaN(selectedDate.getTime()) && day >= 1 && day <= 31) {
                         return new Date(targetYear, targetMonthIdx, day);
                     }
                 }
@@ -84,18 +84,18 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                 const jpDate = parseJapaneseDay(cell);
                 if (jpDate) return jpDate;
                 return parseCellToDate(cell);
-            }
+            };
 
-            // 1. Find Header Row
+            // 1. Find Header Row (Scan top 15 rows for at least 3 date cells)
             let headerRowIndex = -1;
-            // Increase scan header range slightly
-            for (let i = 0; i < Math.min(jsonData.length, 10); i++) {
+            for (let i = 0; i < Math.min(jsonData.length, 15); i++) {
                 const row = jsonData[i];
+                if (!Array.isArray(row)) continue;
                 let dateCount = 0;
                 row.forEach((cell: any) => {
                     if (parseDateComplex(cell)) dateCount++;
                 });
-                if (dateCount > 0) {
+                if (dateCount >= 3) {
                     headerRowIndex = i;
                     break;
                 }
@@ -104,6 +104,11 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
             if (headerRowIndex === -1) {
                 setParsedData([]);
                 setFileStaffNames([]);
+                toast({
+                    variant: 'destructive',
+                    title: '日付列エラー',
+                    description: 'ファイル内に日付列（1日〜31日）が見つかりませんでした。対象年月をご確認ください。'
+                });
                 return;
             }
 
@@ -115,17 +120,36 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                 }
             });
 
-            // 2. Iterate Staff Rows
+            // 2. Iterate Staff Rows (Dynamically find staff name from first 4 columns)
+            const headerKeywords = new Set([
+                '年月', '所属', '所属店舗', '店舗', '氏名', '名前', 'スタッフ名',
+                'no', 'no.', '行番号', 'シリアル', '有休', '半休', '累計', '当月休日計',
+                '有休/半休', 'シフト', '所属g・常駐店', '所属g', '常駐店'
+            ]);
+
             for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
                 const row = jsonData[i];
-                const staffNameCell = row[0];
-                if (!staffNameCell || typeof staffNameCell !== 'string') continue;
+                if (!Array.isArray(row)) continue;
 
-                // Use slightly stricter trim to avoid empty rows
-                if (staffNameCell.trim() === '') continue;
+                // Dynamically scan first 4 cells for staff name
+                let staffName = '';
+                for (let c = 0; c < Math.min(row.length, 4); c++) {
+                    const val = row[c];
+                    if (typeof val === 'string' && val.trim() !== '') {
+                        const trimmed = val.trim();
+                        if (/^\d{4}[\/\-]\d{1,2}$/.test(trimmed)) continue; // Skip year-month
+                        if (/^\d+$/.test(trimmed)) continue; // Skip pure numbers/IDs
+                        if (headerKeywords.has(trimmed.toLowerCase())) continue; // Skip headers
+                        
+                        staffName = trimmed;
+                        break;
+                    }
+                }
 
-                const cleanName = staffNameCell.trim().replace(/\s+/g, '');
-                foundStaffNames.add(staffNameCell.trim()); // Store original or slightly trimmed name
+                if (!staffName) continue;
+
+                const cleanName = staffName.replace(/\s+/g, '');
+                foundStaffNames.add(staffName);
 
                 dateMap.forEach(({ colIndex, date }) => {
                     const cellValue = row[colIndex];
