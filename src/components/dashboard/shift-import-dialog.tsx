@@ -48,7 +48,24 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
 
     const processFile = async (data: ArrayBuffer, inverted: boolean, month: string) => {
         try {
-            const workbook = read(data);
+            let workbook;
+            try {
+                // Try UTF-8 text decoding for CSV
+                const decoder = new TextDecoder('utf-8', { fatal: true });
+                const text = decoder.decode(data);
+                workbook = read(text, { type: 'string' });
+            } catch {
+                try {
+                    // Try Shift-JIS text decoding for CSV
+                    const sjisDecoder = new TextDecoder('shift-jis', { fatal: true });
+                    const text = sjisDecoder.decode(data);
+                    workbook = read(text, { type: 'string' });
+                } catch {
+                    // Fallback to binary ArrayBuffer read for Excel (.xlsx, .xls) files
+                    workbook = read(data);
+                }
+            }
+
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
             const jsonData: any[][] = utils.sheet_to_json(sheet, { header: 1 });
