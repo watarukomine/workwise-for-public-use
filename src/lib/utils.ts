@@ -17,6 +17,16 @@ export function cn(...inputs: ClassValue[]) {
 export const normalizeDateStr = (dStr: any): string => {
   if (!dStr) return '';
   try {
+    if (dStr instanceof Date) {
+      if (!isNaN(dStr.getTime())) {
+        const y = dStr.getFullYear();
+        const m = String(dStr.getMonth() + 1).padStart(2, '0');
+        const day = String(dStr.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+      return '';
+    }
+
     const s = String(dStr).trim();
 
     // Fast path: already in yyyy-MM-dd format
