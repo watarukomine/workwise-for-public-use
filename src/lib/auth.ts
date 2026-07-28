@@ -56,8 +56,13 @@ export const signInWithEmail = async (identifier: string, password: string): Pro
 
   // 2. Validate password against Firestore master record if found
   if (staffProfile) {
-    const storedPass = String((staffProfile as any).password || (staffProfile as any)['パスワード'] || (staffProfile as any).pass || '').trim();
-    if (storedPass && storedPass === cleanPassword) {
+    const pass1 = String((staffProfile as any).password || '').trim();
+    const pass2 = String((staffProfile as any)['パスワード'] || '').trim();
+    const pass3 = String((staffProfile as any).pass || '').trim();
+
+    const validPasswords = new Set([pass1, pass2, pass3, `${pass2}!`, `${pass3}!`].filter(Boolean));
+
+    if (validPasswords.has(cleanPassword) || (cleanPassword.length < 6 && validPasswords.has(`${cleanPassword}!`))) {
       console.log(`[Auth] Master password match success for: ${staffProfile.name} (${staffProfile.id})`);
       sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffProfile));
       return staffProfile;
@@ -67,21 +72,28 @@ export const signInWithEmail = async (identifier: string, password: string): Pro
   // 3. Try Firebase Auth sign-in
   const targetEmail = staffProfile?.email || (cleanInput.includes('@') ? cleanInput.toLowerCase() : `${cleanInput.toLowerCase()}@toyota-mp.co.jp`);
   
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, targetEmail, cleanPassword);
-    const user = userCredential.user;
+  const passwordsToTry = [cleanPassword];
+  if (cleanPassword.length < 6) {
+    passwordsToTry.push(`${cleanPassword}!`);
+  }
 
-    if (!staffProfile) {
-      staffProfile = await StaffService.getStaffByEmail(user.email!);
-    }
+  for (const passCandidate of passwordsToTry) {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, targetEmail, passCandidate);
+      const user = userCredential.user;
 
-    if (staffProfile) {
-      sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffProfile));
-      console.log(`[Auth] Firebase Auth login complete for: ${staffProfile.name}`);
-      return staffProfile;
+      if (!staffProfile) {
+        staffProfile = await StaffService.getStaffByEmail(user.email!);
+      }
+
+      if (staffProfile) {
+        sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffProfile));
+        console.log(`[Auth] Firebase Auth login complete for: ${staffProfile.name}`);
+        return staffProfile;
+      }
+    } catch (fbErr: any) {
+      console.warn('[Auth] Firebase Auth sign-in attempt failed:', fbErr?.code || fbErr?.message);
     }
-  } catch (fbErr: any) {
-    console.warn('[Auth] Firebase Auth sign-in failed:', fbErr?.code || fbErr?.message);
   }
 
   throw new Error('ID/メールアドレス または パスワードが正しくありません。');
