@@ -70,11 +70,22 @@ const processOrderData = (
 
   // Pre-build normalized staff map for instant O(1) lookup (avoids 90,000+ inner loops)
   const staffMapByName = new Map<string, WithId<Staff>>();
+  const staffBySurname = new Map<string, WithId<Staff>>();
+
   allStaff.forEach(sf => {
     if (sf.name) {
-      staffMapByName.set(sf.name, sf);
-      const norm = sf.name.replace(/\s+/g, '').toLowerCase();
+      const rawName = sf.name.trim();
+      staffMapByName.set(rawName, sf);
+      
+      const norm = rawName.replace(/\s+/g, '').toLowerCase();
       staffMapByName.set(norm, sf);
+
+      // Extract surname (first word or 2+ chars)
+      const surname = rawName.split(/[\s　]+/)[0];
+      if (surname) {
+        staffBySurname.set(surname, sf);
+        staffBySurname.set(surname.toLowerCase(), sf);
+      }
     }
   });
 
@@ -103,16 +114,8 @@ const processOrderData = (
     let staffMember: WithId<Staff> | undefined = undefined;
     if (staffNameStr) {
       const norm = staffNameStr.replace(/\s+/g, '').toLowerCase();
-      staffMember = staffMapByName.get(staffNameStr) || staffMapByName.get(norm);
-
-      if (!staffMember) {
-        // Fallback to partial / surname matching (e.g. "岡本" matches "岡本正博")
-        staffMember = allStaff.find(sf => {
-          if (!sf.name) return false;
-          const sfNorm = sf.name.replace(/\s+/g, '').toLowerCase();
-          return sfNorm.includes(norm) || norm.includes(sfNorm);
-        });
-      }
+      // O(1) Instant Lookup - No slow array scanning inside loops!
+      staffMember = staffMapByName.get(staffNameStr) || staffMapByName.get(norm) || staffBySurname.get(staffNameStr) || staffBySurname.get(norm);
     }
 
     if (staffMember) {
