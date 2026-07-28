@@ -59,7 +59,7 @@ interface OrderTableProps {
 
 
 const ORDER_KEYS: Record<string, string[]> = {
-  '受注ID': ['受注 ID', '受注id', 'id', '受注ID'],
+  '受注ID': ['systemId', 'SystemID', 'displayId', '受注 No', '受注 ID', '受注id', 'id', '受注ID'],
   'お取引先名': ['お取引先名', '店舗', 'customerName'],
   '機材有無': ['機材有無', 'equipmentStatus'],
   '作業予定日': ['作業予定日', 'scheduledDate'],

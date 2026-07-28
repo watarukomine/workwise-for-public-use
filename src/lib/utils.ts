@@ -128,10 +128,12 @@ export const formatTime = (date: Date | string | any) => {
 };
 
 export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order> => {
-  // Try to find the robust System ID first (B column)
-  const sysId = findKey(rawOrder, ['SystemID', 'systemId', 'sysId']);
+  // Try to find the robust System ID first (B column), checking both root and raw object
+  const sysId = findKey(rawOrder, ['SystemID', 'systemId', 'sysId']) || 
+                (rawOrder?.raw ? findKey(rawOrder.raw, ['SystemID', 'systemId', 'sysId']) : undefined);
   // Find the visual ID / Row Number (A column: 受注行番号 / 受注 No)
-  const visualId = findKey(rawOrder, ['受注行番号', '通し番号', '受注 No', '受注 ID', '受注id', '受注ID', 'displayId']);
+  const visualId = findKey(rawOrder, ['受注行番号', '通し番号', '受注 No', '受注 ID', '受注id', '受注ID', 'displayId']) ||
+                   (rawOrder?.raw ? findKey(rawOrder.raw, ['受注行番号', '通し番号', '受注 No', '受注 ID', '受注id', '受注ID', 'displayId']) : undefined);
 
   // Generate a deterministic ID based on content if System/Visual IDs are missing
   // This is crucial for "Accompanying" (同行) tasks to have stable IDs across refreshes, preventing "resurrection" after deletion
