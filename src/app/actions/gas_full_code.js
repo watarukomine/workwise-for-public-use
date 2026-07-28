@@ -14,6 +14,14 @@ const CUSTOMER_SHEET_NAME = "販売店情報";
 
 const ACTION_LOG_SHEET_NAME = "行動予定"; // 汎用タスク（休憩・移動等）の保存先
 
+function getTargetSpreadsheetIds() {
+    const ids = [ORDER_SPREADSHEET_ID];
+    if (typeof SECONDARY_ORDER_SPREADSHEET_ID !== 'undefined' && SECONDARY_ORDER_SPREADSHEET_ID && SECONDARY_ORDER_SPREADSHEET_ID !== ORDER_SPREADSHEET_ID) {
+        ids.push(SECONDARY_ORDER_SPREADSHEET_ID);
+    }
+    return ids;
+}
+
 // Firebase Realtime Database URL (シグナル用)
 const FIREBASE_DB_URL = "https://workwise-general-v2-kp-default-rtdb.firebaseio.com";
 // ↓↓↓↓【設定はここまで】↓↓↓↓
@@ -500,26 +508,35 @@ function createTask(params) {
 }
 /**
  * 注文（受注）を新規作成する機能
- * 受注管理シートに追記します
+ * 受注管理シート（二重バックアップ対応）に追記します
  */
 function createOrder(params) {
+    let primaryResult = null;
+    const targetIds = getTargetSpreadsheetIds();
+    for (let idx = 0; idx < targetIds.length; idx++) {
+        const ssId = targetIds[idx];
+        try {
+            const res = createOrderSingleSheet(ssId, params);
+            if (idx === 0) primaryResult = res;
+        } catch (e) {
+            console.error("createOrder error for ss " + ssId, e);
+            if (idx === 0) return errorResponse("注文登録エラー: " + e.message);
+        }
+    }
+    return primaryResult || errorResponse("注文登録エラー");
+}
+
+function createOrderSingleSheet(targetSsId, params) {
     try {
-        const spreadsheet = SpreadsheetApp.openById(ORDER_SPREADSHEET_ID);
+        const spreadsheet = SpreadsheetApp.openById(targetSsId);
         const sheet = spreadsheet.getSheetByName(ORDER_SHEET_NAME);
         if (!sheet) throw new Error(`シート「${ORDER_SHEET_NAME}」が見つかりません。`);
         const headers = sheet.getDataRange().getValues()[0];
-        // SystemID列があるかチェック
+        
         let sysIdColIndex = -1;
         headers.forEach((h, i) => {
             if (String(h).trim() === "SystemID") sysIdColIndex = i;
         });
-        if (sysIdColIndex === -1) {
-            // SystemID列がなければ自動追加（危険回避のため、追加後にメッセージを返すのもありだが、ここでは追加して続行）
-            // ただし、列挿入はユーザーに行わせるほうが安全（上記手順1に従ってもらう）
-            // throw new Error("「SystemID」列が見つかりません。シートに追加してください。");
-        }
-        // 新しいSystemIDの生成: ScheduledDate_UserCode_Random3
-        // 作成日ではなく「作業予定日」をIDのプレフィックスにする
 
         let targetDate = new Date();
         if (params.scheduledDate) {
@@ -537,11 +554,6 @@ function createOrder(params) {
         const userCode = params.userCode || 'guest';
         const randomStr = Utilities.getUuid().split('-')[0].substring(0, 3);
         const newSystemId = params.systemId || `${dateStr}_${userCode}_${randomStr}`;
-        // ---------------------------------------------------------
-        // 2. Prepare Data (Static Order ID Calculation)
-        // ---------------------------------------------------------
-        // 数式の =ROW()-1 ではなく、現在の最大値を取得して +1 した値を固定値としてセットする
-        // これにより行の並び替えを行ってもIDが変わらなくなる
 
         let nextId = 0;
         if (params.displayId) {
@@ -551,12 +563,10 @@ function createOrder(params) {
             const idColIndex = headers.indexOf("受注ID");
             if (idColIndex !== -1) {
                 const colLetter = String.fromCharCode(65 + idColIndex);
-                // ID列の既存値をすべて取得 (ヘッダー除く 2行目以降)
                 const existingIds = sheet.getRange(`${colLetter}2:${colLetter}`).getValues();
                 for (let i = 0; i < existingIds.length; i++) {
                     const val = existingIds[i][0];
                     const numVal = Number(val);
-                    // 数値として有効で、現在の最大値より大きければ記録
                     if (!isNaN(numVal) && numVal > maxId) {
                         maxId = numVal;
                     }
@@ -564,16 +574,15 @@ function createOrder(params) {
             }
             nextId = maxId + 1;
         }
-        const numericId = nextId; // レスポンス用
-        // データの書き込み先行を決定 (最終行+1)
+
         const targetRow = sheet.getLastRow() + 1;
         const newRow = [];
         headers.forEach(header => {
             const h = String(header).trim();
             if (h === "受注ID") {
-                newRow.push(nextId); // 固定数値！
+                newRow.push(nextId);
             } else if (h === "SystemID") {
-                newRow.push(newSystemId); // 【重要】絶対不変のID
+                newRow.push(newSystemId);
             } else if (h === "顧客コード" || h === "ユーザーコード") {
                 newRow.push(params.userCode || "");
             } else if (h === "お取引先名" || h === "店舗" || h === "店舗名") {
@@ -589,23 +598,23 @@ function createOrder(params) {
             } else if (h === "ご担当者様" || h === "担当者名") {
                 newRow.push(params.picName || "");
             } else if (h === "担当") {
-                newRow.push(""); // 弊社担当者はフォームからは空欄にする
+                newRow.push("");
             } else if (h === "注文番号" || h.includes("受注No")) {
                 newRow.push(params.orderNo || "");
             } else if (h.includes("任意コメント")) {
                 newRow.push(params.comment || "");
             } else if (h === "緊急連絡") {
-                newRow.push(""); // フォームからは緊急連絡は空欄
+                newRow.push("");
             } else if (h === "緊急フラグ") {
-                newRow.push(false); // 初期値はfalse
+                newRow.push(false);
             } else if (h === "管理者返信") {
-                newRow.push(""); // 初期値は空
+                newRow.push("");
             } else if (h === "車名") {
                 newRow.push(params.carName || "");
             } else if (h.includes("登録ナンバー")) {
                 newRow.push(params.regNo || "");
             } else if (h === "受注ステータス" || h === "入庫状況") {
-                newRow.push(params.status || "入庫待ち");
+                newRow.push(params.status || "未割当");
             } else if (h === "タイヤ品番") {
                 newRow.push(params.tireNumber || "");
             } else if (h === "タイヤサイズ") {
@@ -632,15 +641,12 @@ function createOrder(params) {
                 newRow.push("");
             }
         });
-        // 書き込み
         sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
-        // 信号を送信
         sendFirebaseSignal('update');
-        // SystemIDを返す (Frontendはこれを使って管理する)
         return successResponse("注文を登録しました。", { orderId: newSystemId, displayId: targetRow - 1 });
     } catch (error) {
-        console.error("createOrder Error:", error);
-        return errorResponse("注文登録エラー: " + error.message);
+        console.error("createOrderSingleSheet Error:", error);
+        throw error;
     }
 }
 /**
