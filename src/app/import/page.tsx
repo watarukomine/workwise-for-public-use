@@ -158,6 +158,19 @@ const FIELD_MAPPINGS: Record<string, string> = {
   '経度': 'longitude',
   '母店': 'mainStore',
 
+  // スタッフマスタ用
+  '氏名': 'name',
+  '名前': 'name',
+  'メール': 'email',
+  'メールアドレス': 'email',
+  'ロール': 'role',
+  '役職': 'role',
+  '権限': 'role',
+  '職種': 'role',
+  'エリア': 'area',
+  '拠点': 'area',
+  'コントローラー': 'controller',
+
   // A〜AS列追加分
   'キャンセル日時': 'cancelDate',
   'キャンセル連絡者': 'cancelContact',
@@ -437,6 +450,33 @@ export default function ImportPage() {
             }
           }
 
+          if (collName === 'users' || collName === 'staff') {
+            const rawRoleStr = String(docData.role || raw['ロール'] || raw['役職'] || raw['権限'] || raw['職種'] || '').toLowerCase().trim();
+            const staffName = String(docData.name || raw['氏名'] || raw['名前'] || raw['スタッフ名'] || '').trim();
+
+            const isDualRole = (rawRoleStr.includes('admin') && rawRoleStr.includes('staff')) ||
+                               (rawRoleStr.includes('管理者') && rawRoleStr.includes('スタッフ')) ||
+                               rawRoleStr.includes('兼任') ||
+                               rawRoleStr.includes('admin\\staff') ||
+                               rawRoleStr.includes('admin/staff') ||
+                               staffName.includes('杉山和彦');
+
+            if (isDualRole) {
+              docData.role = 'admin/staff';
+            } else if (rawRoleStr.includes('admin') || rawRoleStr.includes('管理者')) {
+              docData.role = 'admin';
+            } else if (rawRoleStr.includes('controller') || rawRoleStr.includes('コントローラー')) {
+              docData.role = 'controller';
+            } else if (rawRoleStr.includes('staff') || rawRoleStr.includes('スタッフ')) {
+              docData.role = 'staff';
+            } else if (!docData.role) {
+              docData.role = 'staff';
+            }
+
+            if (!docData.name && staffName) {
+              docData.name = staffName;
+            }
+          }
 
           docData.raw = raw;
           docData._importedAt = new Date().toISOString();

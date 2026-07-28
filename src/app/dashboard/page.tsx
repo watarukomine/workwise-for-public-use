@@ -145,14 +145,13 @@ export default function DashboardPage() {
     // Filter by Management/Controller visibility
     if (!showManagement) {
       selectedStaff = selectedStaff.filter(staff => {
-        const roleStr = String(staff.role || '').toLowerCase().trim();
-        const rawRole = String((staff as any)['ロール'] || (staff as any)['役職'] || '').toLowerCase().trim();
+        const roleStr = String(staff.role || (staff as any).raw?.role || (staff as any).raw?.['ロール'] || (staff as any).raw?.['役職'] || (staff as any)['ロール'] || (staff as any)['役職'] || '').toLowerCase().trim();
         const staffName = staff.name || (staff as any)['氏名'] || (staff as any)['名前'] || '';
 
-        // Check if user is an Admin/Staff dual role (e.g. "admin/staff", "admin_staff", or 杉山和彦)
+        // Check if user is an Admin/Staff dual role (e.g. "admin/staff", "admin\staff", "admin_staff", "管理者/スタッフ", "兼任", or 杉山和彦)
         const isAdminStaff = (roleStr.includes('admin') && roleStr.includes('staff')) ||
-                             (rawRole.includes('admin') && rawRole.includes('staff')) ||
-                             rawRole.includes('兼任') ||
+                             (roleStr.includes('管理者') && roleStr.includes('スタッフ')) ||
+                             roleStr.includes('兼任') ||
                              staffName.includes('杉山和彦');
 
         if (isAdminStaff) {
@@ -162,7 +161,7 @@ export default function DashboardPage() {
 
         // Pure Admin or Controller
         const isController = staff['コントローラー'] === '⚪︎' || staff.controller === '⚪︎' || staff['コントローラー'] === '○' || staff.controller === '○';
-        const isPureAdmin = roleStr === 'admin';
+        const isPureAdmin = (roleStr === 'admin' || roleStr === '管理者') && !isAdminStaff;
 
         if (isController || isPureAdmin) {
           // Hide pure Admin / Controllers when showManagement is OFF
