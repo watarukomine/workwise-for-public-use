@@ -572,7 +572,18 @@ function createOrderSingleSheet(targetSsId, params) {
             nextId = maxId + 1;
         }
 
-        const targetRow = sheet.getLastRow() + 1;
+        // Find actual last populated row based on non-empty values in Column A/B instead of sheet.getLastRow()
+        // which may return blank formatted rows (e.g. row 2900).
+        let actualLastRow = 1;
+        const lastRowCandidate = Math.max(sheet.getLastRow(), 1);
+        const colValues = sheet.getRange(1, 1, lastRowCandidate, 2).getValues();
+        for (let r = colValues.length - 1; r >= 0; r--) {
+            if (String(colValues[r][0]).trim() !== "" || String(colValues[r][1]).trim() !== "") {
+                actualLastRow = r + 1;
+                break;
+            }
+        }
+        const targetRow = actualLastRow + 1;
         const newRow = [];
         headers.forEach(header => {
             const h = String(header).trim();
