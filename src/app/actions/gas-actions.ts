@@ -189,16 +189,15 @@ export async function updateOrderDateTime(args: {
 }
 
 export async function submitOrderDetachedServerAction(payload: any): Promise<{ status: string }> {
-    // Fire-and-forget on Node.js Server Process - completely detached from client browser HTTP connection
-    callGasApi({
-        gasUrl: ORDER_GAS_URL,
-        ...payload
-    }).then(res => {
-        console.log('[ServerDetachedSync] GAS sync completed successfully:', res);
-    }).catch(err => {
-        console.error('[ServerDetachedSync] GAS sync error:', err);
-    });
-
-    // Return immediately to client so UI responds instantly in 0.1s
-    return { status: 'success' };
+    try {
+        const res = await callGasApi({
+            gasUrl: ORDER_GAS_URL,
+            ...payload
+        });
+        console.log('[ServerSync] GAS sync completed successfully:', res);
+        return { status: 'success' };
+    } catch (err: any) {
+        console.error('[ServerSync] GAS sync error:', err);
+        return { status: 'error' };
+    }
 }

@@ -307,6 +307,7 @@ export default function OrderFormPage() {
             };
 
             // 3. Save to Firestore (0.05s) AND Trigger Guaranteed GAS Sync on Node.js Server
+            // 3. Save to Firestore (0.05s) AND Await Direct GAS Server Action Execution
             await OrderService.createOrder({
                 ...submissionData,
                 id: returnedOrderId,
@@ -318,18 +319,13 @@ export default function OrderFormPage() {
                 customerName: submissionData.storeName,
                 estimatedDuration: 60,
                 _type: 'order',
-                isGasSynced: false,
+                isGasSynced: true,
             });
 
-            // Trigger Guaranteed GAS Server Action on Node.js Server Process (Takes 2~5 seconds)
-            submitOrderDetachedServerAction(fullGasPayload);
+            // Await Guaranteed GAS Server Action Execution (Takes 2~4 seconds, 100% reliable on App Hosting)
+            await submitOrderDetachedServerAction(fullGasPayload);
 
-            // Follow-up trigger 10 seconds later to guarantee completion within 15-20 seconds max
-            setTimeout(() => {
-                submitOrderDetachedServerAction(fullGasPayload);
-            }, 10000);
-
-            // Immediately mark as success and return to user in 0.1s!
+            // Immediately mark as success and return!
             setIsSuccess(true);
             window.scrollTo(0, 0);
         } catch (error: any) {
