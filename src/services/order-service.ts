@@ -224,13 +224,13 @@ export const OrderService = {
         // Remove temp property before saving
         delete (orderData as any).isGasSynced;
 
-        // 2. Firestore Sync
+        // 2. Firestore Sync (Fast primary write)
         await setDoc(docRef, orderData);
 
-        // 3. GAS Backup (Synchronous await to guarantee real-time spreadsheet write)
+        // 3. GAS Backup (Non-blocking background sync for instant UI submission)
         const isGasSynced = (data as any).isGasSynced;
         if (!isGasSynced) {
-            await this.backupToGas(orderData as any as Order, 'create');
+            this.backupToGas(orderData as any as Order, 'create').catch(e => console.warn('[OrderService] Background GAS backup failed:', e));
         }
 
         return systemId;
@@ -251,11 +251,12 @@ export const OrderService = {
 
         await updateDoc(docRef, updateData);
 
-        // Fetch full data for GAS backup update
-        const fullDoc = await getDoc(docRef);
-        if (fullDoc.exists()) {
-            await this.backupToGas(fullDoc.data() as Order, 'update');
-        }
+        // Non-blocking GAS backup update in background for instant UI response
+        getDoc(docRef).then(fullDoc => {
+            if (fullDoc.exists()) {
+                this.backupToGas(fullDoc.data() as Order, 'update').catch(e => console.warn('[OrderService] Background GAS update backup failed:', e));
+            }
+        }).catch(e => console.warn('[OrderService] Doc fetch for GAS backup failed:', e));
     },
 
     /**
