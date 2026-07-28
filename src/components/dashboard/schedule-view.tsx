@@ -76,6 +76,27 @@ const timelineEndHour = 19;
 const timelineTotalHours = timelineEndHour - timelineStartHour;
 const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
+
+const normalizeDateStr = (dStr: any): string => {
+  if (!dStr) return '';
+  try {
+    const s = String(dStr).trim();
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    const clean = s.replace(/\//g, '-').split(' ')[0];
+    const parts = clean.split('-');
+    if (parts.length === 3 && parts[0].length === 4) {
+      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+    }
+  } catch (e) {}
+  return String(dStr).replace(/\//g, '-').trim();
+};
 const STAFF_COL_WIDTH = 144;
 const STATUS_COL_WIDTH = 120;
 const TOTAL_TIMELINE_WIDTH = STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH;
@@ -529,14 +550,14 @@ export function ScheduleView({
   const { toast } = useToast();
   const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, toggleTripSuppression, setCurrentViewedDate } = useOrder();
 
-  // Filter orders to only show those scheduled for currentDate
+  // Filter orders to only show those scheduled for currentDate (JST local date format)
   const dailyOrders = React.useMemo(() => {
     if (!orders) return [];
-    const targetDateStr = formatDate(currentDate.toISOString(), 'yyyy-MM-dd');
-    const targetDateStrSlash = formatDate(currentDate.toISOString(), 'yyyy/MM/dd');
+    const targetDateStr = format(currentDate, 'yyyy-MM-dd');
     return orders.filter(order => {
-      const orderDate = order.scheduledDate ? formatDate(order.scheduledDate, 'yyyy-MM-dd') : '';
-      return orderDate === targetDateStr || orderDate === targetDateStrSlash;
+      if (!order.scheduledDate) return false;
+      const orderDate = normalizeDateStr(order.scheduledDate);
+      return orderDate === targetDateStr;
     });
   }, [orders, currentDate]);
 
