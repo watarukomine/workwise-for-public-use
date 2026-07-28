@@ -1857,25 +1857,29 @@ export function ScheduleView({
         setIsSaving(false);
         toast({ title: '予定を作成中...' });
 
-        // Background API Call
-        createTask({
-          gasUrl: ORDER_GAS_URL,
-          staffName: staff.name,
-          taskName: submitDetails.title,
-          description: submitDetails.description,
-          startTime: newStart.toISOString(),
-          endTime: finalEnd.toISOString(),
-          estimatedDuration: durationMinutes
-        }).then(res => {
-          if (res.eventId) {
-            // Success
-          }
-          refetchOrders();
-          toast({ title: '予定を保存しました' });
-        }).catch(err => {
-          console.error('Failed to create task:', err);
-          toast({ variant: 'destructive', title: 'エラー', description: '予定の作成に失敗しました' });
-          setScheduleEvents(prev => prev.filter(e => e.id !== frontendId));
+        // Primary API Call: OrderService.createOrder (Dual-write to Firestore + GAS Spreadsheet)
+        import('@/services/order-service').then(({ OrderService }) => {
+          OrderService.createOrder({
+            id: frontendId,
+            systemId: frontendId,
+            customerName: submitDetails.title || '任意作業',
+            workType: '作業',
+            taskDetails: submitDetails.description || submitDetails.title,
+            scheduledDate: format(newStart, 'yyyy/MM/dd'),
+            scheduledTime: format(newStart, 'HH:mm'),
+            scheduledEndTime: format(finalEnd, 'HH:mm'),
+            estimatedDuration: durationMinutes,
+            picName: staff.name,
+            status: '未割当',
+            _type: 'task' as any
+          }).then(() => {
+            refetchOrders();
+            toast({ title: '予定を保存しました' });
+          }).catch(err => {
+            console.error('Failed to create task:', err);
+            toast({ variant: 'destructive', title: 'エラー', description: '予定の作成に失敗しました' });
+            setScheduleEvents(prev => prev.filter(e => e.id !== frontendId));
+          });
         });
 
         return; // Return early, skipping the synchronous finally block
@@ -2862,30 +2866,20 @@ export function ScheduleView({
                                   setIsSaving(true);
 
                                   try {
-                                    const result = await updateSheetStatus({
-                                      gasUrl: ORDER_GAS_URL,
-                                      eventTitle: `(ID: ${dialogState.order.id})`,
-                                      systemId: dialogState.order.id,
-                                      timestamp: new Date().toISOString(),
+                                    const { OrderService } = await import('@/services/order-service');
+                                    const orderId = dialogState.order.systemId || dialogState.order.id;
+                                    await OrderService.updateOrder(orderId, {
                                       ...editOrderForm,
-                                      shouldSendEmail: false
+                                      updatedAt: new Date().toISOString()
                                     });
 
-                                    if (result.status === 'success') {
-                                      toast({
-                                        title: '保存しました',
-                                        description: 'オーダー詳細を更新しました'
-                                      });
-                                      setIsEditingOrderDetails(false);
-                                      await refetchOrders();
-                                      setDialogState({ mode: 'closed' });
-                                    } else {
-                                      toast({
-                                        title: 'エラー',
-                                        description: result.message || '更新に失敗しました',
-                                        variant: 'destructive'
-                                      });
-                                    }
+                                    toast({
+                                      title: '保存しました',
+                                      description: 'オーダー詳細を更新しました'
+                                    });
+                                    setIsEditingOrderDetails(false);
+                                    await refetchOrders();
+                                    setDialogState({ mode: 'closed' });
                                   } catch (error) {
                                     console.error('Failed to update order details:', error);
                                     toast({
