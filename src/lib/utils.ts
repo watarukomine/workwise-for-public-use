@@ -115,49 +115,50 @@ export const formatDate = (dateString: string | undefined | null, formatString: 
   return str.includes('NaN') ? '' : str.replace(/-/g, '/');
 };
 
-export const formatTime = (date: Date | string | any) => {
+export const formatTime = (date: Date | string | any): string => {
   if (!date) return '';
 
-  // Handle Firestore Timestamp object
   if (date && typeof date === 'object' && 'seconds' in date) {
     date = new Date(date.seconds * 1000);
   }
 
-  // Handle cases like "1899-12-29T15:00:00.000Z" which come from Sheets for time-only values
-  if (typeof date === 'string' && date.startsWith('1899-12-')) {
-    const d = parseISO(date);
-    if (isValid(d)) {
-      return format(d, 'HH:mm');
+  if (date instanceof Date) {
+    if (!isNaN(date.getTime())) {
+      const h = String(date.getHours()).padStart(2, '0');
+      const m = String(date.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
+    }
+    return '';
+  }
+
+  const str = String(date).trim();
+  if (!str || str === 'null' || str === 'undefined') return '';
+
+  if (str.includes('1899') || str.includes('1900')) {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const h = String(d.getHours()).padStart(2, '0');
+      const m = String(d.getMinutes()).padStart(2, '0');
+      return `${h}:${m}`;
     }
   }
 
-  let d = date;
-  if (typeof date === 'string') {
-    // Try to normalize slash dates to ISO format
-    const normalizedStr = date.replace(/\//g, '-').replace(' ', 'T');
-    d = parseISO(normalizedStr);
-    if (!isValid(d)) {
-      d = new Date(date);
-    }
+  // Regex match for HH:mm or H:mm or H時M分
+  const match = str.match(/(\d{1,2})[:：時](\d{1,2})?/);
+  if (match) {
+    const h = String(parseInt(match[1], 10)).padStart(2, '0');
+    const m = String(parseInt(match[2] || '0', 10)).padStart(2, '0');
+    return `${h}:${m}`;
   }
 
-  if (!d || !isValid(d) || isNaN(d.getTime())) {
-    if (typeof date === 'string') {
-      const today = new Date();
-      const timePart = date.includes(' ') ? date.split(' ')[1] : date;
-      const [hours, minutes] = timePart.split(':');
-      if (hours && minutes) {
-        today.setHours(parseInt(hours, 10), parseInt(minutes, 10));
-        if (isValid(today)) {
-          return format(today, 'HH:mm');
-        }
-      }
-    }
-    return "";
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
   }
-  // Ignore 1970 bugs completely, return empty string so it doesn't prefill 09:00
-  if (d.getFullYear() <= 1970) return '';
-  return format(d, 'HH:mm');
+
+  return str;
 };
 
 export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order> => {

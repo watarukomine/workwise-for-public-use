@@ -3,7 +3,7 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import { fetchGasData } from '@/app/actions/fetch-gas-data';
 import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
-import { findKey, mapRawToOrder, normalizeDateStr } from '@/lib/utils';
+import { findKey, mapRawToOrder, normalizeDateStr, formatTime } from '@/lib/utils';
 import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes, addDays } from 'date-fns';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { useSelectedStaff } from './selected-staff-context';
@@ -169,32 +169,15 @@ const processOrderData = (
 
         try {
           const val = order.scheduledTime as any;
-          if (val instanceof Date) {
-            if (val.getFullYear() < 2000) {
-              const timeStr = format(val, 'HH:mm:ss');
-              scheduledTime = parseISO(`${dateStr}T${timeStr}`);
-            } else {
-              scheduledTime = val;
-            }
-          } else if (typeof val === 'string') {
-            if (val.includes('1899') || val.includes('1900')) {
-              logOldDateDetected(order.id, order.taskDetails || '不明', 'scheduledTime', val, 'order-context');
-              const oldDate = new Date(val);
-              if (isValid(oldDate)) {
-                const timeStr = `${String(oldDate.getHours()).padStart(2, '0')}:${String(oldDate.getMinutes()).padStart(2, '0')}:${String(oldDate.getSeconds()).padStart(2, '0')}`;
-                scheduledTime = parseISO(`${dateStr}T${timeStr}`);
-              }
-            } else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
-              scheduledTime = parseISO(`${dateStr}T${val}`);
-            } else {
-              scheduledTime = parseISO(val);
-            }
-          }
-
-          if (scheduledTime && !isValid(scheduledTime)) {
-            scheduledTime = null;
+          const formattedTime = formatTime(val);
+          if (formattedTime && formattedTime.includes(':')) {
+            scheduledTime = parseISO(`${dateStr}T${formattedTime}:00`);
           }
         } catch {
+          scheduledTime = null;
+        }
+
+        if (scheduledTime && !isValid(scheduledTime)) {
           scheduledTime = null;
         }
 
@@ -202,26 +185,9 @@ const processOrderData = (
           let taskEndTime: Date | null = null;
           if (order.scheduledEndTime) {
             try {
-              const endVal = order.scheduledEndTime as any;
-              if (endVal instanceof Date) {
-                if (endVal.getFullYear() < 2000) {
-                  const timeStr = format(endVal, 'HH:mm:ss');
-                  taskEndTime = parseISO(`${dateStr}T${timeStr}`);
-                } else {
-                  taskEndTime = endVal;
-                }
-              } else if (typeof endVal === 'string') {
-                if (endVal.includes('1899') || endVal.includes('1900')) {
-                  const oldDate = new Date(endVal);
-                  if (isValid(oldDate)) {
-                    const timeStr = `${String(oldDate.getHours()).padStart(2, '0')}:${String(oldDate.getMinutes()).padStart(2, '0')}:${String(oldDate.getSeconds()).padStart(2, '0')}`;
-                    taskEndTime = parseISO(`${dateStr}T${timeStr}`);
-                  }
-                } else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(endVal)) {
-                  taskEndTime = parseISO(`${dateStr}T${endVal}`);
-                } else {
-                  taskEndTime = parseISO(endVal);
-                }
+              const endFormatted = formatTime(order.scheduledEndTime);
+              if (endFormatted && endFormatted.includes(':')) {
+                taskEndTime = parseISO(`${dateStr}T${endFormatted}:00`);
               }
             } catch {
               taskEndTime = null;
@@ -229,11 +195,11 @@ const processOrderData = (
           }
 
           if (!taskEndTime || !isValid(taskEndTime)) {
-            taskEndTime = addMinutes(scheduledTime, order.estimatedDuration);
+            taskEndTime = addMinutes(scheduledTime, order.estimatedDuration || 60);
           }
 
           if (isValid(taskEndTime)) {
-            if (scheduledTime.getHours() >= 9) {
+            if (scheduledTime.getHours() >= 6) {
               if (order.rawOrderId) scheduledRawOrderIds.add(order.rawOrderId);
 
               const tripId = `trip-${order.rawOrderId || order.id}`;
