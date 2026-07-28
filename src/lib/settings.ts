@@ -45,7 +45,7 @@ export const CUSTOMER_SHEET_URL = process.env.NEXT_PUBLIC_CUSTOMER_SHEET_URL || 
  * 受注情報が記載されているスプレッドシートのURL。
  * orders/page.tsx のヘッダークリックで開かれます。
  */
-export const ORDER_SHEET_URL = process.env.NEXT_PUBLIC_ORDER_SHEET_URL || 'https://docs.google.com/spreadsheets/d/1D888FVgFcvMN8v31ZX4KC-8RTHEm_9wkGRVlMLUtvEg/edit?usp=sharing';
+export const ORDER_SHEET_URL = process.env.NEXT_PUBLIC_ORDER_SHEET_URL || 'https://docs.google.com/spreadsheets/d/17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s/edit?usp=sharing';
 
 /**
  * 【移行期間用】旧スプレッドシート版の受注情報スプレッドシートURL。

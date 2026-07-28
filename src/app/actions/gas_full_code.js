@@ -1,8 +1,8 @@
 // ↓↓↓↓【要設定】↓↓↓↓
 // 「受注管理」シートがあるスプレッドシートのIDを貼り付けてください
-const ORDER_SPREADSHEET_ID = "1D888FVgFcvMN8v31ZX4KC-8RTHEm_9wkGRVlMLUtvEg";
+const ORDER_SPREADSHEET_ID = "17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s";
 // 【移行期間用】旧スプレッドシート版の受注管理スプレッドシートID
-const SECONDARY_ORDER_SPREADSHEET_ID = "17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s";
+const SECONDARY_ORDER_SPREADSHEET_ID = "";
 const ORDER_SHEET_NAME = "受注管理";
 // 「スタッフマスタ」シートがあるスプレッドシートのIDを貼り付けてください
 const STAFF_SPREADSHEET_ID = "1IP9wxp-VsctyXVn5UI3oRWeik4gMrFA5DFxt-40HGOk";
@@ -15,7 +15,7 @@ const CUSTOMER_SHEET_NAME = "販売店情報";
 const ACTION_LOG_SHEET_NAME = "行動予定"; // 汎用タスク（休憩・移動等）の保存先
 
 function getTargetSpreadsheetIds() {
-    // Only write new/updated orders to the new DB spreadsheet (1D888...) to keep legacy master intact
+    // Single source of truth: Write only to the primary order spreadsheet (17P4a...)
     return [ORDER_SPREADSHEET_ID];
 }
 
