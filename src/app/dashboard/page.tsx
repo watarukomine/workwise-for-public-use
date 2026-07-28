@@ -235,7 +235,9 @@ export default function DashboardPage() {
       const isDateChange = isMount || isRealDateSwitch;
 
       if (isDateChange) {
-        // Only trigger loading UI for actual date changes or initial mount
+        // Immediately sync viewed date to OrderProvider so unassigned tasks for currentDate calculate synchronously
+        setCurrentViewedDate(currentDate);
+
         if (isRealDateSwitch) {
           isDateLoading.current = true;
           setIsSyncing(true);
@@ -268,11 +270,13 @@ export default function DashboardPage() {
       }
 
       // OPTIMISTIC UPDATE
-      // If It's a Real Date Switch: Reset to Order-Based immediately.
-      // If Mount (Reload) or Same Day Update (Background Poll): DO NOT RESET.
-      if (isRealDateSwitch) {
+      // If It's a Real Date Switch or Initial Mount: Set Selected Staff immediately
+      if (isRealDateSwitch || isMount) {
         if (staffWithOrders.size > 0) {
           setSelectedStaffIds(Array.from(staffWithOrders));
+        } else if (allStaff && allStaff.length > 0) {
+          // Default to all staff on initial load if no specific orders scheduled
+          setSelectedStaffIds(allStaff.map(s => s.id));
         }
       }
 
@@ -287,17 +291,19 @@ export default function DashboardPage() {
         const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...scheduledIds, ...Array.from(staffWithOrders)]));
 
         if (combinedStaffIds.length > 0) {
-          if (isRealDateSwitch) {
-            // On Real Date Switch: Force set to new day's attendance
+          if (isRealDateSwitch || isMount) {
+            // On Mount/Refresh OR Real Date Switch: Force set to new day's attendance / all staff
             setSelectedStaffIds(combinedStaffIds);
           } else {
-            // On Mount/Refresh OR Same Day Update (Background Poll):
+            // On Same Day Update (Background Poll):
             // MERGE with existing selection to preserve localStorage state or manual changes
             setSelectedStaffIds(prev => Array.from(new Set([...prev, ...combinedStaffIds])));
           }
         } else if (isRealDateSwitch) {
           // If switching date and no staff found, CLEAR the selection
           setSelectedStaffIds([]);
+        } else if (isMount && allStaff && allStaff.length > 0) {
+          setSelectedStaffIds(allStaff.map(s => s.id));
         }
       } catch (e) {
         console.error("Failed to sync attendance:", e);
@@ -308,9 +314,6 @@ export default function DashboardPage() {
           
           // CRITICAL: Fetch additional data for this date if not already in context
           loadOrders(currentDate);
-          
-          // Inform OrderProvider about the current viewed date for background polling
-          setCurrentViewedDate(currentDate);
         }
       }
     };
