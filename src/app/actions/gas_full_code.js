@@ -570,13 +570,15 @@ function createOrderSingleSheet(targetSsId, params) {
             nextId = maxId > 0 ? maxId + 1 : 1951;
         }
 
-        // Find actual last populated row based on non-empty values in Column A/B instead of sheet.getLastRow()
+        // Find actual last populated row based on non-empty values in first 10 columns instead of sheet.getLastRow()
         // which may return blank formatted rows (e.g. row 2900).
         let actualLastRow = 1;
         const lastRowCandidate = Math.max(sheet.getLastRow(), 1);
-        const colValues = sheet.getRange(1, 1, lastRowCandidate, 2).getValues();
+        const checkCols = Math.min(sheet.getLastColumn() || 1, 10);
+        const colValues = sheet.getRange(1, 1, lastRowCandidate, checkCols).getValues();
         for (let r = colValues.length - 1; r >= 0; r--) {
-            if (String(colValues[r][0]).trim() !== "" || String(colValues[r][1]).trim() !== "") {
+            const hasValue = colValues[r].some(val => String(val).trim() !== "");
+            if (hasValue) {
                 actualLastRow = r + 1;
                 break;
             }
@@ -590,9 +592,9 @@ function createOrderSingleSheet(targetSsId, params) {
             } else if (h === "SystemID") {
                 newRow.push(newSystemId);
             } else if (h === "顧客コード" || h === "ユーザーコード") {
-                newRow.push(params.userCode || "");
+                newRow.push(params.userCode || params.customerCode || "");
             } else if (h === "お取引先名" || h === "店舗" || h === "店舗名") {
-                newRow.push(params.storeName || "");
+                newRow.push(params.storeName || params.customerName || "");
             } else if (h === "主管店舗") {
                 newRow.push(params.mainStore || "");
             } else if (h === "作業内容" || h === "作業") {

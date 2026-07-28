@@ -60,6 +60,7 @@ export type Order = {
   address: string;
   taskDetails: string;
   serviceType: string;
+  workType?: string;
   status: string;
   scheduledDate: string;
   scheduledTime?: string;

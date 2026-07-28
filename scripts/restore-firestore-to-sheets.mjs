@@ -12,7 +12,7 @@ import { join } from 'path';
 
 // --- Spreadsheet IDs ---
 const SPREADSHEETS = {
-  '受注管理': '1A3rbqD87QenOoHx3EYNpnqBujN5TrT2Xn_3tUTCiqmY',
+  '受注管理': '17P4aHYXFdPUtWCrZY4G_LY_zcUYP9ClHNRVcMvj6c6s',
   '販売店情報': '1IZ2VwJ1AT5NvEkUoU0tL6OJXXI3hfDVQ8_773HZwUJI',
   'スタッフマスタ': '1IP9wxp-VsctyXVn5UI3oRWeik4gMrFA5DFxt-40HGOk',
   '行動予定': '1IP9wxp-VsctyXVn5UI3oRWeik4gMrFA5DFxt-40HGOk' // ※行動予定はスタッフマスタと同じファイルにある前提
@@ -111,10 +111,29 @@ async function writeToSheet(sheetName, rows) {
     return;
   }
 
-  console.log(`   - シート「${sheetName}」に ${rows.length} 件書き込み中...`);
+  // Get actual sheet titles from spreadsheet metadata
+  let targetSheetName = sheetName;
+  try {
+    const meta = await sheetsLayer.spreadsheets.get({ spreadsheetId });
+    const sheets = meta.data.sheets || [];
+    const matched = sheets.find(s => s.properties.title.trim() === sheetName.trim());
+    if (matched) {
+      targetSheetName = matched.properties.title;
+    } else if (sheets.length > 0) {
+      targetSheetName = sheets[0].properties.title;
+    }
+  } catch (e) {
+    console.warn(`⚠️ メタデータ取得スキップ (${sheetName}): ${e.message}`);
+  }
+
+  console.log(`   - シート「${targetSheetName}」に ${rows.length} 件書き込み中...`);
   
   // Clear existing
-  await sheetsLayer.spreadsheets.values.clear({ spreadsheetId, range: `${sheetName}!A2:Z5000` });
+  try {
+    await sheetsLayer.spreadsheets.values.clear({ spreadsheetId, range: `'${targetSheetName}'!A2:Z5000` });
+  } catch (e) {
+    console.warn(`⚠️ クリア処理スキップ: ${e.message}`);
+  }
 
   if (rows.length === 0) return;
 
@@ -124,12 +143,12 @@ async function writeToSheet(sheetName, rows) {
     const chunk = rows.slice(i, i + BATCH_SIZE);
     await sheetsLayer.spreadsheets.values.append({
       spreadsheetId,
-      range: `${sheetName}!A2`,
+      range: `'${targetSheetName}'!A2`,
       valueInputOption: 'RAW',
       resource: { values: chunk }
     });
   }
-  console.log(`   ✅ ${sheetName} の復元完了`);
+  console.log(`   ✅ ${targetSheetName} の復元完了`);
 }
 
 function formatTimestamp(ts) {
