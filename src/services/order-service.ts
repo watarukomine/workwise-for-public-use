@@ -268,6 +268,28 @@ export const OrderService = {
      * Backs up data to Google Sheets via GAS Server Action with automatic retries.
      */
     async backupToGas(order: Order, action: 'create' | 'update', maxRetries = 3): Promise<{ status: string, message?: string }> {
+        const userCodeVal = order.customerCode || (order as any).userCode || (order as any)['ユーザーコード'] || (order as any)['お取引先コード'] || '';
+        const storeNameVal = order.customerName || (order as any).storeName || (order as any)['店舗名'] || (order as any)['お取引先名'] || '';
+        const workTypeVal = order.workType || (order as any)['作業区分'] || (order as any)['作業内容'] || '';
+        const scheduledDateVal = formatDateYMD(order.scheduledDate || (order as any)['作業予定日'] || (order as any).date);
+        const scheduledTimeVal = order.scheduledTime || (order as any)['予定時間'] || '';
+        const picNameVal = order.picName || (order as any)['ご担当者様'] || '';
+        const orderNoVal = order.orderNo || (order as any).orderNoRemark || (order as any)['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] || '';
+        const commentVal = order.comment || (order as any)['任意コメント(ﾘﾏｰｸ2　10ｹﾀ)'] || '';
+        const carNameVal = order.carName || (order as any)['車名'] || '';
+        const regNoVal = String(order.regNo || (order as any)['登録ナンバー(下４桁)'] || '');
+        const statusVal = order.status || (order as any)['受注ステータス'] || '未割当';
+        const tireNumberVal = order.tireNumber || (order as any)['タイヤ品番'] || '';
+        const tireSizeVal = order.tireSize || (order as any)['タイヤサイズ'] || '';
+        const productNameVal = order.productName || (order as any)['品名'] || '';
+        const quantityVal = String(order.quantity || (order as any)['本数'] || '');
+        const sensorVal = order.sensor || (order as any)['空気圧センサーパッキン交換'] || '';
+        const arrangementVal = order.arrangement || (order as any)['タイヤ手配状況'] || '';
+        const disposalVal = order.disposal || (order as any)['廃タイヤ処分'] || '';
+        const contactVal = order.contact || (order as any)['連絡先'] || '';
+        const specialNotesVal = order.specialNotes || (order as any)['特記事項'] || '';
+        const submitterVal = (order as any).submitter || (order as any)['フォーム入力者'] || '';
+
         const payload = {
             ...order,
             gasUrl: ORDER_GAS_URL,
@@ -276,54 +298,54 @@ export const OrderService = {
             systemId: order.systemId || order.id,
             orderId: order.systemId || order.id || (order as any).displayId,
             displayId: (order as any).displayId || '',
-            userCode: order.customerCode || (order as any).userCode || '',
-            customerCode: order.customerCode || (order as any).userCode || '',
-            storeName: order.customerName || (order as any).storeName || '',
-            customerName: order.customerName || (order as any).storeName || '',
-            workType: order.workType || '',
-            scheduledDate: formatDateYMD(order.scheduledDate),
-            scheduledTime: order.scheduledTime || '',
-            picName: order.picName || '',
-            orderNo: order.orderNo || (order as any).orderNoRemark || '',
-            comment: order.comment || '',
-            carName: order.carName || '',
-            regNo: order.regNo || '',
-            status: order.status || '未割当',
-            tireNumber: order.tireNumber || '',
-            tireSize: order.tireSize || '',
-            productName: order.productName || '',
-            quantity: String(order.quantity || ''),
-            sensor: order.sensor || '',
-            arrangement: order.arrangement || '',
-            disposal: order.disposal || '',
-            contact: order.contact || '',
-            specialNotes: order.specialNotes || '',
-            submitter: (order as any).submitter || '',
+            userCode: userCodeVal,
+            customerCode: userCodeVal,
+            storeName: storeNameVal,
+            customerName: storeNameVal,
+            workType: workTypeVal,
+            scheduledDate: scheduledDateVal,
+            scheduledTime: scheduledTimeVal,
+            picName: picNameVal,
+            orderNo: orderNoVal,
+            comment: commentVal,
+            carName: carNameVal,
+            regNo: regNoVal,
+            status: statusVal,
+            tireNumber: tireNumberVal,
+            tireSize: tireSizeVal,
+            productName: productNameVal,
+            quantity: quantityVal,
+            sensor: sensorVal,
+            arrangement: arrangementVal,
+            disposal: disposalVal,
+            contact: contactVal,
+            specialNotes: specialNotesVal,
+            submitter: submitterVal,
             // Japanese column names for GAS Script compatibility
             SystemID: order.systemId || order.id,
-            '受注 No': (order as any).displayId || order.orderNo || '',
+            '受注 No': (order as any).displayId || orderNoVal || '',
             '受注行番号': (order as any).displayId || '',
-            'ユーザーコード': order.customerCode || (order as any).userCode || '',
-            '店舗名': order.customerName || (order as any).storeName || '',
-            '作業区分': order.workType || '',
-            '作業予定日': formatDateYMD(order.scheduledDate),
-            '予定時間': order.scheduledTime || '',
-            'ご担当者様': order.picName || '',
-            '受注No(ﾘﾏｰｸ1 8ｹﾀ)': order.orderNo || (order as any).orderNoRemark || '',
-            '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': order.comment || '',
-            '車名': order.carName || '',
-            '登録ナンバー(下４桁)': order.regNo || '',
-            '受注ステータス': order.status || '未割当',
-            'タイヤ品番': order.tireNumber || '',
-            'タイヤサイズ': order.tireSize || '',
-            '品名': order.productName || '',
-            '本数': String(order.quantity || ''),
-            '空気圧センサーパッキン交換': order.sensor || '',
-            'タイヤ手配状況': order.arrangement || '',
-            '廃タイヤ処分': order.disposal || '',
-            '連絡先': order.contact || '',
-            '特記事項': order.specialNotes || '',
-            'フォーム入力者': (order as any).submitter || '',
+            'ユーザーコード': userCodeVal,
+            '店舗名': storeNameVal,
+            '作業区分': workTypeVal,
+            '作業予定日': scheduledDateVal,
+            '予定時間': scheduledTimeVal,
+            'ご担当者様': picNameVal,
+            '受注No(ﾘﾏｰｸ1 8ｹﾀ)': orderNoVal,
+            '任意コメント(ﾘﾏｰｸ2　10ｹﾀ)': commentVal,
+            '車名': carNameVal,
+            '登録ナンバー(下４桁)': regNoVal,
+            '受注ステータス': statusVal,
+            'タイヤ品番': tireNumberVal,
+            'タイヤサイズ': tireSizeVal,
+            '品名': productNameVal,
+            '本数': quantityVal,
+            '空気圧センサーパッキン交換': sensorVal,
+            'タイヤ手配状況': arrangementVal,
+            '廃タイヤ処分': disposalVal,
+            '連絡先': contactVal,
+            '特記事項': specialNotesVal,
+            'フォーム入力者': submitterVal,
         };
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
