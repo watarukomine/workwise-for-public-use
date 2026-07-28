@@ -65,8 +65,8 @@ const READONLY_FIELDS = new Set(['id']);
 
 // Fields with select options
 const SELECT_FIELDS: Record<string, string[]> = {
-  'role': ['admin', 'staff'],
-  'ロール': ['admin', 'staff'],
+  'role': ['admin', 'staff', 'admin/staff', 'controller'],
+  'ロール': ['admin', 'staff', 'admin/staff', 'controller'],
   'area': ['県西', '県央', '県東'],
   '母店': ['厚木', '藤沢', '横須賀', '小田原', '相模原', '平塚', '秦野', '大和'],
 };
@@ -138,7 +138,23 @@ function EditableCell({ value, fieldKey, isReadonly, selectOptions, isEditing, o
   const flashClass = saveStatus === 'success' ? 'animate-pulse bg-green-50 dark:bg-green-900/20' : saveStatus === 'error' ? 'animate-pulse bg-red-50 dark:bg-red-900/20' : '';
 
   if (!isEditing) {
-    if (selectOptions && fieldKey === 'role') return <div className={cn("cursor-pointer rounded px-1 py-0.5", flashClass)} onClick={onStartEdit}><Badge variant={value === 'admin' ? 'default' : 'secondary'} className="text-xs">{value || '−'}</Badge></div>;
+    if (selectOptions && (fieldKey === 'role' || fieldKey === 'ロール')) {
+      const getBadgeVariant = (val: string) => {
+        const norm = String(val || '').toLowerCase().trim();
+        if (norm === 'admin') return 'default';
+        if (norm === 'admin/staff' || (norm.includes('admin') && norm.includes('staff'))) return 'outline';
+        if (norm === 'controller') return 'destructive';
+        return 'secondary';
+      };
+      const isDual = value === 'admin/staff' || value === 'admin\\staff' || (value?.includes('admin') && value?.includes('staff'));
+      return (
+        <div className={cn("cursor-pointer rounded px-1 py-0.5", flashClass)} onClick={onStartEdit}>
+          <Badge variant={getBadgeVariant(value)} className={cn("text-xs font-mono", isDual && "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300")}>
+            {value || '−'}
+          </Badge>
+        </div>
+      );
+    }
     return <div className={cn("cursor-pointer rounded px-2 py-1 min-h-[28px] text-sm hover:bg-muted/60 border border-transparent hover:border-border/40 truncate max-w-[200px]", flashClass)} onClick={onStartEdit} title={value}>{value || <span className="text-muted-foreground/40">−</span>}</div>;
   }
 
