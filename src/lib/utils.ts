@@ -376,7 +376,19 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     _type: findKey(rawOrder, ['_type', 'type']) || (findKey(rawOrder, ['ユーザーコード', 'customerCode', 'お取引先コード']) ? 'order' : 'task'),
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     value: parseFloat(findKey(rawOrder, ['金額', '売上', 'price', 'value']) || 0),
-    staffName: findKey(rawOrder, ['担当', 'スタッフ名', 'staffName', '氏名', '担当者', 'スタッフ', '名前', '担当者名', '社員名', '配置担当', 'staff']) || '',
+    staffName: (() => {
+      let val = findKey(rawOrder, ['担当', '作業担当', '割当担当', 'スタッフ名', 'staffName', '氏名', '担当者', 'スタッフ', '名前', '担当者名', '社員名', '配置担当', 'staff']);
+      if (!val && rawOrder?.raw) {
+        val = findKey(rawOrder.raw, ['担当', '作業担当', '割当担当', 'スタッフ名', 'staffName', '氏名', '担当者', 'スタッフ', '名前', '担当者名', '社員名', '配置担当', 'staff']);
+      }
+      if (!val && Array.isArray(rawOrder) && rawOrder.length >= 28) {
+        val = rawOrder[27]; // Column AB (1-indexed 28 -> 0-indexed 27)
+      }
+      if (!val && rawOrder?.raw && Array.isArray(rawOrder.raw) && rawOrder.raw.length >= 28) {
+        val = rawOrder.raw[27]; // Column AB
+      }
+      return val !== undefined && val !== null ? String(val).trim() : '';
+    })(),
     staffId: findKey(rawOrder, ['スタッフID', 'スタッフコード', 'staffId', '担当者ID', '担当ID', '社員ID', '社員コード', 'staff_id']) || '',
     mainStore: findKey(rawOrder, ['主管店舗', 'mainStore', '主管']) || '',
     customerName: findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '名称', 'お名前', 'Customer', 'storeName']) || '（店舗名未設定）',
