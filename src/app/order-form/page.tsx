@@ -260,8 +260,8 @@ export default function OrderFormPage() {
                 throw new Error('送信に失敗しました。もう一度お試しください。');
             }
 
-            // 3. Trigger GAS Backup in background (ASYNCHRONOUS - Do not await!)
-            createOrderGas({
+            // 3. Trigger GAS Backup in background
+            const gasPayload = {
                 gasUrl: ORDER_GAS_URL,
                 systemId: returnedOrderId,
                 displayId: displayId,
@@ -286,8 +286,26 @@ export default function OrderFormPage() {
                 contact: submissionData.contact || '',
                 specialNotes: submissionData.specialNotes || '',
                 submitter: submissionData.submitter || '',
+            };
+
+            createOrderGas(gasPayload).then(res => {
+                if (res.status === 'error') {
+                    console.warn('GAS creation returned error, attempting fallback fetch:', res.message);
+                    fetch(ORDER_GAS_URL, {
+                        method: 'POST',
+                        body: JSON.stringify({ ...gasPayload, action: 'createOrder' }),
+                        mode: 'no-cors'
+                    }).catch(e => console.error('Fallback GAS fetch error:', e));
+                } else {
+                    console.log('GAS order created successfully:', res);
+                }
             }).catch(gasErr => {
                 console.error('GAS Background sync failed:', gasErr);
+                fetch(ORDER_GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ ...gasPayload, action: 'createOrder' }),
+                    mode: 'no-cors'
+                }).catch(e => console.error('Fallback GAS fetch error:', e));
             });
 
             // Immediately mark as success and return
