@@ -82,6 +82,8 @@ const processOrderData = (
   const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着', '帰社中'];
   const passiveStatuses = ['未着手', '未割当', '待機中'];
 
+  const targetDateStr = targetDate ? (typeof targetDate === 'string' ? normalizeDateStr(targetDate) : format(targetDate, 'yyyy-MM-dd')) : format(new Date(), 'yyyy-MM-dd');
+
   // --- PASS 1: Parse Data, Update Status, Collect Schedulable Items ---
   rawOrdersData.forEach((rawOrder, index) => {
     const mappedOrder = mapRawToOrder(rawOrder, `ord-row-${index}`);
@@ -160,6 +162,12 @@ const processOrderData = (
       }
 
       if (order.scheduledTime) {
+        // CRITICAL FIX: Only display events on timeline if order scheduledDate matches current viewed targetDateStr
+        const normOrderDate = normalizeDateStr(order.scheduledDate);
+        if (normOrderDate && targetDateStr && normOrderDate !== targetDateStr) {
+          return; // Skip orders from other dates from appearing on today's timeline!
+        }
+
         let scheduledTime: Date | null = null;
         let dateStr = order.scheduledDate;
 
@@ -282,8 +290,6 @@ const processOrderData = (
   });
 
   // 3. Determine Unassigned Orders for Current Viewed Date
-  const targetDateStr = targetDate ? (typeof targetDate === 'string' ? targetDate : format(targetDate, 'yyyy-MM-dd')) : format(new Date(), 'yyyy-MM-dd');
-
   const unassignedOrders = orders.filter(order => {
     if (order.isGeneric) return false;
 
