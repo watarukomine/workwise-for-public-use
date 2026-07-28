@@ -2,8 +2,8 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { isValid, format, parseISO } from 'date-fns';
-import type { Order, WithId, Staff } from './types';
-import { logMissingField, logInvalidDate, logOldDateDetected, validationLogger } from './order-validation-logger';
+import type { Order, WithId } from './types';
+import { logMissingField, validationLogger } from './order-validation-logger';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -67,18 +67,17 @@ export const normalizeDateStr = (dStr: any): string => {
   return String(dStr).replace(/\//g, '-').trim();
 };
 
+const normalizeKey = (s: string) => s.replace(/[\s\u3000]+/g, '').toLowerCase();
+
 export function findKey(item: any, possibleKeys: string[]) {
   if (!item || typeof item !== 'object') {
     return undefined;
   }
 
-  // Helper to normalize keys: remove all whitespace (including full-width) and lowercase
-  const normalize = (s: string) => s.replace(/[\s\u3000]+/g, '').toLowerCase();
-
   for (const key of possibleKeys) {
-    const normKey = normalize(key);
-    for (const itemKey in item) {
-      if (normalize(itemKey) === normKey) {
+    const normKey = normalizeKey(key);
+    for (const itemKey of Object.keys(item)) {
+      if (normalizeKey(itemKey) === normKey) {
         return item[itemKey];
       }
     }
@@ -93,7 +92,7 @@ export const formatDate = (dateString: string | undefined | null, formatString: 
 
   try {
     // Fast path: already YYYY/MM/DD or YYYY-MM-DD
-    if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(str)) {
+    if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(str) && formatString === 'yyyy/MM/dd') {
       const parts = str.split(/[\/\-]/);
       return `${parts[0]}/${parts[1].padStart(2, '0')}/${parts[2].padStart(2, '0')}`;
     }
@@ -376,7 +375,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     scheduledTime: scheduledTime || '',
     _type: findKey(rawOrder, ['_type', 'type']) || (findKey(rawOrder, ['ユーザーコード', 'customerCode', 'お取引先コード']) ? 'order' : 'task'),
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
-    value: parseFloat(findKey(rawOrder, ['金額', '売上', 'price', 'value']) || 0),
+    value: parseFloat(String(findKey(rawOrder, ['金額', '売上', 'price', 'value']) || 0).replace(/,/g, '')),
     staffName: (() => {
       let val = findKey(rawOrder, ['担当', '作業担当', '割当担当', 'スタッフ名', 'staffName', '氏名', '担当者', 'スタッフ', '名前', '担当者名', '社員名', '配置担当', 'staff']);
       if (!val && rawOrder?.raw) {

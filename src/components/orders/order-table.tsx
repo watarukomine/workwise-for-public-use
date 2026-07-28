@@ -11,17 +11,12 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
-import { Search, MoreHorizontal, Download } from 'lucide-react';
+import { Search, Download } from 'lucide-react';
 import { cn, findKey, formatDate, formatTime, normalizeDateStr } from '@/lib/utils';
-import { format, isValid, parseISO, startOfToday, isAfter, isEqual } from 'date-fns';
+import { format, isValid, parseISO } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
 import {
@@ -168,7 +163,10 @@ const EXPORT_MAPPING: Record<string, string> = {
 };
 
 
+import { useToast } from '@/hooks/use-toast';
+
 export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState('');
   const [debouncedSearch, setDebouncedSearch] = React.useState('');
   const [sortType, setSortType] = React.useState<'spreadsheet' | 'scheduledDate'>('spreadsheet');
@@ -418,10 +416,10 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
 
       await OrderService.updateOrder(selectedOrder.id, updateData);
       setIsDialogOpen(false);
-      alert('受注データを更新しました。');
+      toast({ title: '受注データを更新しました。', duration: 3000 });
     } catch (e: any) {
       console.error(e);
-      alert(`更新に失敗しました: ${e.message}`);
+      toast({ title: '更新に失敗しました。', variant: 'destructive', duration: 5000 });
     } finally {
       setIsSaving(false);
     }
