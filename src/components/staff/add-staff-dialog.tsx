@@ -25,7 +25,7 @@ import { StaffService } from '@/services/staff-service';
 import { useToast } from '@/hooks/use-toast';
 
 const AREA_OPTIONS = ['県東', '県央', '県西'];
-const STORE_OPTIONS = ['横浜店', '厚木', '藤沢', '横須賀', '小田原', '相模原', '平塚', '秦野', '大和', '東名川崎', '支本部'];
+const STORE_OPTIONS = ['横浜店', '横須賀店', '東名川崎店', '相模原店', '厚木店', '綾瀬店', '小田原店'];
 const ROLE_OPTIONS = [
   { value: 'staff', label: 'staff (スタッフ)' },
   { value: 'admin/staff', label: 'admin/staff (管理者・スタッフ兼任)' },

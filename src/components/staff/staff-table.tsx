@@ -68,7 +68,7 @@ const SELECT_FIELDS: Record<string, string[]> = {
   'role': ['admin', 'staff', 'admin/staff', 'controller'],
   'ロール': ['admin', 'staff', 'admin/staff', 'controller'],
   'area': ['県西', '県央', '県東'],
-  '母店': ['厚木', '藤沢', '横須賀', '小田原', '相模原', '平塚', '秦野', '大和'],
+  '母店': ['横浜店', '横須賀店', '東名川崎店', '相模原店', '厚木店', '綾瀬店', '小田原店'],
 };
 
 const COLUMN_VISIBILITY_KEY = 'workwise_staff_columns_v1';
