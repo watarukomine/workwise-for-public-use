@@ -2942,6 +2942,33 @@ export function ScheduleView({
                                 <Pencil className="mr-2 h-4 w-4" />
                                 編集する
                               </Button>
+                              <Button
+                                variant="outline"
+                                onClick={async () => {
+                                  if (!dialogState.order) return;
+                                  setIsSaving(true);
+                                  try {
+                                    const { OrderService } = await import('@/services/order-service');
+                                    const orderId = dialogState.order.systemId || dialogState.order.id;
+                                    await OrderService.updateOrder(orderId, {
+                                      staffName: '',
+                                      staffId: '',
+                                      status: '未割当',
+                                      updatedAt: new Date().toISOString()
+                                    });
+                                    toast({ title: 'タスクを未割り当てに戻しました' });
+                                    await refetchOrders();
+                                    setDialogState({ mode: 'closed' });
+                                  } catch (err: any) {
+                                    toast({ variant: 'destructive', title: 'エラー', description: err.message });
+                                  } finally {
+                                    setIsSaving(false);
+                                  }
+                                }}
+                                disabled={isSaving}
+                              >
+                                未割当に戻す
+                              </Button>
                               <Button variant="destructive" onClick={() => setIsCancelling(true)} className="bg-red-700 hover:bg-red-800">
                                 受注をキャンセル
                               </Button>

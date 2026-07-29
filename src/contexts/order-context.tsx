@@ -117,6 +117,15 @@ const processOrderData = (
       staffMember = staffMapByName.get(staffNameStr) || staffMapByName.get(norm) || staffBySurname.get(staffNameStr) || staffBySurname.get(norm);
     }
 
+    // RESCUE LOGIC: If staffName exists (e.g., 'DEMO1', deleted/unknown staff) but does not match any active staff member,
+    // normalize staffName to empty so it safely appears in the unassigned orders list for reassignment!
+    if (staffNameStr && !staffMember) {
+      order.staffName = '';
+      if (order.status !== 'キャンセル' && order.status !== '作業完了' && order.status !== '完了') {
+        order.status = '未割当';
+      }
+    }
+
     if (staffMember) {
       // Ensure staffStatusMap entry exists before accessing
       if (!staffStatusMap.has(staffMember.id)) {
