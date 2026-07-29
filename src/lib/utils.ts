@@ -672,3 +672,40 @@ export function calculateTravelTimeMinutes(
 
   return travelMinutes;
 }
+
+/**
+ * 帰社予定・到着予定時刻 (HH:mm) が現在時刻を過ぎているか、または更新日時が過去日付であるか判定する
+ */
+export function isEtaPassed(etaStr?: string | null, lastUpdateIso?: string | null): boolean {
+  if (!etaStr && !lastUpdateIso) return false;
+
+  const now = new Date();
+
+  // 1. lastUpdate が昨日以前（過去日付）であれば無条件に予定時刻超過（自動クリア）
+  if (lastUpdateIso) {
+    try {
+      const lastDate = new Date(lastUpdateIso);
+      if (!isNaN(lastDate.getTime())) {
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        if (lastDate < todayStart) {
+          return true;
+        }
+      }
+    } catch {}
+  }
+
+  // 2. ETA時刻 (HH:mm) の比較
+  if (etaStr) {
+    const cleanTime = String(etaStr).trim();
+    const timeMatch = cleanTime.match(/(\d{1,2}):(\d{2})/);
+    if (timeMatch) {
+      const hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+
+      const etaDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
+      return now.getTime() >= etaDate.getTime();
+    }
+  }
+
+  return false;
+}

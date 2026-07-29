@@ -36,7 +36,7 @@ import {
   TooltipTrigger,
 } from '../ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate, normalizeDateStr } from '../../lib/utils';
+import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate, normalizeDateStr, isEtaPassed } from '../../lib/utils';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import {
@@ -3042,23 +3042,31 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
         </div>
       </div>
       <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[140px]")}>
-        {status && isToday && (
-          <div className="text-xs text-center font-medium leading-snug">
-            <span className={cn(
-              "inline-block px-1.5 py-0.5 rounded text-[11px]",
-              status.status === '帰社中' && "bg-indigo-100 text-indigo-800 font-bold border border-indigo-200",
-              status.status === '移動中' && "bg-purple-100 text-purple-800 font-bold border border-purple-200",
-              status.status === '作業中' && "bg-blue-100 text-blue-800 font-bold border border-blue-200"
-            )}>
-              {status.status}
-            </span>
-            {(status.estimatedArrivalTime || staff.estimatedArrivalTime) && (status.status === '帰社中' || status.status === '移動中') && (
-              <div className="text-[10px] text-indigo-900 font-semibold mt-0.5 whitespace-nowrap">
-                {status.status === '帰社中' ? `帰社予定 ${status.estimatedArrivalTime || staff.estimatedArrivalTime}` : `到着予定 ${status.estimatedArrivalTime || staff.estimatedArrivalTime}`}
-              </div>
-            )}
-          </div>
-        )}
+        {status && isToday && (() => {
+          const etaTime = status.estimatedArrivalTime || staff.estimatedArrivalTime;
+          const lastUpIso = status.lastUpdate || (staff as any).updatedAt;
+          const etaOverdue = isEtaPassed(etaTime, lastUpIso);
+          const displayStatus = (etaOverdue && (status.status === '帰社中' || status.status === '移動中')) ? '待機中' : status.status;
+
+          return (
+            <div className="text-xs text-center font-medium leading-snug">
+              <span className={cn(
+                "inline-block px-1.5 py-0.5 rounded text-[11px]",
+                displayStatus === '帰社中' && "bg-indigo-100 text-indigo-800 font-bold border border-indigo-200",
+                displayStatus === '移動中' && "bg-purple-100 text-purple-800 font-bold border border-purple-200",
+                displayStatus === '作業中' && "bg-blue-100 text-blue-800 font-bold border border-blue-200",
+                displayStatus === '待機中' && "bg-gray-100 text-gray-700 border border-gray-200"
+              )}>
+                {displayStatus}
+              </span>
+              {!etaOverdue && etaTime && (status.status === '帰社中' || status.status === '移動中') && (
+                <div className="text-[10px] text-indigo-900 font-semibold mt-0.5 whitespace-nowrap">
+                  {status.status === '帰社中' ? `帰社予定 ${etaTime}` : `到着予定 ${etaTime}`}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   )

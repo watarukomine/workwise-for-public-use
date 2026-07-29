@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { mapRawToOrder, normalizeDateStr, findKey, cn } from '../../lib/utils';
+import { mapRawToOrder, normalizeDateStr, findKey, cn, isEtaPassed } from '../../lib/utils';
 import { ScheduleView } from '../../components/dashboard/schedule-view';
 import { Staff, StaffStatus, WithId } from '../../lib/types';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';
@@ -475,8 +475,17 @@ export default function DashboardPage() {
           }
         }
 
-        if (displayStatus === '移動開始' || displayStatus === '移動中') return '移動中';
-        if (displayStatus === '帰社' || displayStatus === '帰社中') return '帰社中';
+        const etaTime = (staff as any).estimatedArrivalTime || orderStatusObj?.estimatedArrivalTime;
+        const lastUpIso = orderStatusObj?.lastUpdate || (staff as any).updatedAt;
+
+        if (displayStatus === '移動開始' || displayStatus === '移動中') {
+          if (isEtaPassed(etaTime, lastUpIso)) return '待機中';
+          return '移動中';
+        }
+        if (displayStatus === '帰社' || displayStatus === '帰社中') {
+          if (isEtaPassed(etaTime, lastUpIso)) return '待機中';
+          return '帰社中';
+        }
         if (displayStatus === '現場到着' || displayStatus === '作業待ち') return '作業待ち';
         if (displayStatus === '作業開始' || displayStatus === '作業中') return '作業中';
         // Note: '作業完了' falls through to step 3.

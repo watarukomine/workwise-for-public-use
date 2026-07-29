@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import type { ScheduleEvent, Staff, WithId, Order, StaffStatus } from '@/lib/types';
-import { findKey, mapRawToOrder, normalizeDateStr, formatTime } from '@/lib/utils';
+import { findKey, mapRawToOrder, normalizeDateStr, formatTime, isEtaPassed } from '@/lib/utils';
 import { addMinutes, subMinutes, parseISO, isValid, format, differenceInMinutes } from 'date-fns';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { useSelectedStaff } from './selected-staff-context';
@@ -171,15 +171,20 @@ const processOrderData = (
                 lon = parts[1];
             }
 
+            const lastUpdateIso = lastUpdate.toISOString();
+            const etaTime = order.estimatedArrivalTime;
+            const etaOverdue = isEtaPassed(etaTime, lastUpdateIso);
+            const finalStatus = (etaOverdue && (status === '帰社中' || status === '移動中')) ? '待機中' : status;
+
             staffStatusMap.set(staffMember.id, {
                 staffId: staffMember.id,
-                status: status,
-                lastAction: `[受注] ${status}`,
+                status: finalStatus,
+                lastAction: `[受注] ${finalStatus}`,
                 latitude: !isNaN(lat) ? lat : undefined,
                 longitude: !isNaN(lon) ? lon : undefined,
-                lastUpdate: lastUpdate.toISOString(),
-                estimatedArrivalTime: order.estimatedArrivalTime,
-                nextDestination: order.nextDestination,
+                lastUpdate: lastUpdateIso,
+                estimatedArrivalTime: etaOverdue ? undefined : order.estimatedArrivalTime,
+                nextDestination: etaOverdue ? undefined : order.nextDestination,
             });
         }
       }
