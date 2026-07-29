@@ -2589,6 +2589,7 @@ export function ScheduleView({
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
                         {renderDetailItem('担当者', staff?.name)}
                         {renderDetailItem('フォーム入力者', event.submitter)}
+                        {renderDetailItem('受注日時', event.createdAt ? (event.createdAt instanceof Date ? format(event.createdAt, 'yyyy/MM/dd HH:mm:ss') : formatDate(event.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(event.createdAt)) : '---')}
                         {renderEditableItem('受注No (リマーク1)', 'orderNo')}
                         {renderEditableItem('任意コメント (リマーク2)', 'comment')}
                         {renderEditableItem('お取引先名', 'storeName')}
@@ -2817,6 +2818,7 @@ export function ScheduleView({
                   <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
                       {renderDetailItem('受注ID', dialogState.order.id)}
+                      {renderDetailItem('受注日時', dialogState.order.createdAt ? (dialogState.order.createdAt instanceof Date ? format(dialogState.order.createdAt, 'yyyy/MM/dd HH:mm:ss') : formatDate(dialogState.order.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(dialogState.order.createdAt)) : '---')}
                       {renderEditableItem('受注No (リマーク1)', 'orderNo')}
                       {renderEditableItem('任意コメント (リマーク2)', 'comment')}
                       {renderEditableItem('お取引先名', 'storeName')}

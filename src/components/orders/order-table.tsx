@@ -110,7 +110,8 @@ const EXPORT_HEADERS = [
   '退勤ボタン',
   '緊急フラグ',
   '緊急連絡',
-  '管理者返信'
+  '管理者返信',
+  '受注日時'
 ];
 
 const EXPORT_MAPPING: Record<string, string> = {
@@ -144,6 +145,7 @@ const EXPORT_MAPPING: Record<string, string> = {
   '受注ステータス': 'status',
   '担当': 'staffName',
   '最終更新日時': 'updatedAt',
+  '受注日時': 'createdAt',
   '特記事項': 'specialNotes',
   'フォーム入力者': 'submitter',
   '最終位置情報（緯度,経度）': 'lastLocation',
@@ -617,6 +619,15 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                       value={editForm['SystemID'] || ''}
                       disabled
                       className="bg-muted"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="createdAt">受注日時 (受付タイムスタンプ)</Label>
+                    <Input
+                      id="createdAt"
+                      value={formatDate(selectedOrder.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(selectedOrder.createdAt || editForm['受注日時'] || editForm['最終更新日時'] || '---')}
+                      disabled
+                      className="bg-muted font-semibold text-primary"
                     />
                   </div>
                   <div className="space-y-2">

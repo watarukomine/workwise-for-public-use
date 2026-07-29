@@ -358,6 +358,8 @@ export const OrderService = {
             '廃タイヤ処分': disposalVal,
             '連絡先': contactVal,
             '特記事項': specialNotesVal,
+            '受注日時': (order as any).createdAt ? String((order as any).createdAt) : new Date().toISOString(),
+            'createdAt': (order as any).createdAt ? String((order as any).createdAt) : new Date().toISOString(),
             'フォーム入力者': submitterVal,
         };
 

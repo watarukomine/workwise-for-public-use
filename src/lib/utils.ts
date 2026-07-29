@@ -474,6 +474,24 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     adminReply: findKey(rawOrder, ['管理者返信']) || '',
     isConfirmed: !!(findKey(rawOrder, ['既読確認', '既読', 'confirmedAt', 'readAt'])),
     confirmedAt: String(findKey(rawOrder, ['既読確認', '既読', 'confirmedAt', 'readAt']) || ''),
+    createdAt: (() => {
+      const val = findKey(rawOrder, ['受注日時', '受付日時', '作成日時', '登録日時', 'createdAt', 'created_at', 'タイムスタンプ', 'Timestamp']) || rawOrder.createdAt;
+      if (val) {
+        if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString();
+        if (typeof val === 'object' && (val as any).seconds) return new Date((val as any).seconds * 1000).toISOString();
+        return String(val);
+      }
+      return undefined;
+    })(),
+    updatedAt: (() => {
+      const val = findKey(rawOrder, ['最終更新日時', '更新日時', 'updatedAt', 'updated_at']) || rawOrder.updatedAt;
+      if (val) {
+        if (val instanceof Date && !isNaN(val.getTime())) return val.toISOString();
+        if (typeof val === 'object' && (val as any).seconds) return new Date((val as any).seconds * 1000).toISOString();
+        return String(val);
+      }
+      return undefined;
+    })(),
     raw: rawOrder, // Preserve raw data for context processing
     // Validation metadata - check if this order has any logged issues
     hasValidationIssues: (() => {
