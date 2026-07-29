@@ -113,23 +113,49 @@ export default function DashboardPage() {
   }, [rawOrdersData, orders, currentDate]);
 
   const orderCountsByDate = React.useMemo(() => {
-    if (!rawOrdersData) return {} as Record<string, number>;
     const countsMap: Record<string, number> = {};
+    const processedIds = new Set<string>();
 
-    rawOrdersData.forEach((raw, idx) => {
-      const o = mapRawToOrder(raw, `cnt-${idx}`);
-      const hasNoCustomer = !o.customerCode || o.customerCode === '00000' || !o.customerName || o.customerName === '（店舗名未設定）';
-      const hasNoDetails = !o.taskDetails && !o.orderNo && !o.regNo && !o.productName;
-      if (hasNoCustomer && hasNoDetails) return;
+    const processOrderDate = (scheduledDateRaw: any, id?: string) => {
+      if (id && processedIds.has(id)) return;
+      if (id) processedIds.add(id);
 
-      const normDate = normalizeDateStr(o.scheduledDate);
-      if (normDate) {
-        countsMap[normDate] = (countsMap[normDate] || 0) + 1;
+      if (!scheduledDateRaw) return;
+      const norm = normalizeDateStr(scheduledDateRaw); // returns 'yyyy-MM-dd'
+      if (norm && norm.length === 10) {
+        countsMap[norm] = (countsMap[norm] || 0) + 1;
+        const slashNorm = norm.replace(/-/g, '/');
+        countsMap[slashNorm] = (countsMap[slashNorm] || 0) + 1;
       }
-    });
+    };
+
+    // 1. Process active orders in state
+    if (orders && orders.length > 0) {
+      orders.forEach(o => {
+        if (o.isGeneric) return;
+        const status = String(o.status || '').trim();
+        if (['作業完了', '完了', 'キャンセル', '完了済', '作業終了'].includes(status)) return;
+        const d = o.scheduledDate || (o.raw ? findKey(o.raw, ['作業予定日', 'scheduledDate', '日付']) : '');
+        processOrderDate(d, o.id || o.rawOrderId);
+      });
+    }
+
+    // 2. Process rawOrdersData
+    if (rawOrdersData && rawOrdersData.length > 0) {
+      rawOrdersData.forEach((raw, idx) => {
+        const o = mapRawToOrder(raw, `cnt-${idx}`);
+        const hasNoCustomer = !o.customerCode || o.customerCode === '00000' || !o.customerName || o.customerName === '（店舗名未設定）';
+        const hasNoDetails = !o.taskDetails && !o.orderNo && !o.regNo && !o.productName;
+        if (hasNoCustomer && hasNoDetails) return;
+        const status = String(o.status || '').trim();
+        if (['作業完了', '完了', 'キャンセル', '完了済', '作業終了'].includes(status)) return;
+        const d = o.scheduledDate || (o.raw ? findKey(o.raw, ['作業予定日', 'scheduledDate', '日付']) : '');
+        processOrderDate(d, o.id || o.rawOrderId);
+      });
+    }
 
     return countsMap;
-  }, [rawOrdersData]);
+  }, [rawOrdersData, orders]);
 
   const { isLoading: isLoadingCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -591,7 +617,7 @@ export default function DashboardPage() {
                     <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-2 min-w-[310px]" align="start">
                   <Calendar
                     mode="single"
                     selected={currentDate}
@@ -605,19 +631,28 @@ export default function DashboardPage() {
                     locale={ja}
                     components={{
                       DayContent: (dayProps: any) => {
-                        const date = dayProps.date || dayProps.day?.date || dayProps;
-                        if (!date || !(date instanceof Date)) return null;
-                        const dateStr = normalizeDateStr(date);
-                        const count = orderCountsByDate[dateStr] || 0;
-                        const isSelected = isSameDay(date, currentDate);
+                        const targetDate = dayProps.date instanceof Date 
+                          ? dayProps.date 
+                          : (dayProps.day?.date instanceof Date 
+                            ? dayProps.day.date 
+                            : (dayProps instanceof Date ? dayProps : null));
+
+                        if (!targetDate) {
+                          return <span className="text-xs font-semibold">{dayProps.children || ''}</span>;
+                        }
+
+                        const dateStr = normalizeDateStr(targetDate);
+                        const slashStr = dateStr.replace(/-/g, '/');
+                        const count = orderCountsByDate[dateStr] || orderCountsByDate[slashStr] || 0;
+                        const isSelected = isSameDay(targetDate, currentDate);
 
                         return (
                           <div className="relative flex flex-col items-center justify-center w-full h-full py-0.5">
-                            <span className="text-xs font-semibold leading-tight">{date.getDate()}</span>
+                            <span className="text-xs font-semibold leading-tight">{targetDate.getDate()}</span>
                             {count > 0 ? (
                               <span className={cn(
-                                "mt-0.5 px-1 py-0.5 text-[9px] font-bold rounded-full leading-none shadow-sm min-w-[16px] text-center transition-all",
-                                isSelected ? "bg-white text-blue-700 font-extrabold" : "bg-blue-600 text-white"
+                                "mt-0.5 px-1 py-0.2 text-[9px] font-extrabold rounded-full leading-none shadow-sm min-w-[16px] text-center transition-all px-1",
+                                isSelected ? "bg-white text-blue-700 shadow-md" : "bg-blue-600 text-white"
                               )}>
                                 {count}件
                               </span>
