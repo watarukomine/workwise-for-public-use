@@ -31,6 +31,13 @@ export const StaffService = {
                 id: docSnap.id,
                 ...docSnap.data()
             } as WithId<Staff>));
+
+            staffList.sort((a, b) => {
+                const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof (a as any).order === 'number' ? (a as any).order : 999);
+                const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : (typeof (b as any).order === 'number' ? (b as any).order : 999);
+                return orderA - orderB;
+            });
+
             callback(staffList);
         }, (error) => {
             console.error("[StaffService] Error in staff realtime subscription:", error);
@@ -48,10 +55,18 @@ export const StaffService = {
         const q = query(colRef, where('_type', '!=', 'order'));
         const snapshot = await getDocs(q);
 
-        return snapshot.docs.map(docSnap => ({
+        const staffList = snapshot.docs.map(docSnap => ({
             id: docSnap.id,
             ...docSnap.data()
         } as WithId<Staff>));
+
+        staffList.sort((a, b) => {
+            const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof (a as any).order === 'number' ? (a as any).order : 999);
+            const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : (typeof (b as any).order === 'number' ? (b as any).order : 999);
+            return orderA - orderB;
+        });
+
+        return staffList;
     },
 
     /**

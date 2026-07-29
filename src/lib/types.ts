@@ -14,6 +14,8 @@ export type Staff = {
   role: 'admin' | 'staff';
   area?: '県西' | '県央' | '県東';
   '母店'?: string;
+  sortOrder?: number;
+  order?: number;
   /** @deprecated パスワードをFirestoreに平文保存するのはセキュリティリスクです。Firebase Authへの完全移行を推奨。 */
   password?: string;
   'ロール'?: 'admin' | 'staff';

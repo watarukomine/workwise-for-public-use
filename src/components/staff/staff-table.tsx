@@ -6,7 +6,7 @@ import {
 } from '../ui/table';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
-import { Search, Trash2, Download, Loader2, Check, Settings2 } from 'lucide-react';
+import { Search, Trash2, Download, Loader2, Check, Settings2, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -246,6 +246,24 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     else { const prev = editableIndices[pos - 1]; if (prev !== undefined) setEditingCell({ rowId, colIdx: prev }); else { const rIds = filteredStaff.map(o => o.id); const ri = rIds.indexOf(rowId); if (ri > 0) setEditingCell({ rowId: rIds[ri - 1], colIdx: editableIndices[editableIndices.length - 1] }); else setEditingCell(null); } }
   }, [displayColumns, filteredStaff]);
 
+  const handleMoveOrder = React.useCallback(async (currentIndex: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= filteredStaff.length) return;
+
+    const currentStaff = filteredStaff[currentIndex];
+    const targetStaff = filteredStaff[targetIndex];
+
+    try {
+      await Promise.all([
+        StaffService.updateStaff(currentStaff.id, { sortOrder: targetIndex }),
+        StaffService.updateStaff(targetStaff.id, { sortOrder: currentIndex })
+      ]);
+      toast({ title: '並び順を更新しました', description: `${currentStaff.name || 'スタッフ'} の並び順を変更しました。` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '並び順の更新に失敗', description: e.message });
+    }
+  }, [filteredStaff, toast]);
+
   return (
     <>
       <Card className="shadow-sm">
@@ -275,17 +293,30 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
               <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                 <TableRow className="hover:bg-transparent">
                   {isAdmin && <TableHead className="w-[40px]"><Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} disabled={staffList.length === 0} /></TableHead>}
+                  {isAdmin && <TableHead className="w-[70px] text-xs font-semibold text-center">並び順</TableHead>}
                   {displayColumns.map(col => (<TableHead key={col} className="text-xs font-semibold whitespace-nowrap px-2">{col}</TableHead>))}
                   {isAdmin && <TableHead className="w-[40px]" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={displayColumns.length + (isAdmin ? 2 : 0)} className="h-32 text-center"><div className="flex items-center justify-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />読み込み中...</div></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={displayColumns.length + (isAdmin ? 3 : 0)} className="h-32 text-center"><div className="flex items-center justify-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />読み込み中...</div></TableCell></TableRow>
                 ) : filteredStaff.length > 0 ? (
-                  filteredStaff.map(member => (
+                  filteredStaff.map((member, idx) => (
                     <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>
                       {isAdmin && <TableCell className="py-1 px-1"><Checkbox checked={pendingSelectedStaffIds.includes(member.id)} onCheckedChange={() => togglePendingStaffSelection(member.id)} /></TableCell>}
+                      {isAdmin && (
+                        <TableCell className="py-1 px-1 text-center">
+                          <div className="flex items-center justify-center gap-0.5">
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" disabled={idx === 0} onClick={() => handleMoveOrder(idx, 'up')} title="上へ移動">
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" disabled={idx === filteredStaff.length - 1} onClick={() => handleMoveOrder(idx, 'down')} title="下へ移動">
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                       {displayColumns.map((col, colIdx) => {
                         const val = member[col as keyof typeof member];
                         const strValue = val !== undefined && val !== null ? String(val) : '';
@@ -302,7 +333,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                     </TableRow>
                   ))
                 ) : (
-                  <TableRow><TableCell colSpan={displayColumns.length + (isAdmin ? 2 : 0)} className="h-32 text-center text-muted-foreground">{staffList.length === 0 ? "スタッフ情報がありません。" : "検索条件に合うスタッフが見つかりません。"}</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={displayColumns.length + (isAdmin ? 3 : 0)} className="h-32 text-center text-muted-foreground">{staffList.length === 0 ? "スタッフ情報がありません。" : "検索条件に合うスタッフが見つかりません。"}</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
