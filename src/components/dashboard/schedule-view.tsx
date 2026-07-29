@@ -81,6 +81,7 @@ const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
 const STAFF_COL_WIDTH = 144;
 const STATUS_COL_WIDTH = 120;
 const TOTAL_TIMELINE_WIDTH = STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH;
+const EMPTY_EVENTS: WithId<ScheduleEvent>[] = [];
 
 const isGenericTask = (order: any) => {
   if (!order) return false;
@@ -384,23 +385,35 @@ function GenericTasks() {
   );
 }
 
-function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date, onDoubleClickOrder: (order: WithId<Order>) => void }) {
-  const getCustomerByCode = (code: string | undefined): WithId<Customer> | undefined => {
+const UnassignedTasks = React.memo(({ orders, customers, date, onDoubleClickOrder }: { orders: WithId<Order>[], customers: WithId<Customer>[], date: Date, onDoubleClickOrder: (order: WithId<Order>) => void }) => {
+  const customerMap = React.useMemo(() => {
+    const map = new Map<string, WithId<Customer>>();
+    customers?.forEach(c => {
+      const cCode = c.userCode || c['ユーザーコード'] || '';
+      if (cCode) {
+        const paddedCode = String(cCode).trim().padStart(5, '0');
+        map.set(paddedCode, c);
+      }
+    });
+    return map;
+  }, [customers]);
+
+  const getCustomerByCode = React.useCallback((code: string | undefined): WithId<Customer> | undefined => {
     if (!code) return undefined;
     const paddedCode = String(code).trim().padStart(5, '0');
-    return customers?.find(c => {
-      const cCode = c.userCode || c['ユーザーコード'] || '';
-      return String(cCode).trim().padStart(5, '0') === paddedCode;
-    });
-  };
+    return customerMap.get(paddedCode);
+  }, [customerMap]);
+
   const { setNodeRef, isOver } = useDroppable({ id: UNASSIGNED_TASKS_DROPPABLE_ID });
 
-  const titleText = isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`;
+  const titleText = React.useMemo(() => isToday(date) ? '本日の受注タスク' : `${format(date, 'M/d')}の受注タスク`, [date]);
 
-  const dailyOrders = orders.filter(order => {
-    const status = String(order.status || (order as any)['受注ステータス'] || '').trim();
-    return !['作業完了', '完了', 'キャンセル', '完了済', '作業終了'].includes(status);
-  });
+  const dailyOrders = React.useMemo(() => {
+    return orders.filter(order => {
+      const status = String(order.status || (order as any)['受注ステータス'] || '').trim();
+      return !['作業完了', '完了', 'キャンセル', '完了済', '作業終了'].includes(status);
+    });
+  }, [orders]);
 
   return (
     <Card
@@ -416,12 +429,11 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
           <div className="pr-4 min-h-[6rem]">
             <div className="flex flex-wrap gap-2">
               {dailyOrders.map((order, index) => (
-                <DraggableOrder
+                <UnassignedOrderItem
                   key={`${order.id}-${index}`}
                   order={order}
                   customer={getCustomerByCode(order.customerCode)}
-                  onDoubleClick={() => onDoubleClickOrder(order)}
-                  className={order.status === 'キャンセル' ? 'bg-red-100 dark:bg-red-900/30 border-red-500/50' : ''}
+                  onDoubleClick={onDoubleClickOrder}
                 />
               ))}
               {dailyOrders.length === 0 && (
@@ -435,7 +447,22 @@ function UnassignedTasks({ orders, customers, date, onDoubleClickOrder }: { orde
       </CardContent>
     </Card>
   );
-}
+});
+
+const UnassignedOrderItem = React.memo(({ order, customer, onDoubleClick }: { order: WithId<Order>, customer?: WithId<Customer>, onDoubleClick: (order: WithId<Order>) => void }) => {
+  const handleDoubleClick = React.useCallback(() => {
+    onDoubleClick(order);
+  }, [onDoubleClick, order]);
+
+  return (
+    <DraggableOrder
+      order={order}
+      customer={customer}
+      onDoubleClick={handleDoubleClick}
+      className={order.status === 'キャンセル' ? 'bg-red-100 dark:bg-red-900/30 border-red-500/50' : ''}
+    />
+  );
+});
 
 const TimeIndicator = () => {
   const [now, setNow] = React.useState<Date | null>(null);
@@ -646,9 +673,32 @@ export function ScheduleView({
     }
   }, [dialogState, allCustomers]);
 
-  const getCustomerByCode = React.useCallback((code: string | undefined): WithId<Customer> | undefined => allCustomers?.find(c => c.userCode === code), [allCustomers]);
+  const customerMap = React.useMemo(() => {
+    const map = new Map<string, WithId<Customer>>();
+    allCustomers?.forEach(c => {
+      if (c.userCode) map.set(c.userCode, c);
+    });
+    return map;
+  }, [allCustomers]);
+
+  const staffMap = React.useMemo(() => {
+    const map = new Map<string, WithId<Staff>>();
+    allStaff?.forEach(s => {
+      if (s.id) map.set(s.id, s);
+    });
+    return map;
+  }, [allStaff]);
+
+  const getCustomerByCode = React.useCallback((code: string | undefined): WithId<Customer> | undefined => {
+    if (!code) return undefined;
+    return customerMap.get(code);
+  }, [customerMap]);
+
   // Use allStaff instead of filtered staffData for lookup
-  const getStaffById = React.useCallback((id: string | undefined): WithId<Staff> | undefined => allStaff?.find(s => s.id === id), [allStaff]);
+  const getStaffById = React.useCallback((id: string | undefined): WithId<Staff> | undefined => {
+    if (!id) return undefined;
+    return staffMap.get(id);
+  }, [staffMap]);
 
   const formatEventDescription = (event: any) => {
     const descriptionParts = [
@@ -2235,7 +2285,10 @@ export function ScheduleView({
     );
   };
 
-  const contextValue: ScheduleViewContextType = { getCustomerByCode, getStaffById };
+  const contextValue: ScheduleViewContextType = React.useMemo(() => ({
+    getCustomerByCode,
+    getStaffById
+  }), [getCustomerByCode, getStaffById]);
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -2393,7 +2446,7 @@ export function ScheduleView({
                         </div>
                       )}
                       {staffData?.map((staff) => {
-                        const events = eventsByStaffId.get(staff.id) || [];
+                        const events = eventsByStaffId.get(staff.id) || EMPTY_EVENTS;
                         const status = statusByStaffId.get(staff.id);
                         return (
                           <StaffRow 

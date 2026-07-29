@@ -80,8 +80,15 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
     const [forceMobileView, setForceMobileView] = useState(false);
     const [adminWantsTimelineView, setAdminWantsTimelineView] = useState(false);
 
+    const value = React.useMemo(() => ({
+        forceMobileView,
+        setForceMobileView,
+        adminWantsTimelineView,
+        setAdminWantsTimelineView
+    }), [forceMobileView, adminWantsTimelineView]);
+
     return (
-        <AppShellContext.Provider value={{ forceMobileView, setForceMobileView, adminWantsTimelineView, setAdminWantsTimelineView }}>
+        <AppShellContext.Provider value={value}>
             {children}
         </AppShellContext.Provider>
     );

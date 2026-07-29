@@ -541,62 +541,32 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     if (viewedDateStr === todayStr) return;
 
-    console.log(`[OrderProvider] Subscribing to Firestore updates for viewed date: ${viewedDateStr}`);
-    
-    // Immediate direct fetch for the viewed date to guarantee 1st-click instant rendering
-    OrderService.getOrdersByDate(viewedDateStr).then(directOrders => {
-      if (directOrders && directOrders.length > 0) {
-        setRawOrdersData(prev => {
-          const orderMap = new Map();
-          const normViewed = normalizeDateStr(viewedDateStr);
-          prev.forEach(o => {
-            const normO = normalizeDateStr(o.scheduledDate);
-            if (normO !== normViewed) {
+    // Direct fetch only if not already loaded into rawOrdersData
+    const normViewed = normalizeDateStr(viewedDateStr);
+    const hasDataForDate = rawOrdersData.some(o => normalizeDateStr(o.scheduledDate) === normViewed);
+
+    if (!hasDataForDate) {
+      console.log(`[OrderProvider] Non-blocking fetch for viewed date: ${viewedDateStr}`);
+      OrderService.getOrdersByDate(viewedDateStr).then(directOrders => {
+        if (directOrders && directOrders.length > 0) {
+          setRawOrdersData(prev => {
+            const orderMap = new Map();
+            prev.forEach(o => {
               const id = o.id || o.systemId;
               if (id) orderMap.set(id, o);
-            }
+            });
+            directOrders.forEach(o => {
+              const id = o.id || o.systemId;
+              if (id) orderMap.set(id, o);
+            });
+            return Array.from(orderMap.values());
           });
-          directOrders.forEach(o => {
-            const id = o.id || o.systemId;
-            if (id) orderMap.set(id, o);
-          });
-          return Array.from(orderMap.values());
-        });
-      }
-    }).catch(err => console.warn('Direct fetch for viewed date failed:', err));
-
-    const unsubscribeViewed = OrderService.subscribeToOrders(viewedDateStr, (updatedOrders, removedIds) => {
-      setRawOrdersData(prev => {
-        const orderMap = new Map();
-        const normViewed = normalizeDateStr(viewedDateStr);
-        // Keep non-viewed orders
-        prev.forEach(o => {
-          const normO = normalizeDateStr(o.scheduledDate);
-          if (normO !== normViewed) {
-            const id = o.id || o.systemId;
-            if (id) orderMap.set(id, o);
-          }
-        });
-        // Explicitly delete removed IDs
-        if (removedIds && removedIds.length > 0) {
-          removedIds.forEach(id => orderMap.delete(id));
         }
-        // Add updated viewed orders
-        updatedOrders.forEach(o => {
-          const id = o.id || o.systemId;
-          if (id) orderMap.set(id, o);
-        });
-        return Array.from(orderMap.values());
-      });
-    });
+      }).catch(err => console.warn('Direct fetch for viewed date failed:', err));
+    }
+  }, [profile, isProfileLoading, currentViewedDate, rawOrdersData]);
 
-    return () => {
-      console.log(`[OrderProvider] Unsubscribing from viewed date: ${viewedDateStr}`);
-      unsubscribeViewed();
-    };
-  }, [profile, isProfileLoading, currentViewedDate]);
-
-  const saveLocalEvent = (event: WithId<ScheduleEvent>) => {
+  const saveLocalEvent = useCallback((event: WithId<ScheduleEvent>) => {
     setLocalScheduleEvents(prev => {
       const idx = prev.findIndex(e => e.id === event.id);
       let next;
@@ -608,11 +578,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       }
       return next;
     });
-  };
+  }, []);
 
-  const deleteLocalEvent = (eventId: string) => {
+  const deleteLocalEvent = useCallback((eventId: string) => {
     setLocalScheduleEvents(prev => prev.filter(e => e.id !== eventId));
-  };
+  }, []);
 
   // Process data using useMemo for high performance & 0-lag rendering
   const processedData = React.useMemo(() => {
@@ -657,52 +627,62 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     deleteLocalEvent(`${id}-task`);
   }, [deleteLocalEvent]);
 
-  const value: OrderContextType = {
+  const loadOrders = useCallback(async (date: Date) => {
+    const dateStr = date.toISOString().split('T')[0];
+    const lastFetched = fetchedDateRangesRef.current.get(dateStr);
+    const isStale = lastFetched ? (Date.now() - lastFetched > 120000) : true; // Cache for 2 mins
+
+    if (!isStale) {
+      console.log(`[OrderProvider] Date ${dateStr} in cache, instant load.`);
+      return;
+    }
+    console.log(`[OrderProvider] Non-blocking background fetch for date: ${dateStr}`);
+    fetchAndProcessData(false, { date: dateStr, range: 1 }).catch(err => {
+      console.warn(`[OrderProvider] Background fetch error for ${dateStr}:`, err);
+    });
+  }, [fetchAndProcessData]);
+
+  const syncOrders = useCallback(async () => {
+    await fetchAndProcessData(false);
+  }, [fetchAndProcessData]);
+
+  const refetchOrders = useCallback(async () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    await fetchAndProcessData(true, { date: todayStr, range: 3 });
+    
+    const viewedDate = currentViewedDateRef.current;
+    if (viewedDate) {
+      const diffDays = Math.abs(differenceInMinutes(viewedDate, new Date()) / (60 * 24));
+      if (diffDays > 3) {
+        const viewedDateStr = viewedDate.toISOString().split('T')[0];
+        await fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
+      }
+    }
+  }, [fetchAndProcessData]);
+
+  const loadRange = useCallback(async (date: Date, range: number) => {
+    const dateStr = date.toISOString().split('T')[0];
+    console.log(`[OrderProvider] Loading wider range data for: ${dateStr}, range: ${range}`);
+    await fetchAndProcessData(true, { date: dateStr, range });
+  }, [fetchAndProcessData]);
+
+  const value: OrderContextType = React.useMemo(() => ({
     orders,
     unassignedOrders,
     setUnassignedOrders,
     scheduleEvents,
     setScheduleEvents,
     statuses,
-    loadOrders: async (date: Date) => {
-      const dateStr = date.toISOString().split('T')[0];
-      const lastFetched = fetchedDateRangesRef.current.get(dateStr);
-      const isStale = lastFetched ? (Date.now() - lastFetched > 120000) : true; // Cache for 2 mins
-
-      if (!isStale) {
-        console.log(`[OrderProvider] Date ${dateStr} in cache, instant load.`);
-        return;
-      }
-      console.log(`[OrderProvider] Non-blocking background fetch for date: ${dateStr}`);
-      fetchAndProcessData(false, { date: dateStr, range: 1 }).catch(err => {
-        console.warn(`[OrderProvider] Background fetch error for ${dateStr}:`, err);
-      });
-    },
-    syncOrders: async () => { await fetchAndProcessData(false); },
+    loadOrders,
+    syncOrders,
     isLoading,
     isSyncingOrders: isLoading,
     error,
     saveLocalEvent,
     deleteLocalEvent,
     deleteOrder,
-    refetchOrders: async () => {
-      const todayStr = new Date().toISOString().split('T')[0];
-      await fetchAndProcessData(true, { date: todayStr, range: 3 });
-      
-      const viewedDate = currentViewedDateRef.current;
-      if (viewedDate) {
-        const diffDays = Math.abs(differenceInMinutes(viewedDate, new Date()) / (60 * 24));
-        if (diffDays > 3) {
-          const viewedDateStr = viewedDate.toISOString().split('T')[0];
-          await fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
-        }
-      }
-    },
-    loadRange: async (date: Date, range: number) => {
-      const dateStr = date.toISOString().split('T')[0];
-      console.log(`[OrderProvider] Loading wider range data for: ${dateStr}, range: ${range}`);
-      await fetchAndProcessData(true, { date: dateStr, range });
-    },
+    refetchOrders,
+    loadRange,
     rawOrdersData,
     orderGasUrl,
     setOrderGasUrl,
@@ -710,7 +690,28 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     suppressedTripIds,
     currentViewedDate,
     setCurrentViewedDate
-  };
+  }), [
+    orders,
+    unassignedOrders,
+    scheduleEvents,
+    statuses,
+    loadOrders,
+    syncOrders,
+    isLoading,
+    error,
+    saveLocalEvent,
+    deleteLocalEvent,
+    deleteOrder,
+    refetchOrders,
+    loadRange,
+    rawOrdersData,
+    orderGasUrl,
+    setOrderGasUrl,
+    toggleTripSuppression,
+    suppressedTripIds,
+    currentViewedDate,
+    setCurrentViewedDate
+  ]);
 
   return (
     <OrderContext.Provider value={value}>
