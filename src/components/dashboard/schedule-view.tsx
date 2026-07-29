@@ -1731,9 +1731,9 @@ export function ScheduleView({
     try {
       let orderId: string | undefined;
       if (dialogState.mode === 'details' || dialogState.mode === 'edit') {
-        orderId = dialogState.event?.id;
+        orderId = dialogState.event?.systemId || dialogState.event?.rawOrderId || dialogState.event?.id;
       } else if (dialogState.mode === 'order-details') {
-        orderId = dialogState.order?.id;
+        orderId = dialogState.order?.systemId || dialogState.order?.id;
       }
 
       if (orderId) {
@@ -1961,8 +1961,9 @@ export function ScheduleView({
         }
         const { title, description } = editedEventDetails;
 
-        // Sheet-based event (Order OR Generic Task)
-        if (eventToUpdate.rawOrderId || (eventToUpdate.id && eventToUpdate.id.startsWith('task-'))) {
+        // Database or Sheet-based event (Order OR Generic Task)
+        const isDatabaseOrSheetOrder = eventToUpdate.systemId || eventToUpdate.rawOrderId || eventToUpdate.customerCode || (eventToUpdate.id && (eventToUpdate.id.startsWith('task-') || eventToUpdate.id.startsWith('trip-') || eventToUpdate.id.startsWith('event-') || eventToUpdate.id.startsWith('ord-')));
+        if (isDatabaseOrSheetOrder) {
           // Optimistic UI Update first
           const updatedEvent: WithId<ScheduleEvent> = {
             ...eventToUpdate,
@@ -2003,7 +2004,8 @@ export function ScheduleView({
             if (overrides.statusValue) {
               updateFields.status = overrides.statusValue;
             }
-            await OrderService.updateOrder(eventToUpdate.systemId || eventToUpdate.id, updateFields);
+            const targetId = eventToUpdate.systemId || eventToUpdate.rawOrderId || eventToUpdate.id;
+            await OrderService.updateOrder(targetId, updateFields);
           } catch (fsErr) {
             console.error("Firestore sync error on save event:", fsErr);
           }
