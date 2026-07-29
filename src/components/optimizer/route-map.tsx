@@ -129,11 +129,19 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
                 <AdvancedMarker key={`staff-${s.id}`} position={{ lat, lng }}>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div
-                        className="w-8 h-8 rounded-full bg-white border-2 flex items-center justify-center shadow-md cursor-pointer hover:scale-110 transition-transform"
-                        style={{ borderColor: markerColor }}
-                      >
-                        <User className="w-5 h-5" style={{ color: markerColor }} />
+                      <div className="flex flex-col items-center group cursor-pointer select-none">
+                        <div
+                          className="px-2 py-0.5 rounded-md bg-white/95 dark:bg-slate-900/95 border-2 shadow-md text-[11px] font-extrabold text-slate-800 dark:text-slate-100 whitespace-nowrap mb-1 group-hover:scale-105 transition-transform"
+                          style={{ borderColor: markerColor }}
+                        >
+                          {displayName}
+                        </div>
+                        <div
+                          className="w-8 h-8 rounded-full bg-white border-2 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform"
+                          style={{ borderColor: markerColor }}
+                        >
+                          <User className="w-5 h-5" style={{ color: markerColor }} />
+                        </div>
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>

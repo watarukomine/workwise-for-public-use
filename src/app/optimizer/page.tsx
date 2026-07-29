@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { isToday } from 'date-fns';
+import { getStoreLocation } from '@/lib/utils';
 
 
 function OptimizerPageContent() {
@@ -73,22 +74,33 @@ function OptimizerPageContent() {
   }, [filteredStaffFromSelection, contextStatuses]);
 
   const staffWithLocation = React.useMemo(() => {
-    return filteredStaffFromSelection.map(staffMember => {
-      const status = statuses.find(s => s.staffId === staffMember.id);
+    const staffList = allStaff && allStaff.length > 0 ? allStaff : filteredStaffFromSelection;
+    if (!staffList || staffList.length === 0) return [];
 
-      const lat = status?.latitude !== undefined && status?.latitude !== null ? Number(status.latitude) : ((staffMember as any).latitude !== undefined && (staffMember as any).latitude !== null ? Number((staffMember as any).latitude) : undefined);
-      const lng = status?.longitude !== undefined && status?.longitude !== null ? Number(status.longitude) : ((staffMember as any).longitude !== undefined && (staffMember as any).longitude !== null ? Number((staffMember as any).longitude) : undefined);
+    return staffList.map(staffMember => {
+      const status = statuses.find(s => s.staffId === staffMember.id);
+      const storeLoc = getStoreLocation(staffMember['母店']);
+
+      // Exhaustive lat/lng resolution (status -> staffMember -> store location fallback)
+      const rawLat = status?.latitude ?? (status as any)?.lat ?? (status as any)?.currentLocation?.latitude ?? (staffMember as any).latitude ?? (staffMember as any).lat ?? storeLoc.latitude;
+
+      const rawLng = status?.longitude ?? (status as any)?.lng ?? (status as any)?.currentLocation?.longitude ?? (staffMember as any).longitude ?? (staffMember as any).lng ?? storeLoc.longitude;
+
+      const lat = rawLat !== undefined && rawLat !== null ? Number(rawLat) : storeLoc.latitude;
+      const lng = rawLng !== undefined && rawLng !== null ? Number(rawLng) : storeLoc.longitude;
+
+      const displayName = staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定';
 
       return {
         ...staffMember,
         ...status,
-        name: staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定',
+        name: displayName,
         latitude: lat,
         longitude: lng,
-        lastAction: status?.lastAction || (staffMember as any).currentStatus || '位置情報あり'
+        lastAction: status?.lastAction || (staffMember as any).currentStatus || (staffMember['母店'] ? `${staffMember['母店']}` : '現在地')
       };
     }).filter(s => s.latitude !== undefined && s.longitude !== undefined && !isNaN(s.latitude) && !isNaN(s.longitude));
-  }, [filteredStaffFromSelection, statuses]);
+  }, [allStaff, filteredStaffFromSelection, statuses]);
 
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
