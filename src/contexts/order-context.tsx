@@ -271,12 +271,13 @@ const processOrderData = (
       if (item.isGeneric && !item.isAccompany) {
         newScheduleEvents.push(taskEvent);
       } else {
-        let shouldSuppress = true; // Default suppress redundant travel events
+        let shouldSuppress = false; // Default: ALWAYS show travel event before assigned task!
 
         if (lastEndTime) {
           const gapMinutes = differenceInMinutes(item.start, lastEndTime);
-          if (gapMinutes > 15 && gapMinutes < 180) {
-            shouldSuppress = false;
+          // Only suppress travel chip if current task starts less than 15 minutes after previous task finished
+          if (gapMinutes >= 0 && gapMinutes < 15) {
+            shouldSuppress = true;
           }
         }
 
