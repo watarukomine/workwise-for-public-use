@@ -37,6 +37,7 @@ import { useToast } from '../../hooks/use-toast';
 
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
+  const deferredDate = React.useDeferredValue(currentDate);
   const [isPending, startTransition] = React.useTransition();
   const [calendarOpen, setCalendarOpen] = React.useState(false);
   const router = useRouter();
@@ -758,13 +759,13 @@ export default function DashboardPage() {
         {showVerticalView ? (
           <VerticalScheduleView
             staffData={filteredStaff}
-            currentDate={currentDate}
+            currentDate={deferredDate}
             checkedOutStaffIds={checkedOutStaffIds}
           />
         ) : (
           <ScheduleView
             staffData={filteredStaff}
-            currentDate={currentDate}
+            currentDate={deferredDate}
             checkedOutStaffIds={checkedOutStaffIds}
             statuses={derivedStatuses}
           />

@@ -25,7 +25,7 @@ const formatTime = (date: Date | string | undefined) => {
   return format(d, 'HH:mm');
 };
 
-export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffIds }: VerticalScheduleViewProps) {
+export const VerticalScheduleView = React.memo(function VerticalScheduleView({ staffData, currentDate, checkedOutStaffIds }: VerticalScheduleViewProps) {
   const { customers } = useCustomer();
   const { scheduleEvents, orders } = useOrder();
   const { profile } = useUserProfile();
@@ -210,4 +210,4 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
       })}
     </div>
   );
-}
+});
