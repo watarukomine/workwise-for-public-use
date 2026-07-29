@@ -349,10 +349,12 @@ export default function DashboardPage() {
       } catch (e) {
         if (!cancelled) console.error("Failed to sync attendance:", e);
       } finally {
-        if (!cancelled && isDateChange) {
+        if (!cancelled) {
           isDateLoading.current = false;
           setIsSyncing(false);
-          loadOrders(currentDate);
+          if (isDateChange) {
+            loadOrders(currentDate);
+          }
         }
       }
     };
