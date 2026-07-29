@@ -112,6 +112,25 @@ export default function DashboardPage() {
     };
   }, [rawOrdersData, orders, currentDate]);
 
+  const orderCountsByDate = React.useMemo(() => {
+    if (!rawOrdersData) return {} as Record<string, number>;
+    const countsMap: Record<string, number> = {};
+
+    rawOrdersData.forEach((raw, idx) => {
+      const o = mapRawToOrder(raw, `cnt-${idx}`);
+      const hasNoCustomer = !o.customerCode || o.customerCode === '00000' || !o.customerName || o.customerName === '（店舗名未設定）';
+      const hasNoDetails = !o.taskDetails && !o.orderNo && !o.regNo && !o.productName;
+      if (hasNoCustomer && hasNoDetails) return;
+
+      const normDate = normalizeDateStr(o.scheduledDate);
+      if (normDate) {
+        countsMap[normDate] = (countsMap[normDate] || 0) + 1;
+      }
+    });
+
+    return countsMap;
+  }, [rawOrdersData]);
+
   const { isLoading: isLoadingCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { allStaff, appliedSelectedStaffIds, setSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
@@ -190,18 +209,7 @@ export default function DashboardPage() {
     return selectedStaff.map(s => s.name).join('、');
   }, [allStaff, appliedSelectedStaffIds, profile]);
 
-  const orderCountsByDate = React.useMemo(() => {
-    const counts: Record<string, number> = {};
-    (orders || []).forEach(order => {
-      if (order.isGeneric) return;
-      const dRaw = order.scheduledDate || (order.raw ? findKey(order.raw, ['作業予定日', 'scheduledDate', '日付']) : '');
-      const d = normalizeDateStr(dRaw);
-      if (d) {
-        counts[d] = (counts[d] || 0) + 1;
-      }
-    });
-    return counts;
-  }, [orders]);
+
 
   const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading || isLoadingCustomers;
 
@@ -595,22 +603,24 @@ export default function DashboardPage() {
                     locale={ja}
                     components={{
                       DayContent: (dayProps: any) => {
-                        const date = dayProps.date;
-                        if (!date) return null;
+                        const date = dayProps.date || dayProps.day?.date || dayProps;
+                        if (!date || !(date instanceof Date)) return null;
                         const dateStr = normalizeDateStr(date);
                         const count = orderCountsByDate[dateStr] || 0;
                         const isSelected = isSameDay(date, currentDate);
 
                         return (
                           <div className="relative flex flex-col items-center justify-center w-full h-full py-0.5">
-                            <span className="text-xs font-semibold">{date.getDate()}</span>
-                            {count > 0 && (
+                            <span className="text-xs font-semibold leading-tight">{date.getDate()}</span>
+                            {count > 0 ? (
                               <span className={cn(
-                                "mt-0.5 px-1 py-0.2 text-[9px] font-bold rounded-full leading-none shadow-sm min-w-[14px] text-center transition-all",
-                                isSelected ? "bg-white text-blue-700" : "bg-blue-600 text-white"
+                                "mt-0.5 px-1 py-0.5 text-[9px] font-bold rounded-full leading-none shadow-sm min-w-[16px] text-center transition-all",
+                                isSelected ? "bg-white text-blue-700 font-extrabold" : "bg-blue-600 text-white"
                               )}>
                                 {count}件
                               </span>
+                            ) : (
+                              <span className="h-3" />
                             )}
                           </div>
                         );

@@ -38,7 +38,7 @@ function Calendar({
         week: "flex w-full mt-2", // v9: Updated from row
         day: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100"
+          "h-11 w-11 p-0 font-normal aria-selected:opacity-100 flex flex-col items-center justify-center"
         ),
         day_range_end: "day-range-end",
         day_selected:
