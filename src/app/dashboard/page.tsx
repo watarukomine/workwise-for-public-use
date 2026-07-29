@@ -37,6 +37,8 @@ import { useToast } from '../../hooks/use-toast';
 
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = React.useState(startOfToday());
+  const [isPending, startTransition] = React.useTransition();
+  const [calendarOpen, setCalendarOpen] = React.useState(false);
   const router = useRouter();
   const isMobile = useIsMobile();
   const { forceMobileView, setForceMobileView, adminWantsTimelineView } = useAppShell();
@@ -212,20 +214,26 @@ export default function DashboardPage() {
     total: isLoading
   });
 
-  const handleDateChange = React.useCallback((direction: 'next' | 'prev' | 'today' | number) => {
-    React.startTransition(() => {
-      setCurrentDate(current => {
-        let nextDate: Date;
-        if (direction === 'today' || direction === 0) nextDate = startOfToday();
-        else if (typeof direction === 'number') nextDate = addDays(current, direction);
-        else nextDate = direction === 'next' ? addDays(current, 1) : subDays(current, 1);
+  const handleDateChange = React.useCallback((direction: 'next' | 'prev' | 'today' | number | Date) => {
+    let nextDate: Date;
+    if (direction instanceof Date) {
+      nextDate = direction;
+    } else if (direction === 'today' || direction === 0) {
+      nextDate = startOfToday();
+    } else if (typeof direction === 'number') {
+      nextDate = addDays(currentDate, direction);
+    } else {
+      nextDate = direction === 'next' ? addDays(currentDate, 1) : subDays(currentDate, 1);
+    }
 
-        // Instantly notify OrderProvider of viewed date change synchronously
-        setCurrentViewedDate(nextDate);
-        return nextDate;
-      });
+    // Instantly sync viewed date to OrderContext
+    setCurrentViewedDate(nextDate);
+
+    // Non-blocking UI update transition
+    startTransition(() => {
+      setCurrentDate(nextDate);
     });
-  }, [setCurrentViewedDate]);
+  }, [currentDate, setCurrentViewedDate]);
 
   // Keyboard navigation shortcuts (Left Arrow: Prev, Right Arrow: Next, T: Today)
   useEffect(() => {
@@ -538,7 +546,7 @@ export default function DashboardPage() {
               <div className="px-2.5 sm:px-3.5 py-1 min-w-[90px] sm:min-w-[130px] text-center font-semibold bg-background rounded-md shadow-sm border text-sm select-none transition-all flex items-center justify-center gap-1">
                 <span className="hidden sm:inline">{format(currentDate, 'yyyy年MM月dd日', { locale: ja })}</span>
                 <span className="sm:hidden">{format(currentDate, 'M/d(EEE)', { locale: ja })}</span>
-                {(isSyncing || isAutoRefreshing) && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
+                {(isSyncing || isAutoRefreshing || isPending) && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />}
               </div>
               <Button
                 variant="ghost"
@@ -561,7 +569,7 @@ export default function DashboardPage() {
                 今日
               </Button>
 
-              <Popover>
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="ghost"
@@ -579,10 +587,8 @@ export default function DashboardPage() {
                     selected={currentDate}
                     onSelect={(date: Date | undefined) => {
                       if (date) {
-                        React.startTransition(() => {
-                          setCurrentDate(date);
-                          setCurrentViewedDate(date);
-                        });
+                        setCalendarOpen(false);
+                        handleDateChange(date);
                       }
                     }}
                     initialFocus
