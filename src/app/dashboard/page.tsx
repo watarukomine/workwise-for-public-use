@@ -261,13 +261,9 @@ export default function DashboardPage() {
       nextDate = direction === 'next' ? addDays(currentDate, 1) : subDays(currentDate, 1);
     }
 
-    // Instantly sync viewed date to OrderContext
+    // Instantly update currentDate and sync viewed date to OrderContext for 0-delay response
+    setCurrentDate(nextDate);
     setCurrentViewedDate(nextDate);
-
-    // Non-blocking UI update transition
-    startTransition(() => {
-      setCurrentDate(nextDate);
-    });
   }, [currentDate, setCurrentViewedDate]);
 
   // Keyboard navigation shortcuts (Left Arrow: Prev, Right Arrow: Next, T: Today)
@@ -574,6 +570,7 @@ export default function DashboardPage() {
                 variant="ghost"
                 size="icon"
                 onClick={() => handleDateChange(-1)}
+                onPointerDown={(e) => { e.preventDefault(); handleDateChange(-1); }}
                 title="前日へ (← キー)"
                 aria-label="前日へ"
                 className="h-8 w-8 hover:bg-background active:scale-90 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none"
@@ -589,6 +586,7 @@ export default function DashboardPage() {
                 variant="ghost"
                 size="icon"
                 onClick={() => handleDateChange(1)}
+                onPointerDown={(e) => { e.preventDefault(); handleDateChange(1); }}
                 title="翌日へ (→ キー)"
                 aria-label="翌日へ"
                 className="h-8 w-8 hover:bg-background active:scale-90 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none"
@@ -599,6 +597,7 @@ export default function DashboardPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => handleDateChange(0)}
+                onPointerDown={(e) => { e.preventDefault(); handleDateChange(0); }}
                 disabled={isToday(currentDate)}
                 title="今日へ移動 (T キー)"
                 className="ml-0.5 h-8 px-3 text-xs font-medium hover:bg-background active:scale-95 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none disabled:opacity-40"
