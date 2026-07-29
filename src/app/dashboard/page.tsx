@@ -570,7 +570,6 @@ export default function DashboardPage() {
                 variant="ghost"
                 size="icon"
                 onClick={() => handleDateChange(-1)}
-                onPointerDown={(e) => { e.preventDefault(); handleDateChange(-1); }}
                 title="前日へ (← キー)"
                 aria-label="前日へ"
                 className="h-8 w-8 hover:bg-background active:scale-90 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none"
@@ -586,7 +585,6 @@ export default function DashboardPage() {
                 variant="ghost"
                 size="icon"
                 onClick={() => handleDateChange(1)}
-                onPointerDown={(e) => { e.preventDefault(); handleDateChange(1); }}
                 title="翌日へ (→ キー)"
                 aria-label="翌日へ"
                 className="h-8 w-8 hover:bg-background active:scale-90 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none"
@@ -597,7 +595,6 @@ export default function DashboardPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => handleDateChange(0)}
-                onPointerDown={(e) => { e.preventDefault(); handleDateChange(0); }}
                 disabled={isToday(currentDate)}
                 title="今日へ移動 (T キー)"
                 className="ml-0.5 h-8 px-3 text-xs font-medium hover:bg-background active:scale-95 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none disabled:opacity-40"
