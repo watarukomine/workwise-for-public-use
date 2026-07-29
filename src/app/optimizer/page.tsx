@@ -1,17 +1,15 @@
-
 "use client";
+
 import * as React from 'react';
 import { RouteOptimizer, type Location } from "@/components/optimizer/route-optimizer";
 import { RouteMap } from "@/components/optimizer/route-map";
 import { APIProvider, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Loader2, MapPinned } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import type { OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
-import type { Customer, Staff, StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
+import type { Customer, Staff, StaffStatus, WithId } from '@/lib/types';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import { useCustomer } from '@/contexts/customer-context';
 import { useOrder } from '@/contexts/order-context';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
@@ -19,22 +17,20 @@ import { ORDER_GAS_URL } from '@/lib/settings';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { isToday } from 'date-fns';
 import { getStoreLocation } from '@/lib/utils';
 
 
 function OptimizerPageContent() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
-  const { rawOrdersData: _rawOrders, isLoading: isLoadingOrders } = useOrder();
-  const { appliedSelectedStaffIds, allStaff, isLoading: isStaffLoading } = useSelectedStaff();
+  const { rawOrdersData: _rawOrders, isLoading: isLoadingOrders, statuses: contextStatuses, orders, refetchOrders } = useOrder();
+  const { allStaff, isLoading: isStaffLoading } = useSelectedStaff();
   const router = useRouter();
 
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
   const [avoidHighways, setAvoidHighways] = React.useState(false);
-  const [isApplying, setIsApplying] = React.useState(false);
+  const [_isApplying, setIsApplying] = React.useState(false);
   const { toast } = useToast();
-  const { orders, refetchOrders } = useOrder(); 
   const placesLibrary = useMapsLibrary("places");
 
   useEffect(() => {
@@ -43,90 +39,72 @@ function OptimizerPageContent() {
     }
   }, [isProfileLoading, profile, router]);
 
-  const filteredStaffFromSelection = React.useMemo(() => {
-    if (isStaffLoading || !allStaff) return [];
-    if (appliedSelectedStaffIds.length === 0) {
-      return allStaff;
-    }
-    const selectedIds = new Set(appliedSelectedStaffIds);
-    return allStaff.filter(s => selectedIds.has(s.id));
-  }, [appliedSelectedStaffIds, allStaff, isStaffLoading]);
-
-  const { statuses: contextStatuses } = useOrder();
-
-  const statuses: StaffStatus[] = React.useMemo(() => {
-    // Filter context statuses to only include selected staff
-    if (!contextStatuses) return [];
-
-    // Create a map for quick lookup
-    const statusMap = new Map(contextStatuses.map(s => [s.staffId, s]));
-
-    return filteredStaffFromSelection.map(staff => {
-      const existingStatus = statusMap.get(staff.id);
-      if (existingStatus) return existingStatus;
-
-      return {
-        staffId: staff.id,
-        status: '待機中',
-        lastAction: '現在地情報なし',
-      };
-    });
-  }, [filteredStaffFromSelection, contextStatuses]);
-
+  // Extract ONLY active & attending staff who have location data or are on duty
   const staffWithLocation = React.useMemo(() => {
-    const staffList = allStaff && allStaff.length > 0 ? allStaff : filteredStaffFromSelection;
-    if (!staffList || staffList.length === 0) return [];
+    if (!allStaff || allStaff.length === 0) return [];
 
-    return staffList.map(staffMember => {
-      const status = statuses.find(s => s.staffId === staffMember.id);
-      const storeLoc = getStoreLocation(staffMember['母店']);
+    return allStaff
+      .map(staffMember => {
+        const status = contextStatuses?.find(s => s.staffId === staffMember.id);
+        const storeLoc = getStoreLocation(staffMember['母店']);
 
-      // Exhaustive lat/lng resolution (status -> staffMember -> store location fallback)
-      const rawLat = status?.latitude ?? (status as any)?.lat ?? (status as any)?.currentLocation?.latitude ?? (staffMember as any).latitude ?? (staffMember as any).lat ?? storeLoc.latitude;
+        // Resolve latitude and longitude with fallbacks
+        const rawLat = status?.latitude ?? (status as any)?.lat ?? (status as any)?.currentLocation?.latitude ?? (staffMember as any).latitude ?? (staffMember as any).lat ?? storeLoc.latitude;
 
-      const rawLng = status?.longitude ?? (status as any)?.lng ?? (status as any)?.currentLocation?.longitude ?? (staffMember as any).longitude ?? (staffMember as any).lng ?? storeLoc.longitude;
+        const rawLng = status?.longitude ?? (status as any)?.lng ?? (status as any)?.currentLocation?.longitude ?? (staffMember as any).longitude ?? (staffMember as any).lng ?? storeLoc.longitude;
 
-      const lat = rawLat !== undefined && rawLat !== null ? Number(rawLat) : storeLoc.latitude;
-      const lng = rawLng !== undefined && rawLng !== null ? Number(rawLng) : storeLoc.longitude;
+        const lat = rawLat !== undefined && rawLat !== null ? Number(rawLat) : storeLoc.latitude;
+        const lng = rawLng !== undefined && rawLng !== null ? Number(rawLng) : storeLoc.longitude;
 
-      const displayName = staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定';
+        const currentStatus = String(status?.status || (staffMember as any).currentStatus || '').trim();
+        const hasGps = (status?.latitude !== undefined && status?.latitude !== null) || ((staffMember as any).latitude !== undefined && (staffMember as any).latitude !== null);
 
-      return {
-        ...staffMember,
-        ...status,
-        name: displayName,
-        latitude: lat,
-        longitude: lng,
-        lastAction: status?.lastAction || (staffMember as any).currentStatus || (staffMember['母店'] ? `${staffMember['母店']}` : '現在地')
-      };
-    }).filter(s => s.latitude !== undefined && s.longitude !== undefined && !isNaN(s.latitude) && !isNaN(s.longitude));
-  }, [allStaff, filteredStaffFromSelection, statuses]);
+        // Active working status list
+        const isWorkingStatus = ['作業中', '移動中', '帰社中', '待機中', '出勤中', '確定済'].includes(currentStatus);
 
+        // ONLY include staff who are actively working OR have explicit GPS location
+        if (!isWorkingStatus && !hasGps) {
+          return null;
+        }
+
+        const displayName = staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定';
+
+        return {
+          ...staffMember,
+          ...status,
+          id: staffMember.id,
+          name: displayName,
+          latitude: lat,
+          longitude: lng,
+          lastAction: status?.lastAction || currentStatus || (staffMember['母店'] ? `${staffMember['母店']}` : '拠点位置')
+        };
+      })
+      .filter((s): s is WithId<Staff> & { latitude: number; longitude: number; lastAction: string } => s !== null && s !== undefined && !isNaN(s.latitude) && !isNaN(s.longitude));
+  }, [allStaff, contextStatuses]);
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
     setOptimizedRoute(data);
     setAvoidHighways(options.avoidHighways);
-  }
+  };
 
   const handleApplyToSchedule = async () => {
     if (!optimizedRoute || !optimizedRoute.optimizedRoute) return;
-    
+
     setIsApplying(true);
     try {
       let updateCount = 0;
-      // Only process entries that have an orderId and associated travel time
       for (const loc of optimizedRoute.optimizedRoute) {
         if (loc.orderId && typeof loc.travelTimeFromPrevious === 'number') {
           await updateSheetStatus({
-             gasUrl: ORDER_GAS_URL,
-             systemId: loc.orderId,
-             travelTime: loc.travelTimeFromPrevious,
-             travelDistance: loc.travelDistanceFromPrevious
+            gasUrl: ORDER_GAS_URL,
+            systemId: loc.orderId,
+            travelTime: loc.travelTimeFromPrevious,
+            travelDistance: loc.travelDistanceFromPrevious
           });
           updateCount++;
         }
       }
-      
+
       if (updateCount > 0) {
         await refetchOrders();
         toast({ title: "スケジュールに適用しました", description: `${updateCount}件の移動時間を更新しました。` });
@@ -144,22 +122,6 @@ function OptimizerPageContent() {
   const baseIsLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
 
   const mapLocations = React.useMemo(() => {
-    const staffLocs = filteredStaffFromSelection
-      .map(staffMember => {
-        const status = statuses.find(s => s.staffId === staffMember.id);
-
-        // Filter out stale location data (not from today)
-        if (status?.lastUpdate) {
-          const lastUpdateDate = new Date(status.lastUpdate);
-          if (!isToday(lastUpdateDate)) {
-            return null;
-          }
-        }
-
-        return status && status.latitude && status.longitude ? { ...staffMember, ...status, type: 'staff' as const } : null;
-      })
-      .filter((s): s is Staff & StaffStatus & { type: 'staff' } => s !== null);
-
     const customLocationsInRoute = optimizedRoute?.optimizedRoute
       .filter(r => r.type === 'custom')
       .map(r => ({ ...r, type: 'custom' as const })) || [];
@@ -170,13 +132,12 @@ function OptimizerPageContent() {
     })) || [];
 
     return {
-      staff: staffLocs,
+      staff: staffWithLocation,
       customers: allCustomers || [],
       route: routeLocations,
       custom: customLocationsInRoute
     };
-
-  }, [filteredStaffFromSelection, allCustomers, statuses, optimizedRoute]);
+  }, [staffWithLocation, allCustomers, optimizedRoute]);
 
   if (baseIsLoading || !profile) {
     return (
@@ -191,7 +152,7 @@ function OptimizerPageContent() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">ルート最適化</h1>
         <p className="text-muted-foreground">
-          複数の作業場所間の最も効率的なルートを生成します。
+          出勤中スタッフの位置・拠点と複数の作業場所間の最も効率的なルートを生成します。
         </p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -204,7 +165,7 @@ function OptimizerPageContent() {
             <RouteOptimizer
               onRouteOptimized={handleRouteOptimized}
               staff={staffWithLocation}
-              staffStatus={statuses}
+              staffStatus={contextStatuses || []}
               allCustomers={allCustomers || []}
               orders={orders}
               placesLibraryReady={!!placesLibrary}
@@ -225,7 +186,6 @@ function OptimizerPageContent() {
   );
 }
 
-
 export default function OptimizerPage() {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -236,7 +196,7 @@ export default function OptimizerPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Google Maps APIキーがありません</AlertTitle>
           <AlertDescription>
-            Google Maps APIキーが設定されていません。地図を表示するには、<code>.env.local</code>ファイルに<code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code>として追加してください。
+            Google Maps APIキーが設定されていません。
           </AlertDescription>
         </Alert>
       </div>
