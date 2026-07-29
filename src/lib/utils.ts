@@ -4,6 +4,23 @@ import { twMerge } from "tailwind-merge"
 import { isValid, format, parseISO } from 'date-fns';
 import type { Order, WithId } from './types';
 import { logMissingField, validationLogger } from './order-validation-logger';
+import { STORE_LOCATIONS, DEFAULT_OFFICE_LOCATION, type StoreLocation } from './constants';
+
+export { STORE_LOCATIONS, DEFAULT_OFFICE_LOCATION };
+export type { StoreLocation };
+
+export function getStoreLocation(storeName?: string): StoreLocation {
+  if (!storeName) return DEFAULT_OFFICE_LOCATION;
+  const sName = String(storeName).trim();
+  if (STORE_LOCATIONS[sName]) return STORE_LOCATIONS[sName];
+
+  for (const key of Object.keys(STORE_LOCATIONS)) {
+    if (key.includes(sName) || sName.includes(key)) {
+      return STORE_LOCATIONS[key];
+    }
+  }
+  return DEFAULT_OFFICE_LOCATION;
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -588,12 +605,7 @@ export function lightenColor(color: string, amount: number): string {
   return `hsl(${Math.round(h * 360)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`;
 }
 
-// Default Office / Base Location (e.g. Headquarters / Main Store in Kanagawa)
-export const DEFAULT_OFFICE_LOCATION = {
-  name: '自拠点（事務所）',
-  latitude: 35.4437,
-  longitude: 139.6380
-};
+
 
 /**
  * Asynchronously fetches real-time driving travel time in minutes via Google Maps Distance Matrix API.

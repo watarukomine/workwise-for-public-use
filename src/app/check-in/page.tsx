@@ -13,7 +13,7 @@ import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
 import { updateStaffStatus } from '@/services/attendance-service';
-import { cn, findKey, calculateTravelTimeMinutes, fetchRealtimeTravelMinutes, DEFAULT_OFFICE_LOCATION, formatDate } from '@/lib/utils';
+import { cn, findKey, calculateTravelTimeMinutes, fetchRealtimeTravelMinutes, getStoreLocation, DEFAULT_OFFICE_LOCATION, formatDate } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
 import {
@@ -78,12 +78,15 @@ function CheckInClient() {
         newStatus = '待機中';
       } else if (step === 'return_office') {
         newStatus = '帰社中';
-        nextDest = DEFAULT_OFFICE_LOCATION.name;
-        const travelMin = calculateTravelTimeMinutes(
+        const staffStore = profile?.['母店'] || '横浜店';
+        const targetOfficeLocation = getStoreLocation(staffStore);
+        nextDest = targetOfficeLocation.name;
+
+        const travelMin = await fetchRealtimeTravelMinutes(
           currentLat,
           currentLng,
-          DEFAULT_OFFICE_LOCATION.latitude,
-          DEFAULT_OFFICE_LOCATION.longitude
+          targetOfficeLocation.latitude,
+          targetOfficeLocation.longitude
         );
         const etaDate = new Date(now.getTime() + travelMin * 60000);
         etaStr = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
