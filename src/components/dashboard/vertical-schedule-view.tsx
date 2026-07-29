@@ -1,9 +1,8 @@
-
 'use client';
 
 import * as React from 'react';
 import type { WithId, Staff, Customer } from '../../lib/types';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { format, parseISO, isEqual, startOfDay, isValid } from 'date-fns';
 import { Clock, MapPin, Briefcase } from 'lucide-react';
 import { cn, findKey } from '../../lib/utils';
@@ -28,12 +27,11 @@ const formatTime = (date: Date | string | undefined) => {
 
 export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffIds }: VerticalScheduleViewProps) {
   const { customers } = useCustomer();
-  const { scheduleEvents } = useOrder();
+  const { scheduleEvents, orders } = useOrder();
   const { profile } = useUserProfile();
 
   const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => {
     if (!id) return undefined;
-    // customer.id is userCode in some contexts. Let's find by either.
     return customers.find(c => c.id === id || c.userCode === id);
   };
 
@@ -54,12 +52,11 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
       return startA.getTime() - startB.getTime();
     });
 
-
   if (relevantEvents.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>ダッシュボード</CardTitle>
+          <CardTitle>モバイル スケジュール</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center h-48 text-center text-muted-foreground">
@@ -74,30 +71,44 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
 
   return (
     <div className="space-y-4">
-      {relevantEvents.map((event, index) => {
+      {relevantEvents.map((event) => {
         const customer = getCustomerById(event.locationId);
         const isTravel = event.title.includes('移動');
         const staffMember = staffData.find(s => s.id === event.staffId);
         const areaBgClass = staffMember?.['母店'] ? STORE_COLORS[staffMember['母店']] || '' : '';
 
-        const staffColorStyle = { backgroundColor: staffMember?.color || 'gray' };
+        // Match underlying order object from orders state
+        const targetOrder = orders?.find(o =>
+          o.id === event.id ||
+          o.rawOrderId === event.id ||
+          (event.rawOrderId && (o.id === event.rawOrderId || o.rawOrderId === event.rawOrderId))
+        );
 
-        // Extract order details from raw data
-        const raw = (event as any).raw;
-        const carName = raw ? findKey(raw, ['車名', '車種', '車両']) : undefined;
-        const regNo = raw ? findKey(raw, ['登録ナンバー(下４桁)', '登録ナンバー', 'ナンバー', '車番', '登録番号']) : undefined;
-        const tireSize = raw ? findKey(raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
-        const tireNumber = raw ? findKey(raw, ['本数', 'honsu']) : undefined;
-        const arrangement = raw ? findKey(raw, ['タイヤ手配状況', '手配']) : undefined;
-        const disposal = raw ? findKey(raw, ['廃タイヤ処分', '廃タイヤ']) : undefined;
-        const serviceType = raw ? findKey(raw, ['作業内容', 'サービス種別', 'サービス区分']) : undefined;
-        const specialNotes = raw ? findKey(raw, ['特記事項', '詳細', '連絡事項']) : (event as any).specialNotes;
-        const hasOrderDetails = !isTravel && (carName || regNo || tireSize || tireNumber || arrangement || disposal || serviceType || specialNotes);
+        // Extract order details with complete fallbacks for Firestore DB + raw data
+        const raw = (event as any).raw || (targetOrder as any)?.raw;
+
+        const carName = (targetOrder as any)?.carName || (targetOrder as any)?.carModel || (event as any).carName || (raw ? findKey(raw, ['車名', '車種', '車両']) : undefined);
+
+        const regNo = (targetOrder as any)?.regNo || (targetOrder as any)?.carNumber || (event as any).regNo || (raw ? findKey(raw, ['登録ナンバー(下４桁)', '登録ナンバー', 'ナンバー', '車番', '登録番号']) : undefined);
+
+        const tireSize = (targetOrder as any)?.tireSize || (targetOrder as any)?.size || (event as any).tireSize || (raw ? findKey(raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined);
+
+        const tireNumberRaw = (targetOrder as any)?.tireNumber || (targetOrder as any)?.quantity || (targetOrder as any)?.['本数'] || (event as any).tireNumber || (raw ? findKey(raw, ['本数', 'honsu']) : undefined);
+        const tireNumber = tireNumberRaw ? String(tireNumberRaw).replace(/本$/, '') : undefined;
+
+        const arrangement = (targetOrder as any)?.arrangement || (event as any).arrangement || (raw ? findKey(raw, ['タイヤ手配状況', '手配', '手配状況']) : undefined);
+
+        const disposal = (targetOrder as any)?.disposal || (event as any).disposal || (raw ? findKey(raw, ['廃タイヤ処分', '廃タイヤ', '廃タイヤ回収']) : undefined);
+
+        const serviceType = (targetOrder as any)?.serviceType || (targetOrder as any)?.taskDetails || (event as any).serviceType || (event as any).taskDetails || (raw ? findKey(raw, ['作業内容', 'サービス種別', 'サービス区分', '作業区分']) : undefined);
+
+        const specialNotes = (targetOrder as any)?.specialNotes || (targetOrder as any)?.comment || (event as any).specialNotes || (raw ? findKey(raw, ['特記事項', '詳細', '連絡事項', '備考', 'リマーク1', 'リマーク2']) : undefined);
 
         // Resolve clean storeName for CardTitle
-        let resolvedStoreName = customer?.storeName || (event as any).customerName || '';
-        if (!resolvedStoreName || resolvedStoreName === '（店舗名未設定）' || resolvedStoreName === '(店舗名未設定)' || resolvedStoreName === '店舗名未設定') {
-          const code = (event as any).customerCode || (event as any).userCode || (raw ? findKey(raw, ['ユーザーコード', '顧客コード']) : undefined);
+        let resolvedStoreName = customer?.storeName || (targetOrder as any)?.customerName || (event as any).customerName || (raw ? findKey(raw, ['店舗名', '顧客名', '販売店名', '店舗']) : undefined);
+        
+        if (!resolvedStoreName || resolvedStoreName.includes('店舗名未設定')) {
+          const code = (event as any).customerCode || (targetOrder as any)?.customerCode || (event as any).userCode || (raw ? findKey(raw, ['ユーザーコード', '顧客コード']) : undefined);
           if (code && customers) {
             const paddedCode = String(code).trim().padStart(5, '0');
             const match = customers.find(c => {
@@ -110,80 +121,76 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
           }
         }
 
-        const displayTitle = (resolvedStoreName && resolvedStoreName !== '（店舗名未設定）' && resolvedStoreName !== '(店舗名未設定)' && resolvedStoreName !== '店舗名未設定')
+        const displayTitle = (resolvedStoreName && !resolvedStoreName.includes('店舗名未設定'))
           ? resolvedStoreName
           : (event.title && !event.title.includes('店舗名未設定') ? event.title : '店舗名未設定');
 
         const eventCard = (
           <Card className={cn(
-            "cursor-pointer hover:bg-muted/50 relative overflow-hidden",
-            areaBgClass, // Apply store background color
+            "cursor-pointer hover:bg-muted/50 relative overflow-hidden transition-all shadow-sm border",
+            areaBgClass,
             isTravel && "bg-secondary/50 border-dashed",
             checkedOutStaffIds?.has(event.staffId || '') && "opacity-50 grayscale bg-gray-100 dark:bg-gray-800",
-            // Dim tasks assigned to other staff members
-            profile && event.staffId !== profile.id && "opacity-40 grayscale-[0.8]"
+            profile && event.staffId !== profile.id && "opacity-60 grayscale-[0.5]"
           )}>
             {/* 完了(済)マーク */}
             {event.status === '完了' && (
-              <div className="absolute top-1 right-1 z-10 pointer-events-none">
-                <div className="border border-red-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm rotate-neg-15">
-                  <span className="text-[10px] font-bold text-red-600 leading-none select-none">済</span>
+              <div className="absolute top-2 right-2 z-10 pointer-events-none">
+                <div className="border-2 border-red-600 rounded-full w-6 h-6 flex items-center justify-center bg-white/95 shadow-sm rotate-[-12deg]">
+                  <span className="text-[11px] font-extrabold text-red-600 leading-none select-none">済</span>
                 </div>
               </div>
             )}
             
             {/* 既読(確)マーク */}
             {event.isConfirmed && (
-              <div className="absolute top-1 left-1 z-10 pointer-events-none">
-                <div className="border border-blue-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm">
-                  <span className="text-[10px] font-bold text-blue-600 leading-none select-none">確</span>
+              <div className="absolute top-2 left-2 z-10 pointer-events-none">
+                <div className="border-2 border-blue-600 rounded-full w-6 h-6 flex items-center justify-center bg-white/95 shadow-sm">
+                  <span className="text-[11px] font-extrabold text-blue-600 leading-none select-none">確</span>
                 </div>
               </div>
             )}
 
-            <CardHeader className="p-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg leading-tight font-bold">{displayTitle}</CardTitle>
+            <CardHeader className="p-4 pb-2">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base sm:text-lg leading-tight font-extrabold text-slate-900 dark:text-slate-100">
+                  店舗名：{displayTitle}
+                </CardTitle>
                 <div
-                  className="w-3 h-10 rounded-full dynamic-bg"
+                  className="w-3 h-8 rounded-full dynamic-bg shrink-0"
                   {...{ 'style': { '--dynamic-bg-color': staffMember?.color || 'gray' } as any }}
                 />
               </div>
             </CardHeader>
-            <CardContent className="p-4 pt-0 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span>{formatTime(event.start)} - {formatTime(event.end)}</span>
+            <CardContent className="p-4 pt-1 text-sm space-y-2">
+              <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200">
+                <Clock className="h-4 w-4 text-blue-600 shrink-0" />
+                <span>作業予定時刻：{formatTime(event.start)} - {formatTime(event.end)}</span>
               </div>
-              {customer?.address && <div className="flex items-start gap-2 mt-2">
-                <MapPin className="h-4 w-4 mt-0.5" />
-                <span>{customer.address}</span>
-              </div>}
+
+              {customer?.address && (
+                <div className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-400">
+                  <MapPin className="h-3.5 w-3.5 mt-0.5 text-slate-400 shrink-0" />
+                  <span>{customer.address}</span>
+                </div>
+              )}
+
               {staffMember && (
-                <div className="flex items-center gap-2 mt-2 text-xs font-medium text-slate-600 dark:text-slate-400 bg-white/50 dark:bg-black/20 p-1 rounded inline-block">
-                  <span>担当: {staffMember.name}</span>
+                <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  担当: {staffMember.name}
                 </div>
               )}
-              {hasOrderDetails && (
-                <div className="mt-3 pt-2 border-t border-muted flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                  {carName && <span><span className="font-semibold text-slate-500">車種:</span> {carName}</span>}
-                  {regNo && <span><span className="font-semibold text-slate-500">ナンバー:</span> {regNo}</span>}
-                  {tireSize && <span><span className="font-semibold text-blue-600">サイズ:</span> {tireSize}</span>}
-                  {tireNumber && <span><span className="font-semibold text-blue-600">本数:</span> {tireNumber}本</span>}
-                  {arrangement && <span><span className="font-semibold text-orange-600">手配:</span> {arrangement}</span>}
-                  {disposal && <span><span className="font-semibold text-purple-600">廃タイヤ:</span> {disposal}</span>}
-                  {serviceType && (
-                    <span className="w-full mt-1">
-                      <span className="font-semibold text-green-700">作業内容:</span> {serviceType}
-                    </span>
-                  )}
-                  {specialNotes && (
-                    <span className="w-full mt-1">
-                      <span className="font-semibold text-red-600">特記:</span> <span className="text-slate-700">{specialNotes}</span>
-                    </span>
-                  )}
-                </div>
-              )}
+
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 space-y-1 text-xs text-slate-800 dark:text-slate-200">
+                {carName && <div><span className="font-bold text-slate-500">車種:</span> {carName}</div>}
+                {regNo && <div><span className="font-bold text-slate-500">ナンバー:</span> {regNo}</div>}
+                {tireSize && <div><span className="font-bold text-blue-600 dark:text-blue-400">サイズ:</span> {tireSize}</div>}
+                {tireNumber && <div><span className="font-bold text-blue-600 dark:text-blue-400">本数:</span> {tireNumber}本</div>}
+                {arrangement && <div><span className="font-bold text-amber-600 dark:text-amber-400">手配:</span> {arrangement}</div>}
+                {disposal && <div><span className="font-bold text-purple-600 dark:text-purple-400">廃タイヤ:</span> {disposal}</div>}
+                {serviceType && <div><span className="font-bold text-emerald-700 dark:text-emerald-400">作業内容:</span> {serviceType}</div>}
+                {specialNotes && <div className="text-red-600 dark:text-red-400 font-medium"><span className="font-bold">特記:</span> {specialNotes}</div>}
+              </div>
             </CardContent>
           </Card>
         );
