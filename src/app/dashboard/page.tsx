@@ -174,7 +174,7 @@ export default function DashboardPage() {
     }
   }, [isProfileLoading, profile, router]);
 
-  const [showManagement, setShowManagement] = React.useState(true); // Default to showing all
+  const [showManagement, setShowManagement] = React.useState(false); // Default to OFF
 
   const filteredStaff = React.useMemo(() => {
     if (isProfileLoading || isStaffLoading || !profile) return [];
