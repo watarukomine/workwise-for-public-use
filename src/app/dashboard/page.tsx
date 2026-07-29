@@ -630,6 +630,41 @@ export default function DashboardPage() {
                     initialFocus
                     locale={ja}
                     components={{
+                      DayButton: (dayProps: any) => {
+                        const { day, modifiers, ...buttonProps } = dayProps || {};
+                        const targetDate = day?.date || dayProps?.date || (dayProps instanceof Date ? dayProps : null);
+
+                        if (!targetDate || !(targetDate instanceof Date)) {
+                          return <button {...buttonProps}>{dayProps?.children}</button>;
+                        }
+
+                        const dateStr = normalizeDateStr(targetDate);
+                        const slashStr = dateStr.replace(/-/g, '/');
+                        const count = orderCountsByDate[dateStr] || orderCountsByDate[slashStr] || 0;
+                        const isSelected = modifiers?.selected || isSameDay(targetDate, currentDate);
+
+                        return (
+                          <button
+                            {...buttonProps}
+                            className={cn(
+                              buttonProps?.className,
+                              "relative flex flex-col items-center justify-center w-full h-full py-1 min-h-[42px] cursor-pointer"
+                            )}
+                          >
+                            <span className="text-xs font-bold leading-tight">{targetDate.getDate()}</span>
+                            {count > 0 ? (
+                              <span className={cn(
+                                "mt-0.5 px-1 py-0.2 text-[9px] font-extrabold rounded-full leading-none shadow-sm min-w-[15px] text-center transition-all",
+                                isSelected ? "bg-white text-blue-700 shadow-md" : "bg-blue-600 text-white"
+                              )}>
+                                {count}件
+                              </span>
+                            ) : (
+                              <span className="h-3" />
+                            )}
+                          </button>
+                        );
+                      },
                       DayContent: (dayProps: any) => {
                         const targetDate = dayProps.date instanceof Date 
                           ? dayProps.date 
