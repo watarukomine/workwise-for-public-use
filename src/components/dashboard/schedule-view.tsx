@@ -585,6 +585,11 @@ export function ScheduleView({
       const ev = dialogState.event as any;
       setEditOrderForm({
         storeName: getResolvedStoreName(ev),
+        customerCode: findKey(ev.raw, ["ユーザーコード", "お取引先コード", "ユーザーCode"]) || ev.customerCode || ev.userCode || '',
+        picName: findKey(ev.raw, ["ご担当者様", "担当者", "担当"]) || ev.picName || '',
+        orderNo: findKey(ev.raw, ["受注No\n(ﾘﾏｰｸ1 8ｹﾀ)", "受注No(ﾘﾏｰｸ1 8ｹﾀ)", "リマーク1", "受注No"]) || ev.orderNo || ev.orderNoRemark || '',
+        comment: findKey(ev.raw, ["任意コメント\n(ﾘﾏｰｸ2　10ｹﾀ)", "任意コメント(ﾘﾏｰｸ2　10ｹﾀ)", "リマーク2", "任意コメント"]) || ev.comment || '',
+        contact: findKey(ev.raw, ["連絡先", "電話番号"]) || ev.contact || '',
         equipmentStatus: findKey(ev.raw, ["機材有無"]) || ev.equipmentStatus || '',
         carName: findKey(ev.raw, ["車名", "車両", "車種"]) || ev.carName || '',
         regNo: findKey(ev.raw, ["登録ナンバー(下４桁)", "登録ナンバー", "ナンバー", "車番", "登録番号"]) || ev.regNo || '',
@@ -610,6 +615,11 @@ export function ScheduleView({
       const ord = dialogState.order as any;
       setEditOrderForm({
         storeName: getResolvedStoreName(ord),
+        customerCode: findKey(ord.raw, ["ユーザーコード", "お取引先コード", "ユーザーCode"]) || ord.customerCode || ord.userCode || '',
+        picName: findKey(ord.raw, ["ご担当者様", "担当者", "担当"]) || ord.picName || '',
+        orderNo: findKey(ord.raw, ["受注No\n(ﾘﾏｰｸ1 8ｹﾀ)", "受注No(ﾘﾏｰｸ1 8ｹﾀ)", "リマーク1", "受注No"]) || ord.orderNo || ord.orderNoRemark || '',
+        comment: findKey(ord.raw, ["任意コメント\n(ﾘﾏｰｸ2　10ｹﾀ)", "任意コメント(ﾘﾏｰｸ2　10ｹﾀ)", "リマーク2", "任意コメント"]) || ord.comment || '',
+        contact: findKey(ord.raw, ["連絡先", "電話番号"]) || ord.contact || '',
         equipmentStatus: findKey(ord.raw, ["機材有無"]) || ord.equipmentStatus || '',
         carName: findKey(ord.raw, ["車名", "車両", "車種"]) || ord.carName || '',
         regNo: findKey(ord.raw, ["登録ナンバー(下４桁)", "登録ナンバー", "ナンバー", "車番", "登録番号"]) || ord.regNo || '',
@@ -2568,7 +2578,12 @@ export function ScheduleView({
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
                         {renderDetailItem('担当者', staff?.name)}
                         {renderDetailItem('フォーム入力者', event.submitter)}
+                        {renderEditableItem('受注No (リマーク1)', 'orderNo')}
+                        {renderEditableItem('任意コメント (リマーク2)', 'comment')}
                         {renderEditableItem('お取引先名', 'storeName')}
+                        {renderEditableItem('ユーザーコード', 'customerCode')}
+                        {renderEditableItem('ご担当者様', 'picName')}
+                        {renderEditableItem('連絡先', 'contact')}
                         {renderEditableItem('機材有無', 'equipmentStatus')}
 
                         {renderEditableItem('車名', 'carName')}
@@ -2791,7 +2806,12 @@ export function ScheduleView({
                   <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
                       {renderDetailItem('受注ID', dialogState.order.id)}
+                      {renderEditableItem('受注No (リマーク1)', 'orderNo')}
+                      {renderEditableItem('任意コメント (リマーク2)', 'comment')}
                       {renderEditableItem('お取引先名', 'storeName')}
+                      {renderEditableItem('ユーザーコード', 'customerCode')}
+                      {renderEditableItem('ご担当者様', 'picName')}
+                      {renderEditableItem('連絡先', 'contact')}
                       {renderEditableItem('機材有無', 'equipmentStatus')}
 
                       {renderEditableItem('車名', 'carName')}
