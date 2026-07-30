@@ -731,3 +731,32 @@ export function isEtaPassed(etaStr?: string | null, lastUpdateIso?: string | nul
 
   return false;
 }
+
+export function isStaffMatched(staff: { id?: string; name?: string; email?: string; [key: string]: any }, entries: (string | undefined | null)[]): boolean {
+  if (!staff) return false;
+  const normalize = (str: any) => String(str || '').replace(/[\s\u3000]+/g, '').toLowerCase().trim();
+
+  const normSId = normalize(staff.id);
+  const normSName = normalize(staff.name || staff['氏名'] || staff['名前']);
+  const normSCode = normalize(staff.staffCode || staff.userCode);
+  const normSEmail = normalize(staff.email);
+
+  return entries.some(entry => {
+    if (!entry) return false;
+    const nEntry = normalize(entry);
+    if (!nEntry) return false;
+
+    if (normSId && nEntry === normSId) return true;
+    if (normSName && nEntry === normSName) return true;
+    if (normSCode && nEntry === normSCode) return true;
+    if (normSEmail && nEntry === normSEmail) return true;
+
+    if (nEntry.length >= 2 && normSName) {
+      if (normSName.startsWith(nEntry) || nEntry.startsWith(normSName)) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+}

@@ -27,10 +27,23 @@ export const StaffService = {
         const q = query(colRef, where('_type', '!=', 'order'));
 
         return onSnapshot(q, (snapshot) => {
-            const staffList = snapshot.docs.map(docSnap => ({
+            const rawList = snapshot.docs.map(docSnap => ({
                 id: docSnap.id,
                 ...docSnap.data()
             } as WithId<Staff>));
+
+            const staffList = rawList.filter(s => {
+                if ((s as any)._type === 'order') return false;
+                const name = String(s.name || '').trim();
+                const email = String(s.email || '').trim();
+                const id = String(s.id || '').trim();
+                const isNumericName = /^[0-9]+$/.test(name);
+                const isNumericId = /^[0-9]+$/.test(id);
+                if ((isNumericName || isNumericId) && (!email || email === '-')) {
+                    return false;
+                }
+                return true;
+            });
 
             staffList.sort((a, b) => {
                 const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof (a as any).order === 'number' ? (a as any).order : 999);

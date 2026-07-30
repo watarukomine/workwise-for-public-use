@@ -36,7 +36,7 @@ import {
   TooltipTrigger,
 } from '../ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate, normalizeDateStr, isEtaPassed } from '../../lib/utils';
+import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate, normalizeDateStr, isEtaPassed, isStaffMatched } from '../../lib/utils';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import {
@@ -754,14 +754,14 @@ export function ScheduleView({
 
   const eventsByStaffId = React.useMemo(() => {
     const map = new Map<string, WithId<ScheduleEvent>[]>();
-    dailySchedule.forEach(e => {
-      if (!map.has(e.staffId)) {
-        map.set(e.staffId, []);
-      }
-      map.get(e.staffId)!.push(e);
+    staffData.forEach(staff => {
+      const staffEvents = dailySchedule.filter(e => {
+        return isStaffMatched(staff, [e.staffId, (e as any).staffName, (e as any).assignedStaff, (e as any).作業担当, (e as any).担当]);
+      });
+      map.set(staff.id, staffEvents);
     });
     return map;
-  }, [dailySchedule]);
+  }, [dailySchedule, staffData]);
 
   const statusByStaffId = React.useMemo(() => {
     const map = new Map<string, StaffStatus>();
