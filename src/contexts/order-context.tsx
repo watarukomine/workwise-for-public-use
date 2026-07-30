@@ -34,6 +34,7 @@ interface OrderContextType {
   rawOrdersData: WithId<Order>[];
   setRawOrdersData: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
   updateRawOrder: (targetId: string, updates: Partial<any>) => void;
+  updateOrderFullSync: (targetId: string, updates: Partial<any>) => Promise<void>;
   orderGasUrl: string;
   setOrderGasUrl: (url: string) => void;
   toggleTripSuppression: (tripId: string) => void;
@@ -696,14 +697,39 @@ export function OrderProvider({ children }: { children: ReactNode }) {
           raw: {
             ...(o.raw || {}),
             ...updates,
-            '作業担当者': updates.staffName || (o.raw ? (o.raw['作業担当者'] || o.raw['担当者']) : updates.staffName),
-            '担当者': updates.staffName || (o.raw ? (o.raw['担当者'] || o.raw['作業担当者']) : updates.staffName),
+            '作業担当者': updates.staffName !== undefined ? updates.staffName : (o.raw ? (o.raw['作業担当者'] || o.raw['担当者']) : undefined),
+            '担当者': updates.staffName !== undefined ? updates.staffName : (o.raw ? (o.raw['担当者'] || o.raw['作業担当者']) : undefined),
           }
         };
       }
       return o;
     }));
   }, []);
+
+  const updateOrderFullSync = useCallback(async (targetId: string, updates: Partial<any>) => {
+    // 1. Instantly update rawOrdersData (All Orders & Bottom Order Table)
+    updateRawOrder(targetId, updates);
+
+    // 2. Instantly update scheduleEvents (Timeline Chips)
+    setScheduleEvents(prev => prev.map(ev => {
+      const evId = ev.systemId || ev.rawOrderId || ev.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
+      if (evId === targetId || ev.id === targetId || ev.rawOrderId === targetId) {
+        return {
+          ...ev,
+          ...updates
+        };
+      }
+      return ev;
+    }));
+
+    // 3. Persist to Firestore Backend
+    try {
+      const { OrderService } = await import('@/services/order-service');
+      await OrderService.updateOrder(targetId, updates as any);
+    } catch (err) {
+      console.error('[OrderContext] updateOrderFullSync Firestore error:', err);
+    }
+  }, [updateRawOrder]);
 
   const value: OrderContextType = React.useMemo(() => ({
     orders,
@@ -725,6 +751,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     rawOrdersData,
     setRawOrdersData,
     updateRawOrder,
+    updateOrderFullSync,
     orderGasUrl,
     setOrderGasUrl,
     toggleTripSuppression,
@@ -748,6 +775,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     rawOrdersData,
     setRawOrdersData,
     updateRawOrder,
+    updateOrderFullSync,
     orderGasUrl,
     setOrderGasUrl,
     toggleTripSuppression,

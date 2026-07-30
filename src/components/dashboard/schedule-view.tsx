@@ -559,7 +559,7 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { allStaff, setSelectedStaffIds } = useSelectedStaff(); // Get full list & setter
   const { toast } = useToast();
-  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, deleteOrder, toggleTripSuppression, setCurrentViewedDate, updateRawOrder } = useOrder();
+  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, deleteOrder, toggleTripSuppression, setCurrentViewedDate, updateRawOrder, updateOrderFullSync } = useOrder();
 
   // Filter orders to only show those scheduled for currentDate (JST local date format)
   const dailyOrders = React.useMemo(() => {
@@ -1284,13 +1284,7 @@ export function ScheduleView({
           const rawId = taskPart.rawOrderId || (taskPart.raw ? (taskPart.raw.SystemID || taskPart.raw.systemId || findKey(taskPart.raw, ['SystemID', 'systemId', 'id', '受注No', '受注No(ﾘﾏｰｸ1 8ｹﾀ)'])) : '');
           const finalSystemId = taskPart.systemId || rawId || taskPart.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
 
-          // Instantly update raw order data state so bottom order table updates assigned staff!
-          if (updateRawOrder) {
-            if (finalSystemId) updateRawOrder(finalSystemId, { staffName: newStaff.name, staffId: newStaffId });
-            if (rawId && rawId !== finalSystemId) updateRawOrder(rawId, { staffName: newStaff.name, staffId: newStaffId });
-          }
-
-          // Direct Write to Firestore (Both systemId and rawId for absolute reliability)
+          // Triple Instant Sync across Timeline Chips, Bottom Order Table, and Firestore Backend
           const updatePayload = {
             staffName: newStaff.name,
             staffId: newStaffId,
@@ -1302,16 +1296,12 @@ export function ScheduleView({
             updatedAt: new Date().toISOString()
           };
 
-          try {
-            const { OrderService } = await import('@/services/order-service');
-            if (finalSystemId) {
-              await OrderService.updateOrder(finalSystemId, updatePayload as any);
-            }
-            if (rawId && rawId !== finalSystemId) {
-              await OrderService.updateOrder(rawId, updatePayload as any).catch(() => {});
-            }
-          } catch (fsErr) {
-            console.error("Firestore update failed on re-assign:", fsErr);
+          if (updateOrderFullSync) {
+            if (finalSystemId) updateOrderFullSync(finalSystemId, updatePayload);
+            if (rawId && rawId !== finalSystemId) updateOrderFullSync(rawId, updatePayload).catch(() => {});
+          } else if (updateRawOrder) {
+            if (finalSystemId) updateRawOrder(finalSystemId, updatePayload);
+            if (rawId && rawId !== finalSystemId) updateRawOrder(rawId, updatePayload);
           }
 
           // Determine old staff name before move for GAS spreadsheet lookup

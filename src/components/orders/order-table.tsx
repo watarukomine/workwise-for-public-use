@@ -15,6 +15,7 @@ import { Search, Download } from 'lucide-react';
 import { cn, findKey, formatDate, formatTime, normalizeDateStr } from '@/lib/utils';
 import { format, isValid, parseISO } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
+import { useOrder } from '@/contexts/order-context';
 import { Badge } from '@/components/ui/badge';
 
 import { Button } from '../ui/button';
@@ -183,6 +184,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
   const { profile } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
   const { customers } = useCustomer();
+  const { updateOrderFullSync } = useOrder();
 
   React.useEffect(() => {
     const handler = setTimeout(() => {
@@ -422,6 +424,9 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
       updateData.raw = updatedRaw;
 
       await OrderService.updateOrder(selectedOrder.id, updateData);
+      if (updateOrderFullSync) {
+        updateOrderFullSync(selectedOrder.id, updateData);
+      }
       setIsDialogOpen(false);
       toast({ title: '受注データを更新しました。', duration: 3000 });
     } catch (e: any) {
