@@ -341,8 +341,6 @@ export default function DashboardPage() {
       if (isRealDateSwitch || isMount) {
         if (staffWithOrders.size > 0) {
           setSelectedStaffIds(Array.from(staffWithOrders));
-        } else if (allStaff && allStaff.length > 0) {
-          setSelectedStaffIds(allStaff.map(s => s.id));
         }
       }
 
@@ -359,15 +357,13 @@ export default function DashboardPage() {
         const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...scheduledIds, ...Array.from(staffWithOrders)]));
 
         if (combinedStaffIds.length > 0) {
-          if (isRealDateSwitch || isMount) {
-            setSelectedStaffIds(combinedStaffIds);
-          } else {
-            setSelectedStaffIds(prev => Array.from(new Set([...prev, ...combinedStaffIds])));
+          // If shift schedule or active tasks/attendance exist for this day, strictly display only those scheduled/active staff
+          setSelectedStaffIds(combinedStaffIds);
+        } else {
+          // Only fallback to displaying all staff if NO shift schedule or active tasks exist for this date
+          if (allStaff && allStaff.length > 0) {
+            setSelectedStaffIds(allStaff.map(s => s.id));
           }
-        } else if (isRealDateSwitch) {
-          setSelectedStaffIds([]);
-        } else if (isMount && allStaff && allStaff.length > 0) {
-          setSelectedStaffIds(allStaff.map(s => s.id));
         }
       } catch (e) {
         if (!cancelled) console.error("Failed to sync attendance:", e);
