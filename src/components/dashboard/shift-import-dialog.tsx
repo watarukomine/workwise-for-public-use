@@ -476,6 +476,80 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                 </DialogDescription>
 
                 <div className="grid gap-4 py-4 overflow-y-auto min-h-0 flex-1 px-1">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 rounded-md">
+                        <p className="text-xs font-semibold text-blue-900 dark:text-blue-200 mb-1">【8月度 本式シフト表の自動適用】</p>
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">ユーザー提供の8月1日〜31日の完全な出勤CSVデータを1クリックでシステムへ全反映します。</p>
+                        <Button 
+                            variant="default" 
+                            size="sm" 
+                            className="bg-blue-600 hover:bg-blue-700 text-white w-full"
+                            disabled={isLoading}
+                            onClick={async () => {
+                                setIsLoading(true);
+                                try {
+                                    const csvData = `年月,氏名,所属店舗,1日,2日,3日,4日,5日,6日,7日,8日,9日,10日,11日,12日,13日,14日,15日,16日,17日,18日,19日,20日,21日,22日,23日,24日,25日,26日,27日,28日,29日,30日,31日
+2026/08,桑原和裕,総括G,休,,休,,,,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,休,半,,,,休,
+2026/08,佐藤耕次,総括G,,,,,,,,,有,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,休,,,
+2026/08,足立正道,総括G,半,有,休,,,休,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,休,,,休,,
+2026/08,坂本幸夫,総括G,,,,休,,,,休,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,休,,,休,休,,
+2026/08,杉山和彦,横浜店,,,休,,,休,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,有,休,研修,休,休,,,
+2026/08,福原泰弘,横浜店,,,休,,,,休,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,休,休,,,
+2026/08,水野一也,横浜店,,,休,半,,,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,,,,,休
+2026/08,木村 駿,横浜店,休,,,休,,,有,有,有,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,,有,休,,,休
+2026/08,杉山恭平,横浜店,休,,,休,,,休,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,有,休,,,,
+2026/08,内田 巧,横浜店,,,,休,休,,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,休,組合,,
+2026/08,千葉征英,横浜店,,,休,,,,,休,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,,休,有,
+2026/08,古石 翔,横浜店,,,休,休,休,,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,有,,,,休,,,休
+2026/08,小出達人,東名川崎店,特,特,,休,,,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,休,,,休,,,休
+2026/08,小堀健太,東名川崎店,,,,休,,,休,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,有,,,休,休,,,
+2026/08,湯川浩道,厚木店,,,,休,,,休,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,,休,,休,,休
+2026/08,岡本正博,厚木店,,,休,,,休,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,有,休,,,休,,,休
+2026/08,小松佑輔,厚木店,,,有,休,,休,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,休,休,,,
+2026/08,關 雄弥,厚木店,,,,休,有,有,休,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,休,,,休,,`;
+
+                                    const lines = csvData.trim().split('\n');
+                                    const staffRows = lines.slice(1).map(line => {
+                                        const parts = line.split(',');
+                                        return { name: parts[1].trim(), days: parts.slice(3) };
+                                    });
+
+                                    const batchRecords: { date: Date; staffIds: string[] }[] = [];
+
+                                    for (let dayNum = 1; dayNum <= 31; dayNum++) {
+                                        const dayIdx = dayNum - 1;
+                                        const shiftDate = new Date(2026, 7, dayNum);
+                                        const scheduledStaffIds: string[] = [];
+
+                                        staffRows.forEach(row => {
+                                            const val = String(row.days[dayIdx] || '').trim();
+                                            if (!val) {
+                                                const matched = allStaff.find(s => isStaffMatched(s, [row.name]));
+                                                const staffId = matched ? matched.id : row.name;
+                                                scheduledStaffIds.push(staffId);
+                                            }
+                                        });
+
+                                        batchRecords.push({ date: shiftDate, staffIds: scheduledStaffIds });
+                                    }
+
+                                    await saveDailyScheduledBatch(batchRecords);
+                                    toast({ title: '8月本式シフト反映完了', description: '8月1日〜31日の完全な出勤シフトデータを書き込みました。' });
+                                    if (batchRecords.length > 0) {
+                                        onUpload(batchRecords[0].date, batchRecords[0].staffIds);
+                                    }
+                                    setIsOpen(false);
+                                } catch (e: any) {
+                                    console.error(e);
+                                    toast({ variant: 'destructive', title: '反映エラー', description: e.message });
+                                } finally {
+                                    setIsLoading(false);
+                                }
+                            }}
+                        >
+                            8月度のシフト表を1クリックで完全適用
+                        </Button>
+                    </div>
+
                     <div className="grid w-full max-w-sm items-center gap-1.5">
                         <Label htmlFor="target-month">対象年月</Label>
                         <Input
