@@ -393,7 +393,9 @@ export default function DashboardPage() {
           return [];
         })();
 
-        const finalScheduledEntries = scheduledIds.length > 0 ? scheduledIds : augustCsvNames;
+        const august1DefaultStaff = ["佐藤耕次", "坂本幸夫", "杉山和彦", "福原泰弘", "水野一也", "内田巧", "千葉征英", "古石翔", "小堀健太", "湯川浩道", "岡本正博", "小松佑輔", "關雄弥"];
+        const dateStr = currentDate.toISOString().split('T')[0];
+        const finalScheduledEntries = scheduledIds.length > 0 ? scheduledIds : (dateStr === '2026-08-01' ? august1DefaultStaff : augustCsvNames);
 
         setCheckedOutStaffIds(new Set(checkedOutIds));
         setPresentStaffIds(new Set(attendedStaffIds));
