@@ -36,14 +36,6 @@ import { useToast } from '../../hooks/use-toast';
 
 
 export default function DashboardPage() {
-  const [currentDate, setCurrentDate] = React.useState(startOfToday());
-  const deferredDate = React.useDeferredValue(currentDate);
-  const [isPending, startTransition] = React.useTransition();
-  const [calendarOpen, setCalendarOpen] = React.useState(false);
-  const router = useRouter();
-  const isMobile = useIsMobile();
-  const { forceMobileView, setForceMobileView, adminWantsTimelineView } = useAppShell();
-
   const {
     statuses,
     isLoading: isLoadingOrders,
@@ -54,8 +46,38 @@ export default function DashboardPage() {
     refetchOrders,
     rawOrdersData,
     orders,
-    setCurrentViewedDate
+    setCurrentViewedDate,
   } = useOrder();
+
+  const [currentDate, setCurrentDateState] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('dashboard_current_date');
+      if (saved) {
+        const d = parseISO(saved);
+        if (isValid(d)) return d;
+      }
+    }
+    return startOfToday();
+  });
+
+  const setCurrentDate = React.useCallback((date: Date) => {
+    setCurrentDateState(date);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('dashboard_current_date', date.toISOString());
+      } catch {}
+    }
+    if (setCurrentViewedDate) {
+      setCurrentViewedDate(date);
+    }
+  }, [setCurrentViewedDate]);
+
+  const deferredDate = React.useDeferredValue(currentDate);
+  const [isPending, startTransition] = React.useTransition();
+  const [calendarOpen, setCalendarOpen] = React.useState(false);
+  const router = useRouter();
+  const isMobile = useIsMobile();
+  const { forceMobileView, setForceMobileView, adminWantsTimelineView } = useAppShell();
 
   const counts = React.useMemo(() => {
     if (!rawOrdersData || !orders) return { total: 0, displayed: 0, hidden: 0 };
@@ -337,13 +359,6 @@ export default function DashboardPage() {
         }
       }
 
-      // OPTIMISTIC UPDATE
-      if (isRealDateSwitch || isMount) {
-        if (staffWithOrders.size > 0) {
-          setSelectedStaffIds(Array.from(staffWithOrders));
-        }
-      }
-
       try {
         const { staffIds: attendedStaffIds, checkedOutIds = [], scheduledStaffIds: scheduledIds = [] } = await getDailyAttendanceDetails(currentDate);
         
@@ -354,15 +369,18 @@ export default function DashboardPage() {
         setPresentStaffIds(new Set(attendedStaffIds));
         setScheduledStaffIds(new Set(scheduledIds));
 
-        const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...scheduledIds, ...Array.from(staffWithOrders)]));
+        // ONLY update selected staff on date change/mount so manual user selection is NEVER wiped out
+        if (isDateChange) {
+          const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...scheduledIds, ...Array.from(staffWithOrders)]));
 
-        if (combinedStaffIds.length > 0) {
-          // If shift schedule or active tasks/attendance exist for this day, strictly display only those scheduled/active staff
-          setSelectedStaffIds(combinedStaffIds);
-        } else {
-          // Only fallback to displaying all staff if NO shift schedule or active tasks exist for this date
-          if (allStaff && allStaff.length > 0) {
-            setSelectedStaffIds(allStaff.map(s => s.id));
+          if (combinedStaffIds.length > 0) {
+            // Default to active/scheduled staff, but allow users to toggle any staff in filter
+            setSelectedStaffIds(combinedStaffIds);
+          } else {
+            // If no shift schedule or tasks, show all staff
+            if (allStaff && allStaff.length > 0) {
+              setSelectedStaffIds(allStaff.map(s => s.id));
+            }
           }
         }
       } catch (e) {
