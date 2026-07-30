@@ -241,7 +241,37 @@ export default function DashboardPage() {
       }
     }
 
-    // 大原則：作業チップ・タスクチップが割り当てられているスタッフは絶対にタイムラインから消さず100%表示保持する
+    // 1. showManagement トグルによるフィルタリング（OFF の場合は管理者を非表示）
+    // ただし杉山和彦様などの Admin/Staff やシフト出勤中の管理者は、休みでない限り表示
+    if (!showManagement) {
+      selectedStaff = selectedStaff.filter((staff: any) => {
+        const name = String(staff.name || '').replace(/[\s\u3000]+/g, '');
+        const role = String(staff.role || '').toLowerCase().trim();
+        const rawRole = String((staff as any)['ロール'] || '').toLowerCase().trim();
+
+        const isAdmin = role.includes('admin') || role.includes('管理者') || rawRole.includes('admin') || rawRole.includes('管理者');
+        const isController = role.includes('controller') || role.includes('コントローラー') || rawRole.includes('controller') || rawRole.includes('コントローラー');
+
+        // シフト出勤者（scheduledStaffIds に含まれる場合）
+        const isScheduledToday = scheduledStaffIds && scheduledStaffIds.size > 0
+          ? Array.from(scheduledStaffIds).some(id => isStaffMatched(staff, [id]) || id === staff.id)
+          : true;
+
+        // 杉山和彦様の場合：Admin/Staff職のため、休みでない限り（＝シフト出勤日である限り）表示
+        if (name.includes('杉山和彦') || staff.id === '杉山和彦') {
+          return isScheduledToday;
+        }
+
+        // その他の管理者の場合：showManagementがOFFの場合、シフト出勤日でなければ非表示
+        if (isAdmin || isController) {
+          return isScheduledToday;
+        }
+
+        return true;
+      });
+    }
+
+    // 2. 大原則：作業チップ・タスクチップが割り当てられているスタッフは絶対にタイムラインから消さず100%表示保持する
     if (scheduleEvents && scheduleEvents.length > 0) {
       const activeStaffIds = new Set<string>();
       scheduleEvents.forEach(e => {
@@ -266,7 +296,7 @@ export default function DashboardPage() {
     }
 
     return selectedStaff;
-  }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents]);
+  }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents, scheduledStaffIds]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (appliedSelectedStaffIds.length === 0) {
