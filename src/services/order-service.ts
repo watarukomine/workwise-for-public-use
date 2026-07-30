@@ -289,6 +289,8 @@ export const OrderService = {
         const contactVal = order.contact || (order as any)['連絡先'] || '';
         const specialNotesVal = order.specialNotes || (order as any)['特記事項'] || '';
         const submitterVal = (order as any).submitter || (order as any)['フォーム入力者'] || '';
+        const staffNameVal = order.staffName || (order as any).staff || (order as any)['作業担当者'] || (order as any)['担当者'] || (order as any)['スタッフ名'] || '';
+        const staffIdVal = order.staffId || (order as any)['スタッフID'] || '';
 
         const payload = {
             ...order,
@@ -321,8 +323,14 @@ export const OrderService = {
             contact: contactVal,
             specialNotes: specialNotesVal,
             submitter: submitterVal,
-            // Japanese column names matching exact Sheet headers (including newline variants)
+            staffName: staffNameVal,
+            staffId: staffIdVal,
+            // Japanese column names matching exact Sheet headers
             SystemID: order.systemId || order.id,
+            '作業担当者': staffNameVal,
+            '担当者': staffNameVal,
+            '作業担当': staffNameVal,
+            'スタッフ名': staffNameVal,
             '受注 No': (order as any).displayId || orderNoVal || '',
             '受注行番号': (order as any).displayId || '',
             'ユーザーコード': userCodeVal,

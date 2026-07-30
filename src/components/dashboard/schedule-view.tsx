@@ -1304,11 +1304,19 @@ export function ScheduleView({
             }
           }
 
+          // Determine old staff name before move for GAS spreadsheet lookup
+          const previousEventState = previousSchedule.find(e => e.id === draggedEvent.id || (draggedEvent.tripId && e.tripId === draggedEvent.tripId));
+          const oldStaffId = previousEventState?.staffId || draggedEvent.staffId;
+          const oldStaffName = getStaffById(oldStaffId)?.name || draggedEvent.staffName || '';
+
           // Backup Sync to Spreadsheet
           updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: taskPart.title || `(ID: ${finalSystemId})`,
             staffName: newStaff.name,
+            "作業担当者": newStaff.name,
+            "担当者": newStaff.name,
+            "作業担当": newStaff.name,
             statusValue: (taskPart.status === '未割当') ? '割当済' : undefined,
             scheduledDate: format(taskStart, 'yyyy/MM/dd'),
             scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
@@ -1318,7 +1326,7 @@ export function ScheduleView({
             "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
             "作業予定日": format(taskStart, 'yyyy/MM/dd'),
             systemId: finalSystemId,
-            oldStaffName: getStaffById(draggedEvent.staffId)?.name || draggedEvent.staffName,
+            oldStaffName: oldStaffName,
           }).catch(err => {
             console.warn('Failed to update sheet on task move:', err);
           });
