@@ -1219,7 +1219,7 @@ export function ScheduleView({
       const newStaff = getStaffById(newStaffId);
       if (!newStaff) return;
 
-      // Optimistic UI Update
+      // Optimistic UI Update & Travel Chip Auto-Generation
       setScheduleEvents(prev => {
         const otherEvents = prev.filter(e => e.id !== draggedEvent.id && e.tripId !== draggedEvent.tripId);
         let eventsToUpdate: WithId<ScheduleEvent>[];
@@ -1231,8 +1231,11 @@ export function ScheduleView({
 
         const taskEventInTrip = eventsToUpdate.find(e => e.id.endsWith('-task') || !e.tripId) || eventsToUpdate[0];
         const travelEventInTrip = eventsToUpdate.find(e => e.id.endsWith('-travel'));
-        const taskDuration = differenceInMinutes(safeParseISO(taskEventInTrip.end as string), safeParseISO(taskEventInTrip.start as string));
-        const travelDuration = travelEventInTrip ? differenceInMinutes(safeParseISO(travelEventInTrip.end as string), safeParseISO(travelEventInTrip.start as string)) : TRAVEL_TIME_MINUTES;
+        
+        const effectiveTripId = draggedEvent.tripId || taskEventInTrip.tripId || `trip-${taskEventInTrip.rawOrderId || taskEventInTrip.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '')}`;
+        
+        const taskDuration = differenceInMinutes(safeParseISO(taskEventInTrip.end as string || taskEventInTrip.start as string), safeParseISO(taskEventInTrip.start as string)) || 60;
+        const travelDuration = travelEventInTrip ? (differenceInMinutes(safeParseISO(travelEventInTrip.end as string || travelEventInTrip.start as string), safeParseISO(travelEventInTrip.start as string)) || TRAVEL_TIME_MINUTES) : TRAVEL_TIME_MINUTES;
 
         let newTaskStart = newStart;
         if (draggedEvent.id.endsWith('-travel')) {
@@ -1241,17 +1244,39 @@ export function ScheduleView({
         const newTaskEnd = addMinutes(newTaskStart, taskDuration);
         const newTravelStart = subMinutes(newTaskStart, travelDuration);
 
-        const updatedTripEvents: WithId<ScheduleEvent>[] = [];
-        const updatedTask = { ...taskEventInTrip, staffId: newStaffId, start: newTaskStart.toISOString(), end: newTaskEnd.toISOString() };
-        updatedTripEvents.push(updatedTask);
-        if (travelEventInTrip) {
-          const updatedTravel = { ...travelEventInTrip, staffId: newStaffId, start: newTravelStart.toISOString(), end: newTaskStart.toISOString() };
-          updatedTripEvents.push(updatedTravel);
-        }
-        return [...otherEvents, ...updatedTripEvents];
+        const updatedTask: WithId<ScheduleEvent> = {
+          ...taskEventInTrip,
+          id: taskEventInTrip.id.endsWith('-task') ? taskEventInTrip.id : `${effectiveTripId}-task`,
+          tripId: effectiveTripId,
+          staffId: newStaffId,
+          staffName: newStaff.name,
+          start: newTaskStart.toISOString(),
+          end: newTaskEnd.toISOString()
+        };
+
+        const updatedTravel: WithId<ScheduleEvent> = travelEventInTrip ? {
+          ...travelEventInTrip,
+          tripId: effectiveTripId,
+          staffId: newStaffId,
+          staffName: newStaff.name,
+          start: newTravelStart.toISOString(),
+          end: newTaskStart.toISOString()
+        } : {
+          ...taskEventInTrip,
+          id: `${effectiveTripId}-travel`,
+          tripId: effectiveTripId,
+          title: '移動',
+          staffId: newStaffId,
+          staffName: newStaff.name,
+          start: newTravelStart.toISOString(),
+          end: newTaskStart.toISOString(),
+          estimatedDuration: travelDuration
+        };
+
+        return [...otherEvents, updatedTask, updatedTravel];
       });
 
-      // Backend Update
+      // Backend Update & Local Persistence
       (async () => {
         try {
           if (setSelectedStaffIds) {
@@ -1262,23 +1287,48 @@ export function ScheduleView({
           const taskPart = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
           const travelPart = tripEvents.find(e => e.id.endsWith('-travel'));
           
+          const effectiveTripId = draggedEvent.tripId || taskPart.tripId || `trip-${taskPart.rawOrderId || taskPart.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '')}`;
           const taskDuration = differenceInMinutes(safeParseISO(taskPart.end as string || taskPart.start as string), safeParseISO(taskPart.start as string)) || 60;
-          const travelDuration = travelPart ? (differenceInMinutes(safeParseISO(travelPart.end as string || travelPart.start as string), safeParseISO(travelPart.start as string)) || TRAVEL_TIME_MINUTES) : 0;
+          const travelDuration = travelPart ? (differenceInMinutes(safeParseISO(travelPart.end as string || travelPart.start as string), safeParseISO(travelPart.start as string)) || TRAVEL_TIME_MINUTES) : TRAVEL_TIME_MINUTES;
 
           let taskStart = newStart;
           if (draggedEvent.id.endsWith('-travel')) {
             taskStart = addMinutes(newStart, travelDuration);
           }
           const taskEnd = addMinutes(taskStart, taskDuration);
+          const travelStart = subMinutes(taskStart, travelDuration);
 
-          // Local Storage Persistence & Optimistic Event Save
-          const updatedTask = { ...taskPart, staffId: newStaffId, staffName: newStaff.name, start: taskStart.toISOString(), end: taskEnd.toISOString() };
+          // Local Storage Persistence & Optimistic Event Save (BOTH Task and Travel Events)
+          const updatedTask = {
+            ...taskPart,
+            id: taskPart.id.endsWith('-task') ? taskPart.id : `${effectiveTripId}-task`,
+            tripId: effectiveTripId,
+            staffId: newStaffId,
+            staffName: newStaff.name,
+            start: taskStart.toISOString(),
+            end: taskEnd.toISOString()
+          };
+          const updatedTravel = travelPart ? {
+            ...travelPart,
+            tripId: effectiveTripId,
+            staffId: newStaffId,
+            staffName: newStaff.name,
+            start: travelStart.toISOString(),
+            end: taskStart.toISOString()
+          } : {
+            ...taskPart,
+            id: `${effectiveTripId}-travel`,
+            tripId: effectiveTripId,
+            title: '移動',
+            staffId: newStaffId,
+            staffName: newStaff.name,
+            start: travelStart.toISOString(),
+            end: taskStart.toISOString(),
+            estimatedDuration: travelDuration
+          };
+
           saveLocalEvent(updatedTask);
-          if (travelPart) {
-            const travelStart = subMinutes(taskStart, travelDuration);
-            const updatedTravel = { ...travelPart, staffId: newStaffId, staffName: newStaff.name, start: travelStart.toISOString(), end: taskStart.toISOString() };
-            saveLocalEvent(updatedTravel);
-          }
+          saveLocalEvent(updatedTravel);
 
           // Determine System ID reliably across raw and mapped IDs
           const rawId = taskPart.rawOrderId || (taskPart.raw ? (taskPart.raw.SystemID || taskPart.raw.systemId || findKey(taskPart.raw, ['SystemID', 'systemId', 'id', '受注No', '受注No(ﾘﾏｰｸ1 8ｹﾀ)'])) : '');
