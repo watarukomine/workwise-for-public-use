@@ -1271,7 +1271,7 @@ export function ScheduleView({
           }
           const taskEnd = addMinutes(taskStart, taskDuration);
 
-          // Local Storage Persistence
+          // Local Storage Persistence & Optimistic Event Save
           const updatedTask = { ...taskPart, staffId: newStaffId, staffName: newStaff.name, start: taskStart.toISOString(), end: taskEnd.toISOString() };
           saveLocalEvent(updatedTask);
           if (travelPart) {
@@ -1280,28 +1280,32 @@ export function ScheduleView({
             saveLocalEvent(updatedTravel);
           }
 
-          // Determine System ID
-          const finalSystemId = taskPart.systemId || 
-            (taskPart.raw && Object.keys(taskPart.raw).length > 0 ? mapRawToOrder(taskPart.raw).id : '') ||
-            taskPart.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
+          // Determine System ID reliably across raw and mapped IDs
+          const rawId = taskPart.rawOrderId || (taskPart.raw ? (taskPart.raw.SystemID || taskPart.raw.systemId || findKey(taskPart.raw, ['SystemID', 'systemId', 'id', '受注No', '受注No(ﾘﾏｰｸ1 8ｹﾀ)'])) : '');
+          const finalSystemId = taskPart.systemId || rawId || taskPart.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
 
-          // Direct Write to Firestore
-          if (finalSystemId) {
-            try {
-              const { OrderService } = await import('@/services/order-service');
-              await OrderService.updateOrder(finalSystemId, {
-                staffName: newStaff.name,
-                staffId: newStaffId,
-                status: (taskPart.status === '未割当') ? '割当済' : undefined,
-                scheduledDate: format(taskStart, 'yyyy/MM/dd'),
-                scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-                scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
-                estimatedDuration: taskDuration,
-                updatedAt: new Date().toISOString()
-              } as any);
-            } catch (fsErr) {
-              console.error("Firestore update failed on re-assign:", fsErr);
+          // Direct Write to Firestore (Both systemId and rawId for absolute reliability)
+          const updatePayload = {
+            staffName: newStaff.name,
+            staffId: newStaffId,
+            status: (taskPart.status === '未割当') ? '割当済' : undefined,
+            scheduledDate: format(taskStart, 'yyyy/MM/dd'),
+            scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
+            scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
+            estimatedDuration: taskDuration,
+            updatedAt: new Date().toISOString()
+          };
+
+          try {
+            const { OrderService } = await import('@/services/order-service');
+            if (finalSystemId) {
+              await OrderService.updateOrder(finalSystemId, updatePayload as any);
             }
+            if (rawId && rawId !== finalSystemId) {
+              await OrderService.updateOrder(rawId, updatePayload as any).catch(() => {});
+            }
+          } catch (fsErr) {
+            console.error("Firestore update failed on re-assign:", fsErr);
           }
 
           // Determine old staff name before move for GAS spreadsheet lookup
