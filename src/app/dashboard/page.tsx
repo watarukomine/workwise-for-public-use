@@ -375,23 +375,24 @@ export default function DashboardPage() {
 
           if (allStaff && allStaff.length > 0) {
             allStaff.forEach(s => {
-              const sName = s.name || '';
-              const sLastName = sName.split(' ')[0] || sName.split('　')[0] || sName;
+              const sName = (s.name || '').trim();
 
-              // Robust matching for Shift schedule, Attendance, or Assigned Tasks
-              const matchesScheduled = scheduledIds.some(sched =>
-                sched === s.id ||
-                sched === sName ||
-                (sLastName && sLastName.length >= 2 && sched.includes(sLastName)) ||
-                ((s as any).staffCode && sched === (s as any).staffCode) ||
-                ((s as any).email && sched.toLowerCase() === (s as any).email.toLowerCase())
-              );
+              // STRICT EXACT MATCHING ONLY: Match exact ID, exact full name, staffCode, or email.
+              // NEVER use loose last-name includes() matching to avoid matching different staff with same surname (e.g. Sugiyama Kazuhiko vs Sugiyama Kyohei).
+              const matchesScheduled = scheduledIds.some(sched => {
+                if (!sched) return false;
+                const cleanSched = String(sched).trim();
+                return cleanSched === s.id ||
+                  cleanSched === sName ||
+                  ((s as any).staffCode && cleanSched === String((s as any).staffCode).trim()) ||
+                  ((s as any).email && cleanSched.toLowerCase() === String((s as any).email).toLowerCase());
+              });
 
-              const matchesAttended = attendedStaffIds.some(att =>
-                att === s.id ||
-                att === sName ||
-                (sLastName && sLastName.length >= 2 && att.includes(sLastName))
-              );
+              const matchesAttended = attendedStaffIds.some(att => {
+                if (!att) return false;
+                const cleanAtt = String(att).trim();
+                return cleanAtt === s.id || cleanAtt === sName;
+              });
 
               const hasOrders = staffWithOrders.has(s.id);
 
@@ -403,7 +404,6 @@ export default function DashboardPage() {
           }
 
           // STRICT SAFETY GUARD: ONLY display staff who are scheduled or working on this date!
-          // NEVER fall back to showing off-duty/absent staff (allStaff) to prevent accidental assignment to off-duty workers!
           setSelectedStaffIds(Array.from(validStaffIdsSet));
         }
       } catch (e) {
