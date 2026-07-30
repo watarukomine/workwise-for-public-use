@@ -732,20 +732,13 @@ export function isEtaPassed(etaStr?: string | null, lastUpdateIso?: string | nul
   return false;
 }
 
-export function isStaffMatched(staff: { id?: string; name?: string; email?: string | null; [key: string]: any }, entries: (string | undefined | null)[]): boolean {
-  if (!staff) return false;
+export function isStaffMatched(staff: any, entries: (string | undefined | null)[]): boolean {
+  if (!staff || !entries || entries.length === 0) return false;
   const normalize = (str: any) => String(str || '').replace(/[\s\u3000]+/g, '').toLowerCase().trim();
 
   const normSId = normalize(staff.id);
   const rawSName = String(staff.name || staff['氏名'] || staff['名前'] || '').trim();
   const normSName = normalize(rawSName);
-  const normSCode = normalize(staff.staffCode || staff.userCode);
-  const normSEmail = normalize(staff.email);
-
-  // Extract given name if space exists (e.g. "杉山 和彦" -> "和彦", "杉山 恭平" -> "恭平")
-  const nameParts = rawSName.split(/[\s\u3000]+/);
-  const givenName = nameParts.length > 1 ? normalize(nameParts[nameParts.length - 1]) : '';
-  const surname = nameParts[0] ? normalize(nameParts[0]) : '';
 
   return entries.some(entry => {
     if (!entry) return false;
@@ -753,30 +746,18 @@ export function isStaffMatched(staff: { id?: string; name?: string; email?: stri
     const nEntry = normalize(rawEntry);
     if (!nEntry) return false;
 
-    // 1. Primary Priority: ID, Full Name, Code, Email exact match
+    // 1. Exact match for ID or Full Name (with all spaces stripped)
     if (normSId && nEntry === normSId) return true;
     if (normSName && nEntry === normSName) return true;
-    if (normSCode && nEntry === normSCode) return true;
-    if (normSEmail && nEntry === normSEmail) return true;
 
-    // 2. Bracketed name support (Spreadsheet style: "杉山（和）", "杉山(恭)", "杉山和")
+    // 2. Bracketed name support (e.g. "杉山（和）")
     const bracketMatch = rawEntry.match(/^(.*?)[（(](.*?)[）)]$/);
     if (bracketMatch) {
       const entrySurname = normalize(bracketMatch[1]);
       const entryGivenChar = normalize(bracketMatch[2]);
-      if (surname && entrySurname === surname && givenName && givenName.startsWith(entryGivenChar)) {
+      if (normSName.startsWith(entrySurname) && normSName.includes(entryGivenChar)) {
         return true;
       }
-    }
-
-    // 3. Given Name exact match (e.g. "和彦" vs "恭平")
-    if (givenName && givenName.length >= 2 && nEntry === givenName) {
-      return true;
-    }
-
-    // 4. Exact Surname match ONLY if entry is exactly equal to surname and given name is empty
-    if (surname && nEntry === surname && !givenName) {
-      return true;
     }
 
     return false;
