@@ -559,7 +559,7 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { allStaff, setSelectedStaffIds } = useSelectedStaff(); // Get full list & setter
   const { toast } = useToast();
-  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, deleteOrder, toggleTripSuppression, setCurrentViewedDate } = useOrder();
+  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, deleteOrder, toggleTripSuppression, setCurrentViewedDate, updateRawOrder } = useOrder();
 
   // Filter orders to only show those scheduled for currentDate (JST local date format)
   const dailyOrders = React.useMemo(() => {
@@ -1283,6 +1283,12 @@ export function ScheduleView({
           // Determine System ID reliably across raw and mapped IDs
           const rawId = taskPart.rawOrderId || (taskPart.raw ? (taskPart.raw.SystemID || taskPart.raw.systemId || findKey(taskPart.raw, ['SystemID', 'systemId', 'id', '受注No', '受注No(ﾘﾏｰｸ1 8ｹﾀ)'])) : '');
           const finalSystemId = taskPart.systemId || rawId || taskPart.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
+
+          // Instantly update raw order data state so bottom order table updates assigned staff!
+          if (updateRawOrder) {
+            if (finalSystemId) updateRawOrder(finalSystemId, { staffName: newStaff.name, staffId: newStaffId });
+            if (rawId && rawId !== finalSystemId) updateRawOrder(rawId, { staffName: newStaff.name, staffId: newStaffId });
+          }
 
           // Direct Write to Firestore (Both systemId and rawId for absolute reliability)
           const updatePayload = {

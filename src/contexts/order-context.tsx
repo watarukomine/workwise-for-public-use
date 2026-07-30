@@ -32,6 +32,8 @@ interface OrderContextType {
   deleteOrder: (id: string) => Promise<void>;
   refetchOrders: () => Promise<void>;
   rawOrdersData: WithId<Order>[];
+  setRawOrdersData: React.Dispatch<React.SetStateAction<WithId<Order>[]>>;
+  updateRawOrder: (targetId: string, updates: Partial<any>) => void;
   orderGasUrl: string;
   setOrderGasUrl: (url: string) => void;
   toggleTripSuppression: (tripId: string) => void;
@@ -680,6 +682,29 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     await fetchAndProcessData(true, { date: dateStr, range });
   }, [fetchAndProcessData]);
 
+  const updateRawOrder = useCallback((targetId: string, updates: Partial<any>) => {
+    setRawOrdersData(prev => prev.map(o => {
+      const oId = o.id || o.systemId || (o as any).rawOrderId;
+      const isMatch = oId === targetId ||
+        (o as any).rawOrderId === targetId ||
+        (o.raw && (o.raw.SystemID === targetId || o.raw.systemId === targetId || o.raw.id === targetId || o.raw['受注No'] === targetId));
+
+      if (isMatch) {
+        return {
+          ...o,
+          ...updates,
+          raw: {
+            ...(o.raw || {}),
+            ...updates,
+            '作業担当者': updates.staffName || (o.raw ? (o.raw['作業担当者'] || o.raw['担当者']) : updates.staffName),
+            '担当者': updates.staffName || (o.raw ? (o.raw['担当者'] || o.raw['作業担当者']) : updates.staffName),
+          }
+        };
+      }
+      return o;
+    }));
+  }, []);
+
   const value: OrderContextType = React.useMemo(() => ({
     orders,
     unassignedOrders,
@@ -698,6 +723,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     refetchOrders,
     loadRange,
     rawOrdersData,
+    setRawOrdersData,
+    updateRawOrder,
     orderGasUrl,
     setOrderGasUrl,
     toggleTripSuppression,
@@ -719,6 +746,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     refetchOrders,
     loadRange,
     rawOrdersData,
+    setRawOrdersData,
+    updateRawOrder,
     orderGasUrl,
     setOrderGasUrl,
     toggleTripSuppression,
