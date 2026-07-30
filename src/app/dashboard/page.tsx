@@ -203,23 +203,12 @@ export default function DashboardPage() {
     if (isProfileLoading || isStaffLoading || !profile || !allStaff) return [];
 
     const staffToUse = allStaff;
-    let selectedStaff: WithId<Staff>[] = [];
 
-    if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
-      selectedStaff = staffToUse;
-    } else {
-      selectedStaff = staffToUse.filter(staff => {
-        return (
-          appliedSelectedStaffIds.includes(staff.id) ||
-          isStaffMatched(staff, appliedSelectedStaffIds)
-        );
-      });
-      if (selectedStaff.length === 0) {
-        selectedStaff = staffToUse;
-      }
-    }
+    // Filter staff genuinely scheduled on this date
+    const scheduledList = Array.from(scheduledStaffIds);
+    let selectedStaff = staffToUse.filter(staff => isStaffMatched(staff, scheduledList));
 
-    // Apply showManagement toggle filter: hide admin, controller, and admin/staff unless showManagement is ON
+    // Apply showManagement toggle filter
     if (!showManagement) {
       selectedStaff = selectedStaff.filter(staff => {
         const role = String(staff.role || '').toLowerCase().trim();
@@ -233,7 +222,7 @@ export default function DashboardPage() {
     }
 
     return selectedStaff;
-  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading, showManagement]);
+  }, [profile, isProfileLoading, allStaff, isStaffLoading, showManagement, scheduledStaffIds]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (appliedSelectedStaffIds.length === 0) {
