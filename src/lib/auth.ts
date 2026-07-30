@@ -159,19 +159,50 @@ export const signOut = async (): Promise<void> => {
   const { auth, firestore: db } = initializeFirebase();
   try {
     const sessionUser = getCurrentUser();
-    const userId = auth.currentUser?.uid || sessionUser?.id;
+    const currentAuthUser = auth.currentUser;
+    const userId = currentAuthUser?.uid || sessionUser?.id;
+    const userEmail = currentAuthUser?.email || sessionUser?.email;
+    const userName = sessionUser?.name;
 
-    if (userId && db) {
+    if (db) {
       try {
-        const { doc, updateDoc } = await import('firebase/firestore');
-        const userRef = doc(db, 'users', userId);
-        await updateDoc(userRef, {
+        const { doc, updateDoc, collection, query, where, getDocs } = await import('firebase/firestore');
+        
+        const clearFields = {
           latitude: null,
           longitude: null,
           currentStatus: 'ログアウト',
           isOnline: false,
           updatedAt: new Date().toISOString()
-        }).catch(() => {});
+        };
+
+        // 1. Update by Direct User ID
+        if (userId) {
+          await updateDoc(doc(db, 'users', userId), clearFields).catch(() => {});
+          await updateDoc(doc(db, 'staffStatus', userId), clearFields).catch(() => {});
+        }
+
+        // 2. Fallback update by Email
+        if (userEmail) {
+          const qEmail = query(collection(db, 'users'), where('email', '==', userEmail.trim().toLowerCase()));
+          const snapEmail = await getDocs(qEmail).catch(() => null);
+          if (snapEmail && !snapEmail.empty) {
+            for (const d of snapEmail.docs) {
+              await updateDoc(doc(db, 'users', d.id), clearFields).catch(() => {});
+            }
+          }
+        }
+
+        // 3. Fallback update by Name (e.g. DEMO2)
+        if (userName) {
+          const qName = query(collection(db, 'users'), where('name', '==', userName.trim()));
+          const snapName = await getDocs(qName).catch(() => null);
+          if (snapName && !snapName.empty) {
+            for (const d of snapName.docs) {
+              await updateDoc(doc(db, 'users', d.id), clearFields).catch(() => {});
+            }
+          }
+        }
       } catch (err) {
         console.warn('Failed to clear location on sign out:', err);
       }

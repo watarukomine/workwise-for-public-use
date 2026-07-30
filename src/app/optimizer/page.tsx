@@ -57,13 +57,14 @@ function OptimizerPageContent() {
         const lng = rawLng !== undefined && rawLng !== null ? Number(rawLng) : storeLoc.longitude;
 
         const currentStatus = String(status?.status || (staffMember as any).currentStatus || '').trim();
+        const isLoggedOut = currentStatus === 'ログアウト' || currentStatus === '退勤' || (staffMember as any).isOnline === false;
         const hasGps = (status?.latitude !== undefined && status?.latitude !== null) || ((staffMember as any).latitude !== undefined && (staffMember as any).latitude !== null);
 
         // Active working status list
         const isWorkingStatus = ['作業中', '移動中', '帰社中', '待機中', '出勤中', '確定済'].includes(currentStatus);
 
-        // ONLY include staff who are actively working OR have explicit GPS location
-        if (!isWorkingStatus && !hasGps) {
+        // Exclude logged-out or off-duty staff from map display
+        if (isLoggedOut || !hasGps || !isWorkingStatus) {
           return null;
         }
 
