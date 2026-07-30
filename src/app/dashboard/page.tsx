@@ -378,7 +378,9 @@ export default function DashboardPage() {
               const parts = line.split(',');
               const name = parts[1].trim();
               const days = parts.slice(3);
-              if (!String(days[dayIdx] || '').trim()) {
+              const val = String(days[dayIdx] || '').trim();
+              // Empty OR '半' (half-day attendance) means working on this date!
+              if (!val || val === '半') {
                 activeNames.push(name);
               }
             });
@@ -396,10 +398,16 @@ export default function DashboardPage() {
         // ONLY update selected staff on date change/mount so manual user selection is NEVER wiped out
         if (isDateChange) {
           if (allStaff && allStaff.length > 0) {
-            // Filter ONLY staff who are genuinely scheduled (green circle on shift sheet) for this date!
-            // PRESERVE the original staff master order (do NOT reorder)!
+            // Filter staff who are scheduled (including '半' half-day) OR management staff
+            // PRESERVE the original staff master order!
             const scheduledStaffIdsList = allStaff
-              .filter(s => isStaffMatched(s, finalScheduledEntries))
+              .filter(s => {
+                const isScheduled = isStaffMatched(s, finalScheduledEntries);
+                const role = String(s.role || '').toLowerCase().trim();
+                const rawRole = String((s as any)['ロール'] || '').toLowerCase().trim();
+                const isMgmt = role.includes('admin') || role.includes('管理者') || role.includes('controller') || role.includes('コントローラー') || rawRole.includes('admin') || rawRole.includes('管理者');
+                return isScheduled || isMgmt;
+              })
               .map(s => s.id);
 
             setSelectedStaffIds(scheduledStaffIdsList);
