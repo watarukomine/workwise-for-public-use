@@ -774,11 +774,9 @@ export function isStaffMatched(staff: { id?: string; name?: string; email?: stri
       return true;
     }
 
-    // 4. Fallback: Prefix/Surname match ONLY if no ambiguity or full name starts with entry
-    if (nEntry.length >= 2 && normSName) {
-      if (normSName.startsWith(nEntry) || nEntry.startsWith(normSName)) {
-        return true;
-      }
+    // 4. Exact Surname match ONLY if entry is exactly equal to surname and given name is empty
+    if (surname && nEntry === surname && !givenName) {
+      return true;
     }
 
     return false;
