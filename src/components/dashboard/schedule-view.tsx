@@ -1893,9 +1893,11 @@ export function ScheduleView({
         const staff = getStaffById(dialogState.staffId);
         if (!staff) throw new Error("担当スタッフが見つかりません。");
 
-        const tempEventId = `temp-task-${Date.now()}`;
-        const derivedTripId = `trip-${tempEventId}`;
-        const frontendId = `${derivedTripId}-task`;
+        const dateStrPrefix = format(newStart, 'yyyyMMdd');
+        const timeStrSuffix = format(new Date(), 'HHmmss');
+        const frontendId = `TASK_${dateStrPrefix}_${timeStrSuffix}`;
+        const derivedTripId = `trip-${frontendId}`;
+
         const newEvent: WithId<ScheduleEvent> = {
           id: frontendId,
           title: submitDetails.title,
@@ -1904,11 +1906,11 @@ export function ScheduleView({
           staffId: staff.id,
           locationId: '',
           customerCode: '',
-          customerName: '',
+          customerName: submitDetails.title || '社内作業',
           address: '',
           taskDetails: submitDetails.description || submitDetails.title,
-          serviceType: '',
-          status: '未割当',
+          serviceType: '社内作業',
+          status: '割当済',
           scheduledDate: format(newStart, 'yyyy/MM/dd'),
           estimatedDuration: durationMinutes,
           value: 0,
@@ -1931,7 +1933,7 @@ export function ScheduleView({
           OrderService.createOrder({
             id: frontendId,
             systemId: frontendId,
-            customerName: submitDetails.title || '任意作業',
+            customerName: submitDetails.title || '社内作業',
             workType: '作業',
             taskDetails: submitDetails.description || submitDetails.title,
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
@@ -1939,7 +1941,7 @@ export function ScheduleView({
             scheduledEndTime: format(finalEnd, 'HH:mm'),
             estimatedDuration: durationMinutes,
             picName: staff.name,
-            status: '未割当',
+            status: '割当済',
             _type: 'task' as any
           }).then(() => {
             refetchOrders();
@@ -2465,20 +2467,38 @@ export function ScheduleView({
                       // マスタ解決された店舗名を取得
                       let storeName = order.customerName || '';
                       if (storeName === '' || storeName === '（店舗名未設定）' || storeName === '(店舗名未設定)' || storeName === '店舗名未設定') {
-                        const paddedCode = String(order.customerCode).trim().padStart(5, '0');
+                        const paddedCode = String(order.customerCode || '').trim().padStart(5, '0');
                         const match = allCustomers?.find(c => {
                           const cCode = c.userCode || c['ユーザーコード'] || '';
-                          return String(cCode).trim().padStart(5, '0') === paddedCode;
+                          return String(cCode).trim().padStart(5, '0') === paddedCode && paddedCode !== '00000';
                         });
                         if (match?.storeName) {
                           storeName = match.storeName;
+                        } else if (order.taskDetails || order.serviceType) {
+                          storeName = order.taskDetails || order.serviceType || '社内作業';
                         } else {
-                          storeName = '(店舗名未設定)';
+                          storeName = '社内作業';
                         }
                       }
 
                       // 時間のフォーマット
                       const timeStr = order.scheduledTime ? formatTime(order.scheduledTime) : '未定';
+
+                      // 表示用IDの整形（trip-temp-task-... の旧仮IDの場合は見た目を綺麗に整形）
+                      let rawId = order.id || order.rawOrderId || (order.raw ? findKey(order.raw, ['SystemID', 'systemId']) : '') || order.displayId || '-';
+                      if (rawId.startsWith('trip-temp-task-')) {
+                        const tsMatch = rawId.match(/\d+/);
+                        if (tsMatch) {
+                          const dateObj = new Date(parseInt(tsMatch[0], 10));
+                          if (!isNaN(dateObj.getTime())) {
+                            rawId = `TASK_${format(dateObj, 'yyyyMMdd_HHmmss')}`;
+                          } else {
+                            rawId = 'TASK_手動登録';
+                          }
+                        } else {
+                          rawId = 'TASK_手動登録';
+                        }
+                      }
 
                       // チップへの連動クリック
                       const handleRowClick = () => {
@@ -2498,7 +2518,7 @@ export function ScheduleView({
                           onClick={handleRowClick}
                         >
                           <td className="p-3 pl-4 font-semibold text-foreground font-mono text-xs">
-                            {order.id || order.rawOrderId || (order.raw ? findKey(order.raw, ['SystemID', 'systemId']) : '') || order.displayId || '-'}
+                            {rawId}
                           </td>
                           <td className="p-3">
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
