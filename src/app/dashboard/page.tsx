@@ -204,9 +204,15 @@ export default function DashboardPage() {
 
     const staffToUse = allStaff;
 
-    // Filter staff genuinely scheduled on this date
+    // Filter staff genuinely scheduled on this date if schedule exists for this date
     const scheduledList = Array.from(scheduledStaffIds);
-    let selectedStaff = staffToUse.filter(staff => isStaffMatched(staff, scheduledList));
+    let selectedStaff: WithId<Staff>[] = [];
+
+    if (scheduledList.length > 0) {
+      selectedStaff = staffToUse.filter(staff => isStaffMatched(staff, scheduledList));
+    } else {
+      selectedStaff = staffToUse;
+    }
 
     // Apply showManagement toggle filter
     if (!showManagement) {
