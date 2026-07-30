@@ -557,7 +557,7 @@ export function ScheduleView({
 
 
   const { customers: allCustomers } = useCustomer();
-  const { allStaff } = useSelectedStaff(); // Get full list
+  const { allStaff, setSelectedStaffIds } = useSelectedStaff(); // Get full list & setter
   const { toast } = useToast();
   const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, deleteOrder, toggleTripSuppression, setCurrentViewedDate } = useOrder();
 
@@ -1254,172 +1254,45 @@ export function ScheduleView({
       // Backend Update
       (async () => {
         try {
-          if (draggedEvent.id.startsWith('event-')) {
-            const duration = differenceInMinutes(safeParseISO(draggedEvent.end as string), safeParseISO(draggedEvent.start as string));
-            const updatedEvent = {
-              ...draggedEvent,
-              staffId: newStaffId,
-              start: newStart.toISOString(),
-              end: addMinutes(newStart, duration).toISOString()
-            };
-            saveLocalEvent(updatedEvent);
-            toast({ title: "スケジュールを更新しました", duration: 3000 });
-          } else if (draggedEvent.id.startsWith('task-') || draggedEvent.id.startsWith('generic-') || draggedEvent.id.startsWith('trip-')) {
-            // Generic/Trip Task persistence
-            const tripEvents = draggedEvent.tripId ? previousSchedule.filter(e => e.tripId === draggedEvent.tripId) : [draggedEvent];
-            const taskPart = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
-            const travelPart = tripEvents.find(e => e.id.endsWith('-travel'));
-            
-            const taskDuration = differenceInMinutes(safeParseISO(taskPart.end as string), safeParseISO(taskPart.start as string));
-            const travelDuration = travelPart ? differenceInMinutes(safeParseISO(travelPart.end as string), safeParseISO(travelPart.start as string)) : 0;
+          if (setSelectedStaffIds) {
+            setSelectedStaffIds((prev: string[]) => Array.from(new Set([...prev, newStaffId])));
+          }
 
-            let taskStart = newStart;
-            if (draggedEvent.id.endsWith('-travel')) {
-              taskStart = addMinutes(newStart, travelDuration);
-            }
-            const taskEnd = addMinutes(taskStart, taskDuration);
+          const tripEvents = draggedEvent.tripId ? previousSchedule.filter(e => e.tripId === draggedEvent.tripId) : [draggedEvent];
+          const taskPart = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
+          const travelPart = tripEvents.find(e => e.id.endsWith('-travel'));
+          
+          const taskDuration = differenceInMinutes(safeParseISO(taskPart.end as string || taskPart.start as string), safeParseISO(taskPart.start as string)) || 60;
+          const travelDuration = travelPart ? (differenceInMinutes(safeParseISO(travelPart.end as string || travelPart.start as string), safeParseISO(travelPart.start as string)) || TRAVEL_TIME_MINUTES) : 0;
 
-            // Local Storage Persistence
-            const updatedTask = { ...taskPart, staffId: newStaffId, start: taskStart.toISOString(), end: taskEnd.toISOString() };
-            saveLocalEvent(updatedTask);
-            if (travelPart) {
-              const travelStart = subMinutes(taskStart, travelDuration);
-              const updatedTravel = { ...travelPart, staffId: newStaffId, start: travelStart.toISOString(), end: taskStart.toISOString() };
-              saveLocalEvent(updatedTravel);
-            }
+          let taskStart = newStart;
+          if (draggedEvent.id.endsWith('-travel')) {
+            taskStart = addMinutes(newStart, travelDuration);
+          }
+          const taskEnd = addMinutes(taskStart, taskDuration);
 
-            // Backend Update
-            updateSheetStatus({
-              gasUrl: ORDER_GAS_URL,
-              eventTitle: taskPart.title,
-              staffName: newStaff.name,
-              statusValue: undefined,
-              scheduledDate: format(taskStart, 'yyyy/MM/dd'),
-              scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
-              estimatedDuration: taskDuration,
-              "チップ配置作業予定": format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
-              "作業予定日": format(taskStart, 'yyyy/MM/dd'),
-              systemId: draggedEvent.systemId || draggedEvent.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, ''),
-              oldStaffName: getStaffById(draggedEvent.staffId)?.name || draggedEvent.staffName,
-              oldScheduledTime: taskPart.start ? (typeof taskPart.start === 'string' ? taskPart.start : safeParseISO(taskPart.start).toISOString()) : '',
-              oldScheduledDate: taskPart.scheduledDate || (taskPart.start ? format(safeParseISO(taskPart.start), 'yyyy-MM-dd') : undefined)
-            }).catch(err => {
-              console.warn('Failed to update sheet on task update:', err);
-              deleteLocalEvent(updatedTask.id);
-              if (travelPart) deleteLocalEvent(travelPart.id);
-            });
-            toast({ title: "タスク時間を更新しました", duration: 3000 });
-            // バックエンドの反映を待ってから再取得
-            setTimeout(() => refetchOrders(), 1500);
-          } else if (draggedEvent.rawOrderId) {
-            let taskStart = newStart;
-            let taskDuration = 60;
-            let travelDuration = TRAVEL_TIME_MINUTES;
+          // Local Storage Persistence
+          const updatedTask = { ...taskPart, staffId: newStaffId, staffName: newStaff.name, start: taskStart.toISOString(), end: taskEnd.toISOString() };
+          saveLocalEvent(updatedTask);
+          if (travelPart) {
+            const travelStart = subMinutes(taskStart, travelDuration);
+            const updatedTravel = { ...travelPart, staffId: newStaffId, staffName: newStaff.name, start: travelStart.toISOString(), end: taskStart.toISOString() };
+            saveLocalEvent(updatedTravel);
+          }
 
-            // Initialize local references for persistence and sync
-            let currentTaskEvent: any = draggedEvent;
-            let currentTravelEvent: any = null;
+          // Determine System ID
+          const finalSystemId = taskPart.systemId || 
+            (taskPart.raw && Object.keys(taskPart.raw).length > 0 ? mapRawToOrder(taskPart.raw).id : '') ||
+            taskPart.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
 
-            // Recalculate trip event timings
-            if (draggedEvent.tripId) {
-              const tripEvents = previousSchedule.filter(e => e.tripId === draggedEvent.tripId);
-              currentTaskEvent = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
-              currentTravelEvent = tripEvents.find(e => e.id.endsWith('-travel'));
-
-              if (currentTaskEvent) {
-                taskDuration = differenceInMinutes(safeParseISO(currentTaskEvent.end as string), safeParseISO(currentTaskEvent.start as string));
-              }
-
-              if (currentTravelEvent) {
-                travelDuration = differenceInMinutes(safeParseISO(currentTravelEvent.end as string), safeParseISO(currentTravelEvent.start as string));
-              }
-
-              // Adjust start time if we dragged the travel event
-              if (draggedEvent.id.endsWith('-travel')) {
-                taskStart = addMinutes(newStart, travelDuration);
-              }
-
-              const taskEnd = addMinutes(taskStart, taskDuration);
-              const travelStart = subMinutes(taskStart, travelDuration);
-
-              // 1. Optimistic Save of TASK Event
-              // Even if we dragged the travel event, we must update the task event locally
-              if (currentTaskEvent) {
-                const optimisticTask = {
-                  ...currentTaskEvent,
-                  staffId: newStaffId,
-                  start: taskStart.toISOString(),
-                  end: taskEnd.toISOString()
-                };
-                saveLocalEvent(optimisticTask);
-              }
-
-              // 2. Optimistic Save of TRAVEL Event (if exists)
-              if (currentTravelEvent) {
-                const optimisticTravel = {
-                  ...currentTravelEvent,
-                  staffId: newStaffId,
-                  start: travelStart.toISOString(),
-                  end: taskStart.toISOString()
-                };
-                saveLocalEvent(optimisticTravel);
-              }
-
-            } else {
-              // Standalone event (unlikely given logic but fallback)
-              taskDuration = differenceInMinutes(safeParseISO(draggedEvent.end as string), safeParseISO(draggedEvent.start as string));
-              const taskEnd = addMinutes(taskStart, taskDuration);
-              const optimisticEvent = {
-                ...draggedEvent,
-                staffId: newStaffId,
-                start: newStart.toISOString(),
-                end: taskEnd.toISOString()
-              };
-              saveLocalEvent(optimisticEvent);
-            }
-
-            // Backend Sync (Trigger updateSheetStatus)
-            const taskEnd = addMinutes(taskStart, taskDuration);
-
-            // Determine correct system ID based on whether raw is present
-            const finalSystemId = draggedEvent.systemId || 
-              (draggedEvent.raw && Object.keys(draggedEvent.raw).length > 0
-                ? mapRawToOrder(draggedEvent.raw).id
-                : draggedEvent.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, ''));
-
-            updateSheetStatus({
-              gasUrl: ORDER_GAS_URL,
-              eventTitle: `(ID: ${draggedEvent.rawOrderId})`,
-              staffName: newStaff.name,
-              statusValue: (draggedEvent.staffId !== newStaffId) ? '割当済' : undefined,
-              scheduledDate: format(taskStart, 'yyyy/MM/dd'),
-              scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
-              estimatedDuration: taskDuration,
-              "チップ配置作業予定": format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
-              "作業予定日": format(taskStart, 'yyyy/MM/dd'),
-              "作業時間（分）": taskDuration,
-              systemId: finalSystemId,
-              oldStaffName: getStaffById(draggedEvent.staffId)?.name || draggedEvent.staffName,
-              oldScheduledTime: currentTaskEvent.start ? (typeof currentTaskEvent.start === 'string' ? currentTaskEvent.start : safeParseISO(currentTaskEvent.start).toISOString()) : '',
-              oldScheduledDate: currentTaskEvent.scheduledDate || (currentTaskEvent.start ? format(safeParseISO(currentTaskEvent.start), 'yyyy-MM-dd') : undefined)
-            }).catch(err => {
-              console.warn('Failed to update sheet on order move:', err);
-              if (currentTaskEvent) deleteLocalEvent(currentTaskEvent.id);
-              if (currentTravelEvent) deleteLocalEvent(currentTravelEvent.id);
-              if (!currentTaskEvent && !currentTravelEvent) deleteLocalEvent(draggedEvent.id);
-            });
-
-            // Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
+          // Direct Write to Firestore
+          if (finalSystemId) {
             try {
               const { OrderService } = await import('@/services/order-service');
               await OrderService.updateOrder(finalSystemId, {
                 staffName: newStaff.name,
                 staffId: newStaffId,
-                status: (draggedEvent.staffId !== newStaffId) ? '割当済' : undefined,
+                status: (taskPart.status === '未割当') ? '割当済' : undefined,
                 scheduledDate: format(taskStart, 'yyyy/MM/dd'),
                 scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
                 scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
@@ -1427,13 +1300,31 @@ export function ScheduleView({
                 updatedAt: new Date().toISOString()
               } as any);
             } catch (fsErr) {
-              console.error("Firestore sync error on move:", fsErr);
+              console.error("Firestore update failed on re-assign:", fsErr);
             }
-
-            toast({ title: "スケジュールを更新しました", duration: 3000 });
-            // バックエンドの反映を待ってから再取得
-            setTimeout(() => refetchOrders(), 1500);
           }
+
+          // Backup Sync to Spreadsheet
+          updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: taskPart.title || `(ID: ${finalSystemId})`,
+            staffName: newStaff.name,
+            statusValue: (taskPart.status === '未割当') ? '割当済' : undefined,
+            scheduledDate: format(taskStart, 'yyyy/MM/dd'),
+            scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
+            scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
+            estimatedDuration: taskDuration,
+            "チップ配置作業予定": format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
+            "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
+            "作業予定日": format(taskStart, 'yyyy/MM/dd'),
+            systemId: finalSystemId,
+            oldStaffName: getStaffById(draggedEvent.staffId)?.name || draggedEvent.staffName,
+          }).catch(err => {
+            console.warn('Failed to update sheet on task move:', err);
+          });
+
+          toast({ title: "スケジュールを更新しました", duration: 3000 });
+          setTimeout(() => refetchOrders(), 1500);
         } catch (e: any) {
           toast({ variant: 'destructive', title: '更新エラー', description: `スケジュールの更新に失敗しました: ${e.message}` });
           setScheduleEvents(previousSchedule);
@@ -1444,6 +1335,10 @@ export function ScheduleView({
       const order = item as WithId<Order>;
       const staff = getStaffById(newStaffId);
       if (!staff) return;
+
+      if (setSelectedStaffIds) {
+        setSelectedStaffIds((prev: string[]) => Array.from(new Set([...prev, newStaffId])));
+      }
 
       const isGeneric = order.id.startsWith('generic-');
       // Treat as Accompany if ID says so OR title contains "同行"
