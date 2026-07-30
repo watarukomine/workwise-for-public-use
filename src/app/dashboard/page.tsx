@@ -476,7 +476,7 @@ export default function DashboardPage() {
         }
 
         const etaTime = (staff as any).estimatedArrivalTime || orderStatusObj?.estimatedArrivalTime;
-        const lastUpIso = orderStatusObj?.lastUpdate || (staff as any).updatedAt;
+        const lastUpIso = orderStatusObj?.lastUpdate || (staff as any).updatedAt || (staff as any).lastLocationUpdatedAt || (staff as any).statusUpdatedAt;
 
         if (displayStatus === '移動開始' || displayStatus === '移動中') {
           if (isEtaPassed(etaTime, lastUpIso)) return '待機中';

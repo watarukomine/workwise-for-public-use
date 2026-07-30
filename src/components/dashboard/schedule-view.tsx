@@ -3046,7 +3046,7 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
       <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[140px]")}>
         {status && isToday && (() => {
           const etaTime = status.estimatedArrivalTime || staff.estimatedArrivalTime;
-          const lastUpIso = status.lastUpdate || (staff as any).updatedAt;
+          const lastUpIso = status.lastUpdate || (staff as any).updatedAt || (staff as any).lastLocationUpdatedAt || (staff as any).statusUpdatedAt;
           const etaOverdue = isEtaPassed(etaTime, lastUpIso);
           const displayStatus = (etaOverdue && (status.status === '帰社中' || status.status === '移動中')) ? '待機中' : status.status;
 

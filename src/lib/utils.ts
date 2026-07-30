@@ -698,13 +698,13 @@ export function isEtaPassed(etaStr?: string | null, lastUpdateIso?: string | nul
   if (!etaStr && !lastUpdateIso) return false;
 
   const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
 
   // 1. lastUpdate が昨日以前（過去日付）であれば無条件に予定時刻超過（自動クリア）
   if (lastUpdateIso) {
     try {
       const lastDate = new Date(lastUpdateIso);
       if (!isNaN(lastDate.getTime())) {
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
         if (lastDate < todayStart) {
           return true;
         }
@@ -721,7 +721,11 @@ export function isEtaPassed(etaStr?: string | null, lastUpdateIso?: string | nul
       const minutes = parseInt(timeMatch[2], 10);
 
       const etaDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes, 0, 0);
-      return now.getTime() >= etaDate.getTime();
+
+      // ETA時刻を過ぎていれば true
+      if (now.getTime() >= etaDate.getTime()) {
+        return true;
+      }
     }
   }
 

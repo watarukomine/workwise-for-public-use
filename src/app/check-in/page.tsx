@@ -362,10 +362,13 @@ function CheckInClient() {
               }
             }
 
+            const nowIso = new Date().toISOString();
             const staffFields: any = {
               latitude,
               longitude,
-              lastLocationUpdatedAt: new Date().toISOString(),
+              lastLocationUpdatedAt: nowIso,
+              updatedAt: nowIso,
+              statusUpdatedAt: nowIso,
               currentStatus: statusValue
             };
             if (etaStr) staffFields.estimatedArrivalTime = etaStr;

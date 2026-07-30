@@ -171,7 +171,7 @@ const processOrderData = (
                 lon = parts[1];
             }
 
-            const lastUpdateIso = lastUpdate.toISOString();
+            const lastUpdateIso = (staffMember as any).updatedAt || (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || lastUpdate.toISOString();
             const etaTime = order.estimatedArrivalTime;
             const etaOverdue = isEtaPassed(etaTime, lastUpdateIso);
             const finalStatus = (etaOverdue && (status === '帰社中' || status === '移動中')) ? '待機中' : status;
