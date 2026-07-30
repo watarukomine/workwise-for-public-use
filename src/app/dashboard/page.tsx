@@ -212,39 +212,8 @@ export default function DashboardPage() {
       selectedStaff = staffToUse.filter(staff => selectedIds.has(staff.id));
     }
 
-    // Filter by Management/Controller visibility
-    if (!showManagement) {
-      selectedStaff = selectedStaff.filter(staff => {
-        const roleStr = String(staff.role || (staff as any).raw?.role || (staff as any).raw?.['ロール'] || (staff as any).raw?.['役職'] || (staff as any)['ロール'] || (staff as any)['役職'] || '').toLowerCase().trim();
-        const staffName = staff.name || (staff as any)['氏名'] || (staff as any)['名前'] || '';
-
-        // Check if user is an Admin/Staff dual role (e.g. "admin/staff", "admin\staff", "admin_staff", "管理者/スタッフ", "兼任", or 杉山和彦)
-        const isAdminStaff = (roleStr.includes('admin') && roleStr.includes('staff')) ||
-                             (roleStr.includes('管理者') && roleStr.includes('スタッフ')) ||
-                             roleStr.includes('兼任') ||
-                             staffName.includes('杉山和彦');
-
-        if (isAdminStaff) {
-          // Keep Admin/Staff dual roles visible even when showManagement is OFF
-          return true;
-        }
-
-        // Pure Admin or Controller
-        const isController = staff['コントローラー'] === '⚪︎' || staff.controller === '⚪︎' || staff['コントローラー'] === '○' || staff.controller === '○';
-        const isPureAdmin = (roleStr === 'admin' || roleStr === '管理者') && !isAdminStaff;
-
-        if (isController || isPureAdmin) {
-          // Hide pure Admin / Controllers when showManagement is OFF
-          return false;
-        }
-
-        return true;
-      });
-    }
-
-    return selectedStaff; // Return in original order (Sheet order)
-
-  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading, showManagement]);
+    return selectedStaff; // Return staff matching active selection for current date
+  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (appliedSelectedStaffIds.length === 0) {
