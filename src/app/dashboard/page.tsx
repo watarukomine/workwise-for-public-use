@@ -241,7 +241,7 @@ export default function DashboardPage() {
       }
     }
 
-    // 1. 管理者・コントローラーの表示判定ルール
+    // 1. 本日のシフト出勤・休日判定と表示フィルタリング
     selectedStaff = selectedStaff.filter((staff: any) => {
       const name = String(staff.name || '').replace(/[\s\u3000]+/g, '');
       const role = String(staff.role || '').toLowerCase().trim();
@@ -250,29 +250,24 @@ export default function DashboardPage() {
       const isAdmin = role.includes('admin') || role.includes('管理者') || rawRole.includes('admin') || rawRole.includes('管理者');
       const isController = role.includes('controller') || role.includes('コントローラー') || rawRole.includes('controller') || rawRole.includes('コントローラー');
 
-      // 本日のシフト出勤判定
+      // 本日のシフト出勤判定（scheduledStaffIds に含まれているか）
       const isScheduledToday = scheduledStaffIds && scheduledStaffIds.size > 0
         ? Array.from(scheduledStaffIds).some(id => isStaffMatched(staff, [id]) || id === staff.id)
-        : true;
+        : false; // Shift data available -> default to false if not listed
 
-      // 杉山和彦様（Admin/Staff職）：トグルの ON/OFF に関係なく、休みでない限り（出勤日であれば）表示
-      if (name.includes('杉山和彦') || staff.id === '杉山和彦') {
-        return isScheduledToday;
+      // 休みの日のスタッフ（一般スタッフ、杉山和彦様、管理者全員共通）は表示しない！
+      if (!isScheduledToday) {
+        return false;
       }
 
-      // 一般スタッフ：通常表示
-      if (!isAdmin && !isController) {
+      // 出勤日の場合：
+      // - 杉山和彦様（Admin/Staff職）および一般スタッフ：トグルの ON/OFF に関わらず表示
+      if (name.includes('杉山和彦') || staff.id === '杉山和彦' || (!isAdmin && !isController)) {
         return true;
       }
 
-      // その他の純粋な管理者（Admin/Controller）：
-      // - トグル OFF の場合 -> 常に非表示
-      // - トグル ON の場合 -> 出勤日の管理者のみ表示（休みの管理者は表示しない）
-      if (!showManagement) {
-        return false;
-      } else {
-        return isScheduledToday;
-      }
+      // - その他の純粋な管理者（Admin/Controller）：トグル ON の場合のみ表示
+      return showManagement;
     });
 
     // 2. 大原則：作業チップ・タスクチップが割り当てられているスタッフは絶対にタイムラインから消さず100%表示保持する
