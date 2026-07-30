@@ -612,8 +612,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setOrders(processedData.orders);
     
+    // Backend events calculated from rawOrdersData are primary authority
     const localIds = new Set(localScheduleEvents.map(e => e.id));
     const filteredBackendEvents = processedData.scheduleEvents.filter(e => !localIds.has(e.id));
+    
+    // Always prioritize backend events over local optimistic events if backend has rawOrderId
     setScheduleEvents([...filteredBackendEvents, ...localScheduleEvents.filter(e => e.staffId !== '__DELETED__')]);
     setStatuses(processedData.statuses);
 
@@ -645,7 +648,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, [deleteLocalEvent]);
 
   const loadOrders = useCallback(async (date: Date) => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = format(date, 'yyyy-MM-dd');
     const lastFetched = fetchedDateRangesRef.current.get(dateStr);
     const isStale = lastFetched ? (Date.now() - lastFetched > 120000) : true; // Cache for 2 mins
 
@@ -664,16 +667,19 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, [fetchAndProcessData]);
 
   const refetchOrders = useCallback(async () => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    // CRITICAL FIX: Clear local temporary events so backend latest data is 100% authoritative and never rolls back!
+    setLocalScheduleEvents([]);
+    try {
+      localStorage.removeItem(LOCAL_EVENTS_KEY);
+    } catch (e) {}
+
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
     await fetchAndProcessData(true, { date: todayStr, range: 3 });
     
     const viewedDate = currentViewedDateRef.current;
     if (viewedDate) {
-      const diffDays = Math.abs(differenceInMinutes(viewedDate, new Date()) / (60 * 24));
-      if (diffDays > 3) {
-        const viewedDateStr = viewedDate.toISOString().split('T')[0];
-        await fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
-      }
+      const viewedDateStr = format(viewedDate, 'yyyy-MM-dd');
+      await fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
     }
   }, [fetchAndProcessData]);
 

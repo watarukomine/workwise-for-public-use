@@ -371,13 +371,25 @@ export default function DashboardPage() {
 
         // ONLY update selected staff on date change/mount so manual user selection is NEVER wiped out
         if (isDateChange) {
-          const combinedStaffIds = Array.from(new Set([...attendedStaffIds, ...scheduledIds, ...Array.from(staffWithOrders)]));
+          const validStaffIdsSet = new Set<string>();
 
-          if (combinedStaffIds.length > 0) {
-            // Default to active/scheduled staff, but allow users to toggle any staff in filter
-            setSelectedStaffIds(combinedStaffIds);
+          if (allStaff && allStaff.length > 0) {
+            allStaff.forEach(s => {
+              const matchesScheduled = scheduledIds.includes(s.id) || scheduledIds.includes(s.name) || (s as any).staffCode && scheduledIds.includes((s as any).staffCode);
+              const matchesAttended = attendedStaffIds.includes(s.id) || attendedStaffIds.includes(s.name);
+              const hasOrders = staffWithOrders.has(s.id);
+              if (matchesScheduled || matchesAttended || hasOrders) {
+                validStaffIdsSet.add(s.id);
+              }
+            });
           } else {
-            // If no shift schedule or tasks, show all staff
+            [...attendedStaffIds, ...scheduledIds, ...Array.from(staffWithOrders)].forEach(id => validStaffIdsSet.add(id));
+          }
+
+          if (validStaffIdsSet.size > 0) {
+            setSelectedStaffIds(Array.from(validStaffIdsSet));
+          } else {
+            // If no specific shift or orders found for date, show all staff as fallback
             if (allStaff && allStaff.length > 0) {
               setSelectedStaffIds(allStaff.map(s => s.id));
             }

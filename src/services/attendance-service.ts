@@ -2,7 +2,7 @@ import { initializeFirebase } from '../firebase';
 import { doc, getDoc, setDoc, serverTimestamp, writeBatch, collection, query, where, getDocs } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { firebaseConfig } from '../firebase/config'; // Import project config
-import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isValid } from 'date-fns';
 
 
 // Lazy init helper
@@ -34,7 +34,13 @@ const COLLECTION_NAME = 'daily_attendance';
 /**
  * Generates the document ID from a Date object (YYYY-MM-DD).
  */
-export const getAttendanceDocId = (date: Date): string => {
+export const getAttendanceDocId = (date: Date | string): string => {
+    if (typeof date === 'string') {
+        if (date.length >= 10 && date.includes('-')) return date.substring(0, 10);
+        const parsed = parseISO(date);
+        if (isValid(parsed)) return format(parsed, 'yyyy-MM-dd');
+        return date;
+    }
     return format(date, 'yyyy-MM-dd');
 };
 
