@@ -216,7 +216,11 @@ export default function DashboardPage() {
   ], []);
 
   const filteredStaff = React.useMemo(() => {
-    const isAug1 = currentDate.toISOString().split('T')[0] === '2026-08-01';
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1;
+    const day = currentDate.getDate();
+    const isAug1 = (year === 2026 && month === 8 && day === 1);
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const staffToUse = (allStaff && allStaff.length > 0) ? allStaff : (isAug1 ? (fallbackAugust1StaffObjects as any) : []);
 
     if (staffToUse.length === 0) return [];
@@ -412,7 +416,10 @@ export default function DashboardPage() {
         })();
 
         const august1DefaultStaff = ["佐藤耕次", "坂本幸夫", "杉山和彦", "福原泰弘", "水野一也", "内田巧", "千葉征英", "古石翔", "小堀健太", "湯川浩道", "岡本正博", "小松佑輔", "關雄弥"];
-        const dateStr = currentDate.toISOString().split('T')[0];
+        const yr = currentDate.getFullYear();
+        const mo = currentDate.getMonth() + 1;
+        const dy = currentDate.getDate();
+        const dateStr = `${yr}-${String(mo).padStart(2, '0')}-${String(dy).padStart(2, '0')}`;
         const finalScheduledEntries = scheduledIds.length > 0 ? scheduledIds : (dateStr === '2026-08-01' ? august1DefaultStaff : augustCsvNames);
 
         setCheckedOutStaffIds(new Set(checkedOutIds));
