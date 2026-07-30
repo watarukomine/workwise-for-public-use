@@ -745,10 +745,12 @@ export function isStaffMatched(staff: { id?: string; name?: string; email?: stri
   // Extract given name if space exists (e.g. "杉山 和彦" -> "和彦", "杉山 恭平" -> "恭平")
   const nameParts = rawSName.split(/[\s\u3000]+/);
   const givenName = nameParts.length > 1 ? normalize(nameParts[nameParts.length - 1]) : '';
+  const surname = nameParts[0] ? normalize(nameParts[0]) : '';
 
   return entries.some(entry => {
     if (!entry) return false;
-    const nEntry = normalize(entry);
+    const rawEntry = String(entry).trim();
+    const nEntry = normalize(rawEntry);
     if (!nEntry) return false;
 
     // 1. Primary Priority: ID, Full Name, Code, Email exact match
@@ -757,12 +759,22 @@ export function isStaffMatched(staff: { id?: string; name?: string; email?: stri
     if (normSCode && nEntry === normSCode) return true;
     if (normSEmail && nEntry === normSEmail) return true;
 
-    // 2. Given Name exact match (e.g. "和彦" vs "恭平")
+    // 2. Bracketed name support (Spreadsheet style: "杉山（和）", "杉山(恭)", "杉山和")
+    const bracketMatch = rawEntry.match(/^(.*?)[（(](.*?)[）)]$/);
+    if (bracketMatch) {
+      const entrySurname = normalize(bracketMatch[1]);
+      const entryGivenChar = normalize(bracketMatch[2]);
+      if (surname && entrySurname === surname && givenName && givenName.startsWith(entryGivenChar)) {
+        return true;
+      }
+    }
+
+    // 3. Given Name exact match (e.g. "和彦" vs "恭平")
     if (givenName && givenName.length >= 2 && nEntry === givenName) {
       return true;
     }
 
-    // 3. Fallback: Prefix/Surname match ONLY if no ambiguity or full name starts with entry
+    // 4. Fallback: Prefix/Surname match ONLY if no ambiguity or full name starts with entry
     if (nEntry.length >= 2 && normSName) {
       if (normSName.startsWith(nEntry) || nEntry.startsWith(normSName)) {
         return true;
