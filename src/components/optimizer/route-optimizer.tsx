@@ -320,7 +320,10 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
         longitude: lng,
         lastAction: status?.lastAction || (s as any).currentStatus || '現在地'
       };
-    }).filter(s => s.latitude !== undefined && s.longitude !== undefined && !isNaN(s.latitude) && !isNaN(s.longitude));
+    }).filter(s =>
+      s.latitude !== undefined && s.longitude !== undefined && !isNaN(s.latitude) && !isNaN(s.longitude) &&
+      (s as any).currentStatus !== 'ログアウト' && (s as any).status !== 'ログアウト' && (s as any).isOnline !== false
+    );
 
     const staffLocs: Location[] = staffWithLocation.map(s => ({
       id: s.id,

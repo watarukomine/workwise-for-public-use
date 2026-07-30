@@ -156,8 +156,27 @@ export const sendPasswordReset = async (email: string): Promise<void> => {
  */
 export const signOut = async (): Promise<void> => {
   console.log('Signing out user.');
-  const { auth } = initializeFirebase();
+  const { auth, firestore: db } = initializeFirebase();
   try {
+    const sessionUser = getCurrentUser();
+    const userId = auth.currentUser?.uid || sessionUser?.id;
+
+    if (userId && db) {
+      try {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, {
+          latitude: null,
+          longitude: null,
+          currentStatus: 'ログアウト',
+          isOnline: false,
+          updatedAt: new Date().toISOString()
+        }).catch(() => {});
+      } catch (err) {
+        console.warn('Failed to clear location on sign out:', err);
+      }
+    }
+
     await firebaseSignOut(auth);
     sessionStorage.removeItem(USER_SESSION_KEY);
   } catch (error) {

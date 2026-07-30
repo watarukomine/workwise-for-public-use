@@ -85,8 +85,17 @@ function Directions({ route, avoidHighways }: { route: Location[], avoidHighways
 
 
 export function RouteMap({ staff, customers, customLocations, optimizedRoute, avoidHighways }: RouteMapProps) {
+  const activeStaff = React.useMemo(() => {
+    return staff.filter(s => {
+      const lat = Number(s.latitude);
+      const lng = Number(s.longitude);
+      const isLoggedOut = (s as any).currentStatus === 'ログアウト' || (s as any).status === 'ログアウト' || (s as any).isOnline === false;
+      return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && !isLoggedOut;
+    });
+  }, [staff]);
+
   const allCoordinates = [
-    ...staff.filter(s => s.latitude && s.longitude).map(s => ({ lat: s.latitude!, lng: s.longitude! })),
+    ...activeStaff.map(s => ({ lat: Number(s.latitude), lng: Number(s.longitude) })),
     ...customers.filter(c => c.latitude && c.longitude).map(c => ({ lat: c.latitude!, lng: c.longitude! })),
     ...(customLocations || []).map(l => ({ lat: l.latitude, lng: l.longitude }))
   ];
@@ -119,7 +128,7 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
             disableDefaultUI={true}
             mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID"}
           >
-            {staff.map((s) => {
+            {activeStaff.map((s) => {
               const lat = Number(s.latitude);
               const lng = Number(s.longitude);
               const displayName = s.name || (s as any)['氏名'] || (s as any)['名前'] || (s as any)['担当'] || '名前未設定';
