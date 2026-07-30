@@ -200,16 +200,20 @@ export default function DashboardPage() {
   const [showManagement, setShowManagement] = React.useState(false); // Default to OFF
 
   const filteredStaff = React.useMemo(() => {
-    if (isProfileLoading || isStaffLoading || !profile) return [];
+    if (isProfileLoading || isStaffLoading || !profile || !allStaff) return [];
 
     const staffToUse = allStaff;
+    let selectedStaff: WithId<Staff>[] = [];
 
-    let selectedStaff: WithId<Staff>[];
-
-    if (appliedSelectedStaffIds.length === 0) {
+    if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
       selectedStaff = staffToUse;
     } else {
-      selectedStaff = staffToUse.filter(staff => isStaffMatched(staff, appliedSelectedStaffIds));
+      selectedStaff = staffToUse.filter(staff => {
+        return (
+          appliedSelectedStaffIds.includes(staff.id) ||
+          isStaffMatched(staff, appliedSelectedStaffIds)
+        );
+      });
       if (selectedStaff.length === 0) {
         selectedStaff = staffToUse;
       }
