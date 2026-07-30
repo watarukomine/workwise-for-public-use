@@ -401,7 +401,7 @@ export default function DashboardPage() {
         setPresentStaffIds(new Set(attendedStaffIds));
         setScheduledStaffIds(new Set(finalScheduledEntries));
 
-        // ALWAYS update selected staff on date change so the timeline renders scheduled staff
+        // Synchronize selected staff list immediately
         if (allStaff && allStaff.length > 0) {
           const scheduledStaffIdsList = allStaff
             .filter(s => {
@@ -434,6 +434,13 @@ export default function DashboardPage() {
       cancelled = true;
     };
   }, [currentDate, setSelectedStaffIds, scheduleEvents, loadOrders, setCurrentViewedDate]);
+
+  // Fallback: If appliedSelectedStaffIds is empty, auto-select all staff
+  useEffect(() => {
+    if (allStaff && allStaff.length > 0 && (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0)) {
+      setSelectedStaffIds(allStaff.map(s => s.id));
+    }
+  }, [allStaff, appliedSelectedStaffIds, setSelectedStaffIds]);
 
   // Selection state is persisted in localStorage via SelectedStaffContext.
   // We NO LONGER auto-save selection to "saveDailyAttendance" (Database) 
