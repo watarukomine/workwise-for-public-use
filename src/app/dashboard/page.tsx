@@ -215,11 +215,16 @@ export default function DashboardPage() {
       }
     }
 
-    // Apply showManagement toggle filter: hide admin/controller unless showManagement is ON
+    // Apply showManagement toggle filter: hide admin, controller, and admin/staff unless showManagement is ON
     if (!showManagement) {
       selectedStaff = selectedStaff.filter(staff => {
         const role = String(staff.role || '').toLowerCase().trim();
-        return role !== 'admin' && role !== 'controller';
+        const rawRole = String((staff as any)['ロール'] || '').toLowerCase().trim();
+
+        const isAdmin = role.includes('admin') || role.includes('管理者') || rawRole.includes('admin') || rawRole.includes('管理者');
+        const isController = role.includes('controller') || role.includes('コントローラー') || rawRole.includes('controller') || rawRole.includes('コントローラー');
+
+        return !isAdmin && !isController;
       });
     }
 
