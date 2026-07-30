@@ -732,7 +732,7 @@ export function isEtaPassed(etaStr?: string | null, lastUpdateIso?: string | nul
   return false;
 }
 
-export function isStaffMatched(staff: { id?: string; name?: string; email?: string; [key: string]: any }, entries: (string | undefined | null)[]): boolean {
+export function isStaffMatched(staff: { id?: string; name?: string; email?: string | null; [key: string]: any }, entries: (string | undefined | null)[]): boolean {
   if (!staff) return false;
   const normalize = (str: any) => String(str || '').replace(/[\s\u3000]+/g, '').toLowerCase().trim();
 
