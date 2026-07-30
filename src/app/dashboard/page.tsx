@@ -241,35 +241,39 @@ export default function DashboardPage() {
       }
     }
 
-    // 1. showManagement トグルによるフィルタリング（OFF の場合は管理者を非表示）
-    // ただし杉山和彦様などの Admin/Staff やシフト出勤中の管理者は、休みでない限り表示
-    if (!showManagement) {
-      selectedStaff = selectedStaff.filter((staff: any) => {
-        const name = String(staff.name || '').replace(/[\s\u3000]+/g, '');
-        const role = String(staff.role || '').toLowerCase().trim();
-        const rawRole = String((staff as any)['ロール'] || '').toLowerCase().trim();
+    // 1. 管理者・コントローラーの表示判定ルール
+    selectedStaff = selectedStaff.filter((staff: any) => {
+      const name = String(staff.name || '').replace(/[\s\u3000]+/g, '');
+      const role = String(staff.role || '').toLowerCase().trim();
+      const rawRole = String((staff as any)['ロール'] || '').toLowerCase().trim();
 
-        const isAdmin = role.includes('admin') || role.includes('管理者') || rawRole.includes('admin') || rawRole.includes('管理者');
-        const isController = role.includes('controller') || role.includes('コントローラー') || rawRole.includes('controller') || rawRole.includes('コントローラー');
+      const isAdmin = role.includes('admin') || role.includes('管理者') || rawRole.includes('admin') || rawRole.includes('管理者');
+      const isController = role.includes('controller') || role.includes('コントローラー') || rawRole.includes('controller') || rawRole.includes('コントローラー');
 
-        // シフト出勤者（scheduledStaffIds に含まれる場合）
-        const isScheduledToday = scheduledStaffIds && scheduledStaffIds.size > 0
-          ? Array.from(scheduledStaffIds).some(id => isStaffMatched(staff, [id]) || id === staff.id)
-          : true;
+      // 本日のシフト出勤判定
+      const isScheduledToday = scheduledStaffIds && scheduledStaffIds.size > 0
+        ? Array.from(scheduledStaffIds).some(id => isStaffMatched(staff, [id]) || id === staff.id)
+        : true;
 
-        // 杉山和彦様の場合：Admin/Staff職のため、休みでない限り（＝シフト出勤日である限り）表示
-        if (name.includes('杉山和彦') || staff.id === '杉山和彦') {
-          return isScheduledToday;
-        }
+      // 杉山和彦様（Admin/Staff職）：トグルの ON/OFF に関係なく、休みでない限り（出勤日であれば）表示
+      if (name.includes('杉山和彦') || staff.id === '杉山和彦') {
+        return isScheduledToday;
+      }
 
-        // その他の管理者の場合：showManagementがOFFの場合、シフト出勤日でなければ非表示
-        if (isAdmin || isController) {
-          return isScheduledToday;
-        }
-
+      // 一般スタッフ：通常表示
+      if (!isAdmin && !isController) {
         return true;
-      });
-    }
+      }
+
+      // その他の純粋な管理者（Admin/Controller）：
+      // - トグル OFF の場合 -> 常に非表示
+      // - トグル ON の場合 -> 出勤日の管理者のみ表示（休みの管理者は表示しない）
+      if (!showManagement) {
+        return false;
+      } else {
+        return isScheduledToday;
+      }
+    });
 
     // 2. 大原則：作業チップ・タスクチップが割り当てられているスタッフは絶対にタイムラインから消さず100%表示保持する
     if (scheduleEvents && scheduleEvents.length > 0) {
