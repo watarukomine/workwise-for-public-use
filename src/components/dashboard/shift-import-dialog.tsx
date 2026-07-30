@@ -23,6 +23,7 @@ import type { WithId, Staff } from '../../lib/types';
 import { ScrollArea } from '../ui/scroll-area';
 import { Switch } from '../ui/switch';
 import { initializeFirebase } from '../../firebase';
+import { isStaffMatched } from '../../lib/utils';
 
 interface ParsedShift {
     date: Date;
@@ -322,18 +323,28 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                         staffIds.push(normalizedNameToId.get(norm)!);
                         return;
                     }
-                    // 3. Partial/StartsWith match (Surname only -> Fullname)
-                    // Search for system names that start with the Excel name
-                    const candidates = allStaff.filter(s => {
-                        const cleanSystemName = s.name.replace(/\s+/g, '');
-                        return cleanSystemName.startsWith(name) || cleanSystemName.startsWith(norm);
-                    });
+                    // 3. Partial/StartsWith match with Name Priority:
+                    // If multiple staff share the same surname (e.g. "杉山"), candidates > 1.
+                    // Prioritize exact given name / full name matching over ambiguous surname matching.
+                    const candidates = allStaff.filter(s => isStaffMatched(s, [name, norm]));
 
                     if (candidates.length === 1) {
                         staffIds.push(candidates[0].id);
                         return;
+                    } else if (candidates.length > 1) {
+                        // Disambiguate by given name if available in Excel cell name
+                        const matched = candidates.find(s => {
+                            const raw = String(s.name || '').trim();
+                            const parts = raw.split(/[\s\u3000]+/);
+                            const given = parts.length > 1 ? parts[parts.length - 1] : '';
+                            return given && name.includes(given);
+                        });
+                        if (matched) {
+                            staffIds.push(matched.id);
+                            return;
+                        }
                     }
-                    console.warn(`Unmatched staff name: ${name}`);
+                    console.warn(`Unmatched or ambiguous staff name: ${name}`);
                 });
 
                 if (staffIds.length > 0) {

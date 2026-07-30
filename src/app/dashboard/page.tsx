@@ -28,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { isStaffMatched } from '../../lib/utils';
 import { getDailyAttendance, saveDailyAttendance, getDailyAttendanceDetails } from '../../services/attendance-service';
 import { AttendanceControls } from '../../components/dashboard/attendance-controls';
 import { STORE_ORDER } from '../../lib/constants';
@@ -208,12 +209,22 @@ export default function DashboardPage() {
     if (appliedSelectedStaffIds.length === 0) {
       selectedStaff = staffToUse;
     } else {
-      const selectedIds = new Set(appliedSelectedStaffIds);
-      selectedStaff = staffToUse.filter(staff => selectedIds.has(staff.id));
+      selectedStaff = staffToUse.filter(staff => isStaffMatched(staff, appliedSelectedStaffIds));
+      if (selectedStaff.length === 0) {
+        selectedStaff = staffToUse;
+      }
     }
 
-    return selectedStaff; // Return staff matching active selection for current date
-  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading]);
+    // Apply showManagement toggle filter: hide admin/controller unless showManagement is ON
+    if (!showManagement) {
+      selectedStaff = selectedStaff.filter(staff => {
+        const role = String(staff.role || '').toLowerCase().trim();
+        return role !== 'admin' && role !== 'controller';
+      });
+    }
+
+    return selectedStaff;
+  }, [appliedSelectedStaffIds, profile, isProfileLoading, allStaff, isStaffLoading, showManagement]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (appliedSelectedStaffIds.length === 0) {
@@ -347,25 +358,10 @@ export default function DashboardPage() {
               const sName = (s.name || '').trim();
 
               // STRICT EXACT MATCHING ONLY: Match exact ID, exact full name, staffCode, or email.
-              // NEVER use loose last-name includes() matching to avoid matching different staff with same surname (e.g. Sugiyama Kazuhiko vs Sugiyama Kyohei).
-              const matchesScheduled = scheduledIds.some(sched => {
-                if (!sched) return false;
-                const cleanSched = String(sched).trim();
-                return cleanSched === s.id ||
-                  cleanSched === sName ||
-                  ((s as any).staffCode && cleanSched === String((s as any).staffCode).trim()) ||
-                  ((s as any).email && cleanSched.toLowerCase() === String((s as any).email).toLowerCase());
-              });
-
-              const matchesAttended = attendedStaffIds.some(att => {
-                if (!att) return false;
-                const cleanAtt = String(att).trim();
-                return cleanAtt === s.id || cleanAtt === sName;
-              });
-
+              const matchesScheduled = isStaffMatched(s, scheduledIds);
+              const matchesAttended = isStaffMatched(s, attendedStaffIds);
               const hasOrders = staffWithOrders.has(s.id);
 
-              // ONLY include staff who are genuinely scheduled, attended, or assigned tasks on this date!
               if (matchesScheduled || matchesAttended || hasOrders) {
                 validStaffIdsSet.add(s.id);
               }

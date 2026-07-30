@@ -737,20 +737,32 @@ export function isStaffMatched(staff: { id?: string; name?: string; email?: stri
   const normalize = (str: any) => String(str || '').replace(/[\s\u3000]+/g, '').toLowerCase().trim();
 
   const normSId = normalize(staff.id);
-  const normSName = normalize(staff.name || staff['氏名'] || staff['名前']);
+  const rawSName = String(staff.name || staff['氏名'] || staff['名前'] || '').trim();
+  const normSName = normalize(rawSName);
   const normSCode = normalize(staff.staffCode || staff.userCode);
   const normSEmail = normalize(staff.email);
+
+  // Extract given name if space exists (e.g. "杉山 和彦" -> "和彦", "杉山 恭平" -> "恭平")
+  const nameParts = rawSName.split(/[\s\u3000]+/);
+  const givenName = nameParts.length > 1 ? normalize(nameParts[nameParts.length - 1]) : '';
 
   return entries.some(entry => {
     if (!entry) return false;
     const nEntry = normalize(entry);
     if (!nEntry) return false;
 
+    // 1. Primary Priority: ID, Full Name, Code, Email exact match
     if (normSId && nEntry === normSId) return true;
     if (normSName && nEntry === normSName) return true;
     if (normSCode && nEntry === normSCode) return true;
     if (normSEmail && nEntry === normSEmail) return true;
 
+    // 2. Given Name exact match (e.g. "和彦" vs "恭平")
+    if (givenName && givenName.length >= 2 && nEntry === givenName) {
+      return true;
+    }
+
+    // 3. Fallback: Prefix/Surname match ONLY if no ambiguity or full name starts with entry
     if (nEntry.length >= 2 && normSName) {
       if (normSName.startsWith(nEntry) || nEntry.startsWith(normSName)) {
         return true;
