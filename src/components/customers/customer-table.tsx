@@ -22,6 +22,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -146,6 +150,18 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
   const [editingCell, setEditingCell] = React.useState<{ rowId: string; colIdx: number } | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
   const [isCreating, setIsCreating] = React.useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
+  const [newCustomerForm, setNewCustomerForm] = React.useState({
+    storeName: '',
+    userCode: '',
+    mainStore: '',
+    address: '',
+    phone: '',
+    equipment: '-',
+    latitude: '',
+    longitude: '',
+  });
+
   const { profile } = useUserProfile();
   const { toast } = useToast();
   const isAdmin = profile?.role === 'admin';
@@ -185,12 +201,57 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
     setDeleteTarget(null);
   }, [deleteTarget, toast]);
 
-  const handleAddRow = React.useCallback(async () => {
+  const handleAddRow = React.useCallback(() => {
+    setIsAddDialogOpen(true);
+  }, []);
+
+  const handleCreateCustomer = React.useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCustomerForm.storeName.trim()) {
+      toast({ variant: 'destructive', title: '入力エラー', description: '店舗名を入力してください。' });
+      return;
+    }
+
     setIsCreating(true);
-    try { await CustomerService.createCustomer({ userCode: '', storeName: '', address: '', '電話番号': '', '機材有無': '' }); toast({ title: '新規販売店を追加しました' }); }
-    catch (e: any) { toast({ variant: 'destructive', title: '追加に失敗', description: e.message }); }
-    setIsCreating(false);
-  }, [toast]);
+    try {
+      const dataToSave: any = {
+        storeName: newCustomerForm.storeName.trim(),
+        userCode: newCustomerForm.userCode.trim(),
+        mainStore: newCustomerForm.mainStore.trim(),
+        address: newCustomerForm.address.trim(),
+        '電話番号': newCustomerForm.phone.trim(),
+        '機材有無': newCustomerForm.equipment || '-',
+      };
+
+      if (newCustomerForm.latitude.trim()) {
+        const parsedLat = parseFloat(newCustomerForm.latitude.trim());
+        if (!isNaN(parsedLat)) dataToSave.latitude = parsedLat;
+      }
+      if (newCustomerForm.longitude.trim()) {
+        const parsedLng = parseFloat(newCustomerForm.longitude.trim());
+        if (!isNaN(parsedLng)) dataToSave.longitude = parsedLng;
+      }
+
+      await CustomerService.createCustomer(dataToSave);
+      toast({ title: '販売店を登録しました', description: `${dataToSave.storeName} を追加しました。` });
+
+      setIsAddDialogOpen(false);
+      setNewCustomerForm({
+        storeName: '',
+        userCode: '',
+        mainStore: '',
+        address: '',
+        phone: '',
+        equipment: '-',
+        latitude: '',
+        longitude: '',
+      });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: '登録失敗', description: err.message || '販売店の追加に失敗しました。' });
+    } finally {
+      setIsCreating(false);
+    }
+  }, [newCustomerForm, toast]);
 
   const handleNavigate = React.useCallback((rowId: string, colIdx: number, direction: 'next' | 'prev') => {
     const editableIndices = displayColumns.map((_, i) => i);
@@ -268,6 +329,63 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
           <AlertDialogFooter><AlertDialogCancel>キャンセル</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">削除する</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>新規販売店の登録</DialogTitle>
+            <DialogDescription>
+              新しい販売店情報を入力して「登録」をクリックしてください。
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateCustomer} className="space-y-3 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1 col-span-2">
+                <Label htmlFor="add-storeName" className="text-xs font-semibold">店舗名 <span className="text-destructive">*</span></Label>
+                <Input id="add-storeName" placeholder="例: 横浜SC" value={newCustomerForm.storeName} onChange={(e) => setNewCustomerForm(prev => ({ ...prev, storeName: e.target.value }))} className="h-8 text-xs" required />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-userCode" className="text-xs font-semibold">ユーザーコード (店舗コード)</Label>
+                <Input id="add-userCode" placeholder="例: 49698" value={newCustomerForm.userCode} onChange={(e) => setNewCustomerForm(prev => ({ ...prev, userCode: e.target.value }))} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-mainStore" className="text-xs font-semibold">拠点・エリア (母店)</Label>
+                <Input id="add-mainStore" placeholder="例: 横浜, 相模原..." value={newCustomerForm.mainStore} onChange={(e) => setNewCustomerForm(prev => ({ ...prev, mainStore: e.target.value }))} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <Label htmlFor="add-address" className="text-xs font-semibold">住所 (自動位置取得用)</Label>
+                <Input id="add-address" placeholder="例: 神奈川県横浜市保土ヶ谷区狩場町65" value={newCustomerForm.address} onChange={(e) => setNewCustomerForm(prev => ({ ...prev, address: e.target.value }))} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-phone" className="text-xs font-semibold">電話番号</Label>
+                <Input id="add-phone" placeholder="例: 045-xxx-xxxx" value={newCustomerForm.phone} onChange={(e) => setNewCustomerForm(prev => ({ ...prev, phone: e.target.value }))} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-equipment" className="text-xs font-semibold">機材有無</Label>
+                <Select value={newCustomerForm.equipment} onValueChange={(val) => setNewCustomerForm(prev => ({ ...prev, equipment: val }))}>
+                  <SelectTrigger id="add-equipment" className="h-8 text-xs"><SelectValue placeholder="選択..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="-">なし (-)</SelectItem>
+                    <SelectItem value="⚪︎">⚪︎ (あり)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-lat" className="text-xs font-semibold text-muted-foreground">緯度 (任意/自動補完)</Label>
+                <Input id="add-lat" type="number" step="any" placeholder="自動取得 (空欄で可)" value={newCustomerForm.latitude} onChange={(e) => setNewCustomerForm(prev => ({ ...prev, latitude: e.target.value }))} className="h-8 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="add-lng" className="text-xs font-semibold text-muted-foreground">経度 (任意/自動補完)</Label>
+                <Input id="add-lng" type="number" step="any" placeholder="自動取得 (空欄で可)" value={newCustomerForm.longitude} onChange={(e) => setNewCustomerForm(prev => ({ ...prev, longitude: e.target.value }))} className="h-8 text-xs" />
+              </div>
+            </div>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsAddDialogOpen(false)}>キャンセル</Button>
+              <Button type="submit" size="sm" disabled={isCreating}>{isCreating && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />}登録する</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
