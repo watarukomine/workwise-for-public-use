@@ -375,25 +375,36 @@ export default function DashboardPage() {
 
           if (allStaff && allStaff.length > 0) {
             allStaff.forEach(s => {
-              const matchesScheduled = scheduledIds.includes(s.id) || scheduledIds.includes(s.name) || (s as any).staffCode && scheduledIds.includes((s as any).staffCode);
-              const matchesAttended = attendedStaffIds.includes(s.id) || attendedStaffIds.includes(s.name);
+              const sName = s.name || '';
+              const sLastName = sName.split(' ')[0] || sName.split('　')[0] || sName;
+
+              // Robust matching for Shift schedule, Attendance, or Assigned Tasks
+              const matchesScheduled = scheduledIds.some(sched =>
+                sched === s.id ||
+                sched === sName ||
+                (sLastName && sLastName.length >= 2 && sched.includes(sLastName)) ||
+                ((s as any).staffCode && sched === (s as any).staffCode) ||
+                ((s as any).email && sched.toLowerCase() === (s as any).email.toLowerCase())
+              );
+
+              const matchesAttended = attendedStaffIds.some(att =>
+                att === s.id ||
+                att === sName ||
+                (sLastName && sLastName.length >= 2 && att.includes(sLastName))
+              );
+
               const hasOrders = staffWithOrders.has(s.id);
+
+              // ONLY include staff who are genuinely scheduled, attended, or assigned tasks on this date!
               if (matchesScheduled || matchesAttended || hasOrders) {
                 validStaffIdsSet.add(s.id);
               }
             });
-          } else {
-            [...attendedStaffIds, ...scheduledIds, ...Array.from(staffWithOrders)].forEach(id => validStaffIdsSet.add(id));
           }
 
-          if (validStaffIdsSet.size > 0) {
-            setSelectedStaffIds(Array.from(validStaffIdsSet));
-          } else {
-            // If no specific shift or orders found for date, show all staff as fallback
-            if (allStaff && allStaff.length > 0) {
-              setSelectedStaffIds(allStaff.map(s => s.id));
-            }
-          }
+          // STRICT SAFETY GUARD: ONLY display staff who are scheduled or working on this date!
+          // NEVER fall back to showing off-duty/absent staff (allStaff) to prevent accidental assignment to off-duty workers!
+          setSelectedStaffIds(Array.from(validStaffIdsSet));
         }
       } catch (e) {
         if (!cancelled) console.error("Failed to sync attendance:", e);

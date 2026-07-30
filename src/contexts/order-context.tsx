@@ -670,7 +670,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     // CRITICAL FIX: Clear local temporary events so backend latest data is 100% authoritative and never rolls back!
     setLocalScheduleEvents([]);
     try {
-      localStorage.removeItem(LOCAL_EVENTS_KEY);
+      localStorage.removeItem(ORDERS_CACHE_KEY);
     } catch (e) {}
 
     const todayStr = format(new Date(), 'yyyy-MM-dd');
