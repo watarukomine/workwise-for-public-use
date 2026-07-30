@@ -480,6 +480,16 @@ export default function DashboardPage() {
 
         if (displayStatus === '移動開始' || displayStatus === '移動中') {
           if (isEtaPassed(etaTime, lastUpIso)) return '待機中';
+          // 本日作業タスク（作業チップ）が存在しない場合の「移動中」は目的地が無いため「待機中」に補正
+          let hasActiveTasksToday = false;
+          if (scheduleEvents) {
+            hasActiveTasksToday = scheduleEvents.some(event => {
+              if (event.staffId !== staff.id) return false;
+              const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+              return isValid(start) && isSameDay(start, currentDate) && event.status !== '作業完了' && event.status !== 'キャンセル';
+            });
+          }
+          if (!hasActiveTasksToday) return '待機中';
           return '移動中';
         }
         if (displayStatus === '帰社' || displayStatus === '帰社中') {
