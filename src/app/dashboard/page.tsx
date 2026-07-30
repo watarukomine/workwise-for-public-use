@@ -241,21 +241,32 @@ export default function DashboardPage() {
       }
     }
 
-    // Apply showManagement toggle filter: hide admin, controller, and admin/staff unless showManagement is ON
-    if (!showManagement) {
-      selectedStaff = selectedStaff.filter((staff: any) => {
-        const role = String(staff.role || '').toLowerCase().trim();
-        const rawRole = String((staff as any)['ロール'] || '').toLowerCase().trim();
-
-        const isAdmin = role.includes('admin') || role.includes('管理者') || rawRole.includes('admin') || rawRole.includes('管理者');
-        const isController = role.includes('controller') || role.includes('コントローラー') || rawRole.includes('controller') || rawRole.includes('コントローラー');
-
-        return !isAdmin && !isController;
+    // 大原則：作業チップ・タスクチップが割り当てられているスタッフは絶対にタイムラインから消さず100%表示保持する
+    if (scheduleEvents && scheduleEvents.length > 0) {
+      const activeStaffIds = new Set<string>();
+      scheduleEvents.forEach(e => {
+        const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
+        if (isValid(evStart) && (isToday(evStart) ? isToday(currentDate) : isEqual(startOfDay(evStart), startOfDay(currentDate)))) {
+          if (e.staffId && e.staffId !== 'unassigned') {
+            activeStaffIds.add(e.staffId);
+          }
+        }
       });
+
+      if (activeStaffIds.size > 0) {
+        const missingActiveStaff = staffToUse.filter((s: any) => {
+          const isMatched = Array.from(activeStaffIds).some(id => isStaffMatched(s, [id]) || s.id === id);
+          const isAlreadySelected = selectedStaff.some((sel: any) => sel.id === s.id);
+          return isMatched && !isAlreadySelected;
+        });
+        if (missingActiveStaff.length > 0) {
+          selectedStaff = [...selectedStaff, ...missingActiveStaff];
+        }
+      }
     }
 
     return selectedStaff;
-  }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate]);
+  }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (appliedSelectedStaffIds.length === 0) {
