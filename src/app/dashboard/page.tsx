@@ -250,12 +250,10 @@ export default function DashboardPage() {
         return staffId === id || name === cleanId || isStaffMatched(staff, [id]);
       });
 
-      // 2. スタッフ管理画面で手動チェックONされた人 (絶対最優先表示!)
-      const isSelectedInContext = hasExplicitSelection && isStaffMatched(staff, appliedSelectedStaffIds);
-
-      // 【最重要】手動チェックON または 本日タスク保持者は、管理者スイッチのON/OFFに関わらず100%無条件でタイムライン表示!
-      if (hasActiveTask || isSelectedInContext) {
-        return true;
+      // 2. スタッフ管理画面で手動チェック選択がある場合: チェックONが入っている人だけを100%表示!(チェックOFFの人は絶対に非表示)
+      if (hasExplicitSelection) {
+        const isSelectedInContext = isStaffMatched(staff, appliedSelectedStaffIds);
+        return hasActiveTask || isSelectedInContext;
       }
 
       // 手動選択がないデフォルト時のみ、純粋管理者(Admin)のスイッチ非表示判定を適用
