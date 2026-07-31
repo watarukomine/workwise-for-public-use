@@ -7,12 +7,13 @@ import {
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
 import { Search, Trash2, Download, Loader2, Check, Settings2, ArrowUp, ArrowDown } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, isStaffMatched } from '../../lib/utils';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
 import { Checkbox } from '../ui/checkbox';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';
+import { useOrder } from '../../contexts/order-context';
 import { useUserProfile } from '../../hooks/use-user-profile';
 import { useToast } from '@/hooks/use-toast';
 import { StaffService } from '@/services/staff-service';
@@ -196,6 +197,22 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   const isAdmin = profile?.role === 'admin';
   const staffList = staff || [];
 
+  let activeStaffIds = new Set<string>();
+  try {
+    const { scheduleEvents, orders } = useOrder();
+    if (scheduleEvents && scheduleEvents.length > 0) {
+      scheduleEvents.forEach(e => {
+        if (e.staffId && e.staffId !== 'unassigned') activeStaffIds.add(e.staffId);
+      });
+    }
+    if (orders && orders.length > 0) {
+      orders.forEach(o => {
+        if (o.staffId && o.staffId !== 'unassigned' && o.status !== '作業完了' && o.status !== 'キャンセル') activeStaffIds.add(o.staffId);
+        if (o.staffName) activeStaffIds.add(o.staffName);
+      });
+    }
+  } catch (e) {}
+
   const allColumns = React.useMemo(() => extractColumns(staffList), [staffList]);
 
   const [visibleColumns, setVisibleColumns] = React.useState<Set<string>>(() => {
@@ -306,13 +323,19 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   <TableRow><TableCell colSpan={displayColumns.length + 1 + (isAdmin ? 2 : 0)} className="h-32 text-center"><div className="flex items-center justify-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />読み込み中...</div></TableCell></TableRow>
                 ) : filteredStaff.length > 0 ? (
                   filteredStaff.map((member, idx) => {
-                    const isSelected = pendingSelectedStaffIds.some(selId => {
+                    const staffId = String(member.id || '').trim();
+                    const name = String(member.name || (member as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
+
+                    const hasActiveTask = Array.from(activeStaffIds).some(id => {
+                      const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
+                      return staffId === id || name === cleanId || isStaffMatched(member, [id]);
+                    });
+
+                    const isSelected = hasActiveTask || pendingSelectedStaffIds.some(selId => {
                       if (!selId) return false;
                       const rawSel = String(selId).trim();
                       const cleanSel = rawSel.replace(/[\s\u3000]+/g, '');
-                      const staffId = String(member.id || '').trim();
                       const cleanId = staffId.replace(/[\s\u3000]+/g, '');
-                      const name = String(member.name || (member as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
 
                       if (staffId === rawSel || staffId === cleanSel || cleanId === cleanSel) return true;
                       if (name === rawSel || name === cleanSel) return true;
