@@ -186,9 +186,16 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         // すでに選択中なら、該当するエントリをすべて除外 (OFF)
         next = prevIds.filter(selId => !isStaffMatched(staffObj, [selId]));
       } else {
-        // 未選択なら、IDまたは氏名を代表値として1つだけ安全に追加 (ON)
-        const newEntry = String(staffObj.id || staffObj.name || staffObj['氏名'] || staffMemberOrId).trim();
-        next = [...prevIds.filter(selId => !isStaffMatched(staffObj, [selId])), newEntry];
+        // 未選択なら、ID、氏名、スタッフコードをすべて一括で安全に追加 (ON)
+        const entriesToAdd: string[] = [];
+        if (staffObj.id) entriesToAdd.push(String(staffObj.id).trim());
+        if (staffObj.name) entriesToAdd.push(String(staffObj.name).trim());
+        if (staffObj['氏名']) entriesToAdd.push(String(staffObj['氏名']).trim());
+        if (staffObj['スタッフID']) entriesToAdd.push(String(staffObj['スタッフID']).trim());
+        if (entriesToAdd.length === 0) entriesToAdd.push(String(staffMemberOrId).trim());
+
+        const cleanedPrev = prevIds.filter(selId => !isStaffMatched(staffObj, [selId]));
+        next = Array.from(new Set([...cleanedPrev, ...entriesToAdd]));
       }
 
       setAppliedSelectedStaffIds(next);
