@@ -271,7 +271,11 @@ export default function DashboardPage() {
           const cleanSel = String(selId || '').replace(/[\s\u3000]+/g, '');
           return staffId === selId || name === cleanSel || isStaffMatched(staff, [selId]);
         });
-        if (!isSelected) {
+
+        // ユーザー様が明示的にチェックを入れているスタッフは、シフト休日に関わらず 100% 最優先表示！
+        if (isSelected) {
+          return true;
+        } else {
           return false;
         }
       }
