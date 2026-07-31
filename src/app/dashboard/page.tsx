@@ -301,6 +301,13 @@ export default function DashboardPage() {
       return true;
     });
 
+    // スタッフ管理画面の指定並び順（sortOrder / order）を最優先で厳格適用
+    result.sort((a: any, b: any) => {
+      const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof a.order === 'number' ? a.order : (typeof a.sortIndex === 'number' ? a.sortIndex : 999));
+      const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : (typeof b.order === 'number' ? b.order : (typeof b.sortIndex === 'number' ? b.sortIndex : 999));
+      return orderA - orderB;
+    });
+
     return result;
   }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents, scheduledStaffIds]);
 
