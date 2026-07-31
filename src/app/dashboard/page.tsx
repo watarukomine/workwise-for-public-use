@@ -309,6 +309,20 @@ export default function DashboardPage() {
     return result;
   }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents, scheduledStaffIds]);
 
+  // タイムライン表示スタッフ(filteredStaff)をチェックボックス選択状態へ自動連動同期
+  React.useEffect(() => {
+    if (filteredStaff && filteredStaff.length > 0 && setSelectedStaffIds) {
+      const activeIds = filteredStaff.map((s: any) => String(s.id || '').trim()).filter(Boolean);
+      setSelectedStaffIds((prev: string[]) => {
+        const merged = Array.from(new Set([...prev, ...activeIds]));
+        if (merged.length === prev.length && merged.every((id, idx) => id === prev[idx])) {
+          return prev;
+        }
+        return merged;
+      });
+    }
+  }, [filteredStaff, setSelectedStaffIds]);
+
   const selectedStaffNames = React.useMemo(() => {
     if (filteredStaff.length === 0) {
       return null;

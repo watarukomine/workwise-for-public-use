@@ -305,19 +305,34 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                 {isLoading ? (
                   <TableRow><TableCell colSpan={displayColumns.length + 1 + (isAdmin ? 2 : 0)} className="h-32 text-center"><div className="flex items-center justify-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />読み込み中...</div></TableCell></TableRow>
                 ) : filteredStaff.length > 0 ? (
-                  filteredStaff.map((member, idx) => (
-                    <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>
-                      <TableCell className="py-1 px-1">
-                        <Checkbox
-                          checked={pendingSelectedStaffIds.includes(member.id)}
-                          onCheckedChange={() => {
-                            togglePendingStaffSelection(member.id);
-                            setTimeout(() => {
-                              applyPendingSelection();
-                            }, 0);
-                          }}
-                        />
-                      </TableCell>
+                  filteredStaff.map((member, idx) => {
+                    const isSelected = pendingSelectedStaffIds.some(selId => {
+                      if (!selId) return false;
+                      const rawSel = String(selId).trim();
+                      const cleanSel = rawSel.replace(/[\s\u3000]+/g, '');
+                      const staffId = String(member.id || '').trim();
+                      const cleanId = staffId.replace(/[\s\u3000]+/g, '');
+                      const name = String(member.name || (member as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
+
+                      if (staffId === rawSel || staffId === cleanSel || cleanId === cleanSel) return true;
+                      if (name === rawSel || name === cleanSel) return true;
+                      if (name && cleanSel && (name.includes(cleanSel) || cleanSel.includes(name))) return true;
+                      return false;
+                    });
+
+                    return (
+                      <TableRow key={member.id} data-state={isSelected ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>
+                        <TableCell className="py-1 px-1">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => {
+                              togglePendingStaffSelection(member.id);
+                              setTimeout(() => {
+                                applyPendingSelection();
+                              }, 0);
+                            }}
+                          />
+                        </TableCell>
                       {isAdmin && (
                         <TableCell className="py-1 px-1 text-center">
                           <div className="flex items-center justify-center gap-0.5">
@@ -344,7 +359,8 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                       })}
                       {isAdmin && <TableCell className="py-1 px-1"><Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(member.id)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>}
                     </TableRow>
-                  ))
+                  );
+                })
                 ) : (
                   <TableRow><TableCell colSpan={displayColumns.length + (isAdmin ? 3 : 0)} className="h-32 text-center text-muted-foreground">{staffList.length === 0 ? "スタッフ情報がありません。" : "検索条件に合うスタッフが見つかりません。"}</TableCell></TableRow>
                 )}
