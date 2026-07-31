@@ -256,7 +256,7 @@ export default function DashboardPage() {
         return false;
       }
 
-      // 【最重要・鉄則 B】本日の作業チップ・タスクチップが割り当てられているスタッフは 100% 表示保持！（チップ絶対非消失）
+      // 【ルール 1】すでにチップが貼られている人は例えシフトが「休」でも 100% 表示！（チップ絶対非消失）
       const hasActiveTask = Array.from(activeStaffIds).some(id => {
         const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
         return staffId === id || name === cleanId || isStaffMatched(staff, [id]);
@@ -265,7 +265,7 @@ export default function DashboardPage() {
         return true;
       }
 
-      // 【鉄則 C】ユーザー様のチェックボックス選択状態（手動選択）による 1:1 完全同期コントロール
+      // 【ルール 2 & 3】手動チェックの判定
       if (hasExplicitSelection) {
         const isSelected = appliedSelectedStaffIds.some(selId => {
           const rawSel = String(selId || '').trim();
@@ -285,12 +285,11 @@ export default function DashboardPage() {
           );
         });
 
-        // チェックが入っているスタッフ [✓] は 100% 確実に表示！
-        // チェックが外れているスタッフ [ ] は 100% 確実に非表示！
+        // 手動でチェックを入れた人を表示。チェックを外したら非表示。
         return isSelected;
       }
 
-      // 【鉄則 D】シフトデータ存在時の「休日」非表示判定
+      // 【ルール 4】それ以外はシフト通りの表示（出勤＝表示、休日＝非表示）
       const isScheduledToday = hasShiftData
         ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id)
         : true;
