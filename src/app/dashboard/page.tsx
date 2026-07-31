@@ -224,17 +224,34 @@ export default function DashboardPage() {
 
     if (staffToUse.length === 0) return [];
 
-    // ユーザー様がスタッフ選択（チェックボックス）で明示的に指定しているか判定
+    // 1. 本日のタスク・作業チップが割り当てられているスタッフを抽出（大原則：強制表示！）
+    const activeStaffIds = new Set<string>();
+    if (scheduleEvents && scheduleEvents.length > 0) {
+      scheduleEvents.forEach(e => {
+        const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
+        if (isValid(evStart) && (isToday(evStart) ? isToday(currentDate) : isEqual(startOfDay(evStart), startOfDay(currentDate)))) {
+          if (e.staffId && e.staffId !== 'unassigned') {
+            activeStaffIds.add(e.staffId);
+          }
+        }
+      });
+    }
+
+    // ユーザー様がチェックボックスで選択を行っているか
     const hasExplicitSelection = Boolean(appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0);
 
-    let selectedStaff: WithId<Staff>[] = [];
+    let selectedStaff: WithId<Staff>[] = staffToUse.filter((staff: any) => {
+      const staffId = String(staff.id || '').trim();
+      const staffName = String(staff.name || (staff as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
 
-    if (hasExplicitSelection) {
-      // ユーザー様がチェックを入れたスタッフのみに厳密に絞り込む（ID または 氏名の完全一致）
-      selectedStaff = staffToUse.filter((staff: any) => {
-        const staffId = String(staff.id || '').trim();
-        const staffName = String(staff.name || (staff as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
+      // ① 本日タスクが割り当てられているスタッフは強制作業表示（大原則！）
+      const hasActiveTask = Array.from(activeStaffIds).some(id => isStaffMatched(staff, [id]) || staffId === id || staffName === id);
+      if (hasActiveTask) {
+        return true;
+      }
 
+      // ② 明示的選択がある場合は、チェックが入っているスタッフを表示
+      if (hasExplicitSelection) {
         return appliedSelectedStaffIds.some((selId: string) => {
           const cleanSelId = String(selId || '').replace(/[\s\u3000]+/g, '');
           return (
@@ -243,16 +260,17 @@ export default function DashboardPage() {
             isStaffMatched(staff, [selId])
           );
         });
-      });
-    } else {
-      // 未選択（全選択状態）の場合は全員をベースとする
-      selectedStaff = staffToUse;
-    }
+      }
 
-    // 1. 本日のシフト出勤・休日判定と表示フィルタリング
+      // ③ チェックボックス未指定の場合は通常ベース表示
+      return true;
+    });
+
+    // 2. 本日のシフト出勤・休日判定と表示フィルタリング
     const hasShiftData = Boolean(scheduledStaffIds && scheduledStaffIds.size > 0);
 
     selectedStaff = selectedStaff.filter((staff: any) => {
+      const staffId = String(staff.id || '').trim();
       const name = String(staff.name || '').replace(/[\s\u3000]+/g, '');
       const role = String(staff.role || '').toLowerCase().trim();
       const rawRole = String((staff as any)['ロール'] || '').toLowerCase().trim();
@@ -260,12 +278,18 @@ export default function DashboardPage() {
       const isAdmin = role.includes('admin') || role.includes('管理者') || rawRole.includes('admin') || rawRole.includes('管理者');
       const isController = role.includes('controller') || role.includes('コントローラー') || rawRole.includes('controller') || rawRole.includes('コントローラー');
 
-      // 本日のシフト出勤判定（シフトデータが無い期間は全スタッフ true と判定）
+      // 本日タスクが割り当てられているスタッフは休日やトグル状態に関わらず 100% 強制表示保持！
+      const hasActiveTask = Array.from(activeStaffIds).some(id => isStaffMatched(staff, [id]) || staffId === id || name === id);
+      if (hasActiveTask) {
+        return true;
+      }
+
+      // 本日のシフト出勤判定
       const isScheduledToday = hasShiftData
         ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id)
         : true;
 
-      // 明示的選択がある場合はシフトでの自動除外を行わず、ユーザー様の選択を最優先する
+      // 明示的選択がある場合はシフトでの自動除外を行わず表示
       if (hasExplicitSelection) {
         return true;
       }
@@ -289,16 +313,22 @@ export default function DashboardPage() {
   }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents, scheduledStaffIds]);
 
   const selectedStaffNames = React.useMemo(() => {
-    if (appliedSelectedStaffIds.length === 0) {
+    if (filteredStaff.length === 0) {
       return null;
     }
-    const staffToUse = allStaff;
-    if (appliedSelectedStaffIds.length === staffToUse.length) {
+    if (filteredStaff.length === (allStaff?.length || fallbackAugust1StaffObjects.length)) {
       return "全スタッフ";
     }
-    const selectedStaff = staffToUse.filter(s => appliedSelectedStaffIds.includes(s.id));
-    return selectedStaff.map(s => s.name).join('、');
-  }, [allStaff, appliedSelectedStaffIds, profile]);
+    return filteredStaff.map(s => s.name || s.id).join('、');
+  }, [filteredStaff, allStaff, fallbackAugust1StaffObjects]);
+
+  // タイムラインに表示されているスタッフの ID を選択状態（チェックボックス）へ強制自動同期
+  useEffect(() => {
+    if (filteredStaff && filteredStaff.length > 0) {
+      const renderedIds = filteredStaff.map(s => s.id);
+      setSelectedStaffIds(renderedIds);
+    }
+  }, [filteredStaff, setSelectedStaffIds]);
 
 
 
