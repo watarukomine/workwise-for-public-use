@@ -164,13 +164,28 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     setAllStaffState(staff);
   }, []);
 
-  const togglePendingStaffSelection = React.useCallback((staffId: string) => {
+  const togglePendingStaffSelection = React.useCallback((staffIdOrName: string) => {
     setPendingSelectedStaffIds(prevIds => {
-      const next = prevIds.includes(staffId)
-        ? prevIds.filter(id => id !== staffId)
-        : [...prevIds, staffId];
+      const rawTarget = String(staffIdOrName || '').trim();
+      const cleanTarget = rawTarget.replace(/[\s\u3000]+/g, '');
 
-      // チェックを入れた瞬間に即時・100%リアルタイムでタイムライン反映（適用ボタン不要）
+      if (!cleanTarget) return prevIds;
+
+      const exists = prevIds.some(id => {
+        const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
+        return id === rawTarget || cleanId === cleanTarget || (cleanTarget && cleanId === cleanTarget);
+      });
+
+      let next: string[];
+      if (exists) {
+        next = prevIds.filter(id => {
+          const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
+          return id !== rawTarget && cleanId !== cleanTarget;
+        });
+      } else {
+        next = [...prevIds, rawTarget];
+      }
+
       setAppliedSelectedStaffIds(next);
       try {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next));
@@ -197,16 +212,19 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applyPendingSelection = React.useCallback(() => {
-    setAppliedSelectedStaffIds(pendingSelectedStaffIds);
+    setAppliedSelectedStaffIds([...pendingSelectedStaffIds]);
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pendingSelectedStaffIds));
+      localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
+        date: new Date().toDateString(),
+        ids: pendingSelectedStaffIds
+      }));
+      toast({
+        title: "選択を適用しました",
+        description: `${pendingSelectedStaffIds.length}名の表示設定を更新しました。`,
+      });
     } catch (error) {
       console.error("Failed to save staff IDs to localStorage", error);
-      toast({
-        variant: "destructive",
-        title: "保存エラー",
-        description: "設定を保存できませんでした。",
-      });
     }
   }, [pendingSelectedStaffIds, toast]);
 
@@ -240,6 +258,11 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     pendingSelectedStaffIds,
     appliedSelectedStaffIds,
     allStaff,
+    setAllStaff,
+    togglePendingStaffSelection,
+    setPendingSelection,
+    applyPendingSelection,
+    setSelectedStaffIds,
     isLoading,
     error,
   ]);
