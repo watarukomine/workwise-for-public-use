@@ -734,40 +734,39 @@ export function isEtaPassed(etaStr?: string | null, lastUpdateIso?: string | nul
 
 export function isStaffMatched(staff: any, entries: (string | undefined | null)[]): boolean {
   if (!staff || !entries || entries.length === 0) return false;
-  const normalize = (str: any) => String(str || '').replace(/[\s\u3000\u200B-\u200D\uFEFF]+/g, '').toLowerCase().trim();
+  
+  const norm = (str: any) => String(str || '').replace(/[\s\u3000\u200B-\u200D\uFEFF]+/g, '').toLowerCase().trim();
 
-  const targets = new Set<string>();
-  if (staff.id) targets.add(normalize(staff.id));
-  if (staff.name) targets.add(normalize(staff.name));
-  if (staff['氏名']) targets.add(normalize(staff['氏名']));
-  if (staff['名前']) targets.add(normalize(staff['名前']));
-  if (staff.email) targets.add(normalize(staff.email));
-  if (staff['メール']) targets.add(normalize(staff['メール']));
-  if (staff['スタッフID']) targets.add(normalize(staff['スタッフID']));
-  if (staff['コード']) targets.add(normalize(staff['コード']));
+  // 対象スタッフのあらゆる識別キーを抽出
+  const sId = norm(staff.id);
+  const sName = norm(staff.name || staff['氏名'] || staff['名前']);
+  const sEmail = norm(staff.email || staff['メール']);
+  const sCode = norm(staff['スタッフID'] || staff['コード'] || staff.staffId);
+  const sPrefix = sEmail ? sEmail.split('@')[0] : '';
 
   return entries.some(entry => {
     if (!entry) return false;
-    const nEntry = normalize(entry);
-    if (!nEntry) return false;
+    const n = norm(entry);
+    if (!n) return false;
 
-    for (const target of targets) {
-      if (!target) continue;
-      if (target === nEntry || target.includes(nEntry) || nEntry.includes(target)) {
-        return true;
-      }
-    }
+    // 1. 完全一致・相互包含 (ID, 氏名, メール, コード)
+    if (sId && (sId === n || sId.includes(n) || n.includes(sId))) return true;
+    if (sName && (sName === n || sName.includes(n) || n.includes(sName))) return true;
+    if (sCode && (sCode === n || sCode.includes(n) || n.includes(sCode))) return true;
+    if (sEmail && (sEmail === n || sEmail.includes(n) || n.includes(sEmail))) return true;
+    if (sPrefix && (sPrefix === n || sPrefix.includes(n) || n.includes(sPrefix))) return true;
+
+    // 2. 苗字・名前の部分マッチ (例: "古石", "小堀", "小出")
+    if (sName && n.length >= 2 && (sName.startsWith(n) || n.startsWith(sName))) return true;
 
     // Bracketed name support (e.g. "杉山（和）")
     const rawEntry = String(entry).trim();
     const bracketMatch = rawEntry.match(/^(.*?)[（(](.*?)[）)]$/);
     if (bracketMatch) {
-      const entrySurname = normalize(bracketMatch[1]);
-      const entryGivenChar = normalize(bracketMatch[2]);
-      for (const target of targets) {
-        if (target.startsWith(entrySurname) && target.includes(entryGivenChar)) {
-          return true;
-        }
+      const entrySurname = norm(bracketMatch[1]);
+      const entryGivenChar = norm(bracketMatch[2]);
+      if (sName.startsWith(entrySurname) && sName.includes(entryGivenChar)) {
+        return true;
       }
     }
 
