@@ -266,37 +266,22 @@ export default function DashboardPage() {
         return staffId === id || name === cleanId || isStaffMatched(staff, [id]);
       });
 
-      // 【ルール 2】手動チェックで選択されている人
-      let isSelected = false;
-      if (hasExplicitSelection) {
-        isSelected = appliedSelectedStaffIds.some(selId => {
-          if (!selId) return false;
-          const rawSel = String(selId).trim();
-          const cleanSel = rawSel.replace(/[\s\u3000]+/g, '');
-          const cleanName = name.replace(/[\s\u3000]+/g, '');
-          const cleanId = staffId.replace(/[\s\u3000]+/g, '');
+      // 【完全同期ルール】スタッフ管理画面でチェックONが入っている人(または当日タスク保持者) = タイムライン表示人 (100%完全一致)
+      const isSelectedInContext = hasExplicitSelection ? appliedSelectedStaffIds.some(selId => {
+        if (!selId) return false;
+        const rawSel = String(selId).trim();
+        const cleanSel = rawSel.replace(/[\s\u3000]+/g, '');
+        const cleanName = name.replace(/[\s\u3000]+/g, '');
+        const cleanId = staffId.replace(/[\s\u3000]+/g, '');
 
-          if (staffId === rawSel || staffId === cleanSel || cleanId === cleanSel) return true;
-          if (name === rawSel || name === cleanSel || cleanName === cleanSel) return true;
-          if (cleanName && cleanSel && (cleanName.includes(cleanSel) || cleanSel.includes(cleanName))) return true;
-          if (isStaffMatched(staff, [selId])) return true;
-          return false;
-        });
-      }
+        if (staffId === rawSel || staffId === cleanSel || cleanId === cleanSel) return true;
+        if (name === rawSel || name === cleanSel || cleanName === cleanSel) return true;
+        if (cleanName && cleanSel && (cleanName.includes(cleanSel) || cleanSel.includes(cleanName))) return true;
+        if (isStaffMatched(staff, [selId])) return true;
+        return false;
+      }) : (hasShiftData ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id) : true);
 
-      // 【ルール 3】当日のシフト出勤者
-      const isScheduledToday = hasShiftData
-        ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id)
-        : true;
-
-      // 【合算表示判定】
-      if (hasExplicitSelection) {
-        // 手動選択がある場合: 当日チップ保持者(絶対保護) OR 手動でチェックONされた人
-        return hasActiveTask || isSelected;
-      }
-
-      // 手動選択がないデフォルト時: (シフト出勤者 OR 当日チップ所有者)
-      return isScheduledToday || hasActiveTask;
+      return hasActiveTask || isSelectedInContext;
     });
 
     // スタッフ管理画面の指定並び順（sortOrder / order）を最優先で厳格適用
