@@ -33,10 +33,15 @@ export const StaffService = {
             } as WithId<Staff>));
 
             const staffList = rawList.filter(s => {
-                if ((s as any)._type === 'order') return false;
-                const name = String(s.name || '').trim();
+                const data = s as any;
+                if (data._type === 'order' || data.orderNo || data.customerName || data.orderType) return false;
+                
+                const name = String(s.name || data['氏名'] || data['名前'] || '').trim();
                 const email = String(s.email || '').trim();
                 const id = String(s.id || '').trim();
+
+                if (!name || name === '名前未設定') return false;
+
                 const isNumericName = /^[0-9]+$/.test(name);
                 const isNumericId = /^[0-9]+$/.test(id);
                 if ((isNumericName || isNumericId) && (!email || email === '-')) {
@@ -45,13 +50,25 @@ export const StaffService = {
                 return true;
             });
 
-            staffList.sort((a, b) => {
+            // ID / 氏名による重複排除
+            const seenIds = new Set<string>();
+            const uniqueStaff: WithId<Staff>[] = [];
+            for (const s of staffList) {
+                const nameKey = String(s.name || (s as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
+                const key = `${s.id}_${nameKey}`;
+                if (!seenIds.has(key)) {
+                    seenIds.add(key);
+                    uniqueStaff.push(s);
+                }
+            }
+
+            uniqueStaff.sort((a, b) => {
                 const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof (a as any).order === 'number' ? (a as any).order : 999);
                 const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : (typeof (b as any).order === 'number' ? (b as any).order : 999);
                 return orderA - orderB;
             });
 
-            callback(staffList);
+            callback(uniqueStaff);
         }, (error) => {
             console.error("[StaffService] Error in staff realtime subscription:", error);
         });
@@ -66,20 +83,47 @@ export const StaffService = {
         const colRef = collection(firestore, COLLECTION);
         const snapshot = await getDocs(colRef);
 
-        const staffList = snapshot.docs
-            .filter(docSnap => docSnap.data()._type !== 'order')
-            .map(docSnap => ({
-                id: docSnap.id,
-                ...docSnap.data()
-            } as WithId<Staff>));
+        const rawList = snapshot.docs.map(docSnap => ({
+            id: docSnap.id,
+            ...docSnap.data()
+        } as WithId<Staff>));
 
-        staffList.sort((a, b) => {
+        const staffList = rawList.filter(s => {
+            const data = s as any;
+            if (data._type === 'order' || data.orderNo || data.customerName || data.orderType) return false;
+            
+            const name = String(s.name || data['氏名'] || data['名前'] || '').trim();
+            const email = String(s.email || '').trim();
+            const id = String(s.id || '').trim();
+
+            if (!name || name === '名前未設定') return false;
+
+            const isNumericName = /^[0-9]+$/.test(name);
+            const isNumericId = /^[0-9]+$/.test(id);
+            if ((isNumericName || isNumericId) && (!email || email === '-')) {
+                return false;
+            }
+            return true;
+        });
+
+        const seenIds = new Set<string>();
+        const uniqueStaff: WithId<Staff>[] = [];
+        for (const s of staffList) {
+            const nameKey = String(s.name || (s as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
+            const key = `${s.id}_${nameKey}`;
+            if (!seenIds.has(key)) {
+                seenIds.add(key);
+                uniqueStaff.push(s);
+            }
+        }
+
+        uniqueStaff.sort((a, b) => {
             const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof (a as any).order === 'number' ? (a as any).order : 999);
             const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : (typeof (b as any).order === 'number' ? (b as any).order : 999);
             return orderA - orderB;
         });
 
-        return staffList;
+        return uniqueStaff;
     },
 
     /**
