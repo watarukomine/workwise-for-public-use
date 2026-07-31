@@ -289,10 +289,10 @@ export default function DashboardPage() {
         ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id)
         : true;
 
-      // 【合算表示判定】 (シフト出勤者) OR (当日チップ割当者) OR (手動選択者)
+      // 【合算表示判定】
       if (hasExplicitSelection) {
-        // 手動選択がある場合は、(シフト出勤者 OR 当日チップ所有者 OR 手動選択ON) のいずれかに合致すれば表示
-        return isScheduledToday || hasActiveTask || isSelected;
+        // 手動選択がある場合: 当日チップ保持者(絶対保護) OR 手動でチェックONされた人
+        return hasActiveTask || isSelected;
       }
 
       // 手動選択がないデフォルト時: (シフト出勤者 OR 当日チップ所有者)
@@ -308,20 +308,6 @@ export default function DashboardPage() {
 
     return result;
   }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents, scheduledStaffIds]);
-
-  // タイムライン表示スタッフ(filteredStaff)をチェックボックス選択状態へ自動連動同期
-  React.useEffect(() => {
-    if (filteredStaff && filteredStaff.length > 0 && setSelectedStaffIds) {
-      const activeIds = filteredStaff.map((s: any) => String(s.id || '').trim()).filter(Boolean);
-      setSelectedStaffIds((prev: string[]) => {
-        const merged = Array.from(new Set([...prev, ...activeIds]));
-        if (merged.length === prev.length && merged.every((id, idx) => id === prev[idx])) {
-          return prev;
-        }
-        return merged;
-      });
-    }
-  }, [filteredStaff, setSelectedStaffIds]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (filteredStaff.length === 0) {
