@@ -185,9 +185,11 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const setSelectedStaffIds = React.useCallback((idsOrFn: string[] | ((prev: string[]) => string[])) => {
     setAppliedSelectedStaffIds(prev => {
       const newIds = typeof idsOrFn === 'function' ? idsOrFn(prev) : idsOrFn;
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newIds));
+      } catch (e) {}
       return newIds;
     });
-    // Sync pending with applied
     setPendingSelectedStaffIds(prev => {
       const newIds = typeof idsOrFn === 'function' ? idsOrFn(prev) : idsOrFn;
       return newIds;
