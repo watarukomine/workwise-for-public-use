@@ -268,21 +268,17 @@ export default function DashboardPage() {
       // 【ルール 2 & 3】手動チェックの判定
       if (hasExplicitSelection) {
         const isSelected = appliedSelectedStaffIds.some(selId => {
-          const rawSel = String(selId || '').trim();
+          if (!selId) return false;
+          const rawSel = String(selId).trim();
           const cleanSel = rawSel.replace(/[\s\u3000]+/g, '');
           const cleanName = name.replace(/[\s\u3000]+/g, '');
           const cleanId = staffId.replace(/[\s\u3000]+/g, '');
 
-          return (
-            staffId === rawSel ||
-            staffId === cleanSel ||
-            cleanId === cleanSel ||
-            name === rawSel ||
-            name === cleanSel ||
-            cleanName === cleanSel ||
-            (cleanName.length > 1 && cleanSel.length > 1 && (cleanName.includes(cleanSel) || cleanSel.includes(cleanName))) ||
-            isStaffMatched(staff, [selId])
-          );
+          if (staffId === rawSel || staffId === cleanSel || cleanId === cleanSel) return true;
+          if (name === rawSel || name === cleanSel || cleanName === cleanSel) return true;
+          if (cleanName && cleanSel && (cleanName.includes(cleanSel) || cleanSel.includes(cleanName))) return true;
+          if (isStaffMatched(staff, [selId])) return true;
+          return false;
         });
 
         // 手動でチェックを入れた人を表示。チェックを外したら非表示。

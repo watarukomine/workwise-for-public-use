@@ -287,7 +287,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                 </PopoverContent>
               </Popover>
               <Button variant="outline" size="sm" onClick={() => exportToCSV(filteredStaff, displayColumns)} disabled={filteredStaff.length === 0} className="gap-1.5"><Download className="h-3.5 w-3.5" /> CSV出力</Button>
-              {isAdmin && <Button onClick={applyPendingSelection} disabled={!isSelectionChanged} size="sm" className="gap-1.5"><Check className="h-3.5 w-3.5" /> 選択を適用</Button>}
+              <Button onClick={applyPendingSelection} size="sm" className="gap-1.5"><Check className="h-3.5 w-3.5" /> 選択を適用</Button>
             </div>
           </div>
 
