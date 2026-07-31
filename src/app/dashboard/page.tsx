@@ -265,7 +265,7 @@ export default function DashboardPage() {
         return true;
       }
 
-      // 【鉄則 C】ユーザー様がスタッフ選択（チェックボックス）で絞り込んでいる場合
+      // 【鉄則 C】ユーザー様のチェックボックス選択状態（手動選択）による 1:1 完全同期コントロール
       if (hasExplicitSelection) {
         const isSelected = appliedSelectedStaffIds.some(selId => {
           const rawSel = String(selId || '').trim();
@@ -285,12 +285,9 @@ export default function DashboardPage() {
           );
         });
 
-        // ユーザー様が明示的にチェックを入れているスタッフは、シフト休日に関わらず 100% 最優先表示！
-        if (isSelected) {
-          return true;
-        } else {
-          return false;
-        }
+        // チェックが入っているスタッフ [✓] は 100% 確実に表示！
+        // チェックが外れているスタッフ [ ] は 100% 確実に非表示！
+        return isSelected;
       }
 
       // 【鉄則 D】シフトデータ存在時の「休日」非表示判定

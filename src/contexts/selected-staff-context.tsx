@@ -127,16 +127,13 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         if (!initialLoadDone.current) {
           initialLoadDone.current = true;
           const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
+          // 保存済みの選択がある場合はそれを尊重
           if (savedIds) {
             try {
               const parsedIds = JSON.parse(savedIds);
               setAppliedSelectedStaffIds(parsedIds);
               setPendingSelectedStaffIds(parsedIds);
             } catch (e) {}
-          } else {
-            const allIds = processedStaff.map(s => s.id);
-            setAppliedSelectedStaffIds(prev => prev.length === 0 ? allIds : prev);
-            setPendingSelectedStaffIds(prev => prev.length === 0 ? allIds : prev);
           }
         }
       }
