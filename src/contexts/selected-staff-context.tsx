@@ -200,10 +200,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     setAppliedSelectedStaffIds(pendingSelectedStaffIds);
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pendingSelectedStaffIds));
-      toast({
-        title: "スタッフ選択を更新しました",
-        description: `${pendingSelectedStaffIds.length}人のスタッフが選択されました。`,
-      });
     } catch (error) {
       console.error("Failed to save staff IDs to localStorage", error);
       toast({
