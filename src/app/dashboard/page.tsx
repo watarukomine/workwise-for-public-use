@@ -305,21 +305,6 @@ export default function DashboardPage() {
     return filteredStaff.map((s: any) => s.name || s.id).join('、');
   }, [filteredStaff, allStaff, fallbackAugust1StaffObjects]);
 
-  // タイムラインに描画・表示されている全スタッフの ID を選択状態（チェックボックス）へ自動同期
-  useEffect(() => {
-    if (filteredStaff && filteredStaff.length > 0) {
-      const renderedIds = filteredStaff.map((s: any) => s.id);
-      setSelectedStaffIds(prev => {
-        // 現在の選択に描画スタッフの ID を全て含める（重複除外）
-        const combined = Array.from(new Set([...prev, ...renderedIds]));
-        if (combined.length === prev.length && combined.every(id => prev.includes(id))) {
-          return prev;
-        }
-        return combined;
-      });
-    }
-  }, [filteredStaff, setSelectedStaffIds]);
-
 
 
   const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading || isLoadingCustomers;
