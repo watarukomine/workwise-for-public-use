@@ -327,17 +327,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                     const staffId = String(member.id || '').trim();
                     const name = String(member.name || (member as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
 
-                    const isSelected = pendingSelectedStaffIds.some(selId => {
-                      if (!selId) return false;
-                      const rawSel = String(selId).trim();
-                      const cleanSel = rawSel.replace(/[\s\u3000]+/g, '');
-                      const cleanId = staffId.replace(/[\s\u3000]+/g, '');
-
-                      if (staffId === rawSel || staffId === cleanSel || cleanId === cleanSel) return true;
-                      if (name === rawSel || name === cleanSel) return true;
-                      if (name && cleanSel && (name.includes(cleanSel) || cleanSel.includes(name))) return true;
-                      return false;
-                    });
+                    const isSelected = pendingSelectedStaffIds.some(selId => isStaffMatched(member, [selId]));
 
                     return (
                       <TableRow key={member.id} data-state={isSelected ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>
@@ -345,10 +335,9 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => {
-                              togglePendingStaffSelection(member.id);
-                              if (name && name !== member.id) {
-                                togglePendingStaffSelection(name);
-                              }
+                              if (member.id) togglePendingStaffSelection(member.id);
+                              if (name && name !== member.id) togglePendingStaffSelection(name);
+                              if ((member as any)['スタッフID']) togglePendingStaffSelection((member as any)['スタッフID']);
                               setTimeout(() => {
                                 applyPendingSelection();
                               }, 0);

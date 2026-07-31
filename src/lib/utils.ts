@@ -736,27 +736,38 @@ export function isStaffMatched(staff: any, entries: (string | undefined | null)[
   if (!staff || !entries || entries.length === 0) return false;
   const normalize = (str: any) => String(str || '').replace(/[\s\u3000]+/g, '').toLowerCase().trim();
 
-  const normSId = normalize(staff.id);
-  const rawSName = String(staff.name || staff['氏名'] || staff['名前'] || '').trim();
-  const normSName = normalize(rawSName);
+  const targets = new Set<string>();
+  if (staff.id) targets.add(normalize(staff.id));
+  if (staff.name) targets.add(normalize(staff.name));
+  if (staff['氏名']) targets.add(normalize(staff['氏名']));
+  if (staff['名前']) targets.add(normalize(staff['名前']));
+  if (staff.email) targets.add(normalize(staff.email));
+  if (staff['メール']) targets.add(normalize(staff['メール']));
+  if (staff['スタッフID']) targets.add(normalize(staff['スタッフID']));
+  if (staff['コード']) targets.add(normalize(staff['コード']));
 
   return entries.some(entry => {
     if (!entry) return false;
-    const rawEntry = String(entry).trim();
-    const nEntry = normalize(rawEntry);
+    const nEntry = normalize(entry);
     if (!nEntry) return false;
 
-    // 1. Exact match for ID or Full Name (with all spaces stripped)
-    if (normSId && nEntry === normSId) return true;
-    if (normSName && nEntry === normSName) return true;
+    for (const target of targets) {
+      if (!target) continue;
+      if (target === nEntry || target.includes(nEntry) || nEntry.includes(target)) {
+        return true;
+      }
+    }
 
-    // 2. Bracketed name support (e.g. "杉山（和）")
+    // Bracketed name support (e.g. "杉山（和）")
+    const rawEntry = String(entry).trim();
     const bracketMatch = rawEntry.match(/^(.*?)[（(](.*?)[）)]$/);
     if (bracketMatch) {
       const entrySurname = normalize(bracketMatch[1]);
       const entryGivenChar = normalize(bracketMatch[2]);
-      if (normSName.startsWith(entrySurname) && normSName.includes(entryGivenChar)) {
-        return true;
+      for (const target of targets) {
+        if (target.startsWith(entrySurname) && target.includes(entryGivenChar)) {
+          return true;
+        }
       }
     }
 
