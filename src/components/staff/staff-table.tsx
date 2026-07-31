@@ -65,8 +65,8 @@ const READONLY_FIELDS = new Set(['id']);
 
 // Fields with select options
 const SELECT_FIELDS: Record<string, string[]> = {
-  'role': ['admin', 'staff', 'admin/staff', 'controller'],
-  'ロール': ['admin', 'staff', 'admin/staff', 'controller'],
+  'role': ['admin', 'staff', 'Admin/Staff', 'controller'],
+  'ロール': ['admin', 'staff', 'Admin/Staff', 'controller'],
   'area': ['県西', '県央', '県東'],
   '母店': ['横浜店', '横須賀店', '東名川崎店', '相模原店', '厚木店', '綾瀬店', '小田原店'],
 };
@@ -307,7 +307,17 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                 ) : filteredStaff.length > 0 ? (
                   filteredStaff.map((member, idx) => (
                     <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>
-                      <TableCell className="py-1 px-1"><Checkbox checked={pendingSelectedStaffIds.includes(member.id)} onCheckedChange={() => togglePendingStaffSelection(member.id)} /></TableCell>
+                      <TableCell className="py-1 px-1">
+                        <Checkbox
+                          checked={pendingSelectedStaffIds.includes(member.id)}
+                          onCheckedChange={() => {
+                            togglePendingStaffSelection(member.id);
+                            setTimeout(() => {
+                              applyPendingSelection();
+                            }, 0);
+                          }}
+                        />
+                      </TableCell>
                       {isAdmin && (
                         <TableCell className="py-1 px-1 text-center">
                           <div className="flex items-center justify-center gap-0.5">

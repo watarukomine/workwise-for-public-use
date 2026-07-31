@@ -11,14 +11,14 @@ export type Staff = {
   photoURL?: string | null;
   avatarUrl?: string;
   color?: string;
-  role: 'admin' | 'staff';
+  role: 'admin' | 'staff' | 'Admin/Staff' | 'admin_staff';
   area?: '県西' | '県央' | '県東';
   '母店'?: string;
   sortOrder?: number;
   order?: number;
   /** @deprecated パスワードをFirestoreに平文保存するのはセキュリティリスクです。Firebase Authへの完全移行を推奨。 */
   password?: string;
-  'ロール'?: 'admin' | 'staff';
+  'ロール'?: 'admin' | 'staff' | 'Admin/Staff' | 'admin_staff';
   department?: string; // from user's code
   createdAt?: Timestamp;
   updatedAt?: Timestamp;

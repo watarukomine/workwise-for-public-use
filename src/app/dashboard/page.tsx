@@ -243,31 +243,33 @@ export default function DashboardPage() {
     const result = staffToUse.filter((staff: any) => {
       const staffId = String(staff.id || '').trim();
       const name = String(staff.name || (staff as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
-      const role = String(staff.role || '').toLowerCase().trim();
-      const rawRole = String((staff as any)['ロール'] || '').toLowerCase().trim();
+      const roleOrig = String(staff.role || '').trim();
+      const rawRoleOrig = String((staff as any)['ロール'] || '').trim();
+      const roleLower = roleOrig.toLowerCase();
+      const rawRoleLower = rawRoleOrig.toLowerCase();
 
-      const isAdmin = role.includes('admin') || role.includes('管理者') || rawRole.includes('admin') || rawRole.includes('管理者');
-      const isController = role.includes('controller') || role.includes('コントローラー') || rawRole.includes('controller') || rawRole.includes('コントローラー');
-      const isSugiyama = name.includes('杉山和彦') || staffId === '杉山和彦';
-      const isPureAdmin = (isAdmin || isController) && !isSugiyama;
+      // Admin/Staff (出動する兼務者) の判定
+      const isAdminStaff = roleOrig === 'Admin/Staff' || roleLower === 'admin/staff' || roleLower === 'admin_staff' || rawRoleOrig === 'Admin/Staff' || rawRoleLower === 'admin/staff' || rawRoleLower === 'admin_staff' || roleLower.includes('兼務');
+      
+      // 純粋な管理者（出動しないAdmin）の判定
+      const isAdmin = roleLower.includes('admin') || roleLower.includes('管理者') || rawRoleLower.includes('admin') || rawRoleLower.includes('管理者') || roleLower.includes('controller') || rawRoleLower.includes('controller');
+      const isPureAdmin = isAdmin && !isAdminStaff;
 
-      // 【最重要・鉄則 A】純粋な管理者（桑原和裕、DEMO1等）は、トグル OFF 時は絶対非表示！
+      // 【最重要】純粋な管理者（Admin）は、管理者表示スイッチ OFF 時は非表示
       if (isPureAdmin && !showManagement) {
         return false;
       }
 
-      // 【ルール 1】すでにチップが貼られている人は例えシフトが「休」でも 100% 表示！（チップ絶対非消失）
+      // 【ルール 1】すでにチップが貼られている人（チップ絶対非消失）
       const hasActiveTask = Array.from(activeStaffIds).some(id => {
         const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
         return staffId === id || name === cleanId || isStaffMatched(staff, [id]);
       });
-      if (hasActiveTask) {
-        return true;
-      }
 
-      // 【ルール 2 & 3】手動チェックの判定
+      // 【ルール 2】手動チェックで選択されている人
+      let isSelected = false;
       if (hasExplicitSelection) {
-        const isSelected = appliedSelectedStaffIds.some(selId => {
+        isSelected = appliedSelectedStaffIds.some(selId => {
           if (!selId) return false;
           const rawSel = String(selId).trim();
           const cleanSel = rawSel.replace(/[\s\u3000]+/g, '');
@@ -280,21 +282,21 @@ export default function DashboardPage() {
           if (isStaffMatched(staff, [selId])) return true;
           return false;
         });
-
-        // 手動でチェックを入れた人を表示。チェックを外したら非表示。
-        return isSelected;
       }
 
-      // 【ルール 4】それ以外はシフト通りの表示（出勤＝表示、休日＝非表示）
+      // 【ルール 3】当日のシフト出勤者
       const isScheduledToday = hasShiftData
         ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id)
         : true;
 
-      if (hasShiftData && !isScheduledToday) {
-        return false;
+      // 【合算表示判定】 (シフト出勤者) OR (当日チップ割当者) OR (手動選択者)
+      if (hasExplicitSelection) {
+        // 手動選択がある場合は、(シフト出勤者 OR 当日チップ所有者 OR 手動選択ON) のいずれかに合致すれば表示
+        return isScheduledToday || hasActiveTask || isSelected;
       }
 
-      return true;
+      // 手動選択がないデフォルト時: (シフト出勤者 OR 当日チップ所有者)
+      return isScheduledToday || hasActiveTask;
     });
 
     // スタッフ管理画面の指定並び順（sortOrder / order）を最優先で厳格適用

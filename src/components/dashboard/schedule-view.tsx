@@ -3049,7 +3049,7 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
                 <div className="text-[10px] text-indigo-900 font-semibold mt-0.5 whitespace-nowrap">
                   {displayStatus === '帰社中' 
                     ? `帰社予定 ${etaTime}` 
-                    : (destName ? `${destName} 到着 ${etaTime}` : `到着予定 ${etaTime}`)}
+                    : (destName ? `${destName}へ移動中 (${etaTime}到着予定)` : `移動中 (${etaTime}到着予定)`)}
                 </div>
               )}
             </div>
