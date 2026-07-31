@@ -292,7 +292,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
             <Table>
               <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                 <TableRow className="hover:bg-transparent">
-                  {isAdmin && <TableHead className="w-[40px]"><Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} disabled={staffList.length === 0} /></TableHead>}
+                  <TableHead className="w-[40px]"><Checkbox checked={isAllSelected} onCheckedChange={handleSelectAll} disabled={staffList.length === 0} /></TableHead>
                   {isAdmin && <TableHead className="w-[70px] text-xs font-semibold text-center">並び順</TableHead>}
                   {displayColumns.map(col => (<TableHead key={col} className="text-xs font-semibold whitespace-nowrap px-2">{col}</TableHead>))}
                   {isAdmin && <TableHead className="w-[40px]" />}
@@ -303,8 +303,8 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   <TableRow><TableCell colSpan={displayColumns.length + (isAdmin ? 3 : 0)} className="h-32 text-center"><div className="flex items-center justify-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />読み込み中...</div></TableCell></TableRow>
                 ) : filteredStaff.length > 0 ? (
                   filteredStaff.map((member, idx) => (
-                    <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) && isAdmin ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>
-                      {isAdmin && <TableCell className="py-1 px-1"><Checkbox checked={pendingSelectedStaffIds.includes(member.id)} onCheckedChange={() => togglePendingStaffSelection(member.id)} /></TableCell>}
+                    <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>
+                      <TableCell className="py-1 px-1"><Checkbox checked={pendingSelectedStaffIds.includes(member.id)} onCheckedChange={() => togglePendingStaffSelection(member.id)} /></TableCell>
                       {isAdmin && (
                         <TableCell className="py-1 px-1 text-center">
                           <div className="flex items-center justify-center gap-0.5">
