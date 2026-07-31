@@ -268,8 +268,21 @@ export default function DashboardPage() {
       // 【鉄則 C】ユーザー様がスタッフ選択（チェックボックス）で絞り込んでいる場合
       if (hasExplicitSelection) {
         const isSelected = appliedSelectedStaffIds.some(selId => {
-          const cleanSel = String(selId || '').replace(/[\s\u3000]+/g, '');
-          return staffId === selId || name === cleanSel || isStaffMatched(staff, [selId]);
+          const rawSel = String(selId || '').trim();
+          const cleanSel = rawSel.replace(/[\s\u3000]+/g, '');
+          const cleanName = name.replace(/[\s\u3000]+/g, '');
+          const cleanId = staffId.replace(/[\s\u3000]+/g, '');
+
+          return (
+            staffId === rawSel ||
+            staffId === cleanSel ||
+            cleanId === cleanSel ||
+            name === rawSel ||
+            name === cleanSel ||
+            cleanName === cleanSel ||
+            (cleanName.length > 1 && cleanSel.length > 1 && (cleanName.includes(cleanSel) || cleanSel.includes(cleanName))) ||
+            isStaffMatched(staff, [selId])
+          );
         });
 
         // ユーザー様が明示的にチェックを入れているスタッフは、シフト休日に関わらず 100% 最優先表示！

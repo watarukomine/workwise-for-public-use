@@ -153,15 +153,35 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const togglePendingStaffSelection = React.useCallback((staffId: string) => {
-    setPendingSelectedStaffIds(prevIds =>
-      prevIds.includes(staffId)
+    setPendingSelectedStaffIds(prevIds => {
+      const next = prevIds.includes(staffId)
         ? prevIds.filter(id => id !== staffId)
-        : [...prevIds, staffId]
-    );
+        : [...prevIds, staffId];
+
+      // チェックを入れた瞬間に即時・100%リアルタイムでタイムライン反映（適用ボタン不要）
+      setAppliedSelectedStaffIds(next);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next));
+        localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
+          date: new Date().toDateString(),
+          ids: next
+        }));
+      } catch (e) {}
+
+      return next;
+    });
   }, []);
 
   const setPendingSelection = React.useCallback((staffIds: string[]) => {
     setPendingSelectedStaffIds(staffIds);
+    setAppliedSelectedStaffIds(staffIds);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(staffIds));
+      localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
+        date: new Date().toDateString(),
+        ids: staffIds
+      }));
+    } catch (e) {}
   }, []);
 
   const applyPendingSelection = React.useCallback(() => {
