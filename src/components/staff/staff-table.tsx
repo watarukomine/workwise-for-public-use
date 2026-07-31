@@ -194,24 +194,25 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   const { profile } = useUserProfile();
   const { toast } = useToast();
   const { pendingSelectedStaffIds, togglePendingStaffSelection, applyPendingSelection, appliedSelectedStaffIds } = useSelectedStaff();
+  const { scheduleEvents, orders } = useOrder();
   const isAdmin = profile?.role === 'admin';
   const staffList = staff || [];
 
-  let activeStaffIds = new Set<string>();
-  try {
-    const { scheduleEvents, orders } = useOrder();
+  const activeStaffIds = React.useMemo(() => {
+    const ids = new Set<string>();
     if (scheduleEvents && scheduleEvents.length > 0) {
       scheduleEvents.forEach(e => {
-        if (e.staffId && e.staffId !== 'unassigned') activeStaffIds.add(e.staffId);
+        if (e.staffId && e.staffId !== 'unassigned') ids.add(e.staffId);
       });
     }
     if (orders && orders.length > 0) {
       orders.forEach(o => {
-        if (o.staffId && o.staffId !== 'unassigned' && o.status !== '作業完了' && o.status !== 'キャンセル') activeStaffIds.add(o.staffId);
-        if (o.staffName) activeStaffIds.add(o.staffName);
+        if (o.staffId && o.staffId !== 'unassigned' && o.status !== '作業完了' && o.status !== 'キャンセル') ids.add(o.staffId);
+        if (o.staffName) ids.add(o.staffName);
       });
     }
-  } catch (e) {}
+    return ids;
+  }, [scheduleEvents, orders]);
 
   const allColumns = React.useMemo(() => extractColumns(staffList), [staffList]);
 
