@@ -24,7 +24,7 @@ export const StaffService = {
     subscribeToStaff(callback: (staff: WithId<Staff>[]) => void): () => void {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
-        const q = query(colRef, where('_type', '!=', 'order'));
+        const q = colRef;
 
         return onSnapshot(q, (snapshot) => {
             const rawList = snapshot.docs.map(docSnap => ({
@@ -64,14 +64,14 @@ export const StaffService = {
     async getAllStaff(): Promise<WithId<Staff>[]> {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
-        // During transition, we filter out known 'order' types to avoid junk
-        const q = query(colRef, where('_type', '!=', 'order'));
-        const snapshot = await getDocs(q);
+        const snapshot = await getDocs(colRef);
 
-        const staffList = snapshot.docs.map(docSnap => ({
-            id: docSnap.id,
-            ...docSnap.data()
-        } as WithId<Staff>));
+        const staffList = snapshot.docs
+            .filter(docSnap => docSnap.data()._type !== 'order')
+            .map(docSnap => ({
+                id: docSnap.id,
+                ...docSnap.data()
+            } as WithId<Staff>));
 
         staffList.sort((a, b) => {
             const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof (a as any).order === 'number' ? (a as any).order : 999);
@@ -139,9 +139,21 @@ export const StaffService = {
         const { firestore } = initializeFirebase();
         const colRef = collection(firestore, COLLECTION);
 
-        const staffDocs = await getDocs(query(colRef, where('_type', '!=', 'order')));
-        const nextIndex = staffDocs.size + 1;
-        const newId = data.id || `STAFF${String(nextIndex).padStart(3, '0')}`;
+        const allDocs = await getDocs(colRef);
+        const existingStaffIds = allDocs.docs.map(d => d.id);
+        
+        let newId = data.id;
+        if (!newId) {
+            let maxNum = 0;
+            existingStaffIds.forEach(id => {
+                const match = id.match(/^STAFF(\d+)$/i);
+                if (match) {
+                    const num = parseInt(match[1], 10);
+                    if (num > maxNum) maxNum = num;
+                }
+            });
+            newId = `STAFF${String(maxNum + 1).padStart(3, '0')}`;
+        }
 
         const docRef = doc(colRef, newId);
         const staffData = {

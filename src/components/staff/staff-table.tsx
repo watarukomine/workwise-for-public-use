@@ -217,13 +217,16 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     return staffList.filter(s => displayColumns.some(col => String(s[col as keyof typeof s] || '').toLowerCase().includes(term)));
   }, [staffList, searchTerm, displayColumns]);
 
-  const isAllSelected = staffList.length > 0 && pendingSelectedStaffIds.length === staffList.length;
-  const isSelectionChanged = JSON.stringify(pendingSelectedStaffIds.sort()) !== JSON.stringify(appliedSelectedStaffIds.sort());
+  const isAllSelected = filteredStaff.length > 0 && filteredStaff.every(s => pendingSelectedStaffIds.includes(s.id));
+  const isSelectionChanged = JSON.stringify([...pendingSelectedStaffIds].sort()) !== JSON.stringify([...appliedSelectedStaffIds].sort());
 
   const handleSelectAll = () => {
-    const allIds = staffList.map(s => s.id);
-    if (isAllSelected) allIds.forEach(id => { if (pendingSelectedStaffIds.includes(id)) togglePendingStaffSelection(id); });
-    else allIds.forEach(id => { if (!pendingSelectedStaffIds.includes(id)) togglePendingStaffSelection(id); });
+    const targetIds = filteredStaff.map(s => s.id);
+    if (isAllSelected) {
+      targetIds.forEach(id => { if (pendingSelectedStaffIds.includes(id)) togglePendingStaffSelection(id); });
+    } else {
+      targetIds.forEach(id => { if (!pendingSelectedStaffIds.includes(id)) togglePendingStaffSelection(id); });
+    }
   };
 
   const handleSaveCell = React.useCallback(async (staffId: string, fieldKey: string, newValue: string) => {
@@ -300,7 +303,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={displayColumns.length + (isAdmin ? 3 : 0)} className="h-32 text-center"><div className="flex items-center justify-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />読み込み中...</div></TableCell></TableRow>
+                  <TableRow><TableCell colSpan={displayColumns.length + 1 + (isAdmin ? 2 : 0)} className="h-32 text-center"><div className="flex items-center justify-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />読み込み中...</div></TableCell></TableRow>
                 ) : filteredStaff.length > 0 ? (
                   filteredStaff.map((member, idx) => (
                     <TableRow key={member.id} data-state={pendingSelectedStaffIds.includes(member.id) ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>

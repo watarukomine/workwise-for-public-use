@@ -49,15 +49,17 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const initialLoadDone = useRef(false);
   const STAFF_CACHE_KEY = 'cached_staff_data_v2'; // Changed key to avoid conflict with old GAS data
 
-  // Persist selection
+  // Persist selection (allow empty array so full deselect is saved)
   useEffect(() => {
-    if (initialLoadDone.current && appliedSelectedStaffIds.length > 0) {
+    if (initialLoadDone.current) {
       try {
         const today = new Date().toDateString();
-        localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
+        const payload = JSON.stringify({
           date: today,
           ids: appliedSelectedStaffIds
-        }));
+        });
+        localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, payload);
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appliedSelectedStaffIds));
       } catch (e) {
         console.warn('Failed to save selection to localStorage:', e);
       }
@@ -67,13 +69,12 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   // Restore selection on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY);
+      const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY) || localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
-        const { date, ids } = JSON.parse(saved);
-        if (date === new Date().toDateString() && Array.isArray(ids) && ids.length > 0) {
-          setAppliedSelectedStaffIds(ids);
-          setPendingSelectedStaffIds(ids);
-        }
+        const parsed = JSON.parse(saved);
+        const ids = Array.isArray(parsed) ? parsed : (parsed.ids || []);
+        setAppliedSelectedStaffIds(ids);
+        setPendingSelectedStaffIds(ids);
       }
     } catch (e) {
       console.warn('Failed to restore selection:', e);

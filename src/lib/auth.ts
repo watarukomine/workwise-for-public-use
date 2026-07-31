@@ -229,16 +229,6 @@ export const getCurrentUser = (): WithId<Staff> | null => {
     console.error('Could not retrieve user from session storage:', error);
   }
 
-  // Default admin fallback for seamless app access
-  return {
-    id: 'DEMO_ADMIN_01',
-    name: '管理者',
-    email: 'workwise-demo-ad@toyota-mp.co.jp',
-    role: 'admin',
-    area: '県央',
-    '母店': '横浜店',
-    color: '#3B82F6',
-    currentStatus: '待機中',
-    _type: 'staff'
-  } as WithId<Staff>;
+  // Return null if no authenticated user session is found
+  return null;
 };
