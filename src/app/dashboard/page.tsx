@@ -224,7 +224,7 @@ export default function DashboardPage() {
 
     if (staffToUse.length === 0) return [];
 
-    // 1. 本日のタスク・作業チップが割り当てられているスタッフを抽出（大原則：強制表示！）
+    // 1. 本日タスクチップが割り当てられているスタッフ ID/名前の抽出
     const activeStaffIds = new Set<string>();
     if (scheduleEvents && scheduleEvents.length > 0) {
       scheduleEvents.forEach(e => {
@@ -237,79 +237,58 @@ export default function DashboardPage() {
       });
     }
 
-    // ユーザー様がチェックボックスで選択を行っているか
+    const hasShiftData = Boolean(scheduledStaffIds && scheduledStaffIds.size > 0);
     const hasExplicitSelection = Boolean(appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0);
 
-    let selectedStaff: WithId<Staff>[] = staffToUse.filter((staff: any) => {
+    const result = staffToUse.filter((staff: any) => {
       const staffId = String(staff.id || '').trim();
-      const staffName = String(staff.name || (staff as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
-
-      // ① 本日タスクが割り当てられているスタッフは強制作業表示（大原則！）
-      const hasActiveTask = Array.from(activeStaffIds).some(id => isStaffMatched(staff, [id]) || staffId === id || staffName === id);
-      if (hasActiveTask) {
-        return true;
-      }
-
-      // ② 明示的選択がある場合は、チェックが入っているスタッフを表示
-      if (hasExplicitSelection) {
-        return appliedSelectedStaffIds.some((selId: string) => {
-          const cleanSelId = String(selId || '').replace(/[\s\u3000]+/g, '');
-          return (
-            staffId === selId ||
-            staffName === cleanSelId ||
-            isStaffMatched(staff, [selId])
-          );
-        });
-      }
-
-      // ③ チェックボックス未指定の場合は通常ベース表示
-      return true;
-    });
-
-    // 2. 本日のシフト出勤・休日判定と表示フィルタリング
-    const hasShiftData = Boolean(scheduledStaffIds && scheduledStaffIds.size > 0);
-
-    selectedStaff = selectedStaff.filter((staff: any) => {
-      const staffId = String(staff.id || '').trim();
-      const name = String(staff.name || '').replace(/[\s\u3000]+/g, '');
+      const name = String(staff.name || (staff as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
       const role = String(staff.role || '').toLowerCase().trim();
       const rawRole = String((staff as any)['ロール'] || '').toLowerCase().trim();
 
       const isAdmin = role.includes('admin') || role.includes('管理者') || rawRole.includes('admin') || rawRole.includes('管理者');
       const isController = role.includes('controller') || role.includes('コントローラー') || rawRole.includes('controller') || rawRole.includes('コントローラー');
+      const isSugiyama = name.includes('杉山和彦') || staffId === '杉山和彦';
+      const isPureAdmin = (isAdmin || isController) && !isSugiyama;
 
-      // 本日タスクが割り当てられているスタッフは休日やトグル状態に関わらず 100% 強制表示保持！
-      const hasActiveTask = Array.from(activeStaffIds).some(id => isStaffMatched(staff, [id]) || staffId === id || name === id);
+      // 【最重要・鉄則 A】純粋な管理者（桑原和裕、DEMO1等）は、トグル OFF 時は絶対非表示！
+      if (isPureAdmin && !showManagement) {
+        return false;
+      }
+
+      // 【最重要・鉄則 B】本日の作業チップ・タスクチップが割り当てられているスタッフは 100% 表示保持！（チップ絶対非消失）
+      const hasActiveTask = Array.from(activeStaffIds).some(id => {
+        const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
+        return staffId === id || name === cleanId || isStaffMatched(staff, [id]);
+      });
       if (hasActiveTask) {
         return true;
       }
 
-      // 本日のシフト出勤判定
+      // 【鉄則 C】ユーザー様がスタッフ選択（チェックボックス）で絞り込んでいる場合
+      if (hasExplicitSelection) {
+        const isSelected = appliedSelectedStaffIds.some(selId => {
+          const cleanSel = String(selId || '').replace(/[\s\u3000]+/g, '');
+          return staffId === selId || name === cleanSel || isStaffMatched(staff, [selId]);
+        });
+        if (!isSelected) {
+          return false;
+        }
+      }
+
+      // 【鉄則 D】シフトデータ存在時の「休日」非表示判定
       const isScheduledToday = hasShiftData
         ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id)
         : true;
 
-      // 明示的選択がある場合はシフトでの自動除外を行わず表示
-      if (hasExplicitSelection) {
-        return true;
-      }
-
-      // シフトデータが存在し、かつ出勤予定にない休日のスタッフは非表示
       if (hasShiftData && !isScheduledToday) {
         return false;
       }
 
-      // 出勤日またはシフト未登録日の場合：
-      // - 杉山和彦様（Admin/Staff職）および一般スタッフ：トグルの ON/OFF に関わらず表示
-      if (name.includes('杉山和彦') || staff.id === '杉山和彦' || (!isAdmin && !isController)) {
-        return true;
-      }
-
-      // - その他の純粋な管理者（Admin/Controller）：トグル ON の場合のみ表示
-      return showManagement;
+      return true;
     });
 
-    return selectedStaff;
+    return result;
   }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents, scheduledStaffIds]);
 
   const selectedStaffNames = React.useMemo(() => {
@@ -319,16 +298,8 @@ export default function DashboardPage() {
     if (filteredStaff.length === (allStaff?.length || fallbackAugust1StaffObjects.length)) {
       return "全スタッフ";
     }
-    return filteredStaff.map(s => s.name || s.id).join('、');
+    return filteredStaff.map((s: any) => s.name || s.id).join('、');
   }, [filteredStaff, allStaff, fallbackAugust1StaffObjects]);
-
-  // タイムラインに表示されているスタッフの ID を選択状態（チェックボックス）へ強制自動同期
-  useEffect(() => {
-    if (filteredStaff && filteredStaff.length > 0) {
-      const renderedIds = filteredStaff.map(s => s.id);
-      setSelectedStaffIds(renderedIds);
-    }
-  }, [filteredStaff, setSelectedStaffIds]);
 
 
 
@@ -573,7 +544,7 @@ export default function DashboardPage() {
     // Use currentTime state to ensure reactivity
     const now = currentTime;
 
-    return filteredStaff.map(staff => {
+    return filteredStaff.map((staff: any) => {
       const orderStatusObj = statuses.find(s => s.staffId === staff.id);
 
       const getDisplayStatus = () => {
