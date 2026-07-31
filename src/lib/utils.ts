@@ -734,7 +734,7 @@ export function isEtaPassed(etaStr?: string | null, lastUpdateIso?: string | nul
 
 export function isStaffMatched(staff: any, entries: (string | undefined | null)[]): boolean {
   if (!staff || !entries || entries.length === 0) return false;
-  const normalize = (str: any) => String(str || '').replace(/[\s\u3000]+/g, '').toLowerCase().trim();
+  const normalize = (str: any) => String(str || '').replace(/[\s\u3000\u200B-\u200D\uFEFF]+/g, '').toLowerCase().trim();
 
   const targets = new Set<string>();
   if (staff.id) targets.add(normalize(staff.id));
