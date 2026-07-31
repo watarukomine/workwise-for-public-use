@@ -224,20 +224,28 @@ export default function DashboardPage() {
 
     if (staffToUse.length === 0) return [];
 
+    // ユーザー様がスタッフ選択（チェックボックス）で明示的に指定しているか判定
+    const hasExplicitSelection = Boolean(appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0);
+
     let selectedStaff: WithId<Staff>[] = [];
 
-    // もし選択IDリストが空の場合、全スタッフを全選択状態にしてチェックボックスと表示を完全一致させる
-    const currentSelectedIds = (appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0)
-      ? appliedSelectedStaffIds
-      : staffToUse.map((s: any) => s.id);
+    if (hasExplicitSelection) {
+      // ユーザー様がチェックを入れたスタッフのみに厳密に絞り込む（ID または 氏名の完全一致）
+      selectedStaff = staffToUse.filter((staff: any) => {
+        const staffId = String(staff.id || '').trim();
+        const staffName = String(staff.name || (staff as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
 
-    selectedStaff = staffToUse.filter((staff: any) => {
-      return (
-        currentSelectedIds.includes(staff.id) ||
-        isStaffMatched(staff, currentSelectedIds)
-      );
-    });
-    if (selectedStaff.length === 0) {
+        return appliedSelectedStaffIds.some((selId: string) => {
+          const cleanSelId = String(selId || '').replace(/[\s\u3000]+/g, '');
+          return (
+            staffId === selId ||
+            staffName === cleanSelId ||
+            isStaffMatched(staff, [selId])
+          );
+        });
+      });
+    } else {
+      // 未選択（全選択状態）の場合は全員をベースとする
       selectedStaff = staffToUse;
     }
 
@@ -257,13 +265,13 @@ export default function DashboardPage() {
         ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id)
         : true;
 
-      // 手動選択（ユーザー様が直接スタッフを選択している場合）の優先チェック
-      const isManuallySelected = appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0
-        ? (appliedSelectedStaffIds.includes(staff.id) || isStaffMatched(staff, appliedSelectedStaffIds))
-        : false;
+      // 明示的選択がある場合はシフトでの自動除外を行わず、ユーザー様の選択を最優先する
+      if (hasExplicitSelection) {
+        return true;
+      }
 
-      // シフトデータが存在し、かつ出勤予定になく手動選択もされていない休日のスタッフは非表示
-      if (hasShiftData && !isScheduledToday && !isManuallySelected) {
+      // シフトデータが存在し、かつ出勤予定にない休日のスタッフは非表示
+      if (hasShiftData && !isScheduledToday) {
         return false;
       }
 
@@ -276,30 +284,6 @@ export default function DashboardPage() {
       // - その他の純粋な管理者（Admin/Controller）：トグル ON の場合のみ表示
       return showManagement;
     });
-
-    // 2. 大原則：作業チップ・タスクチップが割り当てられているスタッフは絶対にタイムラインから消さず100%表示保持する
-    if (scheduleEvents && scheduleEvents.length > 0) {
-      const activeStaffIds = new Set<string>();
-      scheduleEvents.forEach(e => {
-        const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
-        if (isValid(evStart) && (isToday(evStart) ? isToday(currentDate) : isEqual(startOfDay(evStart), startOfDay(currentDate)))) {
-          if (e.staffId && e.staffId !== 'unassigned') {
-            activeStaffIds.add(e.staffId);
-          }
-        }
-      });
-
-      if (activeStaffIds.size > 0) {
-        const missingActiveStaff = staffToUse.filter((s: any) => {
-          const isMatched = Array.from(activeStaffIds).some(id => isStaffMatched(s, [id]) || s.id === id);
-          const isAlreadySelected = selectedStaff.some((sel: any) => sel.id === s.id);
-          return isMatched && !isAlreadySelected;
-        });
-        if (missingActiveStaff.length > 0) {
-          selectedStaff = [...selectedStaff, ...missingActiveStaff];
-        }
-      }
-    }
 
     return selectedStaff;
   }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents, scheduledStaffIds]);
