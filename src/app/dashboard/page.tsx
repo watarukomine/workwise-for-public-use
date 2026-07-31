@@ -219,26 +219,26 @@ export default function DashboardPage() {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth() + 1;
     const day = currentDate.getDate();
-    const isAug1 = (year === 2026 && month === 8 && day === 1);
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    const staffToUse = (allStaff && allStaff.length > 0) ? allStaff : (isAug1 ? (fallbackAugust1StaffObjects as any) : []);
+    const staffToUse = (allStaff && allStaff.length > 0) ? allStaff : (fallbackAugust1StaffObjects as any);
 
     if (staffToUse.length === 0) return [];
 
     let selectedStaff: WithId<Staff>[] = [];
 
-    if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
+    // もし選択IDリストが空の場合、全スタッフを全選択状態にしてチェックボックスと表示を完全一致させる
+    const currentSelectedIds = (appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0)
+      ? appliedSelectedStaffIds
+      : staffToUse.map((s: any) => s.id);
+
+    selectedStaff = staffToUse.filter((staff: any) => {
+      return (
+        currentSelectedIds.includes(staff.id) ||
+        isStaffMatched(staff, currentSelectedIds)
+      );
+    });
+    if (selectedStaff.length === 0) {
       selectedStaff = staffToUse;
-    } else {
-      selectedStaff = staffToUse.filter((staff: any) => {
-        return (
-          appliedSelectedStaffIds.includes(staff.id) ||
-          isStaffMatched(staff, appliedSelectedStaffIds)
-        );
-      });
-      if (selectedStaff.length === 0) {
-        selectedStaff = staffToUse;
-      }
     }
 
     // 1. 本日のシフト出勤・休日判定と表示フィルタリング
