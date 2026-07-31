@@ -325,9 +325,8 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                 ) : filteredStaff.length > 0 ? (
                   filteredStaff.map((member, idx) => {
                     const staffId = String(member.id || '').trim();
-                    const name = String(member.name || (member as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
-
-                    const isSelected = pendingSelectedStaffIds.some(selId => isStaffMatched(member, [selId]));
+                    const hasActiveTask = Array.from(activeStaffIds).some(id => isStaffMatched(member, [id]));
+                    const isSelected = hasActiveTask || pendingSelectedStaffIds.some(selId => isStaffMatched(member, [selId]));
 
                     return (
                       <TableRow key={member.id} data-state={isSelected ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>
