@@ -67,15 +67,21 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     }
   }, [appliedSelectedStaffIds]);
 
-  // Restore selection on mount
+  // Restore selection on mount with Date-bound auto-reset
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY) || localStorage.getItem(LOCAL_STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        const ids = Array.isArray(parsed) ? parsed : (parsed.ids || []);
-        setAppliedSelectedStaffIds(ids);
-        setPendingSelectedStaffIds(ids);
+        const today = new Date().toDateString();
+        // 日付が保持されている場合、本日と一致する場合のみ採用。過去の日付ならリセット。
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.date) {
+          if (parsed.date === today && Array.isArray(parsed.ids) && parsed.ids.length > 0) {
+            setAppliedSelectedStaffIds(parsed.ids);
+            setPendingSelectedStaffIds(parsed.ids);
+            return;
+          }
+        }
       }
     } catch (e) {
       console.warn('Failed to restore selection:', e);
