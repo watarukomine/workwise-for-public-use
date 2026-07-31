@@ -335,9 +335,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => {
-                              if (member.id) togglePendingStaffSelection(member.id);
-                              if (name && name !== member.id) togglePendingStaffSelection(name);
-                              if ((member as any)['スタッフID']) togglePendingStaffSelection((member as any)['スタッフID']);
+                              togglePendingStaffSelection(member);
                               setTimeout(() => {
                                 applyPendingSelection();
                               }, 0);

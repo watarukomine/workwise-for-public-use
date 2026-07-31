@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { StaffService } from '@/services/staff-service';
 import { useUser } from '@/firebase/provider';
+import { isStaffMatched } from '@/lib/utils';
 
 const simpleHash = (str: string) => {
   let hash = 0;
@@ -22,7 +23,7 @@ interface SelectedStaffContextType {
   appliedSelectedStaffIds: string[];
   allStaff: WithId<Staff>[];
   setAllStaff: (staff: WithId<Staff>[]) => void;
-  togglePendingStaffSelection: (staffId: string) => void;
+  togglePendingStaffSelection: (staffMemberOrId: any) => void;
   setPendingSelection: (staffIds: string[]) => void;
   applyPendingSelection: () => void;
   setSelectedStaffIds: (ids: string[] | ((prev: string[]) => string[])) => void; // Support functional update
@@ -164,26 +165,24 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     setAllStaffState(staff);
   }, []);
 
-  const togglePendingStaffSelection = React.useCallback((staffIdOrName: string) => {
+  const togglePendingStaffSelection = React.useCallback((staffMemberOrId: any) => {
     setPendingSelectedStaffIds(prevIds => {
-      const rawTarget = String(staffIdOrName || '').trim();
-      const cleanTarget = rawTarget.replace(/[\s\u3000]+/g, '');
+      if (!staffMemberOrId) return prevIds;
 
-      if (!cleanTarget) return prevIds;
+      const isObject = typeof staffMemberOrId === 'object';
+      const staffObj = isObject ? staffMemberOrId : { id: String(staffMemberOrId), name: String(staffMemberOrId) };
 
-      const exists = prevIds.some(id => {
-        const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
-        return id === rawTarget || cleanId === cleanTarget || (cleanTarget && cleanId === cleanTarget);
-      });
+      // isStaffMatchedを使って既存リスト内にマッチするものが存在するか判定
+      const isCurrentlySelected = prevIds.some(selId => isStaffMatched(staffObj, [selId]));
 
       let next: string[];
-      if (exists) {
-        next = prevIds.filter(id => {
-          const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
-          return id !== rawTarget && cleanId !== cleanTarget;
-        });
+      if (isCurrentlySelected) {
+        // すでに選択中なら、該当するエントリをすべて除外 (OFF)
+        next = prevIds.filter(selId => !isStaffMatched(staffObj, [selId]));
       } else {
-        next = [...prevIds, rawTarget];
+        // 未選択なら、IDまたは氏名を代表値として1つだけ安全に追加 (ON)
+        const newEntry = String(staffObj.id || staffObj.name || staffObj['氏名'] || staffMemberOrId).trim();
+        next = [...prevIds.filter(selId => !isStaffMatched(staffObj, [selId])), newEntry];
       }
 
       setAppliedSelectedStaffIds(next);
