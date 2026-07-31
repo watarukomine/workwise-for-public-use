@@ -126,14 +126,28 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         // Initial selection setup
         if (!initialLoadDone.current) {
           initialLoadDone.current = true;
-          const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY);
-          // 保存済みの選択がある場合はそれを尊重
+          const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY) || localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY);
           if (savedIds) {
             try {
-              const parsedIds = JSON.parse(savedIds);
-              setAppliedSelectedStaffIds(parsedIds);
-              setPendingSelectedStaffIds(parsedIds);
-            } catch (e) {}
+              const parsed = JSON.parse(savedIds);
+              const ids = Array.isArray(parsed) ? parsed : (parsed.ids || []);
+              if (ids.length > 0) {
+                setAppliedSelectedStaffIds(ids);
+                setPendingSelectedStaffIds(ids);
+              } else {
+                const allIds = processedStaff.map(s => s.id);
+                setAppliedSelectedStaffIds(allIds);
+                setPendingSelectedStaffIds(allIds);
+              }
+            } catch (e) {
+              const allIds = processedStaff.map(s => s.id);
+              setAppliedSelectedStaffIds(allIds);
+              setPendingSelectedStaffIds(allIds);
+            }
+          } else {
+            const allIds = processedStaff.map(s => s.id);
+            setAppliedSelectedStaffIds(allIds);
+            setPendingSelectedStaffIds(allIds);
           }
         }
       }
