@@ -267,19 +267,9 @@ export default function DashboardPage() {
       });
 
       // 【完全同期ルール】スタッフ管理画面でチェックONが入っている人(または当日タスク保持者) = タイムライン表示人 (100%完全一致)
-      const isSelectedInContext = hasExplicitSelection ? appliedSelectedStaffIds.some(selId => {
-        if (!selId) return false;
-        const rawSel = String(selId).trim();
-        const cleanSel = rawSel.replace(/[\s\u3000]+/g, '');
-        const cleanName = name.replace(/[\s\u3000]+/g, '');
-        const cleanId = staffId.replace(/[\s\u3000]+/g, '');
-
-        if (staffId === rawSel || staffId === cleanSel || cleanId === cleanSel) return true;
-        if (name === rawSel || name === cleanSel || cleanName === cleanSel) return true;
-        if (cleanName && cleanSel && (cleanName.includes(cleanSel) || cleanSel.includes(cleanName))) return true;
-        if (isStaffMatched(staff, [selId])) return true;
-        return false;
-      }) : (hasShiftData ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id) : true);
+      const isSelectedInContext = hasExplicitSelection
+        ? isStaffMatched(staff, appliedSelectedStaffIds)
+        : (hasShiftData ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id) : true);
 
       return hasActiveTask || isSelectedInContext;
     });

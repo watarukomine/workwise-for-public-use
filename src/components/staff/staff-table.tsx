@@ -193,7 +193,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
   const { profile } = useUserProfile();
   const { toast } = useToast();
-  const { pendingSelectedStaffIds, togglePendingStaffSelection, applyPendingSelection, appliedSelectedStaffIds } = useSelectedStaff();
+  const { pendingSelectedStaffIds, togglePendingStaffSelection, applyPendingSelection, appliedSelectedStaffIds, setSelectedStaffIds } = useSelectedStaff();
   const { scheduleEvents, orders } = useOrder();
   const isAdmin = profile?.role === 'admin';
   const staffList = staff || [];
@@ -239,11 +239,16 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   const isSelectionChanged = JSON.stringify([...pendingSelectedStaffIds].sort()) !== JSON.stringify([...appliedSelectedStaffIds].sort());
 
   const handleSelectAll = () => {
-    const targetIds = filteredStaff.map(s => s.id);
     if (isAllSelected) {
-      targetIds.forEach(id => { if (pendingSelectedStaffIds.includes(id)) togglePendingStaffSelection(id); });
+      setSelectedStaffIds([]);
     } else {
-      targetIds.forEach(id => { if (!pendingSelectedStaffIds.includes(id)) togglePendingStaffSelection(id); });
+      const allEntries: string[] = [];
+      filteredStaff.forEach(s => {
+        if (s.id) allEntries.push(String(s.id).trim());
+        if (s.name) allEntries.push(String(s.name).trim());
+        if ((s as any)['氏名']) allEntries.push(String((s as any)['氏名']).trim());
+      });
+      setSelectedStaffIds(Array.from(new Set(allEntries)));
     }
   };
 
