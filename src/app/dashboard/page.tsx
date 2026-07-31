@@ -243,35 +243,40 @@ export default function DashboardPage() {
     const result = staffToUse.filter((staff: any) => {
       const staffId = String(staff.id || '').trim();
       const name = String(staff.name || (staff as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
-      const roleOrig = String(staff.role || '').trim();
-      const rawRoleOrig = String((staff as any)['ロール'] || '').trim();
-      const roleLower = roleOrig.toLowerCase();
-      const rawRoleLower = rawRoleOrig.toLowerCase();
 
-      // Admin/Staff (出動する兼務者) の判定
-      const isAdminStaff = roleOrig === 'Admin/Staff' || roleLower === 'admin/staff' || roleLower === 'admin_staff' || rawRoleOrig === 'Admin/Staff' || rawRoleLower === 'admin/staff' || rawRoleLower === 'admin_staff' || roleLower.includes('兼務');
-      
-      // 純粋な管理者（出動しないAdmin）の判定
-      const isAdmin = roleLower.includes('admin') || roleLower.includes('管理者') || rawRoleLower.includes('admin') || rawRoleLower.includes('管理者') || roleLower.includes('controller') || rawRoleLower.includes('controller');
-      const isPureAdmin = isAdmin && !isAdminStaff;
-
-      // 【最重要】純粋な管理者（Admin）は、管理者表示スイッチ OFF 時は非表示
-      if (isPureAdmin && !showManagement) {
-        return false;
-      }
-
-      // 【ルール 1】すでにチップが貼られている人（チップ絶対非消失）
+      // 1. 本日作業タスク保持者 (絶対保護)
       const hasActiveTask = Array.from(activeStaffIds).some(id => {
         const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
         return staffId === id || name === cleanId || isStaffMatched(staff, [id]);
       });
 
-      // 【完全同期ルール】スタッフ管理画面でチェックONが入っている人(または当日タスク保持者) = タイムライン表示人 (100%完全一致)
-      const isSelectedInContext = hasExplicitSelection
-        ? isStaffMatched(staff, appliedSelectedStaffIds)
-        : (hasShiftData ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id) : true);
+      // 2. スタッフ管理画面で手動チェックONされた人 (絶対最優先表示!)
+      const isSelectedInContext = hasExplicitSelection && isStaffMatched(staff, appliedSelectedStaffIds);
 
-      return hasActiveTask || isSelectedInContext;
+      // 【最重要】手動チェックON または 本日タスク保持者は、管理者スイッチのON/OFFに関わらず100%無条件でタイムライン表示!
+      if (hasActiveTask || isSelectedInContext) {
+        return true;
+      }
+
+      // 手動選択がないデフォルト時のみ、純粋管理者(Admin)のスイッチ非表示判定を適用
+      const roleOrig = String(staff.role || '').trim();
+      const rawRoleOrig = String((staff as any)['ロール'] || '').trim();
+      const roleLower = roleOrig.toLowerCase();
+      const rawRoleLower = rawRoleOrig.toLowerCase();
+
+      const isAdminStaff = roleOrig === 'Admin/Staff' || roleLower === 'admin/staff' || roleLower === 'admin_staff' || rawRoleOrig === 'Admin/Staff' || rawRoleLower === 'admin/staff' || rawRoleLower === 'admin_staff' || roleLower.includes('兼務');
+      const isAdmin = roleLower.includes('admin') || roleLower.includes('管理者') || rawRoleLower.includes('admin') || rawRoleLower.includes('管理者') || roleLower.includes('controller') || rawRoleLower.includes('controller');
+      const isPureAdmin = isAdmin && !isAdminStaff;
+
+      if (isPureAdmin && !showManagement) {
+        return false;
+      }
+
+      const isScheduledToday = hasShiftData
+        ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id)
+        : true;
+
+      return isScheduledToday;
     });
 
     // スタッフ管理画面の指定並び順（sortOrder / order）を最優先で厳格適用
