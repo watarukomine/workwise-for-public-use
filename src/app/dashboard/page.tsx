@@ -309,6 +309,28 @@ export default function DashboardPage() {
     return result;
   }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents, scheduledStaffIds]);
 
+  // 【最重要】タイムラインに表示されている人を判別し、スタッフ管理画面のチェックボックスへあらかじめ全員自動チェックON!
+  React.useEffect(() => {
+    if (filteredStaff && filteredStaff.length > 0 && setSelectedStaffIds) {
+      const activeStaffEntries: string[] = [];
+      filteredStaff.forEach((s: any) => {
+        if (s.id) activeStaffEntries.push(String(s.id).trim());
+        if (s.name) activeStaffEntries.push(String(s.name).trim());
+        if ((s as any)['氏名']) activeStaffEntries.push(String((s as any)['氏名']).trim());
+      });
+
+      if (activeStaffEntries.length > 0) {
+        setSelectedStaffIds((prev: string[]) => {
+          const uniqueEntries = Array.from(new Set([...prev, ...activeStaffEntries]));
+          if (uniqueEntries.length === prev.length && uniqueEntries.every((id, idx) => id === prev[idx])) {
+            return prev;
+          }
+          return uniqueEntries;
+        });
+      }
+    }
+  }, [filteredStaff, setSelectedStaffIds]);
+
   const selectedStaffNames = React.useMemo(() => {
     if (filteredStaff.length === 0) {
       return null;
