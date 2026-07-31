@@ -50,17 +50,27 @@ export const StaffService = {
                 return true;
             });
 
-            // ID / 氏名による重複排除
-            const seenIds = new Set<string>();
-            const uniqueStaff: WithId<Staff>[] = [];
+            // 氏名による完全一意化（重複ドキュメントの統合）
+            const nameMap = new Map<string, WithId<Staff>>();
             for (const s of staffList) {
-                const nameKey = String(s.name || (s as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
-                const key = `${s.id}_${nameKey}`;
-                if (!seenIds.has(key)) {
-                    seenIds.add(key);
-                    uniqueStaff.push(s);
+                const data = s as any;
+                const nameKey = String(s.name || data['氏名'] || data['名前'] || '').replace(/[\s\u3000]+/g, '');
+                if (!nameKey) continue;
+
+                if (!nameMap.has(nameKey)) {
+                    nameMap.set(nameKey, s);
+                } else {
+                    // 既存のものと比べ、メールアドレスや詳細情報を持っている方を優位保存
+                    const existing = nameMap.get(nameKey)!;
+                    const existingScore = (existing.email ? 2 : 0) + ((existing as any).sortOrder !== undefined ? 1 : 0);
+                    const currentScore = (s.email ? 2 : 0) + ((s as any).sortOrder !== undefined ? 1 : 0);
+                    if (currentScore > existingScore) {
+                        nameMap.set(nameKey, s);
+                    }
                 }
             }
+
+            const uniqueStaff = Array.from(nameMap.values());
 
             uniqueStaff.sort((a, b) => {
                 const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof (a as any).order === 'number' ? (a as any).order : 999);
@@ -106,16 +116,25 @@ export const StaffService = {
             return true;
         });
 
-        const seenIds = new Set<string>();
-        const uniqueStaff: WithId<Staff>[] = [];
+        const nameMap = new Map<string, WithId<Staff>>();
         for (const s of staffList) {
-            const nameKey = String(s.name || (s as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
-            const key = `${s.id}_${nameKey}`;
-            if (!seenIds.has(key)) {
-                seenIds.add(key);
-                uniqueStaff.push(s);
+            const data = s as any;
+            const nameKey = String(s.name || data['氏名'] || data['名前'] || '').replace(/[\s\u3000]+/g, '');
+            if (!nameKey) continue;
+
+            if (!nameMap.has(nameKey)) {
+                nameMap.set(nameKey, s);
+            } else {
+                const existing = nameMap.get(nameKey)!;
+                const existingScore = (existing.email ? 2 : 0) + ((existing as any).sortOrder !== undefined ? 1 : 0);
+                const currentScore = (s.email ? 2 : 0) + ((s as any).sortOrder !== undefined ? 1 : 0);
+                if (currentScore > existingScore) {
+                    nameMap.set(nameKey, s);
+                }
             }
         }
+
+        const uniqueStaff = Array.from(nameMap.values());
 
         uniqueStaff.sort((a, b) => {
             const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof (a as any).order === 'number' ? (a as any).order : 999);
