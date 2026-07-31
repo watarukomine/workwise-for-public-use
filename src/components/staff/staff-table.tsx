@@ -327,12 +327,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                     const staffId = String(member.id || '').trim();
                     const name = String(member.name || (member as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
 
-                    const hasActiveTask = Array.from(activeStaffIds).some(id => {
-                      const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
-                      return staffId === id || name === cleanId || isStaffMatched(member, [id]);
-                    });
-
-                    const isSelected = hasActiveTask || pendingSelectedStaffIds.some(selId => {
+                    const isSelected = pendingSelectedStaffIds.some(selId => {
                       if (!selId) return false;
                       const rawSel = String(selId).trim();
                       const cleanSel = rawSel.replace(/[\s\u3000]+/g, '');
