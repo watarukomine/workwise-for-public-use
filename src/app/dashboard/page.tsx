@@ -242,6 +242,8 @@ export default function DashboardPage() {
     }
 
     // 1. 本日のシフト出勤・休日判定と表示フィルタリング
+    const hasShiftData = Boolean(scheduledStaffIds && scheduledStaffIds.size > 0);
+
     selectedStaff = selectedStaff.filter((staff: any) => {
       const name = String(staff.name || '').replace(/[\s\u3000]+/g, '');
       const role = String(staff.role || '').toLowerCase().trim();
@@ -250,17 +252,22 @@ export default function DashboardPage() {
       const isAdmin = role.includes('admin') || role.includes('管理者') || rawRole.includes('admin') || rawRole.includes('管理者');
       const isController = role.includes('controller') || role.includes('コントローラー') || rawRole.includes('controller') || rawRole.includes('コントローラー');
 
-      // 本日のシフト出勤判定（scheduledStaffIds に含まれているか）
-      const isScheduledToday = scheduledStaffIds && scheduledStaffIds.size > 0
-        ? Array.from(scheduledStaffIds).some(id => isStaffMatched(staff, [id]) || id === staff.id)
-        : false; // Shift data available -> default to false if not listed
+      // 本日のシフト出勤判定（シフトデータが無い期間は全スタッフ true と判定）
+      const isScheduledToday = hasShiftData
+        ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id)
+        : true;
 
-      // 休みの日のスタッフ（一般スタッフ、杉山和彦様、管理者全員共通）は表示しない！
-      if (!isScheduledToday) {
+      // 手動選択（ユーザー様が直接スタッフを選択している場合）の優先チェック
+      const isManuallySelected = appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0
+        ? (appliedSelectedStaffIds.includes(staff.id) || isStaffMatched(staff, appliedSelectedStaffIds))
+        : false;
+
+      // シフトデータが存在し、かつ出勤予定になく手動選択もされていない休日のスタッフは非表示
+      if (hasShiftData && !isScheduledToday && !isManuallySelected) {
         return false;
       }
 
-      // 出勤日の場合：
+      // 出勤日またはシフト未登録日の場合：
       // - 杉山和彦様（Admin/Staff職）および一般スタッフ：トグルの ON/OFF に関わらず表示
       if (name.includes('杉山和彦') || staff.id === '杉山和彦' || (!isAdmin && !isController)) {
         return true;
