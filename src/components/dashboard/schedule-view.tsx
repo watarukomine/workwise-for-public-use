@@ -1244,9 +1244,16 @@ export function ScheduleView({
         const newTaskEnd = addMinutes(newTaskStart, taskDuration);
         const newTravelStart = subMinutes(newTaskStart, travelDuration);
 
+        // Determine System ID
+        const rawId = taskEventInTrip.rawOrderId || (taskEventInTrip.raw ? (taskEventInTrip.raw.SystemID || taskEventInTrip.raw.systemId || findKey(taskEventInTrip.raw, ['SystemID', 'systemId', 'id', '受注No', '受注No(ﾘﾏｰｸ1 8ｹﾀ)'])) : '');
+        const finalSystemId = taskEventInTrip.systemId || rawId || taskEventInTrip.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
+        const taskPartId = finalSystemId ? `${finalSystemId}-task` : taskEventInTrip.id;
+        const travelPartId = finalSystemId ? `${finalSystemId}-travel` : `${effectiveTripId}-travel`;
+
         const updatedTask: WithId<ScheduleEvent> = {
           ...taskEventInTrip,
-          id: taskEventInTrip.id,
+          id: taskPartId,
+          systemId: finalSystemId,
           tripId: effectiveTripId,
           staffId: newStaffId,
           staffName: newStaff.name,
@@ -1256,6 +1263,8 @@ export function ScheduleView({
 
         const updatedTravel: WithId<ScheduleEvent> = travelEventInTrip ? {
           ...travelEventInTrip,
+          id: travelPartId,
+          systemId: finalSystemId,
           tripId: effectiveTripId,
           staffId: newStaffId,
           staffName: newStaff.name,
@@ -1263,7 +1272,8 @@ export function ScheduleView({
           end: newTaskStart.toISOString()
         } : {
           ...taskEventInTrip,
-          id: `${effectiveTripId}-travel`,
+          id: travelPartId,
+          systemId: finalSystemId,
           tripId: effectiveTripId,
           title: '移動',
           staffId: newStaffId,
@@ -1296,10 +1306,17 @@ export function ScheduleView({
           const taskEnd = addMinutes(taskStart, taskDuration);
           const travelStart = subMinutes(taskStart, travelDuration);
 
+          // Determine System ID reliably across raw and mapped IDs
+          const rawId = taskPart.rawOrderId || (taskPart.raw ? (taskPart.raw.SystemID || taskPart.raw.systemId || findKey(taskPart.raw, ['SystemID', 'systemId', 'id', '受注No', '受注No(ﾘﾏｰｸ1 8ｹﾀ)'])) : '');
+          const finalSystemId = taskPart.systemId || rawId || taskPart.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
+          const taskPartId = finalSystemId ? `${finalSystemId}-task` : taskPart.id;
+          const travelPartId = finalSystemId ? `${finalSystemId}-travel` : `${effectiveTripId}-travel`;
+
           // Local Storage Persistence & Optimistic Event Save (BOTH Task and Travel Events)
           const updatedTask = {
             ...taskPart,
-            id: taskPart.id,
+            id: taskPartId,
+            systemId: finalSystemId,
             tripId: effectiveTripId,
             staffId: newStaffId,
             staffName: newStaff.name,
@@ -1308,6 +1325,8 @@ export function ScheduleView({
           };
           const updatedTravel = travelPart ? {
             ...travelPart,
+            id: travelPartId,
+            systemId: finalSystemId,
             tripId: effectiveTripId,
             staffId: newStaffId,
             staffName: newStaff.name,
@@ -1315,7 +1334,8 @@ export function ScheduleView({
             end: taskStart.toISOString()
           } : {
             ...taskPart,
-            id: `${effectiveTripId}-travel`,
+            id: travelPartId,
+            systemId: finalSystemId,
             tripId: effectiveTripId,
             title: '移動',
             staffId: newStaffId,
@@ -1327,10 +1347,6 @@ export function ScheduleView({
 
           saveLocalEvent(updatedTask);
           saveLocalEvent(updatedTravel);
-
-          // Determine System ID reliably across raw and mapped IDs
-          const rawId = taskPart.rawOrderId || (taskPart.raw ? (taskPart.raw.SystemID || taskPart.raw.systemId || findKey(taskPart.raw, ['SystemID', 'systemId', 'id', '受注No', '受注No(ﾘﾏｰｸ1 8ｹﾀ)'])) : '');
-          const finalSystemId = taskPart.systemId || rawId || taskPart.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
 
           // Triple Instant Sync across Timeline Chips, Bottom Order Table, and Firestore Backend
           const updatePayload = {
