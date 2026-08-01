@@ -219,8 +219,8 @@ export default function DashboardPage() {
     const staffToUse = (allStaff && allStaff.length > 0) ? allStaff : (fallbackAugust1StaffObjects as any);
     if (!staffToUse || staffToUse.length === 0) return [];
 
-    // 表示日に作業チップ(タスク)が存在するスタッフIDを抽出
-    const activeStaffIds = new Set<string>();
+    // 表示日に作業チップ(タスク)が存在するスタッフを抽出 (漢字名・ID両方で検知)
+    const activeStaffKeys = new Set<string>();
     if (scheduleEvents && scheduleEvents.length > 0) {
       const targetDateStr = format(currentDate, 'yyyy-MM-dd');
       scheduleEvents.forEach(e => {
@@ -229,7 +229,9 @@ export default function DashboardPage() {
           const eventDateStr = format(evStart, 'yyyy-MM-dd');
           if (eventDateStr === targetDateStr) {
             if (e.staffId && e.staffId !== 'unassigned') {
-              activeStaffIds.add(String(e.staffId).trim());
+              const cleanKey = String(e.staffId).trim();
+              activeStaffKeys.add(cleanKey);
+              activeStaffKeys.add(cleanKey.replace(/[\s\u3000]+/g, ''));
             }
           }
         }
@@ -242,12 +244,26 @@ export default function DashboardPage() {
     if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
       selectedStaff = staffToUse;
     } else {
-      selectedStaff = staffToUse.filter((staff: any) => 
-        appliedSelectedStaffIds.includes(staff.id) || 
-        activeStaffIds.has(staff.id) ||
-        (staff.name && appliedSelectedStaffIds.includes(String(staff.name).replace(/[\s\u3000]+/g, ''))) ||
-        (staff['氏名'] && appliedSelectedStaffIds.includes(String(staff['氏名']).replace(/[\s\u3000]+/g, '')))
-      );
+      selectedStaff = staffToUse.filter((staff: any) => {
+        const staffIdClean = String(staff.id || '').trim();
+        const staffNameClean = String(staff.name || '').trim().replace(/[\s\u3000]+/g, '');
+        const staffNameOrig = String(staff.name || '').trim();
+        const staffShiMeiClean = String(staff['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
+
+        const isUserSelected = 
+          appliedSelectedStaffIds.includes(staffIdClean) ||
+          appliedSelectedStaffIds.includes(staffNameOrig) ||
+          appliedSelectedStaffIds.includes(staffNameClean) ||
+          appliedSelectedStaffIds.includes(staffShiMeiClean);
+
+        const hasActiveTaskToday = 
+          activeStaffKeys.has(staffIdClean) ||
+          activeStaffKeys.has(staffNameOrig) ||
+          activeStaffKeys.has(staffNameClean) ||
+          activeStaffKeys.has(staffShiMeiClean);
+
+        return isUserSelected || hasActiveTaskToday;
+      });
     }
 
     // スイッチOFF時は純粋管理者(Admin)のみ非表示(現場兼務者は表示)
