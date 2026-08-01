@@ -2000,6 +2000,7 @@ export function ScheduleView({
           try {
             const { OrderService } = await import('@/services/order-service');
             const updateFields: any = {
+              ...editOrderForm,
               scheduledDate: format(newStart, 'yyyy/MM/dd'),
               scheduledTime: format(newStart, 'yyyy/MM/dd HH:mm:ss'),
               scheduledEndTime: format(finalEnd, 'yyyy/MM/dd HH:mm:ss'),
@@ -2009,6 +2010,10 @@ export function ScheduleView({
             if (overrides.statusValue) {
               updateFields.status = overrides.statusValue;
             }
+            // Clean undefined fields safely to prevent Firestore errors
+            Object.keys(updateFields).forEach(key => {
+              if (updateFields[key] === undefined) delete updateFields[key];
+            });
             const targetId = eventToUpdate.systemId || eventToUpdate.rawOrderId || eventToUpdate.id;
             await OrderService.updateOrder(targetId, updateFields);
           } catch (fsErr) {
@@ -3196,7 +3201,16 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
   const rawCustomerName = targetEvent.customerName || (targetEvent.raw ? findKey(targetEvent.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined);
   const cleanCustomerName = (rawCustomerName && rawCustomerName !== '（店舗名未設定）' && rawCustomerName !== '(店舗名未設定)' && rawCustomerName !== '店舗名未設定') ? rawCustomerName : undefined;
   
-  const baseCustomerName = isTravelEvent ? '移動' : (cleanCustomerName || customer?.storeName || targetEvent.title || line1);
+  const isAccompany = String(targetEvent.title || targetEvent.taskDetails || '').includes('同行');
+  let baseCustomerName = isTravelEvent ? '移動' : (cleanCustomerName || customer?.storeName || targetEvent.title || line1);
+  if (isAccompany && !isTravelEvent) {
+    if (cleanCustomerName && cleanCustomerName !== '同行') {
+      baseCustomerName = `同行：${cleanCustomerName}`;
+    } else {
+      baseCustomerName = '同行';
+    }
+  }
+
   const customerName = isCancelled ? `【キャンセル】 ${baseCustomerName}` : baseCustomerName;
   const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(targetEvent.status || '')) || !!targetEvent.actualEndTime;
 
