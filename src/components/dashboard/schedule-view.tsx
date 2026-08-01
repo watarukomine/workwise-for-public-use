@@ -1246,7 +1246,7 @@ export function ScheduleView({
 
         const updatedTask: WithId<ScheduleEvent> = {
           ...taskEventInTrip,
-          id: taskEventInTrip.id.endsWith('-task') ? taskEventInTrip.id : `${effectiveTripId}-task`,
+          id: taskEventInTrip.id,
           tripId: effectiveTripId,
           staffId: newStaffId,
           staffName: newStaff.name,
@@ -1299,7 +1299,7 @@ export function ScheduleView({
           // Local Storage Persistence & Optimistic Event Save (BOTH Task and Travel Events)
           const updatedTask = {
             ...taskPart,
-            id: taskPart.id.endsWith('-task') ? taskPart.id : `${effectiveTripId}-task`,
+            id: taskPart.id,
             tripId: effectiveTripId,
             staffId: newStaffId,
             staffName: newStaff.name,
