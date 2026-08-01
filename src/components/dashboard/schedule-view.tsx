@@ -1700,9 +1700,11 @@ export function ScheduleView({
     try {
       let orderId: string | undefined;
       if (dialogState.mode === 'details' || dialogState.mode === 'edit') {
-        orderId = dialogState.event?.systemId || dialogState.event?.rawOrderId || dialogState.event?.id;
+        const ev = dialogState.event;
+        orderId = ev?.systemId || ev?.rawOrderId || (ev?.id ? ev.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '') : undefined);
       } else if (dialogState.mode === 'order-details') {
-        orderId = dialogState.order?.systemId || dialogState.order?.id;
+        const o = dialogState.order;
+        orderId = o?.systemId || o?.id || o?.rawOrderId;
       }
 
       if (orderId) {
@@ -1745,7 +1747,8 @@ export function ScheduleView({
     const target = dialogState.mode === 'order-details' ? dialogState.order : (dialogState.mode === 'details' || dialogState.mode === 'edit' ? dialogState.event : undefined);
     if (!target) return;
     
-    const orderId = target.systemId || target.rawOrderId || target.id;
+    const orderId = target.systemId || target.rawOrderId || (target.id ? target.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '') : undefined);
+    if (!orderId) return;
     if (!confirm('この受注データを完全にデータベースから削除しますか？\nこの操作は取り消せません。')) return;
 
     setIsSaving(true);
