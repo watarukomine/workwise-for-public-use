@@ -1247,8 +1247,8 @@ export function ScheduleView({
         // Determine System ID
         const rawId = taskEventInTrip.rawOrderId || (taskEventInTrip.raw ? (taskEventInTrip.raw.SystemID || taskEventInTrip.raw.systemId || findKey(taskEventInTrip.raw, ['SystemID', 'systemId', 'id', '受注No', '受注No(ﾘﾏｰｸ1 8ｹﾀ)'])) : '');
         const finalSystemId = taskEventInTrip.systemId || rawId || taskEventInTrip.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
-        const taskPartId = finalSystemId ? `${finalSystemId}-task` : taskEventInTrip.id;
-        const travelPartId = finalSystemId ? `${finalSystemId}-travel` : `${effectiveTripId}-travel`;
+        const taskPartId = finalSystemId ? `trip-${finalSystemId}-task` : taskEventInTrip.id;
+        const travelPartId = finalSystemId ? `trip-${finalSystemId}-travel` : `${effectiveTripId}-travel`;
 
         const updatedTask: WithId<ScheduleEvent> = {
           ...taskEventInTrip,
@@ -1309,8 +1309,8 @@ export function ScheduleView({
           // Determine System ID reliably across raw and mapped IDs
           const rawId = taskPart.rawOrderId || (taskPart.raw ? (taskPart.raw.SystemID || taskPart.raw.systemId || findKey(taskPart.raw, ['SystemID', 'systemId', 'id', '受注No', '受注No(ﾘﾏｰｸ1 8ｹﾀ)'])) : '');
           const finalSystemId = taskPart.systemId || rawId || taskPart.id.replace(/-(task|travel)$/, '').replace(/^(trip|event)-/, '');
-          const taskPartId = finalSystemId ? `${finalSystemId}-task` : taskPart.id;
-          const travelPartId = finalSystemId ? `${finalSystemId}-travel` : `${effectiveTripId}-travel`;
+          const taskPartId = finalSystemId ? `trip-${finalSystemId}-task` : taskPart.id;
+          const travelPartId = finalSystemId ? `trip-${finalSystemId}-travel` : `${effectiveTripId}-travel`;
 
           // Local Storage Persistence & Optimistic Event Save (BOTH Task and Travel Events)
           const updatedTask = {
