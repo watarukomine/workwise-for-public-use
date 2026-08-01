@@ -1279,9 +1279,7 @@ export function ScheduleView({
       // Backend Update & Local Persistence
       (async () => {
         try {
-          if (setSelectedStaffIds) {
-            setSelectedStaffIds((prev: string[]) => Array.from(new Set([...prev, newStaffId])));
-          }
+
 
           const tripEvents = draggedEvent.tripId ? previousSchedule.filter(e => e.tripId === draggedEvent.tripId) : [draggedEvent];
           const taskPart = tripEvents.find(e => e.id.endsWith('-task')) || draggedEvent;
@@ -1394,9 +1392,7 @@ export function ScheduleView({
       const staff = getStaffById(newStaffId);
       if (!staff) return;
 
-      if (setSelectedStaffIds) {
-        setSelectedStaffIds((prev: string[]) => Array.from(new Set([...prev, newStaffId])));
-      }
+
 
       const isGeneric = order.id.startsWith('generic-');
       // Treat as Accompany if ID says so OR title contains "同行"
