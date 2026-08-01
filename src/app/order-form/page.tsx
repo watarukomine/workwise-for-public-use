@@ -108,25 +108,50 @@ export default function OrderFormPage() {
         }
     });
 
-    const { register, handleSubmit, formState: { errors }, reset, watch, setValue } = form;
+    const { register, handleSubmit, formState: { errors }, reset, setValue } = form;
 
-    // Watch storeName and userCode for changes
-    const storeNameWatched = watch('storeName');
-    const userCodeWatched = watch('userCode');
-    const workTypeWatched = watch('workType'); // Watch for conditional UI logic
-    const quantityWatched = watch('quantity');
+    // Use non-blocking local getValues instead of watch for high performance
+    const workTypeWatched = form.watch('workType'); // Watch only for conditional UI logic
+    const quantityWatched = form.watch('quantity');
 
-    // 1. Store Name -> User Code (and Abbreviations)
-    React.useEffect(() => {
-        if (!storeNameWatched) return;
+    // 1. User Code -> Store Name (Executed on Blur to prevent input lag)
+    const handleUserCodeLookup = React.useCallback((inputCode: string) => {
+        if (!inputCode || inputCode.length < 3) return;
+        if (customers.length === 0) return;
+
+        const cleanedCode = inputCode.replace(/\s|[　]/g, '');
+        const matchedCustomer = customers.find(c => {
+            const rawC = c as any;
+            const codeCandidates = [
+                rawC['ユーザーコード'],
+                c.userCode,
+                findKey(c, ['ユーザーコード', 'userCode'])
+            ];
+            return codeCandidates.some(code => String(code || '') === cleanedCode);
+        });
+
+        if (matchedCustomer) {
+            const rawMatched = matchedCustomer as any;
+            const storeName = findKey(matchedCustomer, ['店舗', '店舗名', 'storeName']) || rawMatched['店舗'] || matchedCustomer.storeName || rawMatched.name;
+            if (storeName) {
+                const currentStoreName = form.getValues('storeName');
+                if (!currentStoreName) {
+                    setValue('storeName', String(storeName), { shouldValidate: true });
+                }
+            }
+        }
+    }, [customers, setValue, form]);
+
+    // 2. Store Name -> User Code (and Abbreviations) (Executed on Blur to prevent input lag)
+    const handleStoreNameLookup = React.useCallback((storeNameInput: string) => {
+        if (!storeNameInput) return;
 
         // A. Abbreviation Expansion
-        let expandedName = storeNameWatched;
+        let expandedName = storeNameInput;
         let isModified = false;
 
         for (const abbr of ABBREVIATIONS) {
             if (abbr.key.test(expandedName)) {
-                // Ensure we don't double replace if already correct (fuzzy check)
                 if (!expandedName.startsWith(abbr.value)) {
                     expandedName = expandedName.replace(abbr.key, abbr.value);
                     isModified = true;
@@ -135,16 +160,12 @@ export default function OrderFormPage() {
         }
 
         if (isModified) {
-            // Update the store name field first
-            // This will trigger this effect again with the new name, so we return early to let the next cycle handle lookup
-            setValue('storeName', expandedName);
-            return;
+            setValue('storeName', expandedName, { shouldValidate: true });
         }
 
         // B. Lookup User Code
         if (expandedName.length > 2 && customers.length > 0) {
             const normalizedInput = expandedName.replace(/\s|[　]/g, '');
-
             const matchedCustomer = customers.find(c => {
                 const rawC = c as any;
                 const cNameCandidates = [
@@ -154,8 +175,6 @@ export default function OrderFormPage() {
                     rawC.name,
                     findKey(c, ['店舗', '店舗名', 'storeName'])
                 ];
-
-                // Check if any candidate name contains the input (or implies it)
                 return cNameCandidates.some(n => {
                     const str = String(n || '');
                     return str.replace(/\s|[　]/g, '').includes(normalizedInput);
@@ -167,47 +186,20 @@ export default function OrderFormPage() {
                 const code = rawMatched['ユーザーコード'] || matchedCustomer.userCode || findKey(matchedCustomer, ['ユーザーコード', 'userCode']);
                 if (code) {
                     const currentCode = form.getValues('userCode');
-                    // Update if empty OR if it doesn't match the found code (to allow correction)
                     if (!currentCode || currentCode !== String(code)) {
                         setValue('userCode', String(code), { shouldValidate: true });
                     }
                 }
             }
         }
-    }, [storeNameWatched, customers, setValue, form]);
+    }, [customers, setValue, form]);
 
-    // 2. User Code -> Store Name
-    React.useEffect(() => {
-        if (!userCodeWatched || userCodeWatched.length < 3) return;
-        if (customers.length === 0) return;
-
-        const inputCode = userCodeWatched.replace(/\s|[　]/g, '');
-
-        const matchedCustomer = customers.find(c => {
-            const rawC = c as any;
-            const codeCandidates = [
-                rawC['ユーザーコード'],
-                c.userCode,
-                findKey(c, ['ユーザーコード', 'userCode'])
-            ];
-
-            return codeCandidates.some(code => String(code || '') === inputCode);
-        });
-
-        if (matchedCustomer) {
-            const rawMatched = matchedCustomer as any;
-            const storeName = findKey(matchedCustomer, ['店舗', '店舗名', 'storeName']) || rawMatched['店舗'] || matchedCustomer.storeName || rawMatched.name;
-
-            if (storeName) {
-                const currentStoreName = form.getValues('storeName');
-                // Only update if currently empty
-                // If user typed code, they expect store name.
-                if (!currentStoreName) {
-                    setValue('storeName', String(storeName));
-                }
-            }
+    // Prevent enter key submission, only allow clicking the submit button
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
         }
-    }, [userCodeWatched, customers, setValue, form]);
+    };
 
     const onSubmit = async (data: OrderFormValues) => {
         setIsSubmitting(true);
@@ -383,7 +375,7 @@ export default function OrderFormPage() {
 
                 <Card>
                     <CardContent className="p-6">
-                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                        <form onSubmit={handleSubmit(onSubmit)} onKeyDown={handleKeyDown} className="space-y-6">
 
                             {/* 基本情報 */}
                             <div className="space-y-4">
@@ -392,13 +384,13 @@ export default function OrderFormPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="userCode">ユーザーコード (5桁)</Label>
-                                        <Input id="userCode" type="text" placeholder="12345" {...register('userCode')} className={errors.userCode ? "border-red-500" : ""} />
+                                        <Input id="userCode" type="text" placeholder="12345" {...register('userCode', { onBlur: (e) => handleUserCodeLookup(e.target.value) })} className={errors.userCode ? "border-red-500" : ""} />
                                         {errors.userCode && <p className="text-red-500 text-xs">{errors.userCode.message}</p>}
                                     </div>
 
                                     <div className="space-y-2">
                                         <Label htmlFor="storeName">店舗名 <span className="text-red-500">*</span></Label>
-                                        <Input id="storeName" {...register('storeName')} className={errors.storeName ? "border-red-500" : ""} />
+                                        <Input id="storeName" {...register('storeName', { onBlur: (e) => handleStoreNameLookup(e.target.value) })} className={errors.storeName ? "border-red-500" : ""} />
                                         {errors.storeName && <p className="text-red-500 text-xs">{errors.storeName.message}</p>}
                                     </div>
 
