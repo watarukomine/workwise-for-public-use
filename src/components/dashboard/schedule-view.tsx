@@ -1708,22 +1708,31 @@ export function ScheduleView({
       }
 
       if (orderId) {
-        // 1. Primary write to Firestore
-        await OrderService.updateOrder(orderId, {
+        const cancelPayload = {
           status: 'キャンセル',
           cancelDate: new Date().toISOString(),
           cancelContact: cancelContact
-        });
+        };
 
-        // 2. Backup update to GAS
+        // 1. Instantly update UI locally (Optimistic UI)
+        if (updateOrderFullSync) {
+          updateOrderFullSync(orderId, cancelPayload);
+        } else if (updateRawOrder) {
+          updateRawOrder(orderId, cancelPayload);
+        }
+
+        // 2. Primary write to Firestore
+        await OrderService.updateOrder(orderId, cancelPayload);
+
+        // 3. Backup update to GAS
         updateSheetStatus({
           gasUrl: ORDER_GAS_URL,
           eventTitle: `(ID: ${orderId})`,
           systemId: orderId,
           staffName: '', // Unassign staff if assigned
           statusValue: 'キャンセル',
-          cancelDate: new Date().toISOString(),
-          cancelContact: cancelContact,
+          cancelDate: cancelPayload.cancelDate,
+          cancelContact: cancelPayload.cancelContact,
           timestamp: new Date().toISOString()
         }).catch(gasErr => {
           console.warn('Failed to update GAS status for cancel:', gasErr);
