@@ -2007,6 +2007,9 @@ export function ScheduleView({
               estimatedDuration: durationMinutes,
               updatedAt: new Date().toISOString()
             };
+            if (editOrderForm.storeName !== undefined) {
+              updateFields.customerName = editOrderForm.storeName;
+            }
             if (overrides.statusValue) {
               updateFields.status = overrides.statusValue;
             }
