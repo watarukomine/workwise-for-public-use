@@ -331,7 +331,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   <TableRow><TableCell colSpan={displayColumns.length + 1 + (isAdmin ? 2 : 0)} className="h-32 text-center"><div className="flex items-center justify-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />読み込み中...</div></TableCell></TableRow>
                 ) : filteredStaff.length > 0 ? (
                   filteredStaff.map((member, idx) => {
-                    const isSelected = pendingSelectedStaffIds.some(selId => isStaffMatched(member, [selId]));
+                    const isSelected = pendingSelectedStaffIds.includes(member.id) || pendingSelectedStaffIds.some(selId => isStaffMatched(member, [selId]));
 
                     return (
                       <TableRow key={member.id} data-state={isSelected ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>

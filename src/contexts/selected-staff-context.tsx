@@ -163,53 +163,21 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const togglePendingStaffSelection = React.useCallback((staffMemberOrId: any) => {
+    if (!staffMemberOrId) return;
+    const staffId = typeof staffMemberOrId === 'object' ? String(staffMemberOrId.id).trim() : String(staffMemberOrId).trim();
+    
     setPendingSelectedStaffIds(prevIds => {
-      if (!staffMemberOrId) return prevIds;
-
-      const isObject = typeof staffMemberOrId === 'object';
-      const staffObj = isObject ? staffMemberOrId : { id: String(staffMemberOrId), name: String(staffMemberOrId) };
-
-      // isStaffMatchedを使って既存リスト内にマッチするものが存在するか判定
-      const isCurrentlySelected = prevIds.some(selId => isStaffMatched(staffObj, [selId]));
-
-      let next: string[];
-      if (isCurrentlySelected) {
-        // すでに選択中なら、該当するエントリをすべて除外 (OFF)
-        next = prevIds.filter(selId => !isStaffMatched(staffObj, [selId]));
+      const exists = prevIds.some(id => id === staffId || (typeof staffMemberOrId === 'object' && isStaffMatched(staffMemberOrId, [id])));
+      if (exists) {
+        return prevIds.filter(id => id !== staffId && (typeof staffMemberOrId === 'object' ? !isStaffMatched(staffMemberOrId, [id]) : true));
       } else {
-        // 未選択なら、ID、氏名、スタッフコードをすべて一括で安全に追加 (ON)
-        const entriesToAdd: string[] = [];
-        if (staffObj.id) entriesToAdd.push(String(staffObj.id).trim());
-        if (staffObj.name) entriesToAdd.push(String(staffObj.name).trim());
-        if (staffObj['氏名']) entriesToAdd.push(String(staffObj['氏名']).trim());
-        if (staffObj['スタッフID']) entriesToAdd.push(String(staffObj['スタッフID']).trim());
-        if (entriesToAdd.length === 0) entriesToAdd.push(String(staffMemberOrId).trim());
-
-        const cleanedPrev = prevIds.filter(selId => !isStaffMatched(staffObj, [selId]));
-        next = Array.from(new Set([...cleanedPrev, ...entriesToAdd]));
+        return [...prevIds, staffId];
       }
-
-      setAppliedSelectedStaffIds(next);
-      try {
-        localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
-          date: new Date().toDateString(),
-          ids: next
-        }));
-      } catch (e) {}
-
-      return next;
     });
   }, []);
 
   const setPendingSelection = React.useCallback((staffIds: string[]) => {
     setPendingSelectedStaffIds(staffIds);
-    setAppliedSelectedStaffIds(staffIds);
-    try {
-      localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
-        date: new Date().toDateString(),
-        ids: staffIds
-      }));
-    } catch (e) {}
   }, []);
 
   const applyPendingSelection = React.useCallback((activeStaffObjects: any[] = []) => {
