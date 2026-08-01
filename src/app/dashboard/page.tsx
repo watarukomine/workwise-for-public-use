@@ -219,16 +219,32 @@ export default function DashboardPage() {
     const staffToUse = (allStaff && allStaff.length > 0) ? allStaff : (fallbackAugust1StaffObjects as any);
     if (!staffToUse || staffToUse.length === 0) return [];
 
+    // 表示日に作業チップ(タスク)が存在するスタッフIDを抽出
+    const activeStaffIds = new Set<string>();
+    if (scheduleEvents && scheduleEvents.length > 0) {
+      const targetDateStr = format(currentDate, 'yyyy-MM-dd');
+      scheduleEvents.forEach(e => {
+        const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
+        if (isValid(evStart)) {
+          const eventDateStr = format(evStart, 'yyyy-MM-dd');
+          if (eventDateStr === targetDateStr) {
+            if (e.staffId && e.staffId !== 'unassigned') {
+              activeStaffIds.add(String(e.staffId).trim());
+            }
+          }
+        }
+      });
+    }
+
     let selectedStaff: any[];
 
-    // 【旧スプレッドシート版と100%同一のシンプル同調判定】
-    // 選択データが空の時のみ全員表示、選択データが存在する時は選択されたスタッフのみを100%忠実に表示!
+    // 選択データが存在する時、選択されたスタッフおよび作業チップが存在するスタッフを表示!
     if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
       selectedStaff = staffToUse;
     } else {
       selectedStaff = staffToUse.filter((staff: any) => 
         appliedSelectedStaffIds.includes(staff.id) || 
-        appliedSelectedStaffIds.includes(staff.name) ||
+        activeStaffIds.has(staff.id) ||
         (staff.name && appliedSelectedStaffIds.includes(String(staff.name).replace(/[\s\u3000]+/g, ''))) ||
         (staff['氏名'] && appliedSelectedStaffIds.includes(String(staff['氏名']).replace(/[\s\u3000]+/g, '')))
       );
