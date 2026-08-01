@@ -600,7 +600,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const deleteLocalEvent = useCallback((eventId: string) => {
     setLocalScheduleEvents(prev => prev.filter(e => e.id !== eventId));
   }, []);
-
   // Process data using useMemo for high performance & 0-lag rendering
   const processedData = React.useMemo(() => {
     if (!rawOrdersData || !rawOrdersData.length) {
@@ -611,28 +610,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setOrders(processedData.orders);
-    
-    // Backend events calculated from rawOrdersData are primary authority
-    const localIds = new Set(localScheduleEvents.map(e => e.id));
-    const filteredBackendEvents = processedData.scheduleEvents.filter(e => !localIds.has(e.id));
-    
-    // Always prioritize backend events over local optimistic events if backend has rawOrderId
-    setScheduleEvents([...filteredBackendEvents, ...localScheduleEvents.filter(e => e.staffId !== '__DELETED__')]);
+    setScheduleEvents(processedData.scheduleEvents);
     setStatuses(processedData.statuses);
-
-    const localAssignedOrderIds = new Set(
-      localScheduleEvents
-        .filter(e => e.staffId && e.staffId !== '__DELETED__')
-        .map(e => e.rawOrderId || e.id)
-    );
-
-    const finalUnassigned = processedData.unassignedOrders.filter(o => !localAssignedOrderIds.has(o.rawOrderId || o.id));
-    setUnassignedOrders(finalUnassigned);
+    setUnassignedOrders(processedData.unassignedOrders);
 
     try {
       localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify({ orders: rawOrdersData, timestamp: Date.now() }));
     } catch (e) { /* quota exceeded - ignore */ }
-  }, [processedData, localScheduleEvents, rawOrdersData]);
+  }, [processedData, rawOrdersData]);
 
   const deleteOrder = useCallback(async (id: string) => {
     // 1. Primary delete from Firestore

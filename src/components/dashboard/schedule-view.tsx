@@ -1348,26 +1348,7 @@ export function ScheduleView({
           saveLocalEvent(updatedTask);
           saveLocalEvent(updatedTravel);
 
-          // 1. Google Sheets (GAS) Backend Update to sync staffName, scheduledDate, and scheduledTime
-          if (finalSystemId) {
-            updateSheetStatus({
-              gasUrl: ORDER_GAS_URL,
-              eventTitle: `(ID: ${finalSystemId})`,
-              staffName: newStaff.name,
-              statusValue: (taskPart.status === '未割当') ? '割当済' : taskPart.status,
-              scheduledDate: format(taskStart, 'yyyy/MM/dd'),
-              scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
-              estimatedDuration: taskDuration,
-              "チップ配置作業予定": format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
-              "チップ配置作業完了予定": format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
-              "作業予定日": format(taskStart, 'yyyy/MM/dd'),
-              "作業時間（分）": taskDuration,
-              timestamp: new Date().toISOString(),
-              systemId: finalSystemId,
-              actionType: 'drag_assign'
-            }).catch(err => console.warn('Failed to update order assignment in Google Sheets:', err));
-          }
+
 
           // Triple Instant Sync across Timeline Chips, Bottom Order Table, and Firestore Backend
           const updatePayload = {
