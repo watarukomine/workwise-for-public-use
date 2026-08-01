@@ -309,8 +309,10 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   <div className="space-y-1.5">{allColumns.map(col => (<label key={col} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"><Checkbox checked={visibleColumns.has(col)} onCheckedChange={() => toggleColumn(col)} className="h-3.5 w-3.5" /><span className="truncate">{col}</span></label>))}</div>
                 </PopoverContent>
               </Popover>
-              <Button variant="outline" size="sm" onClick={() => exportToCSV(filteredStaff, displayColumns)} disabled={filteredStaff.length === 0} className="gap-1.5"><Download className="h-3.5 w-3.5" /> CSV出力</Button>
-              <Button onClick={applyPendingSelection} size="sm" className="gap-1.5"><Check className="h-3.5 w-3.5" /> 選択を適用</Button>
+              <Button onClick={() => {
+                const activeStaffObjects = staffList.filter(s => Array.from(activeStaffIds).some(id => isStaffMatched(s, [id])));
+                applyPendingSelection(activeStaffObjects);
+              }} size="sm" className="gap-1.5"><Check className="h-3.5 w-3.5" /> 選択を適用</Button>
             </div>
           </div>
 

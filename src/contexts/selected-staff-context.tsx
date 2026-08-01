@@ -25,7 +25,7 @@ interface SelectedStaffContextType {
   setAllStaff: (staff: WithId<Staff>[]) => void;
   togglePendingStaffSelection: (staffMemberOrId: any) => void;
   setPendingSelection: (staffIds: string[]) => void;
-  applyPendingSelection: () => void;
+  applyPendingSelection: (activeStaffObjects?: any[]) => void;
   setSelectedStaffIds: (ids: string[] | ((prev: string[]) => string[])) => void; // Support functional update
   isLoading: boolean;
   isStaffLoading: boolean;
@@ -212,20 +212,43 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     } catch (e) {}
   }, []);
 
-  const applyPendingSelection = React.useCallback(() => {
-    setAppliedSelectedStaffIds([...pendingSelectedStaffIds]);
-    try {
-      localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
-        date: new Date().toDateString(),
-        ids: pendingSelectedStaffIds
-      }));
-      toast({
-        title: "選択を適用しました",
-        description: `${pendingSelectedStaffIds.length}名の表示設定を更新しました。`,
-      });
-    } catch (error) {
-      console.error("Failed to save staff IDs to localStorage", error);
-    }
+  const applyPendingSelection = React.useCallback((activeStaffObjects: any[] = []) => {
+    setAppliedSelectedStaffIds(() => {
+      let finalIds = [...pendingSelectedStaffIds];
+
+      // 【ユーザー絶対仕様】チェックが外されたスタッフにチップが貼られていないか確認
+      // チップが貼られている場合はそのスタッフのチェックはつけたまま(強制保護)にする
+      if (activeStaffObjects && activeStaffObjects.length > 0) {
+        activeStaffObjects.forEach(activeStaff => {
+          const isSelected = finalIds.some(selId => isStaffMatched(activeStaff, [selId]));
+          if (!isSelected) {
+            if (activeStaff.id) finalIds.push(String(activeStaff.id).trim());
+            if (activeStaff.name) finalIds.push(String(activeStaff.name).trim());
+            if (activeStaff['氏名']) finalIds.push(String(activeStaff['氏名']).trim());
+            if (activeStaff['スタッフID']) finalIds.push(String(activeStaff['スタッフID']).trim());
+          }
+        });
+      }
+
+      const uniqueFinalIds = Array.from(new Set(finalIds));
+
+      setPendingSelectedStaffIds(uniqueFinalIds);
+
+      try {
+        localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
+          date: new Date().toDateString(),
+          ids: uniqueFinalIds
+        }));
+        toast({
+          title: "選択を適用しました",
+          description: `表示設定を更新・保存しました。`,
+        });
+      } catch (error) {
+        console.error("Failed to save staff IDs to localStorage", error);
+      }
+
+      return uniqueFinalIds;
+    });
   }, [pendingSelectedStaffIds, toast]);
 
   const setSelectedStaffIds = React.useCallback((idsOrFn: string[] | ((prev: string[]) => string[])) => {
