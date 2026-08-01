@@ -3108,17 +3108,24 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
   let dynamicBgColor = staff.color || 'hsl(var(--primary))';
   let textColorClass = getContrastingTextColor(dynamicBgColor) === '#FFFFFF' ? 'text-white' : 'text-black';
 
-  if (isTravelEvent) {
+  const isCancelled = targetEvent.status === 'キャンセル' || (targetEvent as any).statusValue === 'キャンセル';
+
+  if (isCancelled) {
+    dynamicBgColor = 'rgb(239 68 68)'; // Vivid Red for cancelled tasks
+    textColorClass = 'text-white font-bold';
+  } else if (isTravelEvent) {
     dynamicBgColor = lightenColor(dynamicBgColor, 0.6);
     textColorClass = getContrastingTextColor(dynamicBgColor) === '#FFFFFF' ? 'text-white' : 'text-black';
   }
 
-  if (targetEvent.title === '業務') {
-    dynamicBgColor = 'rgb(156 163 175)';
-    textColorClass = 'text-white';
-  } else if (targetEvent.title === '休憩') {
-    dynamicBgColor = 'rgb(34 197 94)';
-    textColorClass = 'text-white';
+  if (!isCancelled) {
+    if (targetEvent.title === '業務') {
+      dynamicBgColor = 'rgb(156 163 175)';
+      textColorClass = 'text-white';
+    } else if (targetEvent.title === '休憩') {
+      dynamicBgColor = 'rgb(34 197 94)';
+      textColorClass = 'text-white';
+    }
   }
 
   const [line1, ...rest] = (targetEvent.title || '').split(/\r?\n/);
@@ -3154,7 +3161,9 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
 
   const rawCustomerName = targetEvent.customerName || (targetEvent.raw ? findKey(targetEvent.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined);
   const cleanCustomerName = (rawCustomerName && rawCustomerName !== '（店舗名未設定）' && rawCustomerName !== '(店舗名未設定)' && rawCustomerName !== '店舗名未設定') ? rawCustomerName : undefined;
-  const customerName = isTravelEvent ? '移動' : (cleanCustomerName || customer?.storeName || targetEvent.title || line1);
+  
+  const baseCustomerName = isTravelEvent ? '移動' : (cleanCustomerName || customer?.storeName || targetEvent.title || line1);
+  const customerName = isCancelled ? `【キャンセル】 ${baseCustomerName}` : baseCustomerName;
   const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(targetEvent.status || '')) || !!targetEvent.actualEndTime;
 
   const eventContent = (
