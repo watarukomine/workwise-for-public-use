@@ -44,13 +44,12 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const LOCAL_STORAGE_KEY = 'appliedStaffIds';
-  const LOCAL_STORAGE_SELECTION_KEY = 'workwise_staff_selection'; // { date: string, ids: string[] }
+  const LOCAL_STORAGE_SELECTION_KEY = 'workwise_staff_selection_v3'; // Single Source of Truth
 
   const initialLoadDone = useRef(false);
-  const STAFF_CACHE_KEY = 'cached_staff_data_v2'; // Changed key to avoid conflict with old GAS data
+  const STAFF_CACHE_KEY = 'cached_staff_data_v3';
 
-  // Persist selection (allow empty array so full deselect is saved)
+  // Persist selection with current Date tag
   useEffect(() => {
     if (initialLoadDone.current) {
       try {
@@ -60,27 +59,22 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
           ids: appliedSelectedStaffIds
         });
         localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, payload);
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(appliedSelectedStaffIds));
       } catch (e) {
         console.warn('Failed to save selection to localStorage:', e);
       }
     }
   }, [appliedSelectedStaffIds]);
 
-  // Restore selection on mount with Date-bound auto-reset
+  // Restore selection on mount (Only if dated today)
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY) || localStorage.getItem(LOCAL_STORAGE_KEY);
+      const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         const today = new Date().toDateString();
-        // 日付が保持されている場合、本日と一致する場合のみ採用。過去の日付ならリセット。
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.date) {
-          if (parsed.date === today && Array.isArray(parsed.ids) && parsed.ids.length > 0) {
-            setAppliedSelectedStaffIds(parsed.ids);
-            setPendingSelectedStaffIds(parsed.ids);
-            return;
-          }
+        if (parsed && typeof parsed === 'object' && parsed.date === today && Array.isArray(parsed.ids) && parsed.ids.length > 0) {
+          setAppliedSelectedStaffIds(parsed.ids);
+          setPendingSelectedStaffIds(parsed.ids);
         }
       }
     } catch (e) {
@@ -89,13 +83,11 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Guard: skip if user is not authenticated or still loading
     if (isUserLoading || !user) {
       setIsLoading(false);
       return;
     }
 
-    // Step 1: Load cached data immediately (optimistic)
     if (!initialLoadDone.current) {
       try {
         const cachedData = localStorage.getItem(STAFF_CACHE_KEY);
@@ -106,12 +98,9 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
             setIsLoading(false);
           }
         }
-      } catch (e) {
-        console.warn('Failed to load cached staff data:', e);
-      }
+      } catch (e) {}
     }
 
-    // Step 2: Subscribe to Realtime Staff Updates from Firestore (onSnapshot)
     console.log('[SelectedStaffContext] Subscribing to realtime staff updates...');
     const unsubscribe = StaffService.subscribeToStaff((staffList) => {
       if (staffList && staffList.length > 0) {
@@ -123,7 +112,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
 
         setAllStaffState(processedStaff);
 
-        // Cache fresh staff list
         try {
           localStorage.setItem(STAFF_CACHE_KEY, JSON.stringify({
             staffList: processedStaff,
@@ -131,31 +119,34 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
           }));
         } catch (e) {}
 
-        // Initial selection setup
+        // Initial selection setup: Default to ALL staff on fresh start/new day
         if (!initialLoadDone.current) {
           initialLoadDone.current = true;
-          const savedIds = localStorage.getItem(LOCAL_STORAGE_KEY) || localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY);
-          if (savedIds) {
+          const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY);
+          let loadedIds: string[] = [];
+          if (saved) {
             try {
-              const parsed = JSON.parse(savedIds);
-              const ids = Array.isArray(parsed) ? parsed : (parsed.ids || []);
-              if (ids.length > 0) {
-                setAppliedSelectedStaffIds(ids);
-                setPendingSelectedStaffIds(ids);
-              } else {
-                const allIds = processedStaff.map(s => s.id);
-                setAppliedSelectedStaffIds(allIds);
-                setPendingSelectedStaffIds(allIds);
+              const parsed = JSON.parse(saved);
+              const today = new Date().toDateString();
+              if (parsed && parsed.date === today && Array.isArray(parsed.ids) && parsed.ids.length > 0) {
+                loadedIds = parsed.ids;
               }
-            } catch (e) {
-              const allIds = processedStaff.map(s => s.id);
-              setAppliedSelectedStaffIds(allIds);
-              setPendingSelectedStaffIds(allIds);
-            }
+            } catch (e) {}
+          }
+
+          if (loadedIds.length > 0) {
+            setAppliedSelectedStaffIds(loadedIds);
+            setPendingSelectedStaffIds(loadedIds);
           } else {
-            const allIds = processedStaff.map(s => s.id);
-            setAppliedSelectedStaffIds(allIds);
-            setPendingSelectedStaffIds(allIds);
+            // デフォルト: 全スタッフを選択状態にする (全員チェックON & タイムライン表示)
+            const allEntries: string[] = [];
+            processedStaff.forEach(s => {
+              if (s.id) allEntries.push(String(s.id).trim());
+              if (s.name) allEntries.push(String(s.name).trim());
+            });
+            const defaultIds = Array.from(new Set(allEntries));
+            setAppliedSelectedStaffIds(defaultIds);
+            setPendingSelectedStaffIds(defaultIds);
           }
         }
       }
@@ -200,7 +191,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
 
       setAppliedSelectedStaffIds(next);
       try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next));
         localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
           date: new Date().toDateString(),
           ids: next
@@ -215,7 +205,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     setPendingSelectedStaffIds(staffIds);
     setAppliedSelectedStaffIds(staffIds);
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(staffIds));
       localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
         date: new Date().toDateString(),
         ids: staffIds
@@ -226,7 +215,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const applyPendingSelection = React.useCallback(() => {
     setAppliedSelectedStaffIds([...pendingSelectedStaffIds]);
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(pendingSelectedStaffIds));
       localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
         date: new Date().toDateString(),
         ids: pendingSelectedStaffIds
@@ -244,7 +232,10 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     setAppliedSelectedStaffIds(prev => {
       const newIds = typeof idsOrFn === 'function' ? idsOrFn(prev) : idsOrFn;
       try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newIds));
+        localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
+          date: new Date().toDateString(),
+          ids: newIds
+        }));
       } catch (e) {}
       return newIds;
     });

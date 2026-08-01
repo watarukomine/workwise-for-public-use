@@ -250,10 +250,9 @@ export default function DashboardPage() {
         return staffId === id || name === cleanId || isStaffMatched(staff, [id]);
       });
 
-      // 2. スタッフ管理画面で手動チェック選択がある場合: チェックONが入っている人だけを100%表示!(チェックOFFの人は絶対に非表示)
+      // 2. スタッフ管理画面の手動チェック選択: チェックONが入っている人だけを100%表示!(チェックOFFの人は絶対に非表示)
       if (hasExplicitSelection) {
-        const isSelectedInContext = isStaffMatched(staff, appliedSelectedStaffIds);
-        return hasActiveTask || isSelectedInContext;
+        return isStaffMatched(staff, appliedSelectedStaffIds);
       }
 
       // 手動選択がないデフォルト時のみ、純粋管理者(Admin)のスイッチ非表示判定を適用
