@@ -65,16 +65,16 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     }
   }, [appliedSelectedStaffIds]);
 
-  // Restore selection on mount (Only if dated today)
+  // Restore selection on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        const today = new Date().toDateString();
-        if (parsed && typeof parsed === 'object' && parsed.date === today && Array.isArray(parsed.ids) && parsed.ids.length > 0) {
-          setAppliedSelectedStaffIds(parsed.ids);
-          setPendingSelectedStaffIds(parsed.ids);
+        const ids = Array.isArray(parsed) ? parsed : (parsed.ids || []);
+        if (Array.isArray(ids) && ids.length > 0) {
+          setAppliedSelectedStaffIds(ids);
+          setPendingSelectedStaffIds(ids);
         }
       }
     } catch (e) {
