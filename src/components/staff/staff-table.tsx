@@ -309,10 +309,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   <div className="space-y-1.5">{allColumns.map(col => (<label key={col} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"><Checkbox checked={visibleColumns.has(col)} onCheckedChange={() => toggleColumn(col)} className="h-3.5 w-3.5" /><span className="truncate">{col}</span></label>))}</div>
                 </PopoverContent>
               </Popover>
-              <Button onClick={() => {
-                const activeStaffObjects = staffList.filter(s => Array.from(activeStaffIds).some(id => isStaffMatched(s, [id])));
-                applyPendingSelection(activeStaffObjects);
-              }} size="sm" className="gap-1.5"><Check className="h-3.5 w-3.5" /> 選択を適用</Button>
+              <Button onClick={applyPendingSelection} size="sm" className="gap-1.5"><Check className="h-3.5 w-3.5" /> 選択を適用</Button>
             </div>
           </div>
 
@@ -331,14 +328,14 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   <TableRow><TableCell colSpan={displayColumns.length + 1 + (isAdmin ? 2 : 0)} className="h-32 text-center"><div className="flex items-center justify-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />読み込み中...</div></TableCell></TableRow>
                 ) : filteredStaff.length > 0 ? (
                   filteredStaff.map((member, idx) => {
-                    const isSelected = pendingSelectedStaffIds.includes(member.id) || pendingSelectedStaffIds.some(selId => isStaffMatched(member, [selId]));
+                    const isSelected = pendingSelectedStaffIds.includes(member.id);
 
                     return (
                       <TableRow key={member.id} data-state={isSelected ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>
                         <TableCell className="py-1 px-1">
                           <Checkbox
                             checked={isSelected}
-                            onCheckedChange={() => togglePendingStaffSelection(member)}
+                            onCheckedChange={() => togglePendingStaffSelection(member.id)}
                           />
                         </TableCell>
                       {isAdmin && (

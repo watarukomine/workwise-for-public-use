@@ -226,7 +226,7 @@ export default function DashboardPage() {
     if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
       selectedStaff = staffToUse;
     } else {
-      selectedStaff = staffToUse.filter((staff: any) => isStaffMatched(staff, appliedSelectedStaffIds));
+      selectedStaff = staffToUse.filter((staff: any) => appliedSelectedStaffIds.includes(staff.id));
     }
 
     // スイッチOFF時は純粋管理者(Admin)のみ非表示(現場兼務者は表示)

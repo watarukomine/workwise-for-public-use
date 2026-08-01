@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
@@ -6,7 +5,6 @@ import { useToast } from '@/hooks/use-toast';
 import type { Staff, WithId } from '@/lib/types';
 import { StaffService } from '@/services/staff-service';
 import { useUser } from '@/firebase/provider';
-import { isStaffMatched } from '@/lib/utils';
 
 const simpleHash = (str: string) => {
   let hash = 0;
@@ -23,10 +21,10 @@ interface SelectedStaffContextType {
   appliedSelectedStaffIds: string[];
   allStaff: WithId<Staff>[];
   setAllStaff: (staff: WithId<Staff>[]) => void;
-  togglePendingStaffSelection: (staffMemberOrId: any) => void;
+  togglePendingStaffSelection: (staffId: string) => void;
   setPendingSelection: (staffIds: string[]) => void;
-  applyPendingSelection: (activeStaffObjects?: any[]) => void;
-  setSelectedStaffIds: (ids: string[] | ((prev: string[]) => string[])) => void; // Support functional update
+  applyPendingSelection: () => void;
+  setSelectedStaffIds: (ids: string[] | ((prev: string[]) => string[])) => void;
   isLoading: boolean;
   isStaffLoading: boolean;
   error: string | null;
@@ -44,26 +42,9 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const LOCAL_STORAGE_SELECTION_KEY = 'workwise_staff_selection_v3'; // Single Source of Truth
-
-  const initialLoadDone = useRef(false);
+  const LOCAL_STORAGE_SELECTION_KEY = 'workwise_staff_selection_v3';
   const STAFF_CACHE_KEY = 'cached_staff_data_v3';
-
-  // Persist selection with current Date tag
-  useEffect(() => {
-    if (initialLoadDone.current) {
-      try {
-        const today = new Date().toDateString();
-        const payload = JSON.stringify({
-          date: today,
-          ids: appliedSelectedStaffIds
-        });
-        localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, payload);
-      } catch (e) {
-        console.warn('Failed to save selection to localStorage:', e);
-      }
-    }
-  }, [appliedSelectedStaffIds]);
+  const initialLoadDone = useRef(false);
 
   // Restore selection on mount
   useEffect(() => {
@@ -72,7 +53,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         const ids = Array.isArray(parsed) ? parsed : (parsed.ids || []);
-        if (Array.isArray(ids) && ids.length > 0) {
+        if (Array.isArray(ids)) {
           setAppliedSelectedStaffIds(ids);
           setPendingSelectedStaffIds(ids);
         }
@@ -119,7 +100,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
           }));
         } catch (e) {}
 
-        // Initial selection setup: Restore saved selection or leave as is
         if (!initialLoadDone.current) {
           initialLoadDone.current = true;
           const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY);
@@ -147,18 +127,14 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     setAllStaffState(staff);
   }, []);
 
-  const togglePendingStaffSelection = React.useCallback((staffMemberOrId: any) => {
-    if (!staffMemberOrId) return;
-    const staffId = typeof staffMemberOrId === 'object' ? String(staffMemberOrId.id).trim() : String(staffMemberOrId).trim();
-    
-    setPendingSelectedStaffIds(prevIds => {
-      const exists = prevIds.some(id => id === staffId || (typeof staffMemberOrId === 'object' && isStaffMatched(staffMemberOrId, [id])));
-      if (exists) {
-        return prevIds.filter(id => id !== staffId && (typeof staffMemberOrId === 'object' ? !isStaffMatched(staffMemberOrId, [id]) : true));
-      } else {
-        return [...prevIds, staffId];
-      }
-    });
+  const togglePendingStaffSelection = React.useCallback((staffId: string) => {
+    if (!staffId) return;
+    const cleanId = String(staffId).trim();
+    setPendingSelectedStaffIds(prevIds =>
+      prevIds.includes(cleanId)
+        ? prevIds.filter(id => id !== cleanId)
+        : [...prevIds, cleanId]
+    );
   }, []);
 
   const setPendingSelection = React.useCallback((staffIds: string[]) => {
@@ -166,10 +142,9 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const applyPendingSelection = React.useCallback(() => {
-    setAppliedSelectedStaffIds([...pendingSelectedStaffIds]);
+    setAppliedSelectedStaffIds(pendingSelectedStaffIds);
     try {
       localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
-        date: new Date().toDateString(),
         ids: pendingSelectedStaffIds
       }));
       toast({
@@ -186,7 +161,6 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
       const newIds = typeof idsOrFn === 'function' ? idsOrFn(prev) : idsOrFn;
       try {
         localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
-          date: new Date().toDateString(),
           ids: newIds
         }));
       } catch (e) {}
