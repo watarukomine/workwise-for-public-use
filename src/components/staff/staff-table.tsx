@@ -338,12 +338,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                         <TableCell className="py-1 px-1">
                           <Checkbox
                             checked={isSelected}
-                            onCheckedChange={() => {
-                              togglePendingStaffSelection(member);
-                              setTimeout(() => {
-                                applyPendingSelection();
-                              }, 0);
-                            }}
+                            onCheckedChange={() => togglePendingStaffSelection(member)}
                           />
                         </TableCell>
                       {isAdmin && (
