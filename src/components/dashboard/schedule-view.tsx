@@ -1525,6 +1525,28 @@ export function ScheduleView({
                 const frontendTaskId = `${derivedTripId}-task`;
                 const frontendTravelId = `${derivedTripId}-travel`;
 
+                // 2. Direct Firestore Persistence for Generic Task!
+                try {
+                  await OrderService.createOrder({
+                    id: realId,
+                    systemId: realId,
+                    displayId: realId,
+                    _type: 'order',
+                    isGeneric: true,
+                    taskDetails: ev.title,
+                    customerName: ev.title,
+                    staffId: newStaffId,
+                    staffName: staff.name,
+                    scheduledDate: format(safeParseISO(ev.start), 'yyyy/MM/dd'),
+                    scheduledTime: format(safeParseISO(ev.start), 'yyyy/MM/dd HH:mm:ss'),
+                    scheduledEndTime: format(safeParseISO(ev.end), 'yyyy/MM/dd HH:mm:ss'),
+                    estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string)),
+                    status: '割当済'
+                  });
+                } catch (dbErr) {
+                  console.warn('Failed to save generic task to Firestore:', dbErr);
+                }
+
                 if (isGenericAccompany) {
                   // Update IDs for BOTH events (Task and Travel) via tripId association
                   // We need to find the OLD IDs.
