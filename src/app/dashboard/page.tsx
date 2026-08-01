@@ -489,12 +489,48 @@ export default function DashboardPage() {
 
 
 
-  // Selection state is persisted in localStorage via SelectedStaffContext.
-  // We NO LONGER auto-save selection to "saveDailyAttendance" (Database) 
-  // because that field (staffIds) represents "Clocked In", not "Viewed".
-  // Visibility is purely local + Shift Schedule + Clocked In status.
+  // 【ユーザー絶対仕様】タイムラインに表示されている（作業チップがある）スタッフは必ずチェックを入れる
+  // 表示日に作業チップが存在するスタッフIDを自動的に選択リスト（appliedSelectedStaffIds）に同期マージする
+  useEffect(() => {
+    if (!allStaff || allStaff.length === 0) return;
 
-  // Calculate Derived Statuses
+    const activeStaffIdsToday = new Set<string>();
+    if (scheduleEvents && scheduleEvents.length > 0) {
+      const targetDateStr = format(currentDate, 'yyyy-MM-dd');
+      scheduleEvents.forEach(e => {
+        const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
+        if (isValid(evStart)) {
+          const eventDateStr = format(evStart, 'yyyy-MM-dd');
+          if (eventDateStr === targetDateStr) {
+            if (e.staffId && e.staffId !== 'unassigned') {
+              const cleanKey = String(e.staffId).trim();
+              const staffObj = allStaff.find(s => 
+                String(s.id).trim() === cleanKey || 
+                String(s.name).trim() === cleanKey ||
+                String(s.name).trim().replace(/[\s\u3000]+/g, '') === cleanKey.replace(/[\s\u3000]+/g, '') ||
+                ((s as any)['氏名'] && String((s as any)['氏名']).trim().replace(/[\s\u3000]+/g, '') === cleanKey.replace(/[\s\u3000]+/g, ''))
+              );
+              if (staffObj && staffObj.id) {
+                activeStaffIdsToday.add(staffObj.id);
+              }
+            }
+          }
+        }
+      });
+    }
+
+    if (activeStaffIdsToday.size > 0) {
+      const missingIds = Array.from(activeStaffIdsToday).filter(id => !appliedSelectedStaffIds.includes(id));
+      if (missingIds.length > 0) {
+        setSelectedStaffIds(prev => {
+          const combined = Array.from(new Set([...prev, ...activeStaffIdsToday]));
+          return combined;
+        });
+      }
+    }
+  }, [currentDate, scheduleEvents, allStaff, appliedSelectedStaffIds, setSelectedStaffIds]);
+
+  // Persistent selection hooks and auto-refresh logic
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
 
   useEffect(() => {
