@@ -453,20 +453,7 @@ export default function DashboardPage() {
         setPresentStaffIds(new Set(attendedStaffIds));
         setScheduledStaffIds(new Set(finalScheduledEntries));
 
-        // Synchronize selected staff list immediately
-        if (allStaff && allStaff.length > 0) {
-          const scheduledStaffIdsList = allStaff
-            .filter(s => {
-              const isScheduled = isStaffMatched(s, finalScheduledEntries);
-              const role = String(s.role || '').toLowerCase().trim();
-              const rawRole = String((s as any)['ロール'] || '').toLowerCase().trim();
-              const isMgmt = role.includes('admin') || role.includes('管理者') || role.includes('controller') || role.includes('コントローラー') || rawRole.includes('admin') || rawRole.includes('管理者');
-              return isScheduled || isMgmt;
-            })
-            .map(s => s.id);
 
-          setSelectedStaffIds(scheduledStaffIdsList.length > 0 ? scheduledStaffIdsList : allStaff.map(s => s.id));
-        }
       } catch (e) {
         if (!cancelled) console.error("Failed to sync attendance:", e);
       } finally {
