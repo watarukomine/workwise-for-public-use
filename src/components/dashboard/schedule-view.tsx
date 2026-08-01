@@ -1351,16 +1351,18 @@ export function ScheduleView({
 
 
           // Triple Instant Sync across Timeline Chips, Bottom Order Table, and Firestore Backend
-          const updatePayload = {
+          const updatePayload: any = {
             staffName: newStaff.name,
             staffId: newStaffId,
-            status: (taskPart.status === '未割当') ? '割当済' : undefined,
             scheduledDate: format(taskStart, 'yyyy/MM/dd'),
             scheduledTime: format(taskStart, 'yyyy/MM/dd HH:mm:ss'),
             scheduledEndTime: format(taskEnd, 'yyyy/MM/dd HH:mm:ss'),
             estimatedDuration: taskDuration,
             updatedAt: new Date().toISOString()
           };
+          if (taskPart.status === '未割当') {
+            updatePayload.status = '割当済';
+          }
 
           if (updateOrderFullSync) {
             if (finalSystemId) updateOrderFullSync(finalSystemId, updatePayload);
