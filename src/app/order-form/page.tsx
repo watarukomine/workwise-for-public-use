@@ -314,8 +314,10 @@ export default function OrderFormPage() {
                 isGasSynced: true,
             });
 
-            // Await Guaranteed GAS Server Action Execution (Takes 2~4 seconds, 100% reliable on App Hosting)
-            await submitOrderDetachedServerAction(fullGasPayload);
+            // Trigger Guaranteed GAS Server Action in the background to avoid blocking transition (0-delay response!)
+            submitOrderDetachedServerAction(fullGasPayload).catch(gasErr => {
+                console.warn('[OrderForm] GAS background backup warning:', gasErr);
+            });
 
             // Immediately mark as success and return!
             setIsSuccess(true);

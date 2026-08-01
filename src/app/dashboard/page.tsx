@@ -298,7 +298,8 @@ export default function DashboardPage() {
 
 
 
-  const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading || isLoadingCustomers;
+  // Optimize: Do NOT block initial dashboard mount on customer loading (takes ~1-2s for 2k+ entries) to achieve instant login transition!
+  const isLoading = isProfileLoading || isLoadingOrders || isStaffLoading;
 
   console.log('Dashboard Loading States:', {
     profile: isProfileLoading,
