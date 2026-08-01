@@ -49,13 +49,26 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   // Restore selection on mount
   useEffect(() => {
     try {
+      // 過去の古い競合キーを完全に一掃・クリア
+      localStorage.removeItem('appliedStaffIds');
+      localStorage.removeItem('workwise_staff_selection');
+
       const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         const ids = Array.isArray(parsed) ? parsed : (parsed.ids || []);
         if (Array.isArray(ids)) {
-          setAppliedSelectedStaffIds(ids);
-          setPendingSelectedStaffIds(ids);
+          // 【汚染データ自動クリーンアップ安全装置】
+          // 過去のバグで保存されてしまった「全員選択（20名以上）」のゴミデータが残っている場合、
+          // 一度強制的にリセット（クリア）してクリーンな初期状態にする
+          if (ids.length >= 20) {
+            localStorage.removeItem(LOCAL_STORAGE_SELECTION_KEY);
+            setAppliedSelectedStaffIds([]);
+            setPendingSelectedStaffIds([]);
+          } else {
+            setAppliedSelectedStaffIds(ids);
+            setPendingSelectedStaffIds(ids);
+          }
         }
       }
     } catch (e) {
