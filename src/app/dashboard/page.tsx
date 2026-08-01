@@ -200,19 +200,19 @@ export default function DashboardPage() {
   const [showManagement, setShowManagement] = React.useState(false); // Default to OFF
 
   const fallbackAugust1StaffObjects = React.useMemo(() => [
-    { id: "佐藤耕次", name: "佐藤 耕次", role: "staff" },
-    { id: "坂本幸夫", name: "坂本 幸夫", role: "staff" },
-    { id: "杉山和彦", name: "杉山 和彦", role: "staff" },
-    { id: "福原泰弘", name: "福原 泰弘", role: "staff" },
-    { id: "水野一也", name: "水野 一也", role: "staff" },
-    { id: "内田巧", name: "内田 巧", role: "staff" },
-    { id: "千葉征英", name: "千葉 征英", role: "staff" },
-    { id: "古石翔", name: "古石 翔", role: "staff" },
-    { id: "小堀健太", name: "小堀 健太", role: "staff" },
-    { id: "湯川浩道", name: "湯川 浩道", role: "staff" },
-    { id: "岡本正博", name: "岡本 正博", role: "staff" },
-    { id: "小松佑輔", name: "小松 佑輔", role: "staff" },
-    { id: "關雄弥", name: "關 雄弥", role: "staff" }
+    { id: "STAFF002", name: "佐藤 耕次", role: "staff" },
+    { id: "STAFF004", name: "坂本 幸夫", role: "staff" },
+    { id: "STAFF012", name: "杉山 和彦", role: "staff" },
+    { id: "STAFF005", name: "福原 泰弘", role: "staff" },
+    { id: "STAFF007", name: "水野 一也", role: "staff" },
+    { id: "STAFF010", name: "内田 巧", role: "staff" },
+    { id: "STAFF011", name: "千葉 征英", role: "staff" },
+    { id: "STAFF019", name: "古石 翔", role: "staff" },
+    { id: "STAFF014", name: "小堀 健太", role: "staff" },
+    { id: "STAFF015", name: "湯川 浩道", role: "staff" },
+    { id: "STAFF016", name: "岡本 正博", role: "staff" },
+    { id: "STAFF017", name: "小松 佑輔", role: "staff" },
+    { id: "STAFF018", name: "關 雄弥", role: "staff" }
   ], []);
 
   const filteredStaff = React.useMemo(() => {
@@ -226,7 +226,12 @@ export default function DashboardPage() {
     if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
       selectedStaff = staffToUse;
     } else {
-      selectedStaff = staffToUse.filter((staff: any) => appliedSelectedStaffIds.includes(staff.id));
+      selectedStaff = staffToUse.filter((staff: any) => 
+        appliedSelectedStaffIds.includes(staff.id) || 
+        appliedSelectedStaffIds.includes(staff.name) ||
+        (staff.name && appliedSelectedStaffIds.includes(String(staff.name).replace(/[\s\u3000]+/g, ''))) ||
+        (staff['氏名'] && appliedSelectedStaffIds.includes(String(staff['氏名']).replace(/[\s\u3000]+/g, '')))
+      );
     }
 
     // スイッチOFF時は純粋管理者(Admin)のみ非表示(現場兼務者は表示)
