@@ -216,75 +216,38 @@ export default function DashboardPage() {
   ], []);
 
   const filteredStaff = React.useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth() + 1;
-    const day = currentDate.getDate();
-    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const staffToUse = (allStaff && allStaff.length > 0) ? allStaff : (fallbackAugust1StaffObjects as any);
+    if (!staffToUse || staffToUse.length === 0) return [];
 
-    if (staffToUse.length === 0) return [];
+    let selectedStaff: any[];
 
-    // 1. 本日タスクチップが割り当てられているスタッフ ID/名前の抽出
-    const activeStaffIds = new Set<string>();
-    if (scheduleEvents && scheduleEvents.length > 0) {
-      scheduleEvents.forEach(e => {
-        const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
-        if (isValid(evStart) && (isToday(evStart) ? isToday(currentDate) : isEqual(startOfDay(evStart), startOfDay(currentDate)))) {
-          if (e.staffId && e.staffId !== 'unassigned') {
-            activeStaffIds.add(e.staffId);
-          }
-        }
+    // 【旧スプレッドシート版と100%同一のシンプル同調判定】
+    // 選択データが空の時のみ全員表示、選択データが存在する時は選択されたスタッフのみを100%忠実に表示!
+    if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
+      selectedStaff = staffToUse;
+    } else {
+      selectedStaff = staffToUse.filter((staff: any) => isStaffMatched(staff, appliedSelectedStaffIds));
+    }
+
+    // スイッチOFF時は純粋管理者(Admin)のみ非表示(現場兼務者は表示)
+    if (!showManagement) {
+      selectedStaff = selectedStaff.filter((staff: any) => {
+        const roleOrig = String(staff.role || '').trim();
+        const rawRoleOrig = String((staff as any)['ロール'] || '').trim();
+        const roleLower = roleOrig.toLowerCase();
+        const rawRoleLower = rawRoleOrig.toLowerCase();
+
+        const isAdminStaff = roleOrig === 'Admin/Staff' || roleLower === 'admin/staff' || roleLower === 'admin_staff' || rawRoleOrig === 'Admin/Staff' || rawRoleLower === 'admin/staff' || rawRoleLower === 'admin_staff' || roleLower.includes('兼務');
+        const isAdmin = roleLower.includes('admin') || roleLower.includes('管理者') || rawRoleLower.includes('admin') || rawRoleLower.includes('管理者') || roleLower.includes('controller') || rawRoleLower.includes('controller');
+        const isPureAdmin = isAdmin && !isAdminStaff;
+
+        if (isPureAdmin) return false;
+        return true;
       });
     }
 
-    const hasShiftData = Boolean(scheduledStaffIds && scheduledStaffIds.size > 0);
-    const hasExplicitSelection = Boolean(appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0);
-
-    const result = staffToUse.filter((staff: any) => {
-      const staffId = String(staff.id || '').trim();
-      const name = String(staff.name || (staff as any)['氏名'] || '').replace(/[\s\u3000]+/g, '');
-
-      // 1. 本日作業タスク保持者 (絶対保護)
-      const hasActiveTask = Array.from(activeStaffIds).some(id => {
-        const cleanId = String(id || '').replace(/[\s\u3000]+/g, '');
-        return staffId === id || name === cleanId || isStaffMatched(staff, [id]);
-      });
-
-      // 2. スタッフ管理画面の手動チェック選択: チェックONが入っている人だけを100%表示!(チェックOFFの人は絶対に非表示)
-      if (hasExplicitSelection) {
-        return isStaffMatched(staff, appliedSelectedStaffIds);
-      }
-
-      // 手動選択がないデフォルト時のみ、純粋管理者(Admin)のスイッチ非表示判定を適用
-      const roleOrig = String(staff.role || '').trim();
-      const rawRoleOrig = String((staff as any)['ロール'] || '').trim();
-      const roleLower = roleOrig.toLowerCase();
-      const rawRoleLower = rawRoleOrig.toLowerCase();
-
-      const isAdminStaff = roleOrig === 'Admin/Staff' || roleLower === 'admin/staff' || roleLower === 'admin_staff' || rawRoleOrig === 'Admin/Staff' || rawRoleLower === 'admin/staff' || rawRoleLower === 'admin_staff' || roleLower.includes('兼務');
-      const isAdmin = roleLower.includes('admin') || roleLower.includes('管理者') || rawRoleLower.includes('admin') || rawRoleLower.includes('管理者') || roleLower.includes('controller') || rawRoleLower.includes('controller');
-      const isPureAdmin = isAdmin && !isAdminStaff;
-
-      if (isPureAdmin && !showManagement) {
-        return false;
-      }
-
-      const isScheduledToday = hasShiftData
-        ? Array.from(scheduledStaffIds!).some(id => isStaffMatched(staff, [id]) || id === staff.id)
-        : true;
-
-      return isScheduledToday;
-    });
-
-    // スタッフ管理画面の指定並び順（sortOrder / order）を最優先で厳格適用
-    result.sort((a: any, b: any) => {
-      const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof a.order === 'number' ? a.order : (typeof a.sortIndex === 'number' ? a.sortIndex : 999));
-      const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : (typeof b.order === 'number' ? b.order : (typeof b.sortIndex === 'number' ? b.sortIndex : 999));
-      return orderA - orderB;
-    });
-
-    return result;
-  }, [appliedSelectedStaffIds, allStaff, showManagement, fallbackAugust1StaffObjects, currentDate, scheduleEvents, scheduledStaffIds]);
+    return selectedStaff;
+  }, [allStaff, appliedSelectedStaffIds, showManagement]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (filteredStaff.length === 0) {
