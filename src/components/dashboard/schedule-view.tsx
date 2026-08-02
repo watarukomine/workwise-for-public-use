@@ -1670,7 +1670,11 @@ export function ScheduleView({
   const handleDoubleClickEvent = React.useCallback((event: WithId<ScheduleEvent>) => {
     // Extract destination from description if present [行き先: xxx]
     const destMatch = event.description?.match(/\[行き先: (.*?)\]/);
-    const destination = destMatch ? destMatch[1] : '';
+    let destination = destMatch ? destMatch[1] : '';
+    const cleanResolvedName = event.customerName || (event as any).storeName;
+    if (cleanResolvedName && cleanResolvedName !== '同行' && cleanResolvedName !== '（店舗名未設定）') {
+      destination = cleanResolvedName;
+    }
     const cleanDescription = event.description?.replace(/\[行き先: .*?\]/, '').trim() || '';
 
     setEditedEventDetails({
@@ -2007,6 +2011,18 @@ export function ScheduleView({
               estimatedDuration: durationMinutes,
               updatedAt: new Date().toISOString()
             };
+            if (dialogState.mode === 'edit') {
+              if (submitDetails.title) {
+                updateFields.taskDetails = submitDetails.title;
+              }
+              if (submitDetails.destination) {
+                updateFields.customerName = submitDetails.destination;
+                updateFields.storeName = submitDetails.destination;
+              }
+              if (submitDetails.description) {
+                updateFields.specialNotes = submitDetails.description;
+              }
+            }
             if (editOrderForm.storeName !== undefined) {
               updateFields.customerName = editOrderForm.storeName;
             }
