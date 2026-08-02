@@ -241,7 +241,8 @@ export default function DashboardPage() {
     let selectedStaff: any[];
 
     // 選択データが存在する時、選択されたスタッフおよび作業チップが存在するスタッフを表示!
-    if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
+    const hasSavedSelection = typeof window !== 'undefined' && localStorage.getItem('workwise_staff_selection_v3') !== null;
+    if (!appliedSelectedStaffIds || (appliedSelectedStaffIds.length === 0 && !hasSavedSelection)) {
       selectedStaff = staffToUse;
     } else {
       selectedStaff = staffToUse.filter((staff: any) => {

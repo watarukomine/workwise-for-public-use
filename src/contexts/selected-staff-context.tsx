@@ -77,7 +77,8 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (isUserLoading || !user) {
+    if (isUserLoading) return;
+    if (!user) {
       setIsLoading(false);
       return;
     }
