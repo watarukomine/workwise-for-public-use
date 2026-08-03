@@ -126,7 +126,7 @@ function EditableCell({ value, fieldKey, isReadonly, selectOptions, isEditing, o
     else if (e.key === 'Tab') { e.preventDefault(); handleSave(); onNavigate(e.shiftKey ? 'prev' : 'next'); }
   };
 
-  if (isReadonly) return <span className="text-xs text-muted-foreground font-mono truncate block max-w-[90px]" title={value}>{value ? value.slice(-8) : ''}</span>;
+  if (isReadonly) return <span className="text-xs text-muted-foreground font-mono truncate block max-w-[120px]" title={value}>{value || ''}</span>;
 
   if (fieldKey === 'color') {
     return (

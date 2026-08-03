@@ -27,10 +27,20 @@ export const StaffService = {
         const q = colRef;
 
         return onSnapshot(q, (snapshot) => {
-            const rawList = snapshot.docs.map(docSnap => ({
-                ...docSnap.data(),
-                id: docSnap.id
-            } as WithId<Staff>));
+            const rawList = snapshot.docs.map(docSnap => {
+                const data = docSnap.data();
+                // 明示的なスタッフコード（STAFF001形式やstaffCode/code/staffId等）が存在すればそれをIDとして優先設定
+                const explicitStaffId = data.staffCode || data.staffId || data.code || data.userCode || (typeof data.id === 'string' && !data.id.includes('@') && data.id !== docSnap.id ? data.id : null);
+                const resolvedId = (explicitStaffId && String(explicitStaffId).trim()) 
+                    ? String(explicitStaffId).trim() 
+                    : docSnap.id;
+
+                return {
+                    ...data,
+                    id: resolvedId,
+                    _docId: docSnap.id
+                } as unknown as WithId<Staff>;
+            });
 
             const staffList = rawList.filter(s => {
                 const data = s as any;
@@ -57,13 +67,15 @@ export const StaffService = {
                 const nameKey = String(s.name || data['氏名'] || data['名前'] || '').replace(/[\s\u3000]+/g, '');
                 if (!nameKey) continue;
 
+                const isStaffCode = (x: any) => /^STAFF\d+/i.test(String(x.id || '')) || /^STAFF\d+/i.test(String((x as any).staffCode || '')) || /^STAFF\d+/i.test(String((x as any)._docId || ''));
+
                 if (!nameMap.has(nameKey)) {
                     nameMap.set(nameKey, s);
                 } else {
-                    // 既存のものと比べ、メールアドレスや詳細情報を持っている方を優位保存
+                    // 既存のものと比べ、STAFFコード形式、メールアドレス、詳細情報を持っている方を優位保存
                     const existing = nameMap.get(nameKey)!;
-                    const existingScore = (existing.email ? 2 : 0) + ((existing as any).sortOrder !== undefined ? 1 : 0);
-                    const currentScore = (s.email ? 2 : 0) + ((s as any).sortOrder !== undefined ? 1 : 0);
+                    const existingScore = (isStaffCode(existing) ? 10 : 0) + (existing.email ? 2 : 0) + ((existing as any).sortOrder !== undefined ? 1 : 0);
+                    const currentScore = (isStaffCode(s) ? 10 : 0) + (s.email ? 2 : 0) + ((s as any).sortOrder !== undefined ? 1 : 0);
                     if (currentScore > existingScore) {
                         nameMap.set(nameKey, s);
                     }
