@@ -61,20 +61,23 @@ export default function DashboardPage() {
     return startOfToday();
   });
 
+  const [isPending, startTransition] = React.useTransition();
+
   const setCurrentDate = React.useCallback((date: Date) => {
-    setCurrentDateState(date);
-    if (typeof window !== 'undefined') {
-      try {
-        sessionStorage.setItem('dashboard_current_date', date.toISOString());
-      } catch {}
-    }
-    if (setCurrentViewedDate) {
-      setCurrentViewedDate(date);
-    }
+    startTransition(() => {
+      setCurrentDateState(date);
+      if (typeof window !== 'undefined') {
+        try {
+          sessionStorage.setItem('dashboard_current_date', date.toISOString());
+        } catch {}
+      }
+      if (setCurrentViewedDate) {
+        setCurrentViewedDate(date);
+      }
+    });
   }, [setCurrentViewedDate]);
 
   const deferredDate = React.useDeferredValue(currentDate);
-  const [isPending, startTransition] = React.useTransition();
   const [calendarOpen, setCalendarOpen] = React.useState(false);
   const router = useRouter();
   const isMobile = useIsMobile();
