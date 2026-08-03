@@ -695,11 +695,11 @@ export default function DashboardPage() {
                 onClick={() => handleDateChange(-1)}
                 title="前日へ (← キー)"
                 aria-label="前日へ"
-                className="h-8 w-8 hover:bg-background active:scale-90 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none"
+                className="h-9 w-9 bg-background/50 hover:bg-background hover:text-primary active:bg-muted active:scale-95 active:translate-y-[0.5px] border shadow-sm hover:shadow active:shadow-inner transition-all duration-75 cursor-pointer select-none"
               >
                 <ChevronLeft className="h-4.5 w-4.5" />
               </Button>
-              <div className="px-2.5 sm:px-3.5 py-1 min-w-[90px] sm:min-w-[130px] text-center font-semibold bg-background rounded-md shadow-sm border text-sm select-none transition-all flex items-center justify-center gap-1">
+              <div className="h-9 px-2.5 sm:px-3.5 text-center font-semibold bg-background rounded-md shadow-sm border text-sm select-none transition-all flex items-center justify-center gap-1">
                 <span className="hidden sm:inline">{format(currentDate, 'yyyy年MM月dd日', { locale: ja })}</span>
                 <span className="sm:hidden">{format(currentDate, 'M/d(EEE)', { locale: ja })}</span>
                 {(isSyncing || isAutoRefreshing || isPending) && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />}
@@ -710,7 +710,7 @@ export default function DashboardPage() {
                 onClick={() => handleDateChange(1)}
                 title="翌日へ (→ キー)"
                 aria-label="翌日へ"
-                className="h-8 w-8 hover:bg-background active:scale-90 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none"
+                className="h-9 w-9 bg-background/50 hover:bg-background hover:text-primary active:bg-muted active:scale-95 active:translate-y-[0.5px] border shadow-sm hover:shadow active:shadow-inner transition-all duration-75 cursor-pointer select-none"
               >
                 <ChevronRight className="h-4.5 w-4.5" />
               </Button>
@@ -720,7 +720,7 @@ export default function DashboardPage() {
                 onClick={() => handleDateChange(0)}
                 disabled={isToday(currentDate)}
                 title="今日へ移動 (T キー)"
-                className="ml-0.5 h-8 px-3 text-xs font-medium hover:bg-background active:scale-95 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none disabled:opacity-40"
+                className="ml-0.5 h-9 px-3.5 text-xs font-semibold bg-background/50 hover:bg-background hover:text-primary active:bg-muted active:scale-95 active:translate-y-[0.5px] border shadow-sm hover:shadow active:shadow-inner transition-all duration-75 cursor-pointer select-none disabled:opacity-40 disabled:pointer-events-none"
               >
                 今日
               </Button>
@@ -732,7 +732,7 @@ export default function DashboardPage() {
                     size="icon"
                     title="日付を選択"
                     aria-label="カレンダーで日付選択"
-                    className="h-8 w-8 hover:bg-background active:scale-90 shadow-none hover:shadow-sm transition-all duration-75 cursor-pointer select-none"
+                    className="h-9 w-9 bg-background/50 hover:bg-background hover:text-primary active:bg-muted active:scale-95 active:translate-y-[0.5px] border shadow-sm hover:shadow active:shadow-inner transition-all duration-75 cursor-pointer select-none"
                   >
                     <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                   </Button>
