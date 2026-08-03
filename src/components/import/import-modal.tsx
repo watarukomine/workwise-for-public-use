@@ -314,6 +314,9 @@ export function ImportModal({ targetCollection, trigger }: ImportModalProps) {
             raw[h] = val; // Store original raw data
 
             let mappedField = FIELD_MAPPINGS[h] || h;
+            if (collName === 'users' && h === '母店') {
+              mappedField = '母店';
+            }
             if (collName === 'orders' && mappedField === 'userCode') {
               mappedField = 'customerCode';
             }
