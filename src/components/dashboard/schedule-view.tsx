@@ -3197,7 +3197,16 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(targetEvent); };
 
-  const isTravelEvent = targetEvent.title?.startsWith('移動');
+  const isTravelEvent = 
+    Boolean(targetEvent.id?.endsWith('-travel')) ||
+    Boolean(targetEvent.title?.startsWith('移動')) ||
+    Boolean(targetEvent.title?.includes('移動')) ||
+    targetEvent.title === '移動' ||
+    Boolean(targetEvent.taskDetails?.includes('移動')) ||
+    targetEvent.taskDetails === '移動' ||
+    targetEvent.customerName === '移動' ||
+    targetEvent.serviceType === '移動' ||
+    Boolean((targetEvent as any).isTravel);
 
   let dynamicBgColor = staff.color || 'hsl(var(--primary))';
   let textColorClass = getContrastingTextColor(dynamicBgColor) === '#FFFFFF' ? 'text-white' : 'text-black';
