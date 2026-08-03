@@ -642,7 +642,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       return;
     }
     console.log(`[OrderProvider] Non-blocking background fetch for date: ${dateStr}`);
-    fetchAndProcessData(false, { date: dateStr, range: 1 }).catch(err => {
+    fetchAndProcessData(true, { date: dateStr, range: 1 }).catch(err => {
       console.warn(`[OrderProvider] Background fetch error for ${dateStr}:`, err);
     });
   }, [fetchAndProcessData]);
