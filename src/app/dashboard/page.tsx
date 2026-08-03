@@ -326,7 +326,8 @@ export default function DashboardPage() {
     // Instantly update currentDate and sync viewed date to OrderContext for 0-delay response
     setCurrentDate(nextDate);
     setCurrentViewedDate(nextDate);
-  }, [currentDate, setCurrentViewedDate]);
+    loadOrders(nextDate);
+  }, [currentDate, setCurrentViewedDate, loadOrders]);
 
   // Keyboard navigation shortcuts (Left Arrow: Prev, Right Arrow: Next, T: Today)
   useEffect(() => {
@@ -364,6 +365,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // 1. Instantly trigger non-blocking order loading for the next date (0-delay timeline refresh!)
+    loadOrders(currentDate);
 
     const syncAttendance = async () => {
       // Determine if we are mounting (Refresh) or switching dates
@@ -462,9 +466,6 @@ export default function DashboardPage() {
         if (!cancelled) {
           isDateLoading.current = false;
           setIsSyncing(false);
-          if (isDateChange) {
-            loadOrders(currentDate);
-          }
         }
       }
     };
