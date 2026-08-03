@@ -113,8 +113,24 @@ export default function StaffPage() {
         const august1DefaultStaff = ["佐藤耕次", "坂本幸夫", "杉山和彦", "福原泰弘", "水野一也", "内田巧", "千葉征英", "古石翔", "小堀健太", "湯川浩道", "岡本正博", "小松佑輔", "關雄弥"];
         const finalScheduledEntries = scheduledIds.length > 0 ? scheduledIds : (targetDateStr === '2026-08-01' ? august1DefaultStaff : augustCsvNames);
 
+        // 当日作業チップ(タスク)が割り当てられているスタッフを抽出
+        const activeTaskStaffKeys = new Set<string>();
+        if (scheduleEvents && scheduleEvents.length > 0) {
+          scheduleEvents.forEach(e => {
+            const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
+            if (isValid(evStart) && format(evStart, 'yyyy-MM-dd') === targetDateStr) {
+              if (e.staffId && e.staffId !== 'unassigned') {
+                activeTaskStaffKeys.add(String(e.staffId).trim());
+                activeTaskStaffKeys.add(String(e.staffId).trim().replace(/[\s\u3000]+/g, ''));
+              }
+            }
+          });
+        }
+
         allStaff.forEach(staff => {
-          if (isStaffMatched(staff, finalScheduledEntries)) {
+          const isScheduled = finalScheduledEntries.length > 0 && isStaffMatched(staff, finalScheduledEntries);
+          const hasTask = isStaffMatched(staff, Array.from(activeTaskStaffKeys));
+          if (isScheduled || hasTask) {
             if (staff.id) activeStaffIdsToday.add(staff.id);
           }
         });

@@ -240,34 +240,33 @@ export default function DashboardPage() {
       });
     }
 
-    let selectedStaff: any[];
+    // シフト出勤者、当日作業チップ割り当て済み者、または手動選択されたスタッフのみを表示
+    let selectedStaff = staffToUse.filter((staff: any) => {
+      const staffIdClean = String(staff.id || '').trim();
+      const staffNameClean = String(staff.name || '').trim().replace(/[\s\u3000]+/g, '');
+      const staffNameOrig = String(staff.name || '').trim();
+      const staffShiMeiClean = String(staff['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
 
-    // 選択データが存在する時、選択されたスタッフおよび作業チップが存在するスタッフを表示!
-    const hasSavedSelection = typeof window !== 'undefined' && localStorage.getItem('workwise_staff_selection_v3') !== null;
-    if (!appliedSelectedStaffIds || (appliedSelectedStaffIds.length === 0 && !hasSavedSelection)) {
-      selectedStaff = staffToUse;
-    } else {
-      selectedStaff = staffToUse.filter((staff: any) => {
-        const staffIdClean = String(staff.id || '').trim();
-        const staffNameClean = String(staff.name || '').trim().replace(/[\s\u3000]+/g, '');
-        const staffNameOrig = String(staff.name || '').trim();
-        const staffShiMeiClean = String(staff['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
+      // 1. 手動選択
+      const isUserSelected = appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0 && (
+        appliedSelectedStaffIds.includes(staffIdClean) ||
+        appliedSelectedStaffIds.includes(staffNameOrig) ||
+        appliedSelectedStaffIds.includes(staffNameClean) ||
+        appliedSelectedStaffIds.includes(staffShiMeiClean)
+      );
 
-        const isUserSelected = 
-          appliedSelectedStaffIds.includes(staffIdClean) ||
-          appliedSelectedStaffIds.includes(staffNameOrig) ||
-          appliedSelectedStaffIds.includes(staffNameClean) ||
-          appliedSelectedStaffIds.includes(staffShiMeiClean);
+      // 2. 当日作業チップ(タスク)割り当て済み
+      const hasActiveTaskToday = 
+        activeStaffKeys.has(staffIdClean) ||
+        activeStaffKeys.has(staffNameOrig) ||
+        activeStaffKeys.has(staffNameClean) ||
+        activeStaffKeys.has(staffShiMeiClean);
 
-        const hasActiveTaskToday = 
-          activeStaffKeys.has(staffIdClean) ||
-          activeStaffKeys.has(staffNameOrig) ||
-          activeStaffKeys.has(staffNameClean) ||
-          activeStaffKeys.has(staffShiMeiClean);
+      // 3. 当日のシフト出勤者
+      const isShiftScheduled = scheduledStaffIds && scheduledStaffIds.size > 0 && isStaffMatched(staff, Array.from(scheduledStaffIds));
 
-        return isUserSelected || hasActiveTaskToday;
-      });
-    }
+      return isUserSelected || hasActiveTaskToday || isShiftScheduled;
+    });
 
     // スイッチOFF時は純粋管理者(Admin)のみ非表示(現場兼務者は表示)
     if (!showManagement) {
@@ -461,18 +460,37 @@ export default function DashboardPage() {
         setPresentStaffIds(new Set(attendedStaffIds));
         setScheduledStaffIds(createNormalizedKeySet(finalScheduledEntries));
 
-        // シフト出勤者を自動で表示選択（setSelectedStaffIds）にマージ
-        if (finalScheduledEntries.length > 0 && allStaff && allStaff.length > 0) {
-          const shiftStaffIds: string[] = [];
+        // シフト出勤者および作業チップ割当者を自動で表示選択（setSelectedStaffIds）にマージ
+        if (allStaff && allStaff.length > 0) {
+          const autoSelectIds: string[] = [];
+
+          // 当日の作業チップ割り当て済みスタッフキーを抽出
+          const activeTaskStaffKeys = new Set<string>();
+          if (scheduleEvents && scheduleEvents.length > 0) {
+            const targetDateStr = format(currentDate, 'yyyy-MM-dd');
+            scheduleEvents.forEach(e => {
+              const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
+              if (isValid(evStart) && format(evStart, 'yyyy-MM-dd') === targetDateStr) {
+                if (e.staffId && e.staffId !== 'unassigned') {
+                  activeTaskStaffKeys.add(String(e.staffId).trim());
+                  activeTaskStaffKeys.add(String(e.staffId).trim().replace(/[\s\u3000]+/g, ''));
+                }
+              }
+            });
+          }
+
           allStaff.forEach(staff => {
-            if (isStaffMatched(staff, finalScheduledEntries)) {
-              if (staff.id) shiftStaffIds.push(staff.id);
+            const isScheduled = finalScheduledEntries.length > 0 && isStaffMatched(staff, finalScheduledEntries);
+            const hasTask = isStaffMatched(staff, Array.from(activeTaskStaffKeys));
+            if (isScheduled || hasTask) {
+              if (staff.id) autoSelectIds.push(staff.id);
             }
           });
-          if (shiftStaffIds.length > 0) {
-            const missingIds = shiftStaffIds.filter(id => !appliedSelectedStaffIds.includes(id));
+
+          if (autoSelectIds.length > 0) {
+            const missingIds = autoSelectIds.filter(id => !appliedSelectedStaffIds.includes(id));
             if (missingIds.length > 0) {
-              setSelectedStaffIds(prev => Array.from(new Set([...prev, ...shiftStaffIds])));
+              setSelectedStaffIds(prev => Array.from(new Set([...prev, ...autoSelectIds])));
             }
           }
         }
