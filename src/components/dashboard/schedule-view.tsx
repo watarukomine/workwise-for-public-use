@@ -3208,8 +3208,8 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     dynamicBgColor = 'rgb(239 68 68)'; // Vivid Red for cancelled tasks
     textColorClass = 'text-white font-bold';
   } else if (isTravelEvent) {
-    // 輝度を上げて同じ色を白っぽく（文字色は受注チップと同じ textColorClass で統一）
-    dynamicBgColor = lightenColor(dynamicBgColor, 0.45);
+    // 輝度をさらに上げて（0.78）、より一層白く薄い背景色に（文字色は受注チップと統一）
+    dynamicBgColor = lightenColor(dynamicBgColor, 0.78);
   }
 
   if (!isCancelled) {
