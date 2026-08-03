@@ -3204,14 +3204,14 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     return `${str}本`;
   };
 
-  const equipmentStatus = targetEvent.raw ? findKey(targetEvent.raw, ['機材有無']) : undefined;
+  const equipmentStatus = targetEvent.equipmentStatus || (targetEvent.raw ? findKey(targetEvent.raw, ['機材有無']) : undefined);
   const equipmentSymbol = getStatusSymbol(equipmentStatus);
-  const tireSize = targetEvent.raw ? findKey(targetEvent.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined;
-  const honsu = targetEvent.raw ? findKey(targetEvent.raw, ['本数', 'honsu']) : undefined;
-  const carName_val = targetEvent.raw ? findKey(targetEvent.raw, ["車名", "車両", "車種"]) : undefined;
-  const regNo = targetEvent.raw ? findKey(targetEvent.raw, ["登録ナンバー(下４桁)", "登録ナンバー", "ナンバー", "車番", "登録番号"]) : undefined;
-  const arrangement = targetEvent.raw ? findKey(targetEvent.raw, ["タイヤ手配状況", "手配"]) : undefined;
-  const disposal = targetEvent.raw ? findKey(targetEvent.raw, ["廃タイヤ処分", "廃タイヤ"]) : undefined;
+  const tireSize = targetEvent.tireSize || (targetEvent.raw ? findKey(targetEvent.raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined);
+  const honsu = targetEvent.quantity || (targetEvent.raw ? findKey(targetEvent.raw, ['本数', 'honsu']) : undefined);
+  const carName_val = targetEvent.carName || (targetEvent.raw ? findKey(targetEvent.raw, ["車名", "車両", "車種"]) : undefined);
+  const regNo = targetEvent.regNo || (targetEvent.raw ? findKey(targetEvent.raw, ["登録ナンバー(下４桁)", "登録ナンバー", "ナンバー", "車番", "登録番号"]) : undefined);
+  const arrangement = targetEvent.arrangement || (targetEvent.raw ? findKey(targetEvent.raw, ["タイヤ手配状況", "手配"]) : undefined);
+  const disposal = targetEvent.disposal || (targetEvent.raw ? findKey(targetEvent.raw, ["廃タイヤ処分", "廃タイヤ"]) : undefined);
 
   const rawCustomerName = targetEvent.customerName || (targetEvent.raw ? findKey(targetEvent.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined);
   const cleanCustomerName = (rawCustomerName && rawCustomerName !== '（店舗名未設定）' && rawCustomerName !== '(店舗名未設定)' && rawCustomerName !== '店舗名未設定') ? rawCustomerName : undefined;
