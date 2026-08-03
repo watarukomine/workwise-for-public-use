@@ -477,9 +477,26 @@ export default function DashboardPage() {
     };
   }, [currentDate]);
 
+  // Listen to background attendance refreshes to dynamically update punch/checkout status without UI freeze
+  useEffect(() => {
+    const handleAttendanceRefresh = (e: Event) => {
+      const customEvent = e as CustomEvent<{ docId: string; data: { staffIds: string[], checkedOutIds: string[], scheduledStaffIds: string[] } }>;
+      const { docId, data } = customEvent.detail;
+      
+      const currentDocId = format(currentDate, 'yyyy-MM-dd');
+      if (docId === currentDocId) {
+        console.log(`[Dashboard] Dynamically updating background attendance for ${docId}`);
+        setCheckedOutStaffIds(new Set(data.checkedOutIds));
+        setPresentStaffIds(new Set(data.staffIds));
+        setScheduledStaffIds(new Set(data.scheduledStaffIds));
+      }
+    };
 
-
-
+    window.addEventListener('attendance_refreshed', handleAttendanceRefresh);
+    return () => {
+      window.removeEventListener('attendance_refreshed', handleAttendanceRefresh);
+    };
+  }, [currentDate]);
 
   // Persistent selection hooks and auto-refresh logic
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
