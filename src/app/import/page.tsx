@@ -500,6 +500,26 @@ export default function ImportPage() {
             if (!docData.name && staffName) {
               docData.name = staffName;
             }
+
+            // Correct mapping for password and email from raw data
+            if (!docData.password) {
+              const pwdVal = raw['パスワード'] || raw['password'];
+              if (pwdVal) docData.password = String(pwdVal).trim();
+            }
+            if (!docData.email) {
+              const emailVal = raw['メールアドレス'] || raw['メール'] || raw['email'];
+              if (emailVal) docData.email = String(emailVal).trim();
+            }
+
+            // Convert controller ⚪︎/○/true -> boolean
+            const ctrlVal = String(raw['コントローラー'] || raw['controller'] || '').trim();
+            docData.controller = ctrlVal === '⚪︎' || ctrlVal === '○' || ctrlVal === '1' || ctrlVal.toLowerCase() === 'true';
+
+            // Ensure id field is always populated within the document data
+            const idVal = raw['スタッフID'] || raw['スタッフID'] || raw['id'] || raw['ID'] || docData.staffId || docData.id;
+            if (idVal) {
+              docData.id = String(idVal).trim();
+            }
           }
 
           docData.raw = raw;
@@ -508,12 +528,16 @@ export default function ImportPage() {
 
           try {
             let docRef;
+            let finalCollName = collName;
+            if (collName === 'staff') {
+              finalCollName = 'users';
+            }
             const idVal = idColumn !== '__auto__' ? docData[FIELD_MAPPINGS[idColumn] || idColumn] : null;
             
             if (idVal) {
-              docRef = doc(firestore, collName, String(idVal));
+              docRef = doc(firestore, finalCollName, String(idVal));
             } else {
-              docRef = doc(collection(firestore, collName));
+              docRef = doc(collection(firestore, finalCollName));
             }
 
             if (mergeMode) {
