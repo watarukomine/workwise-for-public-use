@@ -84,17 +84,36 @@ export const normalizeDateStr = (dStr: any): string => {
   return String(dStr).replace(/\//g, '-').trim();
 };
 
-const normalizeKey = (s: string) => s.replace(/[\s\u3000]+/g, '').toLowerCase();
+const normKeyCache = new Map<string, string>();
+const normalizeKey = (s: string): string => {
+  let cached = normKeyCache.get(s);
+  if (cached !== undefined) return cached;
+  cached = s.replace(/[\s\u3000]+/g, '').toLowerCase();
+  if (normKeyCache.size > 2000) normKeyCache.clear();
+  normKeyCache.set(s, cached);
+  return cached;
+};
 
-export function findKey(item: any, possibleKeys: string[]) {
+export function findKey(item: any, possibleKeys: string[]): any {
   if (!item || typeof item !== 'object') {
     return undefined;
   }
 
-  for (const key of possibleKeys) {
-    const normKey = normalizeKey(key);
-    for (const itemKey of Object.keys(item)) {
-      if (normalizeKey(itemKey) === normKey) {
+  // Fast path 1: Direct key lookup O(1)
+  for (let i = 0; i < possibleKeys.length; i++) {
+    const key = possibleKeys[i];
+    if (item[key] !== undefined && item[key] !== null) {
+      return item[key];
+    }
+  }
+
+  // Fast path 2: Normalized lookup O(K) without inner Object.keys allocation
+  const keys = Object.keys(item);
+  for (let i = 0; i < possibleKeys.length; i++) {
+    const normTarget = normalizeKey(possibleKeys[i]);
+    for (let j = 0; j < keys.length; j++) {
+      const itemKey = keys[j];
+      if (normalizeKey(itemKey) === normTarget) {
         return item[itemKey];
       }
     }
