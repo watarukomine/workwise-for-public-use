@@ -6,7 +6,7 @@ import {
 } from '../ui/table';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
-import { Search, Trash2, Download, Loader2, Check, Settings2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Trash2, Download, Loader2, Check, Settings2, ArrowUp, ArrowDown, Upload } from 'lucide-react';
 import { cn, isStaffMatched } from '../../lib/utils';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -17,6 +17,7 @@ import { useOrder } from '../../contexts/order-context';
 import { useUserProfile } from '../../hooks/use-user-profile';
 import { useToast } from '@/hooks/use-toast';
 import { StaffService } from '@/services/staff-service';
+import { ImportModal } from '@/components/import/import-modal';
 import { STORE_COLORS } from '../../lib/constants';
 import { Staff, WithId } from '../../lib/types';
 import { format } from 'date-fns';
@@ -310,6 +311,15 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                 </PopoverContent>
               </Popover>
               <Button onClick={applyPendingSelection} size="sm" className="gap-1.5"><Check className="h-3.5 w-3.5" /> 選択を適用</Button>
+              <ImportModal
+                targetCollection="users"
+                trigger={
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    <Upload className="h-3.5 w-3.5" />
+                    CSVインポート
+                  </Button>
+                }
+              />
             </div>
           </div>
 

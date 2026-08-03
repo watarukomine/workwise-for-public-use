@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useToast } from '@/hooks/use-toast';
 import { CustomerService } from '@/services/customer-service';
+import { ImportModal } from '@/components/import/import-modal';
 import { format } from 'date-fns';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -280,6 +281,15 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
                 </PopoverContent>
               </Popover>
               <Button variant="outline" size="sm" onClick={() => exportToCSV(filteredCustomers, displayColumns)} disabled={filteredCustomers.length === 0} className="gap-1.5"><Download className="h-3.5 w-3.5" /> CSV出力</Button>
+              <ImportModal
+                targetCollection="customers"
+                trigger={
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    <Download className="h-3.5 w-3.5 rotate-180" />
+                    CSVインポート
+                  </Button>
+                }
+              />
               {isAdmin && <Button size="sm" onClick={handleAddRow} disabled={isCreating} className="gap-1.5">{isCreating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}新規追加</Button>}
             </div>
           </div>

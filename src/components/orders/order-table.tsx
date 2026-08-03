@@ -17,6 +17,7 @@ import { format, isValid, parseISO } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useOrder } from '@/contexts/order-context';
 import { Badge } from '@/components/ui/badge';
+import { ImportModal } from '@/components/import/import-modal';
 
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
@@ -528,6 +529,15 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
               <Download className="h-4 w-4" />
               CSVエクスポート
             </Button>
+            <ImportModal
+              targetCollection="orders"
+              trigger={
+                <Button variant="outline" className="flex items-center gap-2">
+                  <Download className="h-4 w-4 rotate-180" />
+                  CSVインポート
+                </Button>
+              }
+            />
           </div>
         </div>
         <ScrollArea className="h-[60vh] rounded-md border">
