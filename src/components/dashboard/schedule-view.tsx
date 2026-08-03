@@ -1516,95 +1516,43 @@ export function ScheduleView({
 
             for (let i = 0; i < eventsToCreate.length; i++) {
               const ev = eventsToCreate[i];
-              const res = await createTask({
+              const taskId = ev.id || `task-${Date.now()}`;
+
+              // 1. Immediate Direct Firestore Persistence for Generic Task (Ensures task never disappears on refetch)
+              try {
+                const { OrderService } = await import('@/services/order-service');
+                await OrderService.createOrder({
+                  id: taskId,
+                  systemId: taskId,
+                  title: ev.title,
+                  _type: 'task' as any,
+                  isGeneric: true,
+                  taskDetails: ev.title,
+                  customerName: ev.title,
+                  staffId: newStaffId,
+                  staffName: staff.name,
+                  picName: staff.name,
+                  scheduledDate: format(safeParseISO(ev.start), 'yyyy/MM/dd'),
+                  scheduledTime: format(safeParseISO(ev.start), "yyyy/MM/dd'T'HH:mm:ss"),
+                  scheduledEndTime: format(safeParseISO(ev.end), "yyyy/MM/dd'T'HH:mm:ss"),
+                  estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string)) || 60,
+                  status: '割当済'
+                });
+              } catch (dbErr) {
+                console.warn('Failed to save generic task to Firestore:', dbErr);
+              }
+
+              // 2. Backup to GAS Spreadsheet
+              createTask({
                 gasUrl: ORDER_GAS_URL,
                 staffName: staff.name,
                 taskName: ev.title,
                 startTime: ev.start as string,
                 endTime: ev.end as string,
                 estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string))
-              });
-
-              if (res.eventId) {
-                const realId = res.eventId;
-                const derivedTripId = `trip-${realId}`;
-                const frontendTaskId = `${derivedTripId}-task`;
-                const frontendTravelId = `${derivedTripId}-travel`;
-
-                // 2. Direct Firestore Persistence for Generic Task!
-                try {
-                  await OrderService.createOrder({
-                    id: realId,
-                    systemId: realId,
-                    displayId: realId,
-                    _type: 'order',
-                    isGeneric: true,
-                    taskDetails: ev.title,
-                    customerName: ev.title,
-                    staffId: newStaffId,
-                    staffName: staff.name,
-                    scheduledDate: format(safeParseISO(ev.start), 'yyyy/MM/dd'),
-                    scheduledTime: format(safeParseISO(ev.start), 'yyyy/MM/dd HH:mm:ss'),
-                    scheduledEndTime: format(safeParseISO(ev.end), 'yyyy/MM/dd HH:mm:ss'),
-                    estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string)),
-                    status: '割当済'
-                  });
-                } catch (dbErr) {
-                  console.warn('Failed to save generic task to Firestore:', dbErr);
-                }
-
-                if (isGenericAccompany) {
-                  // Update IDs for BOTH events (Task and Travel) via tripId association
-                  // We need to find the OLD IDs.
-                  // ev.tripId should be `trip-event-...`
-                  const oldTripId = ev.tripId;
-                  if (oldTripId) {
-                    // Update Local Persistence
-                    // 1. Delete Old Events
-                    const eventsToRemove = newEvents.filter(e => e.tripId === oldTripId);
-                    eventsToRemove.forEach(e => deleteLocalEvent(e.id));
-
-                    // 2. Create New Events with Real IDs
-                    const travelEv = newEvents.find(e => e.id.endsWith('-travel') && e.tripId === oldTripId);
-                    const taskEv = newEvents.find(e => e.id.endsWith('-task') && e.tripId === oldTripId);
-
-                    if (travelEv) {
-                      const newTravel = { ...travelEv, id: frontendTravelId, tripId: derivedTripId };
-                      saveLocalEvent(newTravel);
-                    }
-                    if (taskEv) {
-                      const newTask = { ...taskEv, id: frontendTaskId, tripId: derivedTripId };
-                      saveLocalEvent(newTask);
-                    }
-
-                    // Update State
-                    setScheduleEvents(prev => prev.map(e => {
-                      if (e.tripId === oldTripId) {
-                        if (e.id.endsWith('-task')) return { ...e, id: frontendTaskId, tripId: derivedTripId };
-                        if (e.id.endsWith('-travel')) return { ...e, id: frontendTravelId, tripId: derivedTripId };
-                      }
-                      return e;
-                    }));
-                  }
-                } else {
-                  // Normal Generic Task (Single)
-                  const derivedTripId = `trip-${realId}`;
-                  const frontendId = `${derivedTripId}-task`;
-
-                  updatedEvents[i] = {
-                    ...ev,
-                    id: frontendId,
-                    tripId: derivedTripId
-                  };
-                  deleteLocalEvent(ev.id);
-                  saveLocalEvent(updatedEvents[i]);
-                  setScheduleEvents(prev => prev.map(e => e.id === ev.id ? updatedEvents[i] : e));
-                }
-              }
+              }).catch(err => console.warn('GAS createTask warning:', err));
             }
             toast({ title: "アクションログを保存しました" });
-            // await new Promise(resolve => setTimeout(resolve, 1500));
-            // await refetchOrders(); // No longer strictly needed if state is updated correctly, but good for sync
           } else {
             // Updating Real Order
             const taskEvent = newEvents.find(e => e.id.endsWith('-task'));
@@ -1960,13 +1908,16 @@ export function ScheduleView({
           OrderService.createOrder({
             id: frontendId,
             systemId: frontendId,
-            customerName: submitDetails.title || '社内作業',
+            title: submitDetails.title || '商談',
+            customerName: submitDetails.title || '商談',
             workType: '作業',
-            taskDetails: submitDetails.description || submitDetails.title,
+            taskDetails: submitDetails.description || submitDetails.title || '商談',
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
-            scheduledTime: format(newStart, 'HH:mm'),
-            scheduledEndTime: format(finalEnd, 'HH:mm'),
+            scheduledTime: format(newStart, "yyyy/MM/dd'T'HH:mm:ss"),
+            scheduledEndTime: format(finalEnd, "yyyy/MM/dd'T'HH:mm:ss"),
             estimatedDuration: durationMinutes,
+            staffId: staff.id,
+            staffName: staff.name,
             picName: staff.name,
             status: '割当済',
             _type: 'task' as any

@@ -215,10 +215,10 @@ export const OrderService = {
           id: systemId,
           displayId: displayId,
           systemId: systemId,
-          _type: 'order' as const,
+          _type: data._type || ('order' as const),
           createdAt: now,
           updatedAt: now,
-          status: data.status || '未割当',
+          status: data.status || '割当済',
           isGasSynced: false
         };
 

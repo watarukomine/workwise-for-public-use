@@ -62,6 +62,7 @@ export type Order = {
   customerName?: string;
   address: string;
   taskDetails: string;
+  title?: string;
   serviceType: string;
   workType?: string;
   status: string;
