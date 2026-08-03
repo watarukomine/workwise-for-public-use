@@ -3200,7 +3200,7 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
   const isTravelEvent = targetEvent.title?.startsWith('移動');
 
   let dynamicBgColor = staff.color || 'hsl(var(--primary))';
-  let textColorClass = 'text-white';
+  let textColorClass = getContrastingTextColor(dynamicBgColor) === '#FFFFFF' ? 'text-white' : 'text-black';
 
   const isCancelled = targetEvent.status === 'キャンセル' || (targetEvent as any).statusValue === 'キャンセル';
 
@@ -3208,9 +3208,8 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     dynamicBgColor = 'rgb(239 68 68)'; // Vivid Red for cancelled tasks
     textColorClass = 'text-white font-bold';
   } else if (isTravelEvent) {
-    // 輝度を上げて同じ色を白っぽくし、文字はくっきり見やすく
+    // 輝度を上げて同じ色を白っぽく（文字色は受注チップと同じ textColorClass で統一）
     dynamicBgColor = lightenColor(dynamicBgColor, 0.45);
-    textColorClass = 'text-slate-900 font-bold';
   }
 
   if (!isCancelled) {
@@ -3276,7 +3275,7 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
         "w-full h-full rounded-md flex flex-col justify-center p-1 relative dynamic-bg dynamic-width transition-all", 
         textColorClass, 
         isDragging && !isOverlay && "opacity-50",
-        isTravelEvent && "border border-dashed border-slate-400/80 shadow-none font-semibold"
+        isTravelEvent && "border border-dashed border-current/40 shadow-none font-semibold"
       )}
       {...{ 'style': { '--dynamic-bg-color': dynamicBgColor, '--dynamic-width': isOverlay ? `${width}px` : '100%' } as any }}
     >
