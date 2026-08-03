@@ -240,32 +240,25 @@ export default function DashboardPage() {
       });
     }
 
-    // シフト出勤者、当日作業チップ割り当て済み者、または手動選択されたスタッフのみを表示
+    // レ点チェックがONになっているスタッフをタイムラインに表示
     let selectedStaff = staffToUse.filter((staff: any) => {
+      if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
+        const isShiftScheduled = scheduledStaffIds && scheduledStaffIds.size > 0 && isStaffMatched(staff, Array.from(scheduledStaffIds));
+        const hasTask = isStaffMatched(staff, Array.from(activeStaffKeys));
+        return isShiftScheduled || hasTask;
+      }
+
       const staffIdClean = String(staff.id || '').trim();
       const staffNameClean = String(staff.name || '').trim().replace(/[\s\u3000]+/g, '');
       const staffNameOrig = String(staff.name || '').trim();
       const staffShiMeiClean = String(staff['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
 
-      // 1. 手動選択
-      const isUserSelected = appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0 && (
+      return (
         appliedSelectedStaffIds.includes(staffIdClean) ||
         appliedSelectedStaffIds.includes(staffNameOrig) ||
         appliedSelectedStaffIds.includes(staffNameClean) ||
         appliedSelectedStaffIds.includes(staffShiMeiClean)
       );
-
-      // 2. 当日作業チップ(タスク)割り当て済み
-      const hasActiveTaskToday = 
-        activeStaffKeys.has(staffIdClean) ||
-        activeStaffKeys.has(staffNameOrig) ||
-        activeStaffKeys.has(staffNameClean) ||
-        activeStaffKeys.has(staffShiMeiClean);
-
-      // 3. 当日のシフト出勤者
-      const isShiftScheduled = scheduledStaffIds && scheduledStaffIds.size > 0 && isStaffMatched(staff, Array.from(scheduledStaffIds));
-
-      return isUserSelected || hasActiveTaskToday || isShiftScheduled;
     });
 
     // スイッチOFF時は純粋管理者(Admin)のみ非表示(現場兼務者は表示)
@@ -460,7 +453,36 @@ export default function DashboardPage() {
         setPresentStaffIds(new Set(attendedStaffIds));
         setScheduledStaffIds(createNormalizedKeySet(finalScheduledEntries));
 
-        // setSelectedStaffIdsへの自動流し込みを廃止（手動選択のみ保持し、タイムラインは動的判定）
+        // シフト出勤者および作業チップ割当者のみをデフォルトでレ点チェックONに設定
+        if (allStaff && allStaff.length > 0) {
+          const activeStaffIdsForToday: string[] = [];
+
+          // 当日の作業チップ割り当て済みスタッフキーを抽出
+          const activeTaskStaffKeys = new Set<string>();
+          if (scheduleEvents && scheduleEvents.length > 0) {
+            const targetDateStr = format(currentDate, 'yyyy-MM-dd');
+            scheduleEvents.forEach(e => {
+              const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
+              if (isValid(evStart) && format(evStart, 'yyyy-MM-dd') === targetDateStr) {
+                if (e.staffId && e.staffId !== 'unassigned') {
+                  activeTaskStaffKeys.add(String(e.staffId).trim());
+                  activeTaskStaffKeys.add(String(e.staffId).trim().replace(/[\s\u3000]+/g, ''));
+                }
+              }
+            });
+          }
+
+          allStaff.forEach(staff => {
+            const isScheduled = finalScheduledEntries.length > 0 && isStaffMatched(staff, finalScheduledEntries);
+            const hasTask = isStaffMatched(staff, Array.from(activeTaskStaffKeys));
+            if (isScheduled || hasTask) {
+              if (staff.id) activeStaffIdsForToday.push(staff.id);
+            }
+          });
+
+          // 出勤者＋タスク割当者のみをレ点チェックONに設定
+          setSelectedStaffIds(Array.from(new Set(activeStaffIdsForToday)));
+        }
 
 
       } catch (e) {
