@@ -135,12 +135,7 @@ export default function StaffPage() {
           }
         });
 
-        if (activeStaffIdsToday.size > 0 && !cancelled) {
-          const missingIds = Array.from(activeStaffIdsToday).filter(id => !appliedSelectedStaffIds.includes(id));
-          if (missingIds.length > 0) {
-            setSelectedStaffIds(prev => Array.from(new Set([...prev, ...activeStaffIdsToday])));
-          }
-        }
+        // setSelectedStaffIdsへの自動流し込みを廃止（手動選択のみ保持）
       } catch (e) {
         console.warn('Failed to fetch shift attendance in StaffPage:', e);
       }

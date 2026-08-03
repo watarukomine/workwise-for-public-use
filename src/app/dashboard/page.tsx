@@ -460,40 +460,7 @@ export default function DashboardPage() {
         setPresentStaffIds(new Set(attendedStaffIds));
         setScheduledStaffIds(createNormalizedKeySet(finalScheduledEntries));
 
-        // シフト出勤者および作業チップ割当者を自動で表示選択（setSelectedStaffIds）にマージ
-        if (allStaff && allStaff.length > 0) {
-          const autoSelectIds: string[] = [];
-
-          // 当日の作業チップ割り当て済みスタッフキーを抽出
-          const activeTaskStaffKeys = new Set<string>();
-          if (scheduleEvents && scheduleEvents.length > 0) {
-            const targetDateStr = format(currentDate, 'yyyy-MM-dd');
-            scheduleEvents.forEach(e => {
-              const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
-              if (isValid(evStart) && format(evStart, 'yyyy-MM-dd') === targetDateStr) {
-                if (e.staffId && e.staffId !== 'unassigned') {
-                  activeTaskStaffKeys.add(String(e.staffId).trim());
-                  activeTaskStaffKeys.add(String(e.staffId).trim().replace(/[\s\u3000]+/g, ''));
-                }
-              }
-            });
-          }
-
-          allStaff.forEach(staff => {
-            const isScheduled = finalScheduledEntries.length > 0 && isStaffMatched(staff, finalScheduledEntries);
-            const hasTask = isStaffMatched(staff, Array.from(activeTaskStaffKeys));
-            if (isScheduled || hasTask) {
-              if (staff.id) autoSelectIds.push(staff.id);
-            }
-          });
-
-          if (autoSelectIds.length > 0) {
-            const missingIds = autoSelectIds.filter(id => !appliedSelectedStaffIds.includes(id));
-            if (missingIds.length > 0) {
-              setSelectedStaffIds(prev => Array.from(new Set([...prev, ...autoSelectIds])));
-            }
-          }
-        }
+        // setSelectedStaffIdsへの自動流し込みを廃止（手動選択のみ保持し、タイムラインは動的判定）
 
 
       } catch (e) {

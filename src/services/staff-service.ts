@@ -213,10 +213,10 @@ export const StaffService = {
     async updateStaff(id: string, data: Partial<Staff>): Promise<void> {
         const { firestore } = initializeFirebase();
         const docRef = doc(firestore, COLLECTION, id);
-        await updateDoc(docRef, {
+        await setDoc(docRef, {
             ...data,
             updatedAt: serverTimestamp()
-        });
+        }, { merge: true });
     },
 
     /**
