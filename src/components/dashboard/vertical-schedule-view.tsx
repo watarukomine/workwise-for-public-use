@@ -3,6 +3,7 @@
 import * as React from 'react';
 import type { WithId, Staff, Customer } from '../../lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Badge } from '../ui/badge';
 import { format, parseISO, isEqual, startOfDay, isValid } from 'date-fns';
 import { Clock, MapPin, Briefcase } from 'lucide-react';
 import { cn, findKey } from '../../lib/utils';
@@ -16,6 +17,7 @@ interface VerticalScheduleViewProps {
   staffData: WithId<Staff>[];
   currentDate: Date;
   checkedOutStaffIds?: Set<string>;
+  scheduledStaffIds?: Set<string>;
 }
 
 const formatTime = (date: Date | string | undefined) => {
@@ -25,7 +27,7 @@ const formatTime = (date: Date | string | undefined) => {
   return format(d, 'HH:mm');
 };
 
-export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffIds }: VerticalScheduleViewProps) {
+export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffIds, scheduledStaffIds }: VerticalScheduleViewProps) {
   const { customers } = useCustomer();
   const { scheduleEvents, orders } = useOrder();
   const { profile } = useUserProfile();
@@ -175,11 +177,26 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
                 </div>
               )}
 
-              {staffMember && (
-                <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  担当: {staffMember.name}
-                </div>
-              )}
+              {staffMember && (() => {
+                const isShiftOn = !scheduledStaffIds || scheduledStaffIds.size === 0 || (() => {
+                  const id = String(staffMember.id || '').trim();
+                  const name = String(staffMember.name || '').trim();
+                  const cleanName = name.replace(/[\s\u3000]+/g, '');
+                  const shiMei = String((staffMember as any)['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
+                  return scheduledStaffIds.has(id) || scheduledStaffIds.has(name) || scheduledStaffIds.has(cleanName) || (shiMei !== '' && scheduledStaffIds.has(shiMei));
+                })();
+
+                return (
+                  <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 flex-wrap">
+                    <span>担当: {staffMember.name}</span>
+                    {!isShiftOn && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-100 text-amber-800 border-amber-300 font-bold dark:bg-amber-950 dark:text-amber-300 dark:border-amber-700">
+                        シフト外
+                      </Badge>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 space-y-1 text-xs text-slate-800 dark:text-slate-200">
                 {carName && <div><span className="font-bold text-slate-500">車種:</span> {carName}</div>}

@@ -883,12 +883,14 @@ export default function DashboardPage() {
             staffData={filteredStaff}
             currentDate={deferredDate}
             checkedOutStaffIds={checkedOutStaffIds}
+            scheduledStaffIds={scheduledStaffIds}
           />
         ) : (
           <ScheduleView
             staffData={filteredStaff}
             currentDate={deferredDate}
             checkedOutStaffIds={checkedOutStaffIds}
+            scheduledStaffIds={scheduledStaffIds}
             statuses={derivedStatuses}
           />
         )}

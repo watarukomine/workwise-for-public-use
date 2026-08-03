@@ -29,6 +29,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../ui/card';
+import { Badge } from '../ui/badge';
 import {
   Tooltip,
   TooltipContent,
@@ -344,6 +345,7 @@ interface ScheduleViewProps {
   currentDate: Date;
   statuses: StaffStatus[];
   checkedOutStaffIds?: Set<string>;
+  scheduledStaffIds?: Set<string>;
 }
 
 const genericTasks: WithId<Order>[] = [
@@ -553,6 +555,8 @@ export function ScheduleView({
   staffData,
   currentDate,
   statuses,
+  checkedOutStaffIds,
+  scheduledStaffIds,
 }: ScheduleViewProps) {
   const { profile } = useUserProfile();
   const isAdmin = profile?.role === 'admin';
@@ -2447,6 +2451,7 @@ export function ScheduleView({
                             onDoubleClickEvent={handleDoubleClickEvent} 
                             onDoubleClickTimeline={handleDoubleClickTimeline} 
                             isToday={isToday(currentDate)}
+                            scheduledStaffIds={scheduledStaffIds}
                           />
                         );
                       })}
@@ -3074,12 +3079,21 @@ interface StaffRowProps {
   onDoubleClickEvent: (event: WithId<ScheduleEvent>) => void;
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
   isToday: boolean;
+  scheduledStaffIds?: Set<string>;
 }
 
-const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomerByCode, onDoubleClickEvent, onDoubleClickTimeline, isToday }) => {
+const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomerByCode, onDoubleClickEvent, onDoubleClickTimeline, isToday, scheduledStaffIds }) => {
   const { setNodeRef, isOver } = useDroppable({ id: staff.id });
   const { toggleTripSuppression } = useOrder();
   const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
+
+  const isShiftOn = !scheduledStaffIds || scheduledStaffIds.size === 0 || (() => {
+    const id = String(staff.id || '').trim();
+    const name = String(staff.name || '').trim();
+    const cleanName = name.replace(/[\s\u3000]+/g, '');
+    const shiMei = String((staff as any)['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
+    return scheduledStaffIds.has(id) || scheduledStaffIds.has(name) || scheduledStaffIds.has(cleanName) || (shiMei !== '' && scheduledStaffIds.has(shiMei));
+  })();
 
   const emergencyEvent = events.find(e => e.isEmergency);
 
@@ -3101,9 +3115,14 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
         </div>
       )}
       <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit w-[144px]")}>
-        <div className="font-semibold flex items-center gap-2 w-full truncate">
-          <div className='w-2 h-8 rounded-full dynamic-bg' {...{ 'style': { '--dynamic-bg-color': staff.color } as any }}></div>
-          <span className='truncate flex-1'>{staff.name}</span>
+        <div className="font-semibold flex items-center gap-1.5 w-full truncate">
+          <div className='w-2 h-8 rounded-full dynamic-bg shrink-0' {...{ 'style': { '--dynamic-bg-color': staff.color } as any }}></div>
+          <span className='truncate flex-1 min-w-0'>{staff.name}</span>
+          {!isShiftOn && (
+            <Badge variant="outline" className="text-[9px] px-1 py-0 bg-amber-100 text-amber-800 border-amber-300 font-bold shrink-0 leading-tight dark:bg-amber-950 dark:text-amber-300 dark:border-amber-700">
+              シフト外
+            </Badge>
+          )}
         </div>
       </div>
       <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
