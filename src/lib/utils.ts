@@ -561,10 +561,26 @@ export function getContrastingTextColor(hexColor: string): string {
 }
 
 export function hexToHsl(color: string): { h: number, s: number, l: number } | null {
-  let r = 0, g = 0, b = 0;
+  if (!color || typeof color !== 'string') return null;
 
-  if (color.startsWith('#')) {
-    const hex = color.slice(1);
+  let str = color.trim();
+
+  // 1. HSL format parsing: hsl(300, 70%, 50%) or hsla(...)
+  if (str.startsWith('hsl')) {
+    const match = str.match(/hsl(?:a)?\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%/i);
+    if (match) {
+      const h = parseFloat(match[1]) / 360;
+      const s = parseFloat(match[2]) / 100;
+      const l = parseFloat(match[3]) / 100;
+      return { h, s, l };
+    }
+  }
+
+  // 2. HEX format parsing: #fff, #ffffff, or hex without # (e.g. D946EF)
+  const isHexCandidate = str.startsWith('#') || /^[0-9a-fA-F]{3}$/.test(str) || /^[0-9a-fA-F]{6}$/.test(str);
+  if (isHexCandidate) {
+    const hex = str.startsWith('#') ? str.slice(1) : str;
+    let r = 0, g = 0, b = 0;
     if (hex.length === 3) {
       r = parseInt(hex[0] + hex[0], 16);
       g = parseInt(hex[1] + hex[1], 16);
@@ -574,37 +590,53 @@ export function hexToHsl(color: string): { h: number, s: number, l: number } | n
       g = parseInt(hex.substring(2, 4), 16);
       b = parseInt(hex.substring(4, 6), 16);
     }
-  } else if (color.startsWith('rgb')) {
-    const match = color.match(/\d+/g);
-    if (match) {
-      r = parseInt(match[0]);
-      g = parseInt(match[1]);
-      b = parseInt(match[2]);
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0, l = (max + min) / 2;
+
+    if (max !== min) {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+      }
+      h /= 6;
     }
-  } else {
-    return null;
+    return { h, s, l };
   }
 
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h = 0, s = 0, l = (max + min) / 2;
+  // 3. RGB format parsing: rgb(239, 68, 68) or rgb(239 68 68)
+  if (str.startsWith('rgb')) {
+    const match = str.match(/\d+/g);
+    if (match && match.length >= 3) {
+      let r = parseInt(match[0]) / 255;
+      let g = parseInt(match[1]) / 255;
+      let b = parseInt(match[2]) / 255;
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      let h = 0, s = 0, l = (max + min) / 2;
 
-  if (max !== min) {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-      case g: h = (b - r) / d + 2; break;
-      case b: h = (r - g) / d + 4; break;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      return { h, s, l };
     }
-    h /= 6;
   }
-  return { h, s, l };
+
+  return null;
 }
 
 export function darkenColor(color: string, amount: number): string {
   const hsl = hexToHsl(color);
-  if (!hsl) return color;
+  if (!hsl) return 'hsl(215, 16%, 47%)';
   
   let { h, s, l } = hsl;
   l = Math.max(0, l * (1 - amount));
@@ -614,7 +646,7 @@ export function darkenColor(color: string, amount: number): string {
 
 export function lightenColor(color: string, amount: number): string {
   const hsl = hexToHsl(color);
-  if (!hsl) return color;
+  if (!hsl) return 'hsl(210, 40%, 93%)';
   
   let { h, s, l } = hsl;
   // Lighten logic: Increase lightness towards 1.0
