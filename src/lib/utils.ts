@@ -773,3 +773,21 @@ export function isStaffMatched(staff: any, entries: (string | undefined | null)[
     return false;
   });
 }
+
+export function createNormalizedKeySet(entries: (string | undefined | null)[]): Set<string> {
+  const set = new Set<string>();
+  if (!entries) return set;
+  entries.forEach(e => {
+    if (!e) return;
+    const str = String(e).trim();
+    if (!str) return;
+    set.add(str);
+    set.add(str.toLowerCase());
+    const clean = str.replace(/[\s\u3000\u200B-\u200D\uFEFF]+/g, '');
+    if (clean) {
+      set.add(clean);
+      set.add(clean.toLowerCase());
+    }
+  });
+  return set;
+}

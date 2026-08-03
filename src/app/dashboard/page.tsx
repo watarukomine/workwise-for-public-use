@@ -1,6 +1,6 @@
 'use client';
 import * as React from 'react';
-import { mapRawToOrder, normalizeDateStr, findKey, cn, isEtaPassed } from '../../lib/utils';
+import { mapRawToOrder, normalizeDateStr, findKey, cn, isEtaPassed, createNormalizedKeySet, isStaffMatched } from '../../lib/utils';
 import { ScheduleView } from '../../components/dashboard/schedule-view';
 import { Staff, StaffStatus, WithId } from '../../lib/types';
 import { useSelectedStaff } from '../../contexts/selected-staff-context';
@@ -28,7 +28,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../../
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { isStaffMatched } from '../../lib/utils';
 import { getDailyAttendance, saveDailyAttendance, getDailyAttendanceDetails } from '../../services/attendance-service';
 import { AttendanceControls } from '../../components/dashboard/attendance-controls';
 import { STORE_ORDER } from '../../lib/constants';
@@ -460,21 +459,14 @@ export default function DashboardPage() {
 
         setCheckedOutStaffIds(new Set(checkedOutIds));
         setPresentStaffIds(new Set(attendedStaffIds));
-        setScheduledStaffIds(new Set(finalScheduledEntries));
+        setScheduledStaffIds(createNormalizedKeySet(finalScheduledEntries));
 
         // シフト出勤者を自動で表示選択（setSelectedStaffIds）にマージ
         if (finalScheduledEntries.length > 0 && allStaff && allStaff.length > 0) {
           const shiftStaffIds: string[] = [];
-          finalScheduledEntries.forEach(entry => {
-            const cleanKey = String(entry).trim();
-            const staffObj = allStaff.find(s => 
-              String(s.id).trim() === cleanKey || 
-              String(s.name).trim() === cleanKey ||
-              String(s.name).trim().replace(/[\s\u3000]+/g, '') === cleanKey.replace(/[\s\u3000]+/g, '') ||
-              ((s as any)['氏名'] && String((s as any)['氏名']).trim().replace(/[\s\u3000]+/g, '') === cleanKey.replace(/[\s\u3000]+/g, ''))
-            );
-            if (staffObj && staffObj.id) {
-              shiftStaffIds.push(staffObj.id);
+          allStaff.forEach(staff => {
+            if (isStaffMatched(staff, finalScheduledEntries)) {
+              if (staff.id) shiftStaffIds.push(staff.id);
             }
           });
           if (shiftStaffIds.length > 0) {

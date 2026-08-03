@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { format, parseISO, isEqual, startOfDay, isValid } from 'date-fns';
 import { Clock, MapPin, Briefcase } from 'lucide-react';
-import { cn, findKey } from '../../lib/utils';
+import { cn, findKey, isStaffMatched } from '../../lib/utils';
 import { useCustomer } from '../../contexts/customer-context';
 import Link from 'next/link';
 import { useOrder } from '../../contexts/order-context';
@@ -178,13 +178,7 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
               )}
 
               {staffMember && (() => {
-                const isShiftOn = !scheduledStaffIds || scheduledStaffIds.size === 0 || (() => {
-                  const id = String(staffMember.id || '').trim();
-                  const name = String(staffMember.name || '').trim();
-                  const cleanName = name.replace(/[\s\u3000]+/g, '');
-                  const shiMei = String((staffMember as any)['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
-                  return scheduledStaffIds.has(id) || scheduledStaffIds.has(name) || scheduledStaffIds.has(cleanName) || (shiMei !== '' && scheduledStaffIds.has(shiMei));
-                })();
+                const isShiftOn = !scheduledStaffIds || scheduledStaffIds.size === 0 || isStaffMatched(staffMember, Array.from(scheduledStaffIds));
 
                 return (
                   <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 flex-wrap">

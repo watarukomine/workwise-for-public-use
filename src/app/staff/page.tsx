@@ -19,6 +19,7 @@ import { AddStaffDialog } from '@/components/staff/add-staff-dialog';
 import { useOrder } from '@/contexts/order-context';
 import { format, parseISO, isValid } from 'date-fns';
 import { getDailyAttendanceDetails } from '@/services/attendance-service';
+import { isStaffMatched } from '@/lib/utils';
 
 export default function StaffPage() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
@@ -112,16 +113,9 @@ export default function StaffPage() {
         const august1DefaultStaff = ["佐藤耕次", "坂本幸夫", "杉山和彦", "福原泰弘", "水野一也", "内田巧", "千葉征英", "古石翔", "小堀健太", "湯川浩道", "岡本正博", "小松佑輔", "關雄弥"];
         const finalScheduledEntries = scheduledIds.length > 0 ? scheduledIds : (targetDateStr === '2026-08-01' ? august1DefaultStaff : augustCsvNames);
 
-        finalScheduledEntries.forEach(entry => {
-          const cleanKey = String(entry).trim();
-          const staffObj = allStaff.find(s => 
-            String(s.id).trim() === cleanKey || 
-            String(s.name).trim() === cleanKey ||
-            String(s.name).trim().replace(/[\s\u3000]+/g, '') === cleanKey.replace(/[\s\u3000]+/g, '') ||
-            ((s as any)['氏名'] && String((s as any)['氏名']).trim().replace(/[\s\u3000]+/g, '') === cleanKey.replace(/[\s\u3000]+/g, ''))
-          );
-          if (staffObj && staffObj.id) {
-            activeStaffIdsToday.add(staffObj.id);
+        allStaff.forEach(staff => {
+          if (isStaffMatched(staff, finalScheduledEntries)) {
+            if (staff.id) activeStaffIdsToday.add(staff.id);
           }
         });
 

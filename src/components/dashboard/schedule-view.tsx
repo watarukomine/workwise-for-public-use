@@ -3087,13 +3087,7 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
   const { toggleTripSuppression } = useOrder();
   const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
 
-  const isShiftOn = !scheduledStaffIds || scheduledStaffIds.size === 0 || (() => {
-    const id = String(staff.id || '').trim();
-    const name = String(staff.name || '').trim();
-    const cleanName = name.replace(/[\s\u3000]+/g, '');
-    const shiMei = String((staff as any)['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
-    return scheduledStaffIds.has(id) || scheduledStaffIds.has(name) || scheduledStaffIds.has(cleanName) || (shiMei !== '' && scheduledStaffIds.has(shiMei));
-  })();
+  const isShiftOn = !scheduledStaffIds || scheduledStaffIds.size === 0 || isStaffMatched(staff, Array.from(scheduledStaffIds));
 
   const emergencyEvent = events.find(e => e.isEmergency);
 

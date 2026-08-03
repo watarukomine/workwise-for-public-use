@@ -62,15 +62,21 @@ export function MonthlyShiftTable({ staffList, refreshTrigger = 0 }: MonthlyShif
     const handleCellClick = async (day: Date, staffId: string, isScheduled: boolean) => {
         const dateKey = format(day, 'yyyy-MM-dd');
         const currentScheduledIds = scheduleData[dateKey] || [];
+        const targetStaff = staffList.find(s => s.id === staffId);
+        const targetName = targetStaff?.name || '';
+        const targetCleanName = targetName.replace(/[\s\u3000]+/g, '');
 
         // Optimistic Update
         let newScheduledIds: string[];
         if (isScheduled) {
             // Remove
-            newScheduledIds = currentScheduledIds.filter(id => id !== staffId);
+            newScheduledIds = currentScheduledIds.filter(id => {
+                const clean = String(id || '').trim().replace(/[\s\u3000]+/g, '');
+                return id !== staffId && id !== targetName && clean !== targetCleanName;
+            });
         } else {
             // Add
-            newScheduledIds = [...currentScheduledIds, staffId];
+            newScheduledIds = Array.from(new Set([...currentScheduledIds, staffId, targetName].filter(Boolean)));
         }
 
         setScheduleData(prev => ({
