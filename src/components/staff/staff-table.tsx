@@ -279,25 +279,28 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     const currentStaff = filteredStaff[currentIndex];
     const targetStaff = filteredStaff[targetIndex];
 
-    const fullCurrentIndex = staffList.findIndex(s => s.id === currentStaff.id);
-    const fullTargetIndex = staffList.findIndex(s => s.id === targetStaff.id);
-
     try {
-      const currentOrderVal = (currentStaff as any).sortOrder ?? (fullCurrentIndex >= 0 ? fullCurrentIndex : currentIndex);
-      const targetOrderVal = (targetStaff as any).sortOrder ?? (fullTargetIndex >= 0 ? fullTargetIndex : targetIndex);
+      const newStaffOrder = [...filteredStaff];
+      newStaffOrder[currentIndex] = targetStaff;
+      newStaffOrder[targetIndex] = currentStaff;
 
-      const finalCurrentOrder = currentOrderVal === targetOrderVal ? (direction === 'up' ? targetOrderVal - 1 : targetOrderVal + 1) : targetOrderVal;
-      const finalTargetOrder = currentOrderVal === targetOrderVal ? targetOrderVal : currentOrderVal;
+      const updates = newStaffOrder.map((s, idx) => {
+        const docId = (s as any)._docId || s.id;
+        const mainId = s.id;
+        const sortOrder = (idx + 1) * 10;
 
-      await Promise.all([
-        StaffService.updateStaff(currentStaff.id, { sortOrder: finalCurrentOrder }),
-        StaffService.updateStaff(targetStaff.id, { sortOrder: finalTargetOrder })
-      ]);
-      toast({ title: '並び順を更新しました', description: `${currentStaff.name || 'スタッフ'} の並び順を変更しました。` });
+        const p1 = StaffService.updateStaff(docId, { sortOrder });
+        const p2 = docId !== mainId ? StaffService.updateStaff(mainId, { sortOrder }) : Promise.resolve();
+        return [p1, p2];
+      }).flat();
+
+      await Promise.all(updates);
+      toast({ title: '並び順を更新しました', description: `${currentStaff.name || 'スタッフ'} の位置を変更しました。` });
     } catch (e: any) {
+      console.error('Failed to move staff:', e);
       toast({ variant: 'destructive', title: '並び順の更新に失敗', description: e.message });
     }
-  }, [filteredStaff, staffList, toast]);
+  }, [filteredStaff, toast]);
 
   return (
     <>
