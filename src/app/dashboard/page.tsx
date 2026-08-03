@@ -475,7 +475,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [currentDate, setSelectedStaffIds, scheduleEvents, loadOrders, setCurrentViewedDate]);
+  }, [currentDate]);
 
 
 
