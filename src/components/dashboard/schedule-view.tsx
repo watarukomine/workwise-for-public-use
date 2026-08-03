@@ -3194,7 +3194,6 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     dynamicBgColor = 'rgb(239 68 68)'; // Vivid Red for cancelled tasks
     textColorClass = 'text-white font-bold';
   } else if (isTravelEvent) {
-    dynamicBgColor = lightenColor(dynamicBgColor, 0.6);
     textColorClass = getContrastingTextColor(dynamicBgColor) === '#FFFFFF' ? 'text-white' : 'text-black';
   }
 
@@ -3257,7 +3256,12 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
 
   const eventContent = (
     <div
-      className={cn("w-full h-full rounded-md flex flex-col justify-center p-1 relative dynamic-bg dynamic-width", textColorClass, isDragging && !isOverlay && "opacity-50")}
+      className={cn(
+        "w-full h-full rounded-md flex flex-col justify-center p-1 relative dynamic-bg dynamic-width transition-all", 
+        textColorClass, 
+        isDragging && !isOverlay && "opacity-50",
+        isTravelEvent && "opacity-50 border border-dashed border-white/40 shadow-none"
+      )}
       {...{ 'style': { '--dynamic-bg-color': dynamicBgColor, '--dynamic-width': isOverlay ? `${width}px` : '100%' } as any }}
     >
       {isCompleted && !isTravelEvent && (
