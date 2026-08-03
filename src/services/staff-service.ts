@@ -72,10 +72,16 @@ export const StaffService = {
 
             const uniqueStaff = Array.from(nameMap.values());
 
+            const getOrderVal = (x: any) => {
+                if (typeof x.sortOrder === 'number') return x.sortOrder;
+                if (typeof x.order === 'number') return x.order;
+                const idMatch = String(x.id || '').match(/\d+/);
+                if (idMatch) return parseInt(idMatch[0], 10);
+                return 999;
+            };
+
             uniqueStaff.sort((a, b) => {
-                const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof (a as any).order === 'number' ? (a as any).order : 999);
-                const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : (typeof (b as any).order === 'number' ? (b as any).order : 999);
-                return orderA - orderB;
+                return getOrderVal(a) - getOrderVal(b);
             });
 
             callback(uniqueStaff);
@@ -136,10 +142,16 @@ export const StaffService = {
 
         const uniqueStaff = Array.from(nameMap.values());
 
+        const getOrderVal = (x: any) => {
+            if (typeof x.sortOrder === 'number') return x.sortOrder;
+            if (typeof x.order === 'number') return x.order;
+            const idMatch = String(x.id || '').match(/\d+/);
+            if (idMatch) return parseInt(idMatch[0], 10);
+            return 999;
+        };
+
         uniqueStaff.sort((a, b) => {
-            const orderA = typeof a.sortOrder === 'number' ? a.sortOrder : (typeof (a as any).order === 'number' ? (a as any).order : 999);
-            const orderB = typeof b.sortOrder === 'number' ? b.sortOrder : (typeof (b as any).order === 'number' ? (b as any).order : 999);
-            return orderA - orderB;
+            return getOrderVal(a) - getOrderVal(b);
         });
 
         return uniqueStaff;

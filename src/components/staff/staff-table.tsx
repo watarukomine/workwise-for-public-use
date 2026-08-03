@@ -196,7 +196,8 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   const { toast } = useToast();
   const { pendingSelectedStaffIds, togglePendingStaffSelection, applyPendingSelection, appliedSelectedStaffIds, setSelectedStaffIds } = useSelectedStaff();
   const { scheduleEvents, orders } = useOrder();
-  const isAdmin = profile?.role === 'admin';
+  const roleStr = String(profile?.role || '').toLowerCase();
+  const isAdmin = roleStr === 'admin' || roleStr === 'admin/staff';
   const staffList = staff || [];
 
   const activeStaffIds = React.useMemo(() => {
@@ -281,10 +282,18 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     const targetStaff = filteredStaff[targetIndex];
 
     try {
-      await Promise.all([
-        StaffService.updateStaff(currentStaff.id, { sortOrder: targetIndex }),
-        StaffService.updateStaff(targetStaff.id, { sortOrder: currentIndex })
-      ]);
+      // Re-index all staff members dynamically to secure their relative order and prevent sort order collapse
+      const promises = filteredStaff.map((s, idx) => {
+        let newOrder = idx;
+        if (idx === currentIndex) {
+          newOrder = targetIndex;
+        } else if (idx === targetIndex) {
+          newOrder = currentIndex;
+        }
+        return StaffService.updateStaff(s.id, { sortOrder: newOrder });
+      });
+
+      await Promise.all(promises);
       toast({ title: '並び順を更新しました', description: `${currentStaff.name || 'スタッフ'} の並び順を変更しました。` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: '並び順の更新に失敗', description: e.message });
