@@ -1665,6 +1665,20 @@ export function ScheduleView({
             }
           }
         } catch (e: any) {
+          const errMsg = String(e?.message || '');
+          if (errMsg.includes('Server Action') || errMsg.includes('was not found') || errMsg.includes('failed-to-find-server-action')) {
+            toast({
+              title: "システム最新バージョンの検出",
+              description: "新しいアプリバージョンが反映されたため、画面を再読み込みして更新を完了します。",
+              duration: 4000
+            });
+            setTimeout(() => {
+              if (typeof window !== 'undefined') {
+                window.location.reload();
+              }
+            }, 1200);
+            return;
+          }
           toast({ variant: 'destructive', title: '割当エラー', description: `タスクの割り当てに失敗しました: ${e.message}` });
           setScheduleEvents(previousSchedule);
           setUnassignedOrders(previousUnassigned);
