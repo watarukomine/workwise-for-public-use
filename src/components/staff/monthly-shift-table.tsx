@@ -53,13 +53,9 @@ export function MonthlyShiftTable({ staffList, refreshTrigger = 0 }: MonthlyShif
 
     const handleMonthChange = (direction: 'next' | 'prev') => {
         setCurrentMonth(prev => {
-            const newDate = new Date(prev);
-            if (direction === 'next') {
-                newDate.setMonth(newDate.getMonth() + 1);
-            } else {
-                newDate.setMonth(newDate.getMonth() - 1);
-            }
-            return newDate;
+            const yr = prev.getFullYear();
+            const mo = prev.getMonth() + (direction === 'next' ? 1 : -1);
+            return new Date(yr, mo, 1);
         });
     };
 
@@ -124,6 +120,7 @@ export function MonthlyShiftTable({ staffList, refreshTrigger = 0 }: MonthlyShif
                     <TableHeader>
                         <TableRow>
                             <TableHead className="w-[150px] sticky left-0 bg-background z-10">スタッフ名</TableHead>
+                            <TableHead className="w-[70px] text-center font-bold bg-muted/30">出勤日数</TableHead>
                             {daysInMonth.map(day => {
                                 const dayOfWeek = getDay(day);
                                 return (
@@ -151,36 +148,65 @@ export function MonthlyShiftTable({ staffList, refreshTrigger = 0 }: MonthlyShif
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            staffList.map(staff => (
-                                <TableRow key={staff.id}>
-                                    <TableCell className="font-medium sticky left-0 bg-background z-10 border-r shadow-[1px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                                        {staff.name}
+                            <>
+                                {staffList.map(staff => {
+                                    const totalDays = daysInMonth.filter(day => {
+                                        const dateKey = format(day, 'yyyy-MM-dd');
+                                        return (scheduleData[dateKey] || []).includes(staff.id);
+                                    }).length;
+
+                                    return (
+                                        <TableRow key={staff.id}>
+                                            <TableCell className="font-medium sticky left-0 bg-background z-10 border-r shadow-[1px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                                                {staff.name}
+                                            </TableCell>
+                                            <TableCell className="text-center font-semibold text-xs bg-muted/20">
+                                                {totalDays}日
+                                            </TableCell>
+                                            {daysInMonth.map(day => {
+                                                const dateKey = format(day, 'yyyy-MM-dd');
+                                                const scheduledIds = scheduleData[dateKey] || [];
+                                                const isScheduled = scheduledIds.includes(staff.id);
+
+                                                return (
+                                                    <TableCell
+                                                        key={day.toISOString()}
+                                                        className="text-center p-1 border-l cursor-pointer hover:bg-muted/50 transition-colors"
+                                                        onClick={() => handleCellClick(day, staff.id, isScheduled)}
+                                                    >
+                                                        {isScheduled ? (
+                                                            <div className="flex justify-center">
+                                                                <div className="h-4 w-4 rounded-full bg-green-500 shadow-sm" title="クリックで欠席に変更" />
+                                                            </div>
+                                                        ) : (
+                                                            <div className="h-4 w-4 mx-auto rounded-full hover:bg-gray-200" title="クリックで出勤に変更">
+                                                                <span className="text-muted-foreground opacity-20">-</span>
+                                                            </div>
+                                                        )}
+                                                    </TableCell>
+                                                );
+                                            })}
+                                        </TableRow>
+                                    );
+                                })}
+                                <TableRow className="bg-muted/40 font-semibold text-xs border-t-2">
+                                    <TableCell className="sticky left-0 bg-muted/40 z-10 font-bold border-r">
+                                        出勤人数合計
+                                    </TableCell>
+                                    <TableCell className="text-center font-bold">
+                                        -
                                     </TableCell>
                                     {daysInMonth.map(day => {
                                         const dateKey = format(day, 'yyyy-MM-dd');
-                                        const scheduledIds = scheduleData[dateKey] || [];
-                                        const isScheduled = scheduledIds.includes(staff.id);
-
+                                        const count = (scheduleData[dateKey] || []).length;
                                         return (
-                                            <TableCell
-                                                key={day.toISOString()}
-                                                className="text-center p-1 border-l cursor-pointer hover:bg-muted/50 transition-colors"
-                                                onClick={() => handleCellClick(day, staff.id, isScheduled)}
-                                            >
-                                                {isScheduled ? (
-                                                    <div className="flex justify-center">
-                                                        <div className="h-4 w-4 rounded-full bg-green-500 shadow-sm" title="クリックで欠席に変更" />
-                                                    </div>
-                                                ) : (
-                                                    <div className="h-4 w-4 mx-auto rounded-full hover:bg-gray-200" title="クリックで出勤に変更">
-                                                        <span className="text-muted-foreground opacity-20">-</span>
-                                                    </div>
-                                                )}
+                                            <TableCell key={day.toISOString()} className="text-center p-1 border-l">
+                                                {count > 0 ? `${count}名` : '-'}
                                             </TableCell>
                                         );
                                     })}
                                 </TableRow>
-                            ))
+                            </>
                         )}
                     </TableBody>
                 </Table>

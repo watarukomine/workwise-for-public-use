@@ -85,8 +85,14 @@ const processOrderData = (
       // Extract surname (first word or 2+ chars)
       const surname = rawName.split(/[\s　]+/)[0];
       if (surname) {
-        staffBySurname.set(surname, sf);
-        staffBySurname.set(surname.toLowerCase(), sf);
+        if (staffBySurname.has(surname) && staffBySurname.get(surname)?.id !== sf.id) {
+          // Surname collision! Clear to avoid mapping to wrong person
+          staffBySurname.delete(surname);
+          staffBySurname.delete(surname.toLowerCase());
+        } else {
+          staffBySurname.set(surname, sf);
+          staffBySurname.set(surname.toLowerCase(), sf);
+        }
       }
     }
   });
@@ -614,9 +620,13 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setStatuses(processedData.statuses);
     setUnassignedOrders(processedData.unassignedOrders);
 
-    try {
-      localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify({ orders: rawOrdersData, timestamp: Date.now() }));
-    } catch (e) { /* quota exceeded - ignore */ }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify({ orders: rawOrdersData, timestamp: Date.now() }));
+      } catch (e) { /* quota exceeded - ignore */ }
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [processedData, rawOrdersData]);
 
   const deleteOrder = useCallback(async (id: string) => {

@@ -11,13 +11,14 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
-import { Search, Download } from 'lucide-react';
+import { Search, Download, ExternalLink } from 'lucide-react';
 import { cn, findKey, formatDate, formatTime, normalizeDateStr } from '@/lib/utils';
 import { format, isValid, parseISO } from 'date-fns';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { useOrder } from '@/contexts/order-context';
 import { Badge } from '@/components/ui/badge';
 import { ImportModal } from '@/components/import/import-modal';
+import { ORDER_SHEET_URL } from '@/lib/settings';
 
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
@@ -247,6 +248,21 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     // Map to include original index for stable sorting
     let ordersToDisplay = (rawOrders || []).map((order, index) => ({ ...order, _originalIndex: index }));
 
+    if (!showPastOrders) {
+        // If showPastOrders is false, filter to only show today and future orders first
+        ordersToDisplay = ordersToDisplay.filter(order => {
+            const workDateRaw = findKey(order, [
+              '作業予定日', 'scheduledDate', '日付', '予定日', 'date', 
+              'workScheduledDate', 'シフト日', '勤務日', '出勤日'
+            ]) || (order.raw ? findKey(order.raw, ['作業予定日', 'scheduledDate', '日付']) : undefined);
+
+            if (!workDateRaw) return true; // Keep undated tasks as current/new tasks
+            const normWorkDate = normalizeDateStr(workDateRaw);
+            if (!normWorkDate) return true;
+            return normWorkDate >= todayStr;
+        });
+    }
+
     if (searchLower !== '') {
         // If searching, search across all displayed columns and raw data
         ordersToDisplay = ordersToDisplay.filter(order => {
@@ -261,19 +277,6 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
             );
 
             return matchesDisplayed || matchesRaw;
-        });
-    } else if (!showPastOrders) {
-        // If not searching AND showPastOrders is false, filter to only show today and future orders
-        ordersToDisplay = ordersToDisplay.filter(order => {
-            const workDateRaw = findKey(order, [
-              '作業予定日', 'scheduledDate', '日付', '予定日', 'date', 
-              'workScheduledDate', 'シフト日', '勤務日', '出勤日'
-            ]) || (order.raw ? findKey(order.raw, ['作業予定日', 'scheduledDate', '日付']) : undefined);
-
-            if (!workDateRaw) return true; // Keep undated tasks as current/new tasks
-            const normWorkDate = normalizeDateStr(workDateRaw);
-            if (!normWorkDate) return true;
-            return normWorkDate >= todayStr;
         });
     }
     
@@ -449,7 +452,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
     };
 
     const headerRow = EXPORT_HEADERS.map(h => escapeCell(h)).join(',');
-    const dataRows = (rawOrders || []).map(order => {
+    const dataRows = (filteredAndSortedOrders || []).map(order => {
       const raw = order.raw || {};
       const rowValues = EXPORT_HEADERS.map(h => {
         // 1. Prefer raw original data
@@ -529,6 +532,12 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
               <Download className="h-4 w-4" />
               CSVエクスポート
             </Button>
+            <Button variant="outline" asChild className="flex items-center gap-2">
+              <a href={ORDER_SHEET_URL} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-4 w-4 text-emerald-600" />
+                スプレッドシートを開く
+              </a>
+            </Button>
             <ImportModal
               targetCollection="orders"
               trigger={
@@ -560,12 +569,13 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     <TableRow 
                       key={order.id || index}
                       onDoubleClick={() => handleRowClick(order)}
-                      className={cn(isAdmin && "cursor-pointer hover:bg-muted/50")}
+                      className="cursor-pointer hover:bg-muted/50"
                     >
                       {headers.map(header => {
                         const cellValue = getFormattedValue(order, header);
                         if (header === '機材有無') {
-                            return <TableCell key={header}>{cellValue ? '○' : ''}</TableCell>
+                            const isPresent = cellValue === '有' || cellValue === '○' || cellValue === 'true' || cellValue === '1';
+                            return <TableCell key={header}>{isPresent ? '○' : ''}</TableCell>
                         }
                         if (header === '受注ステータス') {
                            return <TableCell key={header}><Badge variant={cellValue === '未割当' ? 'secondary' : 'outline'}>{cellValue || 'N/A'}</Badge></TableCell>

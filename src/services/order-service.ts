@@ -83,8 +83,8 @@ export const OrderService = {
         const q = query(colRef, limit(limitCount));
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
+            ...doc.data(),
+            id: doc.id
         } as WithId<Order>));
     },
 
@@ -102,8 +102,8 @@ export const OrderService = {
         
         return onSnapshot(q, (snapshot) => {
             const orders = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
+                ...doc.data(),
+                id: doc.id
             } as WithId<Order>));
             const removedIds = snapshot.docChanges()
                 .filter(change => change.type === 'removed')
@@ -127,8 +127,8 @@ export const OrderService = {
             const q = query(colRef, where('scheduledDate', '==', fmt));
             const snapshot = await getDocs(q);
             return snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
+                ...doc.data(),
+                id: doc.id
             } as WithId<Order>));
         }));
 
@@ -156,8 +156,8 @@ export const OrderService = {
         const snapshot = await getDocs(q);
 
         return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
+            ...doc.data(),
+            id: doc.id
         } as WithId<Order>));
     },
 
@@ -175,8 +175,8 @@ export const OrderService = {
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const orders = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
+                ...doc.data(),
+                id: doc.id
             } as WithId<Order>));
             const removedIds = snapshot.docChanges()
                 .filter(change => change.type === 'removed')
@@ -422,7 +422,7 @@ export const OrderService = {
             let syncedCount = 0;
 
             for (const docSnap of snapshot.docs) {
-                const orderData = { id: docSnap.id, ...docSnap.data() } as Order;
+                const orderData = { ...docSnap.data(), id: docSnap.id } as Order;
                 const res = await this.backupToGas(orderData, 'create', 2);
                 if (res.status === 'success' || res.status === 'ok') {
                     syncedCount++;

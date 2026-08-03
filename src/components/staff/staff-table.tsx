@@ -247,8 +247,6 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
       const allEntries: string[] = [];
       filteredStaff.forEach(s => {
         if (s.id) allEntries.push(String(s.id).trim());
-        if (s.name) allEntries.push(String(s.name).trim());
-        if ((s as any)['氏名']) allEntries.push(String((s as any)['氏名']).trim());
       });
       setSelectedStaffIds(Array.from(new Set(allEntries)));
     }
@@ -281,24 +279,25 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     const currentStaff = filteredStaff[currentIndex];
     const targetStaff = filteredStaff[targetIndex];
 
-    try {
-      // Re-index all staff members dynamically to secure their relative order and prevent sort order collapse
-      const promises = filteredStaff.map((s, idx) => {
-        let newOrder = idx;
-        if (idx === currentIndex) {
-          newOrder = targetIndex;
-        } else if (idx === targetIndex) {
-          newOrder = currentIndex;
-        }
-        return StaffService.updateStaff(s.id, { sortOrder: newOrder });
-      });
+    const fullCurrentIndex = staffList.findIndex(s => s.id === currentStaff.id);
+    const fullTargetIndex = staffList.findIndex(s => s.id === targetStaff.id);
 
-      await Promise.all(promises);
+    try {
+      const currentOrderVal = (currentStaff as any).sortOrder ?? (fullCurrentIndex >= 0 ? fullCurrentIndex : currentIndex);
+      const targetOrderVal = (targetStaff as any).sortOrder ?? (fullTargetIndex >= 0 ? fullTargetIndex : targetIndex);
+
+      const finalCurrentOrder = currentOrderVal === targetOrderVal ? (direction === 'up' ? targetOrderVal - 1 : targetOrderVal + 1) : targetOrderVal;
+      const finalTargetOrder = currentOrderVal === targetOrderVal ? targetOrderVal : currentOrderVal;
+
+      await Promise.all([
+        StaffService.updateStaff(currentStaff.id, { sortOrder: finalCurrentOrder }),
+        StaffService.updateStaff(targetStaff.id, { sortOrder: finalTargetOrder })
+      ]);
       toast({ title: '並び順を更新しました', description: `${currentStaff.name || 'スタッフ'} の並び順を変更しました。` });
     } catch (e: any) {
       toast({ variant: 'destructive', title: '並び順の更新に失敗', description: e.message });
     }
-  }, [filteredStaff, toast]);
+  }, [filteredStaff, staffList, toast]);
 
   return (
     <>

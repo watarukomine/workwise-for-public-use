@@ -35,13 +35,14 @@ const COLLECTION_NAME = 'daily_attendance';
  * Generates the document ID from a Date object (YYYY-MM-DD).
  */
 export const getAttendanceDocId = (date: Date | string): string => {
-    if (typeof date === 'string') {
-        if (date.length >= 10 && date.includes('-')) return date.substring(0, 10);
-        const parsed = parseISO(date);
-        if (isValid(parsed)) return format(parsed, 'yyyy-MM-dd');
-        return date;
+    try {
+        const d = typeof date === 'string' ? parseISO(date) : date;
+        if (isValid(d)) return format(d, 'yyyy-MM-dd');
+    } catch (e) {}
+    if (typeof date === 'string' && date.length >= 10 && date.includes('-')) {
+        return date.substring(0, 10);
     }
-    return format(date, 'yyyy-MM-dd');
+    return typeof date === 'string' ? date : format(date, 'yyyy-MM-dd');
 };
 
 /**
@@ -449,7 +450,7 @@ const saveDailyAttendanceViaRest = async (date: Date, staffIds: string[]): Promi
 
     const projectId = pId;
     const databaseId = dbId;
-    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/${COLLECTION_NAME}/${docId}?key=${firebaseConfig.apiKey}&updateMask.fieldPaths=id&updateMask.fieldPaths=date&updateMask.fieldPaths=staffIds&updateMask.fieldPaths=updatedAt`;
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents/${COLLECTION_NAME}/${docId}?key=${firebaseConfig.apiKey}&updateMask.fieldPaths=id&updateMask.fieldPaths=date&updateMask.fieldPaths=staffIds&updateMask.fieldPaths=checkedOutIds&updateMask.fieldPaths=scheduledStaffIds&updateMask.fieldPaths=updatedAt`;
 
     const body = {
         name: `projects/${projectId}/databases/${databaseId}/documents/${COLLECTION_NAME}/${docId}`,
@@ -606,26 +607,27 @@ const fetchAndUpdateAttendanceInBackground = (date: Date, docId: string) => {
         const db = getDb();
         const docRef = doc(db, COLLECTION_NAME, docId);
         getDoc(docRef).then(docSnap => {
+            let freshData: { staffIds: string[], checkedOutIds: string[], scheduledStaffIds: string[] } = { staffIds: [], checkedOutIds: [], scheduledStaffIds: [] };
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                const freshData = {
+                freshData = {
                     staffIds: (data.staffIds as string[]) || [],
                     checkedOutIds: (data.checkedOutIds as string[]) || [],
                     scheduledStaffIds: (data.scheduledStaffIds as string[]) || []
                 };
-                
-                // Check if data changed before updating cache & triggering rerender
-                const cached = attendanceDetailsCache.get(docId);
-                const isChanged = !cached || 
-                    JSON.stringify(cached.staffIds) !== JSON.stringify(freshData.staffIds) ||
-                    JSON.stringify(cached.checkedOutIds) !== JSON.stringify(freshData.checkedOutIds);
-                
-                if (isChanged) {
-                    attendanceDetailsCache.set(docId, freshData);
-                    if (typeof window !== 'undefined') {
-                        const event = new CustomEvent('attendance_refreshed', { detail: { docId, data: freshData } });
-                        window.dispatchEvent(event);
-                    }
+            }
+            
+            // Check if data changed before updating cache & triggering rerender
+            const cached = attendanceDetailsCache.get(docId);
+            const isChanged = !cached || 
+                JSON.stringify(cached.staffIds) !== JSON.stringify(freshData.staffIds) ||
+                JSON.stringify(cached.checkedOutIds) !== JSON.stringify(freshData.checkedOutIds);
+            
+            if (isChanged) {
+                attendanceDetailsCache.set(docId, freshData);
+                if (typeof window !== 'undefined') {
+                    const event = new CustomEvent('attendance_refreshed', { detail: { docId, data: freshData } });
+                    window.dispatchEvent(event);
                 }
             }
         }).catch(err => {

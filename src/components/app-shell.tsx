@@ -156,10 +156,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const isMobile = useIsMobile() || forceMobileView;
     const pathname = usePathname();
 
-    const handleSignOut = () => {
+    const handleSignOut = async () => {
         setIsAuthLoading(true);
         try {
-            signOut();
+            await signOut();
             clearProfile();
             toast({
                 title: "ログアウトしました",

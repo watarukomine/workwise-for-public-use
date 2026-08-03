@@ -64,6 +64,16 @@ export const signInWithEmail = async (identifier: string, password: string): Pro
 
     if (validPasswords.has(cleanPassword) || (cleanPassword.length < 6 && validPasswords.has(`${cleanPassword}!`))) {
       console.log(`[Auth] Master password match success for: ${staffProfile.name} (${staffProfile.id})`);
+      const targetEmail = staffProfile.email || `${cleanInput.toLowerCase()}@toyota-mp.co.jp`;
+      try {
+        await signInWithEmailAndPassword(auth, targetEmail, cleanPassword);
+      } catch (authErr) {
+        if (cleanPassword.length < 6) {
+          try {
+            await signInWithEmailAndPassword(auth, targetEmail, `${cleanPassword}!`);
+          } catch (e) {}
+        }
+      }
       sessionStorage.setItem(USER_SESSION_KEY, JSON.stringify(staffProfile));
       return staffProfile;
     }
@@ -116,7 +126,12 @@ export const signUpWithEmail = async (email: string, password: string, name: str
         email: normalizedEmail,
         _type: 'staff',
         role: 'staff',
-        createdAt: new Date().toISOString()
+        currentStatus: '未出勤',
+        isOnline: true,
+        '母店': '横浜店',
+        color: '#3B82F6',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
     };
 
     // Use UID as key for better practice and consistency
@@ -209,9 +224,10 @@ export const signOut = async (): Promise<void> => {
     }
 
     await firebaseSignOut(auth);
-    sessionStorage.removeItem(USER_SESSION_KEY);
   } catch (error) {
     console.error('Sign out error:', error);
+  } finally {
+    sessionStorage.removeItem(USER_SESSION_KEY);
   }
 };
 

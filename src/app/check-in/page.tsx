@@ -299,7 +299,7 @@ function CheckInClient() {
     const statusMap: Partial<Record<string, string>> = {
       'Start Travel': '移動中',
       'Begin Task': '作業中',
-      'Finish Task': '待機中',
+      'Finish Task': '作業完了',
       'Clock Out': '帰社中',
       'Wait': '待機中',
       'Arrive': '作業待ち',
@@ -318,6 +318,9 @@ function CheckInClient() {
       if (!profile?.name) {
         setError('ユーザー情報が取得できません。ログインしているか確認してください。');
         return;
+      }
+      if (latitude !== null && longitude !== null) {
+        setLocation({ latitude, longitude });
       }
 
       try {
@@ -501,32 +504,14 @@ function CheckInClient() {
       navigator.geolocation.getCurrentPosition(
         (pos) => executeUpdate(pos.coords.latitude, pos.coords.longitude),
         (err) => {
-          // Fallback to update without location if error, but warn?
-          // Actually existing logic just errors out.
-          let message = '';
-          switch (err.code) {
-            case err.PERMISSION_DENIED:
-              message = '位置情報の利用がブロックされています。';
-              break;
-            case err.POSITION_UNAVAILABLE:
-              message = '現在地の取得に失敗しました。';
-              break;
-            case err.TIMEOUT:
-              message = '位置情報の取得がタイムアウトしました。';
-              break;
-            default:
-              message = '不明なエラーが発生しました。';
-              break;
-          }
-          if (isManual) {
-            // Should not happen if bypass is true
-            executeUpdate(null, null);
-          } else {
-            setError(message + ' 修正モードを試してください。');
-            setIsLoading(null);
-          }
+          console.warn("[CheckIn] Geolocation warning:", err);
+          toast({
+            title: '位置情報の取得をスキップしました',
+            description: '現在地なしでステータスを更新します。',
+          });
+          executeUpdate(null, null);
         },
-        { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 }
+        { enableHighAccuracy: false, timeout: 5000, maximumAge: 10000 }
       );
     } else {
       await executeUpdate(null, null);
@@ -677,8 +662,8 @@ function CheckInClient() {
               <div className="flex gap-2">
                 <Button
                   className="flex-1 bg-red-400 hover:bg-red-500 text-white"
-                  onClick={() => executeCheckIn('Emergency')}
-                  disabled={!!isLoading || !emergencyMessage}
+                  onClick={handleEmergency}
+                  disabled={!!isLoading || !emergencyMessage.trim()}
                 >
                   <Send className="mr-2 h-4 w-4" />
                   緊急連絡を送信
@@ -836,6 +821,45 @@ function CheckInClient() {
               決定
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isNextStepDialogOpen} onOpenChange={setIsNextStepDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>作業完了後の移動先を選択</DialogTitle>
+            <DialogDescription>
+              作業が完了しました。次のアクションを選択してください。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-4">
+            <Button
+              className="w-full justify-start h-12 text-base gap-3"
+              onClick={() => handleNextStepAction('next_task')}
+              disabled={isProcessingNextStep}
+            >
+              <Truck className="h-5 w-5" />
+              次の現場へ移動開始
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start h-12 text-base gap-3"
+              onClick={() => handleNextStepAction('return_office')}
+              disabled={isProcessingNextStep}
+            >
+              <Building className="h-5 w-5" />
+              帰社する
+            </Button>
+            <Button
+              variant="secondary"
+              className="w-full justify-start h-12 text-base gap-3"
+              onClick={() => handleNextStepAction('wait')}
+              disabled={isProcessingNextStep}
+            >
+              <PauseCircle className="h-5 w-5" />
+              待機する
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

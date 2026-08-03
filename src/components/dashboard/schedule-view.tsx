@@ -165,9 +165,11 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
 
   // If the event is pushed past the end, adjust left to make room for the minimum width
   let leftPixels = minutesToPixels(leftInMinutes);
-  const maxLeftPixels = minutesToPixels(timelineTotalHours * 60) - widthPixels;
-  if (leftPixels > maxLeftPixels) {
-    leftPixels = maxLeftPixels;
+  if (leftInMinutes >= timelineTotalHours * 60) {
+    leftPixels = minutesToPixels(timelineTotalHours * 60) - widthPixels;
+  } else {
+    widthPixels = Math.min(widthPixels, minutesToPixels(timelineTotalHours * 60) - leftPixels);
+    if (widthPixels < 20) widthPixels = 20;
   }
 
   return {
@@ -887,7 +889,7 @@ export function ScheduleView({
       const newComment = String(currentComment).replace(/【緊急】/g, '').trim();
 
       // Optimistic update
-      const fullEvent = scheduleEvents.find(e => e.id === event.systemId);
+      const fullEvent = scheduleEvents.find(e => e.id === event.systemId || (e as any).systemId === event.systemId || (e as any).rawOrderId === event.rawOrderId || e.id === (event as any).id || e.tripId === (event as any).tripId);
 
       // Calculate recovery status based on timestamps
       let recoveryStatus = '未着手';
@@ -1257,8 +1259,8 @@ export function ScheduleView({
           tripId: effectiveTripId,
           staffId: newStaffId,
           staffName: newStaff.name,
-          start: newTaskStart.toISOString(),
-          end: newTaskEnd.toISOString()
+          start: format(newTaskStart, "yyyy-MM-dd'T'HH:mm:ss"),
+          end: format(newTaskEnd, "yyyy-MM-dd'T'HH:mm:ss")
         };
 
         const updatedTravel: WithId<ScheduleEvent> = travelEventInTrip ? {
@@ -1268,8 +1270,8 @@ export function ScheduleView({
           tripId: effectiveTripId,
           staffId: newStaffId,
           staffName: newStaff.name,
-          start: newTravelStart.toISOString(),
-          end: newTaskStart.toISOString()
+          start: format(newTravelStart, "yyyy-MM-dd'T'HH:mm:ss"),
+          end: format(newTaskStart, "yyyy-MM-dd'T'HH:mm:ss")
         } : {
           ...taskEventInTrip,
           id: travelPartId,
@@ -1278,8 +1280,8 @@ export function ScheduleView({
           title: '移動',
           staffId: newStaffId,
           staffName: newStaff.name,
-          start: newTravelStart.toISOString(),
-          end: newTaskStart.toISOString(),
+          start: format(newTravelStart, "yyyy-MM-dd'T'HH:mm:ss"),
+          end: format(newTaskStart, "yyyy-MM-dd'T'HH:mm:ss"),
           estimatedDuration: travelDuration
         };
 
@@ -1320,8 +1322,8 @@ export function ScheduleView({
             tripId: effectiveTripId,
             staffId: newStaffId,
             staffName: newStaff.name,
-            start: taskStart.toISOString(),
-            end: taskEnd.toISOString()
+            start: format(taskStart, "yyyy-MM-dd'T'HH:mm:ss"),
+            end: format(taskEnd, "yyyy-MM-dd'T'HH:mm:ss")
           };
           const updatedTravel = travelPart ? {
             ...travelPart,
@@ -1330,8 +1332,8 @@ export function ScheduleView({
             tripId: effectiveTripId,
             staffId: newStaffId,
             staffName: newStaff.name,
-            start: travelStart.toISOString(),
-            end: taskStart.toISOString()
+            start: format(travelStart, "yyyy-MM-dd'T'HH:mm:ss"),
+            end: format(taskStart, "yyyy-MM-dd'T'HH:mm:ss")
           } : {
             ...taskPart,
             id: travelPartId,
@@ -1340,8 +1342,8 @@ export function ScheduleView({
             title: '移動',
             staffId: newStaffId,
             staffName: newStaff.name,
-            start: travelStart.toISOString(),
-            end: taskStart.toISOString(),
+            start: format(travelStart, "yyyy-MM-dd'T'HH:mm:ss"),
+            end: format(taskStart, "yyyy-MM-dd'T'HH:mm:ss"),
             estimatedDuration: travelDuration
           };
 
@@ -2532,6 +2534,13 @@ export function ScheduleView({
                         const tripId = `trip-${order.id}`;
                         const taskEvent = scheduleEvents.find(e => e.tripId === tripId || e.rawOrderId === order.id);
                         if (taskEvent) {
+                          setEditedEventDetails({
+                            title: taskEvent.title || order.customerName || '',
+                            description: taskEvent.description || '',
+                            startTime: formatTime(taskEvent.start),
+                            endTime: formatTime(taskEvent.end),
+                            destination: (taskEvent as any).destination || (order as any).destination || ''
+                          });
                           setDialogState({ mode: 'details', event: taskEvent });
                         } else {
                           setDialogState({ mode: 'order-details', order });
@@ -3249,6 +3258,13 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
         <div className="absolute -top-1 -left-1 z-[60] pointer-events-none">
           <div className="border border-blue-600 rounded-full w-5 h-5 flex items-center justify-center bg-white/90 shadow-sm">
             <span className="text-[10px] font-bold text-blue-600 leading-none select-none">確</span>
+          </div>
+        </div>
+      )}
+      {targetEvent.hasValidationIssues && !isTravelEvent && (
+        <div className="absolute -top-1 right-5 z-[65] pointer-events-none">
+          <div className="bg-amber-500 rounded-full p-0.5 shadow-md">
+            <AlertTriangle className="h-3 w-3 text-white" />
           </div>
         </div>
       )}

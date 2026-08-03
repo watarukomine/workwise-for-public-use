@@ -25,8 +25,8 @@ export const CustomerService = {
         const snapshot = await getDocs(colRef);
 
         return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
+            ...doc.data(),
+            id: doc.id
         } as WithId<Customer>));
     },
 
@@ -41,8 +41,8 @@ export const CustomerService = {
         if (!snapshot.exists()) return null;
 
         return {
-            id: snapshot.id,
-            ...snapshot.data()
+            ...snapshot.data(),
+            id: snapshot.id
         } as WithId<Customer>;
     },
 

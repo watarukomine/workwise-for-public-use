@@ -28,8 +28,8 @@ export const StaffService = {
 
         return onSnapshot(q, (snapshot) => {
             const rawList = snapshot.docs.map(docSnap => ({
-                id: docSnap.id,
-                ...docSnap.data()
+                ...docSnap.data(),
+                id: docSnap.id
             } as WithId<Staff>));
 
             const staffList = rawList.filter(s => {
@@ -100,8 +100,8 @@ export const StaffService = {
         const snapshot = await getDocs(colRef);
 
         const rawList = snapshot.docs.map(docSnap => ({
-            id: docSnap.id,
-            ...docSnap.data()
+            ...docSnap.data(),
+            id: docSnap.id
         } as WithId<Staff>));
 
         const staffList = rawList.filter(s => {
@@ -168,8 +168,8 @@ export const StaffService = {
         if (!snapshot.exists()) return null;
 
         return {
-            id: snapshot.id,
-            ...snapshot.data()
+            ...snapshot.data(),
+            id: snapshot.id
         } as WithId<Staff>;
     },
 
