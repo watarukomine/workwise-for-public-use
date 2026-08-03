@@ -42,16 +42,19 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const LOCAL_STORAGE_SELECTION_KEY = 'workwise_staff_selection_v3';
-  const STAFF_CACHE_KEY = 'cached_staff_data_v3';
+  const LOCAL_STORAGE_SELECTION_KEY = 'workwise_staff_selection_v4';
+  const STAFF_CACHE_KEY = 'cached_staff_data_v4';
   const initialLoadDone = useRef(false);
 
   // Restore selection on mount
   useEffect(() => {
     try {
-      // 過去の古い競合キーを完全に一掃・クリア
+      // 過去の古い競合・全員選択キーを完全に一掃・クリア
       localStorage.removeItem('appliedStaffIds');
       localStorage.removeItem('workwise_staff_selection');
+      localStorage.removeItem('workwise_staff_selection_v2');
+      localStorage.removeItem('workwise_staff_selection_v3');
+      localStorage.removeItem('cached_staff_data_v3');
 
       const saved = localStorage.getItem(LOCAL_STORAGE_SELECTION_KEY);
       if (saved) {
@@ -59,9 +62,9 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         const ids = Array.isArray(parsed) ? parsed : (parsed.ids || []);
         if (Array.isArray(ids)) {
           // 【汚染データ自動クリーンアップ安全装置】
-          // 過去のバグで保存されてしまった「全員選択（20名以上）」のゴミデータが残っている場合、
-          // 一度強制的にリセット（クリア）してクリーンな初期状態にする
-          if (ids.length >= 20) {
+          // 過去に保存されてしまった多数選択（10名以上）の旧デフォルトデータが残っている場合、
+          // 強制削除してシフト出勤者ベースの動的デフォルト表示に委ねる
+          if (ids.length >= 10) {
             localStorage.removeItem(LOCAL_STORAGE_SELECTION_KEY);
             setAppliedSelectedStaffIds([]);
             setPendingSelectedStaffIds([]);
@@ -121,9 +124,13 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
             try {
               const parsed = JSON.parse(saved);
               const ids = Array.isArray(parsed) ? parsed : (parsed?.ids || []);
-              if (Array.isArray(ids)) {
+              if (Array.isArray(ids) && ids.length < 10) {
                 setAppliedSelectedStaffIds(ids);
                 setPendingSelectedStaffIds(ids);
+              } else {
+                localStorage.removeItem(LOCAL_STORAGE_SELECTION_KEY);
+                setAppliedSelectedStaffIds([]);
+                setPendingSelectedStaffIds([]);
               }
             } catch (e) {}
           }
