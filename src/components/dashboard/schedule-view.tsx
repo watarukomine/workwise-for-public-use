@@ -2397,7 +2397,7 @@ export function ScheduleView({
 
             <div>
               <div>
-                <div id="timeline-scroll-container" className="w-full border rounded-md h-[calc(100vh-200px)] overflow-auto">
+                <div id="timeline-scroll-container" className="w-full border rounded-md h-auto overflow-x-auto overflow-y-visible">
                   <div className="relative dynamic-width" {...{ 'style': { '--dynamic-width': `calc(var(--staff-col-width) + ${timelineTotalHours * 60} * var(--pixels-per-minute) * 1px + var(--status-col-width))` } as any }}>
 
                     {/* Header Row - Now inside ScrollArea for perfect alignment */}
