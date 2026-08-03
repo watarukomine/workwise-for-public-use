@@ -462,6 +462,29 @@ export default function DashboardPage() {
         setPresentStaffIds(new Set(attendedStaffIds));
         setScheduledStaffIds(new Set(finalScheduledEntries));
 
+        // シフト出勤者を自動で表示選択（setSelectedStaffIds）にマージ
+        if (finalScheduledEntries.length > 0 && allStaff && allStaff.length > 0) {
+          const shiftStaffIds: string[] = [];
+          finalScheduledEntries.forEach(entry => {
+            const cleanKey = String(entry).trim();
+            const staffObj = allStaff.find(s => 
+              String(s.id).trim() === cleanKey || 
+              String(s.name).trim() === cleanKey ||
+              String(s.name).trim().replace(/[\s\u3000]+/g, '') === cleanKey.replace(/[\s\u3000]+/g, '') ||
+              ((s as any)['氏名'] && String((s as any)['氏名']).trim().replace(/[\s\u3000]+/g, '') === cleanKey.replace(/[\s\u3000]+/g, ''))
+            );
+            if (staffObj && staffObj.id) {
+              shiftStaffIds.push(staffObj.id);
+            }
+          });
+          if (shiftStaffIds.length > 0) {
+            const missingIds = shiftStaffIds.filter(id => !appliedSelectedStaffIds.includes(id));
+            if (missingIds.length > 0) {
+              setSelectedStaffIds(prev => Array.from(new Set([...prev, ...shiftStaffIds])));
+            }
+          }
+        }
+
 
       } catch (e) {
         if (!cancelled) console.error("Failed to sync attendance:", e);
