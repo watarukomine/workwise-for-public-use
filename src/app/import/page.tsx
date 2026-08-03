@@ -290,8 +290,45 @@ export default function ImportPage() {
       }
       setHeaders(h);
       setRows(r);
+
+      // --- スマート自動コレクション判別・切り替え機能 ---
+      const fileNameLower = file.name.toLowerCase();
+      const headersStr = h.join(',').toLowerCase();
+
+      if (
+        fileNameLower.includes('staff') || 
+        fileNameLower.includes('スタッフ') || 
+        fileNameLower.includes('user') || 
+        headersStr.includes('スタッフid') || 
+        headersStr.includes('ロール') || 
+        headersStr.includes('パスワード') || 
+        headersStr.includes('コントローラー')
+      ) {
+        setTargetCollection('users');
+      } else if (
+        fileNameLower.includes('customer') || 
+        fileNameLower.includes('店舗') || 
+        fileNameLower.includes('販売店') || 
+        fileNameLower.includes('取引先') || 
+        headersStr.includes('顧客コード') || 
+        headersStr.includes('お取引先コード') || 
+        headersStr.includes('母店')
+      ) {
+        setTargetCollection('customers');
+      } else if (
+        fileNameLower.includes('order') || 
+        fileNameLower.includes('受注') || 
+        fileNameLower.includes('案件') || 
+        headersStr.includes('受注id') || 
+        headersStr.includes('作業区分') || 
+        headersStr.includes('車名') || 
+        headersStr.includes('登録ナンバー')
+      ) {
+        setTargetCollection('orders');
+      }
+
       // Auto-detect ID column
-      const idCandidates = ['SystemID', 'systemId', 'id', 'ID', 'ユーザーコード', 'userCode', 'staffId', '受注ID', '受注 ID', '受注番号'];
+      const idCandidates = ['SystemID', 'systemId', 'id', 'ID', 'ユーザーコード', 'userCode', 'staffId', '受注ID', '受注 ID', '受注番号', 'スタッフID'];
       const found = idCandidates.find(c => h.includes(c));
       setIdColumn(found || '__auto__');
       setStep('preview');
@@ -357,6 +394,12 @@ export default function ImportPage() {
         const slice = rows.slice(i, i + BATCH_SIZE);
 
         for (const row of slice) {
+          // Skip empty rows (all columns are empty)
+          const isRowEmpty = row.every(val => !val || String(val).trim() === '');
+          if (isRowEmpty) {
+            continue;
+          }
+
           // Build document from row
           const docData: Record<string, any> = {};
           const raw: Record<string, any> = {};
