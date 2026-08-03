@@ -480,8 +480,13 @@ export default function DashboardPage() {
             }
           });
 
-          // 出勤者＋タスク割当者のみをレ点チェックONに設定
-          setSelectedStaffIds(Array.from(new Set(activeStaffIdsForToday)));
+          // 出勤者＋タスク割当者のみをレ点チェックONに設定（変更があった場合のみState更新）
+          const nextSelectedIds = Array.from(new Set(activeStaffIdsForToday));
+          const isSame = appliedSelectedStaffIds.length === nextSelectedIds.length && 
+                         nextSelectedIds.every(id => appliedSelectedStaffIds.includes(id));
+          if (!isSame) {
+            setSelectedStaffIds(nextSelectedIds);
+          }
         }
 
 

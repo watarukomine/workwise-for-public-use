@@ -177,9 +177,16 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     }
   }, [pendingSelectedStaffIds, toast]);
 
+  const isSameIdList = (a: string[], b: string[]) => {
+    if (a.length !== b.length) return false;
+    const setA = new Set(a);
+    return b.every(id => setA.has(id));
+  };
+
   const setSelectedStaffIds = React.useCallback((idsOrFn: string[] | ((prev: string[]) => string[])) => {
     setAppliedSelectedStaffIds(prev => {
       const newIds = typeof idsOrFn === 'function' ? idsOrFn(prev) : idsOrFn;
+      if (isSameIdList(prev, newIds)) return prev;
       try {
         localStorage.setItem(LOCAL_STORAGE_SELECTION_KEY, JSON.stringify({
           ids: newIds
@@ -189,6 +196,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     });
     setPendingSelectedStaffIds(prev => {
       const newIds = typeof idsOrFn === 'function' ? idsOrFn(prev) : idsOrFn;
+      if (isSameIdList(prev, newIds)) return prev;
       return newIds;
     });
   }, []);

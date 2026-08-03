@@ -136,7 +136,12 @@ export default function StaffPage() {
         });
 
         if (activeStaffIdsToday.size > 0 && !cancelled) {
-          setSelectedStaffIds(Array.from(activeStaffIdsToday));
+          const nextSelectedIds = Array.from(activeStaffIdsToday);
+          const isSame = appliedSelectedStaffIds.length === nextSelectedIds.length && 
+                         nextSelectedIds.every(id => appliedSelectedStaffIds.includes(id));
+          if (!isSame) {
+            setSelectedStaffIds(nextSelectedIds);
+          }
         }
       } catch (e) {
         console.warn('Failed to fetch shift attendance in StaffPage:', e);
