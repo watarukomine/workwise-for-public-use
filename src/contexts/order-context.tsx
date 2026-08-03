@@ -658,6 +658,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, [fetchAndProcessData]);
 
   const syncOrders = useCallback(async () => {
+    // 1. Recover any unsynced GAS orders in the background
+    OrderService.syncUnsyncedOrders().catch(err => console.warn('[OrderProvider] syncUnsyncedOrders warning:', err));
     await fetchAndProcessData(false);
   }, [fetchAndProcessData]);
 
@@ -667,6 +669,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.removeItem(ORDERS_CACHE_KEY);
     } catch (e) {}
+
+    // Auto-salvage unsynced orders to GAS in background
+    OrderService.syncUnsyncedOrders().catch(err => console.warn('[OrderProvider] syncUnsyncedOrders warning:', err));
 
     const todayStr = format(new Date(), 'yyyy-MM-dd');
     await fetchAndProcessData(true, { date: todayStr, range: 3 });

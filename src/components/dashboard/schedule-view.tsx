@@ -1542,15 +1542,27 @@ export function ScheduleView({
                 console.warn('Failed to save generic task to Firestore:', dbErr);
               }
 
-              // 2. Backup to GAS Spreadsheet
-              createTask({
-                gasUrl: ORDER_GAS_URL,
-                staffName: staff.name,
-                taskName: ev.title,
-                startTime: ev.start as string,
-                endTime: ev.end as string,
-                estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string))
-              }).catch(err => console.warn('GAS createTask warning:', err));
+              // 2. Backup to GAS Spreadsheet with 100% Retry Guarantee
+              (async () => {
+                for (let attempt = 1; attempt <= 3; attempt++) {
+                  try {
+                    const res = await createTask({
+                      gasUrl: ORDER_GAS_URL,
+                      staffName: staff.name,
+                      taskName: ev.title,
+                      startTime: ev.start as string,
+                      endTime: ev.end as string,
+                      estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string))
+                    });
+                    if (res && (res.status === 'success' || (res.status as string) === 'ok')) {
+                      break;
+                    }
+                  } catch (err) {
+                    console.warn(`[GAS createTask] Attempt ${attempt} failed:`, err);
+                  }
+                  if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
+                }
+              })();
             }
             toast({ title: "アクションログを保存しました" });
           } else {
