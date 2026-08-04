@@ -21,7 +21,9 @@ import {
     Upload,
     UserCircle,
     Settings,
+    RefreshCw,
 } from 'lucide-react';
+import { useOrder } from '@/contexts/order-context';
 
 import {
     Sidebar,
@@ -248,6 +250,62 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )
     }
 
+    function SyncControl() {
+        const { lastGasSyncedAt, syncOrdersToGasManual } = useOrder();
+        const [isSyncing, setIsSyncing] = React.useState(false);
+        const { toast } = useToast();
+
+        const handleSync = async () => {
+            setIsSyncing(true);
+            try {
+                const count = await syncOrdersToGasManual();
+                toast({
+                    title: 'シート同期完了',
+                    description: count > 0 
+                      ? `${count}件の未反映データをスプレッドシートへ同期しました。`
+                      : 'すべてのデータは既にスプレッドシートへ同期済みです。',
+                });
+            } catch (err: any) {
+                toast({
+                    variant: 'destructive',
+                    title: '同期失敗',
+                    description: `スプレッドシートへの同期に失敗しました: ${err.message || err}`,
+                });
+            } finally {
+                setIsSyncing(false);
+            }
+        };
+
+        const displayTime = React.useMemo(() => {
+            if (!lastGasSyncedAt) return '未同期';
+            const parts = lastGasSyncedAt.split(' ');
+            if (parts.length >= 2) {
+                return parts[1]; // HH:mm:ss
+            }
+            return lastGasSyncedAt;
+        }, [lastGasSyncedAt]);
+
+        return (
+            <div className="flex items-center gap-2">
+                <div className="hidden sm:flex flex-col items-end text-xs text-muted-foreground leading-tight">
+                    <span className="text-[10px] opacity-70">最終バックアップ</span>
+                    <span className="font-mono font-medium text-foreground">{displayTime}</span>
+                </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 px-2.5 text-xs font-medium border-primary/20 hover:bg-primary/5"
+                    onClick={handleSync}
+                    disabled={isSyncing}
+                    title={`最終バックアップ: ${lastGasSyncedAt || '未同期'} (クリックで全データ強制送信)`}
+                >
+                    <RefreshCw className={cn("h-3.5 w-3.5 text-primary", isSyncing && "animate-spin")} />
+                    <span>{isSyncing ? '同期中...' : 'シート同期'}</span>
+                </Button>
+            </div>
+        );
+    }
+
     const showLoginButton = !profile && pathname !== '/login' && pathname !== '/order-form';
 
     if (isMobile) {
@@ -286,11 +344,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <header className="flex h-16 items-center justify-between gap-4 border-b bg-background/80 backdrop-blur-sm px-6 sticky top-0 z-30">
                         <SidebarTrigger className="md:hidden" />
                         <div className="flex-1"></div>
-                        {isLoading ? (
-                            <div className="flex items-center justify-center">
-                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                            </div>
-                        ) : profile ? (
+                        <div className="flex items-center gap-3">
+                            {profile && <SyncControl />}
+                            {isLoading ? (
+                                <div className="flex items-center justify-center">
+                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : profile ? (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="ghost" className="flex items-center gap-2 p-1 h-auto rounded-full">
@@ -310,6 +370,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         ) : null}
+                        </div>
                     </header>
                     <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
                     <div className="fixed bottom-1 right-2 text-[10px] text-muted-foreground/40 pointer-events-none z-50 font-mono">
@@ -336,6 +397,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {profile && <SyncControl />}
                     {isLoading ? (
                         <div className="flex items-center justify-center">
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

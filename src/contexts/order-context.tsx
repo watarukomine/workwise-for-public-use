@@ -41,6 +41,8 @@ interface OrderContextType {
   suppressedTripIds: Set<string>;
   currentViewedDate: Date | null;
   setCurrentViewedDate: (date: Date | null) => void;
+  lastGasSyncedAt: string | null;
+  syncOrdersToGasManual: () => Promise<number>;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -403,7 +405,30 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const [rawOrdersData, setRawOrdersData] = useState<any[]>([]);
   const [orderGasUrl, setOrderGasUrlState] = useState(ORDER_GAS_URL);
+  const [lastGasSyncedAt, setLastGasSyncedAt] = useState<string | null>(null);
   const [fetchedDateRanges, setFetchedDateRanges] = useState<Map<string, number>>(new Map()); // Use Map for timestamp-based cache
+
+  useEffect(() => {
+    try {
+      const savedTime = localStorage.getItem('last_gas_synced_at');
+      if (savedTime) setLastGasSyncedAt(savedTime);
+    } catch (e) {}
+  }, []);
+
+  const syncOrdersToGasManual = useCallback(async () => {
+    try {
+      const count = await OrderService.syncUnsyncedOrders();
+      const nowStr = format(new Date(), 'yyyy/MM/dd HH:mm:ss');
+      setLastGasSyncedAt(nowStr);
+      try {
+        localStorage.setItem('last_gas_synced_at', nowStr);
+      } catch (e) {}
+      return count;
+    } catch (err) {
+      console.error('Manual GAS sync failed:', err);
+      throw err;
+    }
+  }, []);
   const [currentViewedDate, setCurrentViewedDate] = useState<Date | null>(null);
   const currentViewedDateRef = React.useRef<Date | null>(null);
   const fetchedDateRangesRef = React.useRef(fetchedDateRanges);
@@ -614,6 +639,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         if (count > 0) {
           console.log(`[OrderContext] Auto-synced ${count} unsynced orders to GAS spreadsheet.`);
         }
+        const nowStr = format(new Date(), 'yyyy/MM/dd HH:mm:ss');
+        setLastGasSyncedAt(nowStr);
+        try {
+          localStorage.setItem('last_gas_synced_at', nowStr);
+        } catch (e) {}
       }).catch(err => console.warn('[OrderContext] Auto-sync failed:', err));
     }
   }, [rawOrdersData.length]);
@@ -808,7 +838,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     toggleTripSuppression,
     suppressedTripIds,
     currentViewedDate,
-    setCurrentViewedDate
+    setCurrentViewedDate,
+    lastGasSyncedAt,
+    syncOrdersToGasManual
   }), [
     orders,
     unassignedOrders,
@@ -832,7 +864,9 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     toggleTripSuppression,
     suppressedTripIds,
     currentViewedDate,
-    setCurrentViewedDate
+    setCurrentViewedDate,
+    lastGasSyncedAt,
+    syncOrdersToGasManual
   ]);
 
   return (
