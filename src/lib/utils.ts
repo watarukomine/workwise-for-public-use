@@ -400,8 +400,8 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     }
   }
 
-  const rawTaskDetails = findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '';
-  const rawCustomerName = findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '名称', 'お名前', 'Customer', 'storeName']) || '';
+  const rawTaskDetails = String(findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '');
+  const rawCustomerName = String(findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '名称', 'お名前', 'Customer', 'storeName']) || '');
   const idStr = String(orderId);
 
   const genericKeywords = ['移動', '業務', '休憩', '研修', '同行', '商談', '会議'];
