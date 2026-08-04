@@ -65,7 +65,6 @@ const allNavItems = [
     { href: '/customers', label: '販売店情報', icon: Building2, roles: ['admin'] },
     { href: '/admin/analytics', label: '分析レポート', icon: BarChart, roles: ['admin'] },
     { href: '/staff', label: 'スタッフ管理', icon: Users, roles: ['admin', 'staff'], hideOnMobile: true },
-    { href: '/import', label: 'インポート', icon: Upload, roles: ['admin'] },
     { href: '/manuals', label: 'マニュアル', icon: BookOpen, roles: ['admin', 'staff'] },
 ];
 
@@ -286,21 +285,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         }, [lastGasSyncedAt]);
 
         return (
-            <div className="flex items-center gap-2">
-                <div className="hidden sm:flex flex-col items-end text-xs text-muted-foreground leading-tight">
-                    <span className="text-[10px] opacity-70">最終バックアップ</span>
-                    <span className="font-mono font-medium text-foreground">{displayTime}</span>
+            <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+                <div className="hidden sm:flex flex-col items-end text-xs text-muted-foreground leading-tight whitespace-nowrap">
+                    <span className="text-[10px] opacity-70 whitespace-nowrap">最終バックアップ</span>
+                    <span className="font-mono font-medium text-foreground whitespace-nowrap">{displayTime}</span>
                 </div>
                 <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-1.5 px-2.5 text-xs font-medium border-primary/20 hover:bg-primary/5"
+                    className="h-8 gap-1.5 px-2.5 text-xs font-medium border-primary/20 hover:bg-primary/5 shrink-0 whitespace-nowrap"
                     onClick={handleSync}
                     disabled={isSyncing}
                     title={`最終バックアップ: ${lastGasSyncedAt || '未同期'} (クリックで全データ強制送信)`}
                 >
-                    <RefreshCw className={cn("h-3.5 w-3.5 text-primary", isSyncing && "animate-spin")} />
-                    <span>{isSyncing ? '同期中...' : 'シート同期'}</span>
+                    <RefreshCw className={cn("h-3.5 w-3.5 text-primary shrink-0", isSyncing && "animate-spin")} />
+                    <span className="whitespace-nowrap">{isSyncing ? '同期中...' : 'シート同期'}</span>
                 </Button>
             </div>
         );

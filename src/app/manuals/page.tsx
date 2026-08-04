@@ -2,8 +2,9 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { BookOpen, FileText, Settings, Shield } from 'lucide-react';
+import { BookOpen, FileText, Settings, Shield, Download } from 'lucide-react';
 import Link from 'next/link';
+import { downloadCSVTemplate } from '@/lib/templates';
 
 export default function ManualsPage() {
     const manuals = [
@@ -83,6 +84,34 @@ export default function ManualsPage() {
                                 開く (Web)
                             </Link>
                         </Button>
+                    </CardContent>
+                </Card>
+
+                {/* CSV Templates Section */}
+                <Card className="flex flex-col hover:shadow-lg transition-shadow duration-200 md:col-span-2 lg:col-span-3 border-dashed border-2">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center gap-2">
+                            <div className="p-2.5 rounded-full bg-primary/10 text-primary">
+                                <Download className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-lg">データ一括登録用 CSVテンプレート</CardTitle>
+                                <CardDescription className="text-xs">各データ一括取り込み用のサンプル形式ファイルをダウンロードできます。</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex gap-3 flex-wrap">
+                            <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5" onClick={() => downloadCSVTemplate('customers')}>
+                                <Download className="h-4 w-4 text-muted-foreground" /> 販売店情報テンプレート (.csv)
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5" onClick={() => downloadCSVTemplate('staff')}>
+                                <Download className="h-4 w-4 text-muted-foreground" /> スタッフ登録テンプレート (.csv)
+                            </Button>
+                            <Button variant="outline" size="sm" className="h-9 text-xs gap-1.5" onClick={() => downloadCSVTemplate('orders')}>
+                                <Download className="h-4 w-4 text-muted-foreground" /> 受注データテンプレート (.csv)
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
