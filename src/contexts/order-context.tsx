@@ -607,6 +607,17 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, [profile, isProfileLoading, currentViewedDate, rawOrdersData]);
 
+  // Auto-sync any unsynced orders to GAS in the background
+  useEffect(() => {
+    if (rawOrdersData && rawOrdersData.length > 0) {
+      OrderService.syncUnsyncedOrders().then(count => {
+        if (count > 0) {
+          console.log(`[OrderContext] Auto-synced ${count} unsynced orders to GAS spreadsheet.`);
+        }
+      }).catch(err => console.warn('[OrderContext] Auto-sync failed:', err));
+    }
+  }, [rawOrdersData.length]);
+
   const saveLocalEvent = useCallback((event: WithId<ScheduleEvent>) => {
     setLocalScheduleEvents(prev => {
       const idx = prev.findIndex(e => e.id === event.id);

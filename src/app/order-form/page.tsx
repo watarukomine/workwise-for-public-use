@@ -311,7 +311,7 @@ export default function OrderFormPage() {
                 customerName: submissionData.storeName,
                 estimatedDuration: 60,
                 _type: 'order',
-                isGasSynced: true,
+                isGasSynced: false,
             });
 
             // Trigger Guaranteed GAS Server Action in the background to avoid blocking transition (0-delay response!)

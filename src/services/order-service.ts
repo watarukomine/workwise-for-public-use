@@ -296,9 +296,11 @@ export const OrderService = {
         const staffNameVal = order.staffName || (order as any).staff || (order as any)['作業担当者'] || (order as any)['担当者'] || (order as any)['スタッフ名'] || '';
         const staffIdVal = order.staffId || (order as any)['スタッフID'] || '';
 
+        const customGasUrl = (order as any).gasUrl || (typeof window !== 'undefined' ? localStorage.getItem('custom_order_gas_url') : undefined) || ORDER_GAS_URL;
+
         const payload = {
             ...order,
-            gasUrl: ORDER_GAS_URL,
+            gasUrl: customGasUrl,
             action: action === 'create' ? 'createOrder' : 'updateOrderSchedule',
             operation: action === 'create' ? 'createOrder' : 'updateOrderSchedule',
             systemId: order.systemId || order.id,

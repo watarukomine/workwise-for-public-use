@@ -38,6 +38,7 @@ async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
             body: JSON.stringify(bodyPayload),
             cache: 'no-store',
             redirect: 'follow',
+            keepalive: true,
             signal: controller.signal,
         });
         clearTimeout(timeoutId);
