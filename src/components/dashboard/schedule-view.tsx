@@ -567,7 +567,7 @@ export function ScheduleView({
   const { customers: allCustomers } = useCustomer();
   const { allStaff, setSelectedStaffIds } = useSelectedStaff(); // Get full list & setter
   const { toast } = useToast();
-  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, deleteOrder, toggleTripSuppression, setCurrentViewedDate, updateRawOrder, updateOrderFullSync } = useOrder();
+  const { orders, refetchOrders, unassignedOrders, setUnassignedOrders, scheduleEvents, setScheduleEvents, saveLocalEvent, deleteLocalEvent, deleteOrder, toggleTripSuppression, setCurrentViewedDate, updateRawOrder, updateOrderFullSync, setRawOrdersData } = useOrder();
 
   // Filter orders to only show those scheduled for currentDate (JST local date format)
   const dailyOrders = React.useMemo(() => {
@@ -1523,11 +1523,11 @@ export function ScheduleView({
               // 1. Immediate Direct Firestore Persistence for Generic Task (Ensures task never disappears on refetch)
               try {
                 const { OrderService } = await import('@/services/order-service');
-                await OrderService.createOrder({
+                const genericOrderData: any = {
                   id: taskId,
                   systemId: taskId,
                   title: ev.title,
-                  _type: 'task' as any,
+                  _type: 'task',
                   isGeneric: true,
                   taskDetails: ev.title,
                   customerName: ev.title,
@@ -1539,7 +1539,11 @@ export function ScheduleView({
                   scheduledEndTime: format(safeParseISO(ev.end), "yyyy/MM/dd'T'HH:mm:ss"),
                   estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string)) || 60,
                   status: '割当済'
-                });
+                };
+                await OrderService.createOrder(genericOrderData);
+                if (setRawOrdersData) {
+                  setRawOrdersData(prev => [...prev.filter(o => o.id !== taskId && o.systemId !== taskId), genericOrderData]);
+                }
               } catch (dbErr) {
                 console.warn('Failed to save generic task to Firestore:', dbErr);
               }
@@ -1566,7 +1570,8 @@ export function ScheduleView({
                 }
               })();
             }
-            toast({ title: "アクションログを保存しました" });
+            const savedTaskName = eventsToCreate[0]?.title || '汎用タスク';
+            toast({ title: `${savedTaskName}を保存しました` });
           } else {
             // Updating Real Order
             const taskEvent = newEvents.find(e => e.id.endsWith('-task'));

@@ -634,7 +634,23 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setOrders(processedData.orders);
-    setScheduleEvents(processedData.scheduleEvents);
+
+    let finalScheduleEvents = [...processedData.scheduleEvents];
+    if (localScheduleEvents.length > 0) {
+      const eventMap = new Map<string, WithId<ScheduleEvent>>();
+      finalScheduleEvents.forEach(e => eventMap.set(e.id, e));
+
+      localScheduleEvents.forEach(localEv => {
+        if (localEv.staffId === '__DELETED__') {
+          eventMap.delete(localEv.id);
+        } else {
+          eventMap.set(localEv.id, localEv);
+        }
+      });
+      finalScheduleEvents = Array.from(eventMap.values());
+    }
+
+    setScheduleEvents(finalScheduleEvents);
     setStatuses(processedData.statuses);
     setUnassignedOrders(processedData.unassignedOrders);
 
@@ -645,7 +661,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [processedData, rawOrdersData]);
+  }, [processedData, rawOrdersData, localScheduleEvents]);
 
   const deleteOrder = useCallback(async (id: string) => {
     // 1. Primary delete from Firestore
