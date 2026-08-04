@@ -400,6 +400,21 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     }
   }
 
+  const rawTaskDetails = findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '';
+  const rawCustomerName = findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '名称', 'お名前', 'Customer', 'storeName']) || '';
+  const idStr = String(orderId);
+
+  const genericKeywords = ['移動', '業務', '休憩', '研修', '同行', '商談', '会議'];
+  const rawIsGeneric = findKey(rawOrder, ['isGeneric']) ?? rawOrder?.isGeneric;
+  const isGenericTask = rawIsGeneric !== undefined ? Boolean(rawIsGeneric) : (
+    idStr.startsWith('task-') ||
+    idStr.startsWith('generic-') ||
+    idStr.includes('-generic-') ||
+    idStr.endsWith('-task') ||
+    genericKeywords.some(k => rawTaskDetails.includes(k) || rawCustomerName.includes(k)) ||
+    (findKey(rawOrder, ['_type', 'type']) === 'task')
+  );
+
   return {
     id: String(orderId),
     displayId: visualId ? String(visualId) : undefined,
@@ -409,7 +424,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
       (rawOrder.raw ? findKey(rawOrder.raw, ['customerCode', 'userCode', 'ユーザーコード', 'usercode', '顧客コード']) : undefined) ||
       '00000'
     ),
-    taskDetails: findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '',
+    taskDetails: rawTaskDetails,
     status: (() => {
       const raw = findKey(rawOrder, ['受注ステータス', 'status']) || '未割当';
       if (['お客まち', '点検', 'お預かり済', '点検待ち', '洗車待ち'].some(s => raw.includes(s))) {
@@ -419,7 +434,8 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     })(),
     scheduledDate: scheduledDateVal,
     scheduledTime: scheduledTime || '',
-    _type: findKey(rawOrder, ['_type', 'type']) || (findKey(rawOrder, ['ユーザーコード', 'customerCode', 'お取引先コード']) ? 'order' : 'task'),
+    _type: (findKey(rawOrder, ['_type', 'type']) || (isGenericTask ? 'task' : (findKey(rawOrder, ['ユーザーコード', 'customerCode', 'お取引先コード']) ? 'order' : 'task'))) as 'order' | 'task',
+    isGeneric: isGenericTask,
     estimatedDuration: !isNaN(duration) && duration > 0 ? duration : 60,
     value: parseFloat(String(findKey(rawOrder, ['金額', '売上', 'price', 'value']) || 0).replace(/,/g, '')),
     staffName: (() => {

@@ -112,7 +112,14 @@ const processOrderData = (
       raw: rawOrder
     };
 
-    const isGenericTask = order.id.startsWith('task-');
+    const genericKeywords = ['移動', '業務', '休憩', '研修', '同行', '商談', '会議'];
+    const isGenericTask = Boolean(order.isGeneric) ||
+      order._type === 'task' ||
+      order.id.startsWith('task-') ||
+      order.id.startsWith('generic-') ||
+      order.id.includes('-generic-') ||
+      order.id.endsWith('-task') ||
+      genericKeywords.some(k => String(order.taskDetails || order.customerName || '').includes(k));
 
     if (!isGenericTask) {
       orders.push(order);
@@ -328,8 +335,19 @@ const processOrderData = (
   });
 
   // 3. Determine Unassigned Orders for Current Viewed Date
+  const genericKeywords = ['移動', '業務', '休憩', '研修', '同行', '商談', '会議'];
   const unassignedOrders = orders.filter(order => {
-    if (order.isGeneric) return false;
+    if (
+      order.isGeneric ||
+      order._type === 'task' ||
+      order.id.startsWith('task-') ||
+      order.id.startsWith('generic-') ||
+      order.id.includes('-generic-') ||
+      order.id.endsWith('-task') ||
+      genericKeywords.some(k => String(order.taskDetails || order.customerName || '').includes(k))
+    ) {
+      return false;
+    }
 
     // Filter out completed or cancelled orders
     const status = String(order.status || (order as any)['受注ステータス'] || '').trim();

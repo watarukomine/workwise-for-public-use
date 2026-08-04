@@ -86,15 +86,17 @@ const EMPTY_EVENTS: WithId<ScheduleEvent>[] = [];
 
 const isGenericTask = (order: any) => {
   if (!order) return false;
-  const id = order.id || '';
-  const title = order.title || order.taskDetails || '';
+  if (order.isGeneric) return true;
+  const id = String(order.id || '');
+  const title = String(order.title || order.taskDetails || '');
   const type = order._type || order.type;
+  const keywords = ['休憩', '移動', '業務', '研修', '同行', '商談', '会議'];
   
-  if (type === 'order') return false;
+  if (keywords.some(k => title.includes(k))) return true;
   if (type === 'task') return true;
+  if (type === 'order') return false;
 
-  return id.startsWith('task-') || id.startsWith('generic-') ||
-    ['休憩', '移動', '業務', '研修', '同行', '商談'].includes(title) ||
+  return id.startsWith('task-') || id.startsWith('generic-') || id.endsWith('-task') || id.includes('-generic-') ||
     (!order.customerCode && !order.customerName);
 };
 
@@ -1420,9 +1422,9 @@ export function ScheduleView({
 
 
 
-      const isGeneric = order.id.startsWith('generic-');
+      const isGeneric = order.id.startsWith('generic-') || Boolean(order.isGeneric) || isGenericTask(order);
       // Treat as Accompany if ID says so OR title contains "同行"
-      const isGenericAccompany = order.id === 'generic-accompany' || String(order.taskDetails || '').includes('同行');
+      const isGenericAccompany = order.id === 'generic-accompany' || String(order.taskDetails || order.title || order.customerName || '').includes('同行');
       const taskStart = getNewStartFromDrop();
 
       let newEvents: WithId<ScheduleEvent>[] = [];
