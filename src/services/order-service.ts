@@ -413,24 +413,35 @@ export const OrderService = {
         try {
             const { firestore } = initializeFirebase();
             const colRef = collection(firestore, COLLECTION);
-            const q = query(colRef, where('isGasSynced', '==', false));
-            const snapshot = await getDocs(q);
+            
+            // Fetch all orders and filter client-side for any order with isGasSynced !== true
+            // (handles both isGasSynced === false and missing/undefined isGasSynced property)
+            const snapshot = await getDocs(colRef);
 
             if (snapshot.empty) {
                 return 0;
             }
 
-            console.log(`[OrderService] Auto-recovering ${snapshot.size} unsynced orders...`);
+            const unsyncedDocs = snapshot.docs.filter(docSnap => {
+                const data = docSnap.data();
+                return data.isGasSynced !== true;
+            });
+
+            if (unsyncedDocs.length === 0) {
+                return 0;
+            }
+
+            console.log(`[OrderService] Auto-recovering ${unsyncedDocs.length} unsynced/unflagged orders...`);
             let syncedCount = 0;
 
-            for (const docSnap of snapshot.docs) {
+            for (const docSnap of unsyncedDocs) {
                 const orderData = { ...docSnap.data(), id: docSnap.id } as Order;
                 const res = await this.backupToGas(orderData, 'create', 2);
                 if (res.status === 'success' || res.status === 'ok') {
                     syncedCount++;
                 }
             }
-            console.log(`[OrderService] Auto-recovered ${syncedCount}/${snapshot.size} orders to GAS.`);
+            console.log(`[OrderService] Auto-recovered ${syncedCount}/${unsyncedDocs.length} orders to GAS.`);
             return syncedCount;
         } catch (e) {
             console.error('[OrderService] Error during syncUnsyncedOrders:', e);
