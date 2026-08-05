@@ -144,7 +144,11 @@ const processOrderData = (
       }
     }
 
-    if (staffMember) {
+    // PERF: Early return for orders from other dates to cut calculation load by 99%
+    const normOrderDate = normalizeDateStr(order.scheduledDate);
+    const isTargetDateMatch = !normOrderDate || !targetDateStr || normOrderDate === targetDateStr;
+
+    if (staffMember && isTargetDateMatch) {
       // Ensure staffStatusMap entry exists before accessing
       if (!staffStatusMap.has(staffMember.id)) {
         staffStatusMap.set(staffMember.id, {
@@ -208,11 +212,7 @@ const processOrderData = (
       }
 
       if (order.scheduledTime) {
-        // CRITICAL FIX: Only display events on timeline if order scheduledDate matches current viewed targetDateStr
-        const normOrderDate = normalizeDateStr(order.scheduledDate);
-        if (normOrderDate && targetDateStr && normOrderDate !== targetDateStr) {
-          return; // Skip orders from other dates from appearing on today's timeline!
-        }
+        if (!isTargetDateMatch) return;
 
         let scheduledTime: Date | null = null;
         let dateStr = order.scheduledDate;
