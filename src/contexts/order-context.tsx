@@ -719,18 +719,11 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   const loadOrders = useCallback(async (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const lastFetched = fetchedDateRangesRef.current.get(dateStr);
-    const isStale = lastFetched ? (Date.now() - lastFetched > 120000) : true; // Cache for 2 mins
-
-    if (!isStale) {
-      console.log(`[OrderProvider] Date ${dateStr} in cache, instant load.`);
-      return;
-    }
-    console.log(`[OrderProvider] Non-blocking background fetch for date: ${dateStr}`);
-    fetchAndProcessData(true, { date: dateStr, range: 1 }).catch(err => {
-      console.warn(`[OrderProvider] Background fetch error for ${dateStr}:`, err);
-    });
-  }, [fetchAndProcessData]);
+    // Store viewed date for instant filtering
+    fetchedDateRangesRef.current.set(dateStr, Date.now());
+    // All orders are already real-time synced in memory via subscribeAllOrders!
+    // No network fetch needed — 0ms instant transition.
+  }, []);
 
   const syncOrders = useCallback(async () => {
     // 1. Recover any unsynced GAS orders in the background

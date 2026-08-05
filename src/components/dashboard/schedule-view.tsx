@@ -1382,6 +1382,16 @@ export function ScheduleView({
             if (rawId && rawId !== finalSystemId) updateRawOrder(rawId, updatePayload);
           }
 
+          // Direct Firestore Auto-Save for Generic and Real Tasks on Move
+          try {
+            const { OrderService } = await import('@/services/order-service');
+            if (finalSystemId) {
+              await OrderService.updateOrder(finalSystemId, updatePayload);
+            }
+          } catch (fsErr) {
+            console.warn('Direct Firestore auto-save on move warning:', fsErr);
+          }
+
           // Determine old staff name before move for GAS spreadsheet lookup
           const previousEventState = previousSchedule.find(e => e.id === draggedEvent.id || (draggedEvent.tripId && e.tripId === draggedEvent.tripId));
           const oldStaffId = previousEventState?.staffId || draggedEvent.staffId;
@@ -1536,13 +1546,14 @@ export function ScheduleView({
                   staffId: newStaffId,
                   staffName: staff.name,
                   picName: staff.name,
-                  scheduledDate: format(safeParseISO(ev.start), 'yyyy/MM/dd'),
-                  scheduledTime: format(safeParseISO(ev.start), "yyyy/MM/dd'T'HH:mm:ss"),
-                  scheduledEndTime: format(safeParseISO(ev.end), "yyyy/MM/dd'T'HH:mm:ss"),
+                  scheduledDate: format(safeParseISO(ev.start), 'yyyy-MM-dd'),
+                  scheduledTime: format(safeParseISO(ev.start), "yyyy-MM-dd'T'HH:mm:ss"),
+                  scheduledEndTime: format(safeParseISO(ev.end), "yyyy-MM-dd'T'HH:mm:ss"),
                   estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string)) || 60,
                   status: '割当済'
                 };
                 await OrderService.createOrder(genericOrderData);
+                saveLocalEvent(ev);
                 if (setRawOrdersData) {
                   setRawOrdersData(prev => [...prev.filter(o => o.id !== taskId && o.systemId !== taskId), genericOrderData]);
                 }

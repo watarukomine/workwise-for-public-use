@@ -18,7 +18,7 @@ import { ORDER_GAS_URL } from '@/lib/settings';
 
 async function callGasApi(args: GasApiArgs): Promise<GasResponse> {
     const { gasUrl, ...bodyPayload } = args;
-    const targetUrl = gasUrl || ORDER_GAS_URL || 'https://script.google.com/macros/s/AKfycbwYhwK50z_vFldzSxVuTA31vTZhyOPzZ43iFzqJApNf7j79Dbx5TyB9-tSgRlAjuLTc/exec';
+    const targetUrl = gasUrl || ORDER_GAS_URL || 'https://script.google.com/macros/s/AKfycbyxFXMdbcTfvrA0cZ_V1av92eDy7LHRuNU9dY1sJzb0jquEs4QhGRTnxSaFRCH9uYik/exec';
 
     if (!targetUrl) {
         return { status: 'error', message: 'GAS URLが設定されていません。' };

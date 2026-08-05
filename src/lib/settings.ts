@@ -9,7 +9,7 @@
 // Note: These URLs point to the deployed Web App URL of your GAS project.
 // Ensure your GAS project is deployed with "Execute as: Me" and "Who has access: Anyone".
 
-const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwYhwK50z_vFldzSxVuTA31vTZhyOPzZ43iFzqJApNf7j79Dbx5TyB9-tSgRlAjuLTc/exec';
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyxFXMdbcTfvrA0cZ_V1av92eDy7LHRuNU9dY1sJzb0jquEs4QhGRTnxSaFRCH9uYik/exec';
 
 // Staff Data Script (Unified)
 export const STAFF_GAS_URL = process.env.NEXT_PUBLIC_STAFF_GAS_URL || DEFAULT_GAS_URL;

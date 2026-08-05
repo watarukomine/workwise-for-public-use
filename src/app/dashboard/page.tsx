@@ -370,9 +370,6 @@ export default function DashboardPage() {
       const isDateChange = isMount || isRealDateSwitch;
 
       if (isDateChange) {
-        if (isRealDateSwitch) {
-          isDateLoading.current = true;
-        }
         lastSyncedDate.current = currentDate;
         setCheckedOutStaffIds(new Set());
       }
