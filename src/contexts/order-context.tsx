@@ -144,11 +144,7 @@ const processOrderData = (
       }
     }
 
-    // PERF: Early return for orders from other dates to cut calculation load by 99%
-    const normOrderDate = normalizeDateStr(order.scheduledDate);
-    const isTargetDateMatch = !normOrderDate || !targetDateStr || normOrderDate === targetDateStr;
-
-    if (staffMember && isTargetDateMatch) {
+    if (staffMember) {
       // Ensure staffStatusMap entry exists before accessing
       if (!staffStatusMap.has(staffMember.id)) {
         staffStatusMap.set(staffMember.id, {
@@ -212,7 +208,11 @@ const processOrderData = (
       }
 
       if (order.scheduledTime) {
-        if (!isTargetDateMatch) return;
+        // CRITICAL FIX: Only display events on timeline if order scheduledDate matches current viewed targetDateStr
+        const normOrderDate = normalizeDateStr(order.scheduledDate);
+        if (normOrderDate && targetDateStr && normOrderDate !== targetDateStr) {
+          return; // Skip orders from other dates from appearing on today's timeline!
+        }
 
         let scheduledTime: Date | null = null;
         let dateStr = order.scheduledDate;
@@ -719,11 +719,18 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   const loadOrders = useCallback(async (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    // Store viewed date for instant filtering
-    fetchedDateRangesRef.current.set(dateStr, Date.now());
-    // All orders are already real-time synced in memory via subscribeAllOrders!
-    // No network fetch needed — 0ms instant transition.
-  }, []);
+    const lastFetched = fetchedDateRangesRef.current.get(dateStr);
+    const isStale = lastFetched ? (Date.now() - lastFetched > 120000) : true; // Cache for 2 mins
+
+    if (!isStale) {
+      console.log(`[OrderProvider] Date ${dateStr} in cache, instant load.`);
+      return;
+    }
+    console.log(`[OrderProvider] Non-blocking background fetch for date: ${dateStr}`);
+    fetchAndProcessData(true, { date: dateStr, range: 1 }).catch(err => {
+      console.warn(`[OrderProvider] Background fetch error for ${dateStr}:`, err);
+    });
+  }, [fetchAndProcessData]);
 
   const syncOrders = useCallback(async () => {
     // 1. Recover any unsynced GAS orders in the background
