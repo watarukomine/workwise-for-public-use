@@ -155,33 +155,19 @@ export default function DashboardPage() {
       }
     };
 
-    // 1. Process active orders in state
-    if (orders && orders.length > 0) {
-      orders.forEach(o => {
-        if (o.isGeneric) return;
-        const status = String(o.status || '').trim();
-        if (['作業完了', '完了', 'キャンセル', '完了済', '作業終了'].includes(status)) return;
-        const d = o.scheduledDate || (o.raw ? findKey(o.raw, ['作業予定日', 'scheduledDate', '日付']) : '');
-        processOrderDate(d, o.id || o.rawOrderId);
-      });
-    }
-
-    // 2. Process rawOrdersData
+    // Fast light direct scan over rawOrdersData (No heavy mapRawToOrder object creation!)
     if (rawOrdersData && rawOrdersData.length > 0) {
-      rawOrdersData.forEach((raw, idx) => {
-        const o = mapRawToOrder(raw, `cnt-${idx}`);
-        const hasNoCustomer = !o.customerCode || o.customerCode === '00000' || !o.customerName || o.customerName === '（店舗名未設定）';
-        const hasNoDetails = !o.taskDetails && !o.orderNo && !o.regNo && !o.productName;
-        if (hasNoCustomer && hasNoDetails) return;
-        const status = String(o.status || '').trim();
+      rawOrdersData.forEach((raw: any, idx: number) => {
+        const id = raw.id || raw.systemId || raw.SystemID || `cnt-${idx}`;
+        const status = String(raw.status || raw['受注ステータス'] || '').trim();
         if (['作業完了', '完了', 'キャンセル', '完了済', '作業終了'].includes(status)) return;
-        const d = o.scheduledDate || (o.raw ? findKey(o.raw, ['作業予定日', 'scheduledDate', '日付']) : '');
-        processOrderDate(d, o.id || o.rawOrderId);
+        const dateVal = raw.scheduledDate || raw['作業予定日'] || raw.scheduled_date || raw['予定日'];
+        processOrderDate(dateVal, id);
       });
     }
 
     return countsMap;
-  }, [rawOrdersData, orders]);
+  }, [rawOrdersData]);
 
   const { isLoading: isLoadingCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
