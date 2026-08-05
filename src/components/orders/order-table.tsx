@@ -810,11 +810,13 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="equipmentStatus">機材有無</Label>
+                    <Label htmlFor="equipmentStatus" className="text-muted-foreground">機材有無（編集不可）</Label>
                     <Input
                       id="equipmentStatus"
                       value={editForm['機材有無'] || ''}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, '機材有無': e.target.value }))}
+                      disabled
+                      readOnly
+                      className="bg-muted text-muted-foreground cursor-not-allowed"
                     />
                   </div>
                   <div className="space-y-2">
