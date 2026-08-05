@@ -739,7 +739,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   }, [fetchAndProcessData]);
 
   const refetchOrders = useCallback(async () => {
-    // CRITICAL FIX: Clear local temporary events so backend latest data is 100% authoritative and never rolls back!
     setLocalScheduleEvents([]);
     try {
       localStorage.removeItem(ORDERS_CACHE_KEY);
@@ -748,14 +747,19 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     // Auto-salvage unsynced orders to GAS in background
     OrderService.syncUnsyncedOrders().catch(err => console.warn('[OrderProvider] syncUnsyncedOrders warning:', err));
 
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    await fetchAndProcessData(true, { date: todayStr, range: 3 });
-    
-    const viewedDate = currentViewedDateRef.current;
-    if (viewedDate) {
-      const viewedDateStr = format(viewedDate, 'yyyy-MM-dd');
-      await fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
+    // Fetch latest fresh documents from Firestore
+    try {
+      const freshOrders = await OrderService.getAllOrders(4000);
+      if (freshOrders && freshOrders.length > 0) {
+        setRawOrdersData(freshOrders);
+      }
+    } catch (e) {
+      console.warn('[OrderProvider] Refetch fresh orders error:', e);
     }
+
+    const viewedDate = currentViewedDateRef.current || new Date();
+    const viewedDateStr = format(viewedDate, 'yyyy-MM-dd');
+    await fetchAndProcessData(true, { date: viewedDateStr, range: 1 });
   }, [fetchAndProcessData]);
 
   const loadRange = useCallback(async (date: Date, range: number) => {
