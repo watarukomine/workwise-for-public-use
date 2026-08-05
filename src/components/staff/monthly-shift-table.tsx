@@ -156,9 +156,25 @@ export function MonthlyShiftTable({ staffList, refreshTrigger = 0 }: MonthlyShif
                         ) : (
                             <>
                                 {staffList.map(staff => {
+                                    const cleanStaffName = staff.name ? staff.name.replace(/[\s\u3000]+/g, '') : '';
+                                    
+                                    const isStaffScheduledOnDate = (dateKey: string) => {
+                                        const scheduledIds = scheduleData[dateKey] || [];
+                                        if (scheduledIds.length === 0) return false;
+                                        if (scheduledIds.includes(staff.id)) return true;
+                                        if (staff.name && scheduledIds.includes(staff.name)) return true;
+                                        if (cleanStaffName) {
+                                            return scheduledIds.some(id => {
+                                                const cleanId = String(id || '').trim().replace(/[\s\u3000]+/g, '');
+                                                return cleanId === cleanStaffName || cleanId === staff.id;
+                                            });
+                                        }
+                                        return false;
+                                    };
+
                                     const totalDays = daysInMonth.filter(day => {
                                         const dateKey = format(day, 'yyyy-MM-dd');
-                                        return (scheduleData[dateKey] || []).includes(staff.id);
+                                        return isStaffScheduledOnDate(dateKey);
                                     }).length;
 
                                     return (
@@ -171,8 +187,7 @@ export function MonthlyShiftTable({ staffList, refreshTrigger = 0 }: MonthlyShif
                                             </TableCell>
                                             {daysInMonth.map(day => {
                                                 const dateKey = format(day, 'yyyy-MM-dd');
-                                                const scheduledIds = scheduleData[dateKey] || [];
-                                                const isScheduled = scheduledIds.includes(staff.id);
+                                                const isScheduled = isStaffScheduledOnDate(dateKey);
 
                                                 return (
                                                     <TableCell
