@@ -383,17 +383,11 @@ export default function DashboardPage() {
         }
       }
 
-      try {
-        const { staffIds: attendedStaffIds, checkedOutIds = [], scheduledStaffIds: scheduledIds = [] } = await getDailyAttendanceDetails(currentDate);
-        
-        // Prevent race condition if user switched date while fetching
-        if (cancelled) return;
-
-        // Parse August 2026 CSV shift data for 100% accurate fallback matching
-        const augustCsvNames = (() => {
-          if (currentDate.getFullYear() === 2026 && currentDate.getMonth() === 7) {
-            const dayIdx = currentDate.getDate() - 1;
-            const csvLines = `2026/08,桑原和裕,総括G,休,,休,,,,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,休,半,,,,休,
+      // 1. Instant 0ms Synchronous Shift Matching from August 2026 CSV
+      const augustCsvNames = (() => {
+        if (currentDate.getFullYear() === 2026 && currentDate.getMonth() === 7) {
+          const dayIdx = currentDate.getDate() - 1;
+          const csvLines = `2026/08,桑原和裕,総括G,休,,休,,,,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,休,半,,,,休,
 2026/08,佐藤耕次,総括G,,,,,,,,,有,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,休,,,
 2026/08,足立正道,総括G,半,有,休,,,休,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,休,,,休,,
 2026/08,坂本幸夫,総括G,,,,休,,,,休,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,休,,,休,休,,
@@ -412,32 +406,39 @@ export default function DashboardPage() {
 2026/08,小松佑輔,厚木店,,,有,休,,休,,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,,休,休,,,
 2026/08,關 雄弥,厚木店,,,,休,有,有,休,,,休,休,休,休,休,休,休,休,休,休,休,休,休,休,休,,休,,,休,,`.trim().split('\n');
 
-            const activeNames: string[] = [];
-            csvLines.forEach(line => {
-              const parts = line.split(',');
-              const name = parts[1].trim();
-              const days = parts.slice(3);
-              const val = String(days[dayIdx] || '').trim();
-              // Empty OR '半' (half-day attendance) means working on this date!
-              if (!val || val === '半') {
-                activeNames.push(name);
-              }
-            });
-            return activeNames;
-          }
-          return [];
-        })();
+          const activeNames: string[] = [];
+          csvLines.forEach(line => {
+            const parts = line.split(',');
+            const name = parts[1].trim();
+            const days = parts.slice(3);
+            const val = String(days[dayIdx] || '').trim();
+            if (!val || val === '半') {
+              activeNames.push(name);
+            }
+          });
+          return activeNames;
+        }
+        return [];
+      })();
 
-        const august1DefaultStaff = ["佐藤耕次", "坂本幸夫", "杉山和彦", "福原泰弘", "水野一也", "内田巧", "千葉征英", "古石翔", "小堀健太", "湯川浩道", "岡本正博", "小松佑輔", "關雄弥"];
-        const yr = currentDate.getFullYear();
-        const mo = currentDate.getMonth() + 1;
-        const dy = currentDate.getDate();
-        const dateStr = `${yr}-${String(mo).padStart(2, '0')}-${String(dy).padStart(2, '0')}`;
-        const finalScheduledEntries = scheduledIds.length > 0 ? scheduledIds : (dateStr === '2026-08-01' ? august1DefaultStaff : augustCsvNames);
+      const august1DefaultStaff = ["佐藤耕次", "坂本幸夫", "杉山和彦", "福原泰弘", "水野一也", "内田巧", "千葉征英", "古石翔", "小堀健太", "湯川浩道", "岡本正博", "小松佑輔", "關雄弥"];
+      const yr = currentDate.getFullYear();
+      const mo = currentDate.getMonth() + 1;
+      const dy = currentDate.getDate();
+      const dateStr = `${yr}-${String(mo).padStart(2, '0')}-${String(dy).padStart(2, '0')}`;
+      const finalScheduledEntries = (dateStr === '2026-08-01' ? august1DefaultStaff : augustCsvNames);
 
+      setScheduledStaffIds(createNormalizedKeySet(finalScheduledEntries));
+
+      // Trigger background fetch without blocking date switch (0ms transition!)
+      getDailyAttendanceDetails(currentDate).then(({ staffIds: attendedStaffIds, checkedOutIds = [], scheduledStaffIds: scheduledIds = [] }) => {
+        if (cancelled) return;
         setCheckedOutStaffIds(new Set(checkedOutIds));
         setPresentStaffIds(new Set(attendedStaffIds));
-        setScheduledStaffIds(createNormalizedKeySet(finalScheduledEntries));
+        if (scheduledIds && scheduledIds.length > 0) {
+          setScheduledStaffIds(createNormalizedKeySet(scheduledIds));
+        }
+      }).catch(err => console.warn("[Dashboard] Background attendance fetch warning:", err));
 
         // シフト出勤者および作業チップ割当者のみをデフォルトでレ点チェックONに設定
         if (allStaff && allStaff.length > 0) {
@@ -474,16 +475,6 @@ export default function DashboardPage() {
             setSelectedStaffIds(nextSelectedIds);
           }
         }
-
-
-      } catch (e) {
-        if (!cancelled) console.error("Failed to sync attendance:", e);
-      } finally {
-        if (!cancelled) {
-          isDateLoading.current = false;
-          setIsSyncing(false);
-        }
-      }
     };
 
     syncAttendance();
