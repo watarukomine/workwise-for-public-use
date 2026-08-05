@@ -25,6 +25,14 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const CUSTOMER_CACHE_KEY = 'cached_customer_data_v2'; // Changed key
 
   const setCustomers = (data: any[]) => {
+    const map = new Map<string, string>();
+    data.forEach(c => {
+      const code = c.userCode || c['ユーザーコード'] || '';
+      if (code) {
+        map.set(String(code).trim().padStart(5, '0'), c.storeName || c['店舗'] || '');
+      }
+    });
+    (data as any)._mapByCode = map;
     setCustomersState(data);
   };
 

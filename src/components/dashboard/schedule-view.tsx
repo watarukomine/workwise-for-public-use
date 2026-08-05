@@ -200,14 +200,16 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
     const code = order.customerCode || (order as any).userCode || findKey(order.raw, ["ユーザーコード", "顧客コード"]);
     if (code && allCustomers) {
       const paddedCode = String(code).trim().padStart(5, '0');
-      const match = allCustomers.find(c => {
-        const cCode = c.userCode || c['ユーザーコード'] || '';
-        return String(cCode).trim().padStart(5, '0') === paddedCode;
-      });
-      if (match?.storeName) {
-        resolvedStoreName = match.storeName;
+      // High performance lookup
+      const storeName = (allCustomers as any)._mapByCode?.get(paddedCode);
+      if (storeName) {
+        resolvedStoreName = storeName;
       } else {
-        resolvedStoreName = '(店舗名未設定)';
+        const match = allCustomers.find(c => {
+          const cCode = c.userCode || c['ユーザーコード'] || '';
+          return String(cCode).trim().padStart(5, '0') === paddedCode;
+        });
+        resolvedStoreName = match?.storeName || '(店舗名未設定)';
       }
     } else {
       resolvedStoreName = '(店舗名未設定)';
@@ -2267,9 +2269,20 @@ export function ScheduleView({
     getStaffById
   }), [getCustomerByCode, getStaffById]);
   const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 3,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 5,
+      },
+    }),
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5,
+        distance: 3,
       },
     })
   );
