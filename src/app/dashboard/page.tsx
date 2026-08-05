@@ -725,10 +725,9 @@ export default function DashboardPage() {
               >
                 <ChevronLeft className="h-4.5 w-4.5" />
               </Button>
-              <div className="h-9 px-2.5 sm:px-3.5 text-center font-semibold bg-background rounded-md shadow-sm border text-sm select-none transition-all flex items-center justify-center gap-1">
+              <div className="h-9 min-w-[110px] sm:min-w-[150px] px-2.5 sm:px-3.5 text-center font-semibold bg-background rounded-md shadow-sm border text-sm select-none flex items-center justify-center">
                 <span className="hidden sm:inline">{format(currentDate, 'yyyy年MM月dd日', { locale: ja })}</span>
                 <span className="sm:hidden">{format(currentDate, 'M/d(EEE)', { locale: ja })}</span>
-                {(isSyncing || isAutoRefreshing || isPending) && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />}
               </div>
               <Button
                 variant="ghost"
