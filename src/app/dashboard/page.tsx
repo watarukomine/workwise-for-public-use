@@ -261,7 +261,7 @@ export default function DashboardPage() {
     }
 
     return selectedStaff;
-  }, [allStaff, appliedSelectedStaffIds, showManagement]);
+  }, [allStaff, appliedSelectedStaffIds, showManagement, scheduledStaffIds, scheduleEvents, currentDate]);
 
   const selectedStaffNames = React.useMemo(() => {
     if (filteredStaff.length === 0) {
@@ -409,7 +409,7 @@ export default function DashboardPage() {
             const name = parts[1].trim();
             const days = parts.slice(3);
             const val = String(days[dayIdx] || '').trim();
-            if (!val) {
+            if (!val || val === '半') {
               activeNames.push(name);
             }
           });

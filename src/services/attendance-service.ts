@@ -621,7 +621,8 @@ const fetchAndUpdateAttendanceInBackground = (date: Date, docId: string) => {
             const cached = attendanceDetailsCache.get(docId);
             const isChanged = !cached || 
                 JSON.stringify(cached.staffIds) !== JSON.stringify(freshData.staffIds) ||
-                JSON.stringify(cached.checkedOutIds) !== JSON.stringify(freshData.checkedOutIds);
+                JSON.stringify(cached.checkedOutIds) !== JSON.stringify(freshData.checkedOutIds) ||
+                JSON.stringify(cached.scheduledStaffIds) !== JSON.stringify(freshData.scheduledStaffIds);
             
             if (isChanged) {
                 attendanceDetailsCache.set(docId, freshData);
