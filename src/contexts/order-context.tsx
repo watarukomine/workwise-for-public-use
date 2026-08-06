@@ -573,30 +573,14 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Realtime subscription setup for all orders
+  // Realtime subscription setup for all orders (Clean Memory Management - No Leak/Bloat)
   useEffect(() => {
     if (isProfileLoading || !profile) return;
 
     console.log(`[OrderProvider] Subscribing to ALL Firestore orders in real-time...`);
-    const unsubscribeAll = OrderService.subscribeAllOrders((allOrders, removedIds) => {
-      setRawOrdersData(prev => {
-        const orderMap = new Map();
-        // Keep existing data as base
-        prev.forEach(o => {
-          const id = o.id || o.systemId;
-          if (id) orderMap.set(id, o);
-        });
-        // Explicitly delete documents removed from Firestore
-        if (removedIds && removedIds.length > 0) {
-          removedIds.forEach(id => orderMap.delete(id));
-        }
-        // Update/overwrite with fresh data from subscription
-        allOrders.forEach(o => {
-          const id = o.id || o.systemId;
-          if (id) orderMap.set(id, o);
-        });
-        return Array.from(orderMap.values());
-      });
+    const unsubscribeAll = OrderService.subscribeAllOrders((allOrders) => {
+      // Direct replace with fresh Firestore state to prevent memory bloat and duplicate accumulation
+      setRawOrdersData(allOrders);
       setIsLoading(false);
     });
 
@@ -706,7 +690,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       try {
         localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify({ orders: rawOrdersData, timestamp: Date.now() }));
       } catch (e) { /* quota exceeded - ignore */ }
-    }, 500);
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, [processedData, rawOrdersData, localScheduleEvents]);
