@@ -307,7 +307,8 @@ export default function DashboardPage() {
     setCurrentDate(nextDate);
     setCurrentViewedDate(nextDate);
     loadOrders(nextDate);
-  }, [currentDate, setCurrentViewedDate, loadOrders]);
+    refetchOrders().catch(err => console.warn('[handleDateChange] Auto-refetch error:', err));
+  }, [currentDate, setCurrentViewedDate, loadOrders, refetchOrders]);
 
   // Keyboard navigation shortcuts (Left Arrow: Prev, Right Arrow: Next, T: Today)
   useEffect(() => {
