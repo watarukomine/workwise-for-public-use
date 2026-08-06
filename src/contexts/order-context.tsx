@@ -429,10 +429,17 @@ export function OrderProvider({ children }: { children: ReactNode }) {
       throw err;
     }
   }, []);
-  const [currentViewedDate, setCurrentViewedDate] = useState<Date | null>(null);
+  const [currentViewedDate, setCurrentViewedDateState] = useState<Date | null>(null);
   const currentViewedDateRef = React.useRef<Date | null>(null);
   const fetchedDateRangesRef = React.useRef(fetchedDateRanges);
   const ORDERS_CACHE_KEY = 'cached_orders_results';
+
+  const setCurrentViewedDate = useCallback((date: Date | null) => {
+    setCurrentViewedDateState(date);
+    currentViewedDateRef.current = date;
+    // Clear temporary local drag cache so new date timeline refreshes INSTANTLY without manual 'Refresh' button click!
+    setLocalScheduleEvents([]);
+  }, []);
 
   useEffect(() => {
     currentViewedDateRef.current = currentViewedDate;
