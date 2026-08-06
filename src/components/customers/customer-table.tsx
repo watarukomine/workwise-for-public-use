@@ -7,7 +7,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from '@/components/ui/input';
 import { Search, Plus, Trash2, Download, Loader2, Settings2 } from 'lucide-react';
-import { cn, findKey } from '@/lib/utils';
+import { cn, findKey, toHalfWidthAlphanumeric } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -356,7 +356,16 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
               </div>
               <div className="space-y-1">
                 <Label htmlFor="add-userCode" className="text-xs font-semibold">ユーザーコード (店舗コード)</Label>
-                <Input id="add-userCode" placeholder="例: 49698" value={newCustomerForm.userCode} onChange={(e) => setNewCustomerForm(prev => ({ ...prev, userCode: e.target.value }))} className="h-8 text-xs" />
+                <Input
+                  id="add-userCode"
+                  placeholder="例: 49698"
+                  value={newCustomerForm.userCode}
+                  onChange={(e) => {
+                    const val = toHalfWidthAlphanumeric(e.target.value, 'userCode');
+                    setNewCustomerForm(prev => ({ ...prev, userCode: val }));
+                  }}
+                  className="h-8 text-xs"
+                />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="add-mainStore" className="text-xs font-semibold">拠点・エリア (母店)</Label>

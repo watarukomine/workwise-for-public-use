@@ -37,7 +37,7 @@ import {
   TooltipTrigger,
 } from '../ui/tooltip';
 import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
-import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate, normalizeDateStr, isEtaPassed, isStaffMatched } from '../../lib/utils';
+import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate, normalizeDateStr, isEtaPassed, isStaffMatched, toHalfWidthAlphanumeric } from '../../lib/utils';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import {
@@ -2264,6 +2264,17 @@ export function ScheduleView({
             <Input 
               type={type} 
               defaultValue={editOrderForm[field] || ''} 
+              onChange={(e) => {
+                let fieldType: 'userCode' | 'regNo' | 'tireNumber' | 'tireSize' | null = null;
+                if (field === 'customerCode' || field === 'userCode') fieldType = 'userCode';
+                else if (field === 'regNo') fieldType = 'regNo';
+                else if (field === 'tireNumber') fieldType = 'tireNumber';
+                else if (field === 'tireSize') fieldType = 'tireSize';
+
+                if (fieldType) {
+                  e.target.value = toHalfWidthAlphanumeric(e.target.value, fieldType);
+                }
+              }}
               onBlur={(e) => setEditOrderForm((prev: any) => ({ ...prev, [field]: e.target.value }))} 
               className="h-8 text-sm" 
             />

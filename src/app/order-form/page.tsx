@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCustomer } from '@/contexts/customer-context';
 import { Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { ORDER_GAS_URL } from '@/lib/settings';
-import { findKey } from '@/lib/utils';
+import { findKey, toHalfWidthAlphanumeric } from '@/lib/utils';
 import { createOrder as createOrderGas, submitOrderDetachedServerAction } from '@/app/actions/gas-actions';
 
 // Schema definition
@@ -386,7 +386,18 @@ export default function OrderFormPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="userCode">ユーザーコード (5桁)</Label>
-                                        <Input id="userCode" type="text" placeholder="12345" {...register('userCode', { onBlur: (e) => handleUserCodeLookup(e.target.value) })} className={errors.userCode ? "border-red-500" : ""} />
+                                        <Input
+                                            id="userCode"
+                                            type="text"
+                                            placeholder="12345"
+                                            {...register('userCode', {
+                                                onChange: (e) => {
+                                                    e.target.value = toHalfWidthAlphanumeric(e.target.value, 'userCode');
+                                                },
+                                                onBlur: (e) => handleUserCodeLookup(e.target.value)
+                                            })}
+                                            className={errors.userCode ? "border-red-500" : ""}
+                                        />
                                         {errors.userCode && <p className="text-red-500 text-xs">{errors.userCode.message}</p>}
                                     </div>
 
@@ -468,7 +479,16 @@ export default function OrderFormPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="regNo">登録ナンバー (下4桁) <span className="text-red-500">*</span></Label>
-                                        <Input id="regNo" placeholder="1234" {...register('regNo')} className={errors.regNo ? "border-red-500" : ""} />
+                                        <Input
+                                            id="regNo"
+                                            placeholder="1234"
+                                            {...register('regNo', {
+                                                onChange: (e) => {
+                                                    e.target.value = toHalfWidthAlphanumeric(e.target.value, 'regNo');
+                                                }
+                                            })}
+                                            className={errors.regNo ? "border-red-500" : ""}
+                                        />
                                         {errors.regNo && <p className="text-red-500 text-xs">{errors.regNo.message}</p>}
                                     </div>
                                 </div>
@@ -485,12 +505,29 @@ export default function OrderFormPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="tireNumber">タイヤ品番 <span className={workTypeWatched === 'ホイールセット付替' ? "text-gray-400" : "text-red-500"}>{workTypeWatched === 'ホイールセット付替' ? '(任意)' : '*'}</span></Label>
-                                        <Input id="tireNumber" {...register('tireNumber')} className={errors.tireNumber ? "border-red-500" : ""} />
+                                        <Input
+                                            id="tireNumber"
+                                            {...register('tireNumber', {
+                                                onChange: (e) => {
+                                                    e.target.value = toHalfWidthAlphanumeric(e.target.value, 'tireNumber');
+                                                }
+                                            })}
+                                            className={errors.tireNumber ? "border-red-500" : ""}
+                                        />
                                         {errors.tireNumber && <p className="text-red-500 text-xs">{errors.tireNumber.message}</p>}
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="tireSize">タイヤサイズ <span className={workTypeWatched === 'ホイールセット付替' ? "text-gray-400" : "text-red-500"}>{workTypeWatched === 'ホイールセット付替' ? '(任意)' : '*'}</span></Label>
-                                        <Input id="tireSize" placeholder="195/65R15" {...register('tireSize')} className={errors.tireSize ? "border-red-500" : ""} />
+                                        <Input
+                                            id="tireSize"
+                                            placeholder="195/65R15"
+                                            {...register('tireSize', {
+                                                onChange: (e) => {
+                                                    e.target.value = toHalfWidthAlphanumeric(e.target.value, 'tireSize');
+                                                }
+                                            })}
+                                            className={errors.tireSize ? "border-red-500" : ""}
+                                        />
                                         {errors.tireSize && <p className="text-red-500 text-xs">{errors.tireSize.message}</p>}
                                     </div>
                                 </div>

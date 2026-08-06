@@ -27,6 +27,35 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Converts full-width alphanumeric characters and symbols to half-width,
+ * and strips invalid characters based on the specified input field type.
+ */
+export function toHalfWidthAlphanumeric(
+  value: string,
+  type: 'userCode' | 'regNo' | 'tireNumber' | 'tireSize' | 'alphanumeric' = 'alphanumeric'
+): string {
+  if (!value) return '';
+  let converted = value
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0))
+    .replace(/ー/g, '-')
+    .replace(/／/g, '/')
+    .replace(/　/g, ' ');
+
+  switch (type) {
+    case 'userCode':
+      return converted.replace(/[^a-zA-Z0-9]/g, '');
+    case 'regNo':
+      return converted.replace(/[^a-zA-Z0-9\s\-]/g, '');
+    case 'tireNumber':
+    case 'tireSize':
+      return converted.replace(/[^a-zA-Z0-9\s\-/\.]/g, '');
+    case 'alphanumeric':
+    default:
+      return converted.replace(/[^a-zA-Z0-9]/g, '');
+  }
+}
+
+/**
  * Normalizes a date string to 'yyyy-MM-dd' format.
  * Handles ISO strings, slash-separated dates, and various formats from GAS/Firestore.
  * Uses string parsing first to avoid timezone issues with new Date().
