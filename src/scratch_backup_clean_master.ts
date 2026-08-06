@@ -1,11 +1,12 @@
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 
-if (!admin.apps.length) {
-    admin.initializeApp({
+if (getApps().length === 0) {
+    initializeApp({
         projectId: 'workwise-general-v2-kp'
     });
 }
-const db = admin.firestore();
+const db = getFirestore();
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxAsSaNs4MO_ekVuq73N_-OioXBREtbwrNA4mkU6RkGU2hgCZYciav1QiFhVgJxRc_VkQ/exec';
 
@@ -14,7 +15,7 @@ async function backupCleanMasterToSheets() {
     const snapshot = await db.collection('orders').get();
     
     // Filter to only valid orders (exclude generic tasks and guest test submissions)
-    const cleanOrders = snapshot.docs.filter(doc => {
+    const cleanOrders = snapshot.docs.filter((doc: any) => {
         const data = doc.data();
         const docId = doc.id;
         const type = data._type;
@@ -42,28 +43,8 @@ async function backupCleanMasterToSheets() {
             gasUrl: GAS_URL,
             action: 'createOrder',
             systemId: systemId,
-            displayId: data.displayId || '',
-            userCode: data.customerCode || data.userCode || '',
-            storeName: data.customerName || data.storeName || '',
-            workType: data.workType || '通常作業',
-            scheduledDate: data.scheduledDate || '',
-            scheduledTime: data.scheduledTime || '',
-            picName: data.picName || '',
-            orderNo: data.orderNo || '',
-            comment: data.comment || '',
-            carName: data.carName || '',
-            regNo: data.regNo || '',
-            status: data.status || '未割当',
-            tireNumber: data.tireNumber || '',
-            tireSize: data.tireSize || '',
-            productName: data.productName || '',
-            quantity: String(data.quantity || ''),
-            sensor: data.sensor || '',
-            arrangement: data.arrangement || '',
-            disposal: data.disposal || '',
-            contact: data.contact || '',
-            specialNotes: data.specialNotes || '',
-            submitter: data.submitter || ''
+            // Spread all remaining order fields; explicit overrides keep default values if needed
+            ...data
         };
 
         try {

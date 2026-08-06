@@ -54,13 +54,13 @@ export function ShiftImportDialog({ onUpload }: { onUpload: (date: Date, staffId
                 // Try UTF-8 text decoding for CSV
                 const decoder = new TextDecoder('utf-8', { fatal: true });
                 const text = decoder.decode(data);
-                workbook = read(text, { type: 'string' });
+                workbook = read(text, { type: 'binary' });
             } catch {
                 try {
                     // Try Shift-JIS text decoding for CSV
                     const sjisDecoder = new TextDecoder('shift-jis', { fatal: true });
                     const text = sjisDecoder.decode(data);
-                    workbook = read(text, { type: 'string' });
+                    workbook = read(text, { type: 'binary' });
                 } catch {
                     // Fallback to binary ArrayBuffer read for Excel (.xlsx, .xls) files
                     workbook = read(data);
