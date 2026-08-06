@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
@@ -8,16 +8,19 @@ import { format } from 'date-fns';
  * @param sheets エクスポートするデータ配列とシート名のセット
  * @param fileName 保存するファイル名
  */
-export const exportToExcel = (sheets: { name: string, data: any[] }[], fileName: string) => {
-    const workbook = XLSX.utils.book_new();
-
+export const exportToExcel = async (sheets: { name: string, data: any[] }[], fileName: string) => {
+    const workbook = new ExcelJS.Workbook();
     sheets.forEach(sheet => {
-        const worksheet = XLSX.utils.json_to_sheet(sheet.data);
-        XLSX.utils.book_append_sheet(workbook, worksheet, sheet.name);
+        const worksheet = workbook.addWorksheet(sheet.name);
+        if (sheet.data && sheet.data.length > 0) {
+            // Define columns based on object keys of first row
+            worksheet.columns = Object.keys(sheet.data[0]).map(key => ({ header: key, key }));
+            worksheet.addRows(sheet.data);
+        }
     });
-
-    XLSX.writeFile(workbook, `${fileName}.xlsx`);
+    await workbook.xlsx.writeFile(`${fileName}.xlsx`);
 };
+
 
 /**
  * データをPDFファイルとしてエクスポートします

@@ -409,7 +409,7 @@ export default function DashboardPage() {
             const name = parts[1].trim();
             const days = parts.slice(3);
             const val = String(days[dayIdx] || '').trim();
-            if (!val || val === '半') {
+            if (!val) {
               activeNames.push(name);
             }
           });
