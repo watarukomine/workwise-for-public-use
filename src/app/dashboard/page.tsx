@@ -76,7 +76,7 @@ export default function DashboardPage() {
     });
   }, [setCurrentViewedDate]);
 
-  const deferredDate = React.useDeferredValue(currentDate);
+  // Use direct currentDate to eliminate deferred lag on date switch
   const [calendarOpen, setCalendarOpen] = React.useState(false);
   const router = useRouter();
   const isMobile = useIsMobile();
@@ -880,14 +880,14 @@ export default function DashboardPage() {
         {showVerticalView ? (
           <VerticalScheduleView
             staffData={filteredStaff}
-            currentDate={deferredDate}
+            currentDate={currentDate}
             checkedOutStaffIds={checkedOutStaffIds}
             scheduledStaffIds={scheduledStaffIds}
           />
         ) : (
           <ScheduleView
             staffData={filteredStaff}
-            currentDate={deferredDate}
+            currentDate={currentDate}
             checkedOutStaffIds={checkedOutStaffIds}
             scheduledStaffIds={scheduledStaffIds}
             statuses={derivedStatuses}
