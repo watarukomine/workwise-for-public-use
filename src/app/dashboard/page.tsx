@@ -49,7 +49,7 @@ export default function DashboardPage() {
     setCurrentViewedDate,
   } = useOrder();
 
-  const [currentDate, setCurrentDateState] = React.useState(() => {
+  const [currentDate, setCurrentDateState] = React.useState<Date>(() => {
     if (typeof window !== 'undefined') {
       const saved = sessionStorage.getItem('dashboard_current_date');
       if (saved) {
@@ -60,20 +60,16 @@ export default function DashboardPage() {
     return startOfToday();
   });
 
-  const [isPending, startTransition] = React.useTransition();
-
   const setCurrentDate = React.useCallback((date: Date) => {
-    startTransition(() => {
-      setCurrentDateState(date);
-      if (typeof window !== 'undefined') {
-        try {
-          sessionStorage.setItem('dashboard_current_date', date.toISOString());
-        } catch {}
-      }
-      if (setCurrentViewedDate) {
-        setCurrentViewedDate(date);
-      }
-    });
+    setCurrentDateState(date);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('dashboard_current_date', date.toISOString());
+      } catch {}
+    }
+    if (setCurrentViewedDate) {
+      setCurrentViewedDate(date);
+    }
   }, [setCurrentViewedDate]);
 
   // Use direct currentDate to eliminate deferred lag on date switch
