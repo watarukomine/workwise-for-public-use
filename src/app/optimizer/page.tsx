@@ -65,50 +65,24 @@ function OptimizerPageContent() {
           }
         }
 
-        const isUpdatedToday = (dateVal: any): boolean => {
-          if (!dateVal) return false;
-          try {
-            const d = typeof dateVal === 'string' ? new Date(dateVal) : (dateVal instanceof Date ? dateVal : new Date(dateVal?.seconds ? dateVal.seconds * 1000 : dateVal));
-            if (isNaN(d.getTime())) return false;
-            const now = new Date();
-            return d.getFullYear() === now.getFullYear() &&
-                   d.getMonth() === now.getMonth() &&
-                   d.getDate() === now.getDate();
-          } catch {
-            return false;
-          }
-        };
-
+        // 1. Check coordinates directly on staffMember (user account doc)
         const staffLat = parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? rawStrLat;
         const staffLng = parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? rawStrLng;
-        const staffTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || (staffMember as any).updatedAt;
-        const hasStaffTodayLoc = staffLat !== null && staffLng !== null && isUpdatedToday(staffTime);
 
+        // 2. Check coordinates from order status if available
         const statusLat = parseCoord(status?.latitude) ?? parseCoord((status as any)?.lat);
         const statusLng = parseCoord(status?.longitude) ?? parseCoord((status as any)?.lng);
-        const statusTime = status?.lastUpdate;
-        const hasStatusTodayLoc = statusLat !== null && statusLng !== null && isUpdatedToday(statusTime);
 
-        let actualLat: number | null = null;
-        let actualLng: number | null = null;
+        // Prefer staffMember direct location coordinates, fallback to status location coordinates
+        const actualLat = staffLat ?? statusLat;
+        const actualLng = staffLng ?? statusLng;
 
-        if (hasStaffTodayLoc) {
-          actualLat = staffLat;
-          actualLng = staffLng;
-        } else if (hasStatusTodayLoc) {
-          actualLat = statusLat;
-          actualLng = statusLng;
-        } else if (staffLat !== null && staffLng !== null && (staffMember as any).lastLocationUpdatedAt && isUpdatedToday((staffMember as any).lastLocationUpdatedAt)) {
-          actualLat = staffLat;
-          actualLng = staffLng;
-        }
-
-        // Exclude staff who do NOT have actual GPS location data updated today
+        // Exclude staff who do NOT have location coordinates
         if (actualLat === null || actualLng === null) {
           return null;
         }
 
-        const currentStatus = String(status?.status || (staffMember as any).currentStatus || '').trim();
+        const currentStatus = String((staffMember as any).currentStatus || status?.status || '').trim();
         const isLoggedOut = currentStatus === 'ログアウト' || currentStatus === '退勤' || (staffMember as any).isOnline === false;
 
         // Exclude logged-out or off-duty staff from map display
@@ -125,7 +99,7 @@ function OptimizerPageContent() {
           name: displayName,
           latitude: actualLat,
           longitude: actualLng,
-          lastAction: status?.lastAction || currentStatus || '現在地'
+          lastAction: (staffMember as any).lastAction || status?.lastAction || currentStatus || '現在地'
         };
       })
       .filter((s): s is WithId<Staff> & { latitude: number; longitude: number; lastAction: string } =>
