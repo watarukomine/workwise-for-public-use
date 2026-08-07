@@ -224,23 +224,28 @@ export default function DashboardPage() {
 
     // レ点チェックがONになっているスタッフをタイムラインに表示
     let selectedStaff = staffToUse.filter((staff: any) => {
-      if (!appliedSelectedStaffIds || appliedSelectedStaffIds.length === 0) {
-        const isShiftScheduled = scheduledStaffIds && scheduledStaffIds.size > 0 && isStaffMatched(staff, Array.from(scheduledStaffIds));
-        const hasTask = isStaffMatched(staff, Array.from(activeStaffKeys));
-        return isShiftScheduled || hasTask;
-      }
+      const isShiftScheduled = scheduledStaffIds && scheduledStaffIds.size > 0 && isStaffMatched(staff, Array.from(scheduledStaffIds));
+      const hasTask = isStaffMatched(staff, Array.from(activeStaffKeys));
 
       const staffIdClean = String(staff.id || '').trim();
       const staffNameClean = String(staff.name || '').trim().replace(/[\s\u3000]+/g, '');
       const staffNameOrig = String(staff.name || '').trim();
       const staffShiMeiClean = String(staff['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
 
-      return (
+      const isManuallySelected = appliedSelectedStaffIds && (
         appliedSelectedStaffIds.includes(staffIdClean) ||
         appliedSelectedStaffIds.includes(staffNameOrig) ||
         appliedSelectedStaffIds.includes(staffNameClean) ||
         appliedSelectedStaffIds.includes(staffShiMeiClean)
       );
+
+      // 手動選択がある場合は手動選択・シフト出勤者・タスク割当者を合成表示
+      if (appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0) {
+        return isManuallySelected || isShiftScheduled || hasTask;
+      }
+
+      // 手動選択がないデフォルト時はシフト出勤者またはタスク割当者を表示
+      return isShiftScheduled || hasTask;
     });
 
     // スイッチOFF時は純粋管理者(Admin)のみ非表示(現場兼務者は表示)
@@ -425,51 +430,7 @@ export default function DashboardPage() {
       const dateStr = `${yr}-${String(mo).padStart(2, '0')}-${String(dy).padStart(2, '0')}`;
       const finalScheduledEntries = (dateStr === '2026-08-01' ? august1DefaultStaff : augustCsvNames);
 
-      const applySelectedStaffList = (scheduledEntries: string[]) => {
-        if (!allStaff || allStaff.length === 0) return;
-        const activeStaffIdsForToday: string[] = [];
-
-        // 当日の作業チップ割り当て済みスタッフキーを抽出
-        const activeTaskStaffKeys = new Set<string>();
-        if (scheduleEvents && scheduleEvents.length > 0) {
-          const targetDateStr = format(currentDate, 'yyyy-MM-dd');
-          scheduleEvents.forEach(e => {
-            const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
-            if (isValid(evStart) && format(evStart, 'yyyy-MM-dd') === targetDateStr) {
-              if (e.staffId && e.staffId !== 'unassigned') {
-                activeTaskStaffKeys.add(String(e.staffId).trim());
-                activeTaskStaffKeys.add(String(e.staffId).trim().replace(/[\s\u3000]+/g, ''));
-              }
-            }
-          });
-        }
-
-        allStaff.forEach(staff => {
-          const isScheduled = scheduledEntries.length > 0 && isStaffMatched(staff, scheduledEntries);
-          const hasTask = isStaffMatched(staff, Array.from(activeTaskStaffKeys));
-          const isManuallySelected = appliedSelectedStaffIds && (
-            appliedSelectedStaffIds.includes(staff.id) || 
-            appliedSelectedStaffIds.includes(staff.name)
-          );
-          if (isScheduled || hasTask || isManuallySelected) {
-            if (staff.id) activeStaffIdsForToday.push(staff.id);
-          }
-        });
-
-        const nextSelectedIds = Array.from(new Set(activeStaffIdsForToday));
-        // appliedSelectedStaffIds に含まれているが nextSelectedIds に含まれていない手動選択項目も保持
-        if (appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0) {
-          appliedSelectedStaffIds.forEach(id => {
-            if (!nextSelectedIds.includes(id)) {
-              nextSelectedIds.push(id);
-            }
-          });
-        }
-        setSelectedStaffIds(nextSelectedIds);
-      };
-
       setScheduledStaffIds(createNormalizedKeySet(finalScheduledEntries));
-      applySelectedStaffList(finalScheduledEntries);
 
       // Trigger background fetch without blocking date switch (0ms transition!)
       getDailyAttendanceDetails(currentDate).then(({ staffIds: attendedStaffIds, checkedOutIds = [], scheduledStaffIds: scheduledIds = [] }) => {
@@ -478,7 +439,6 @@ export default function DashboardPage() {
         setPresentStaffIds(new Set(attendedStaffIds));
         if (scheduledIds && scheduledIds.length > 0) {
           setScheduledStaffIds(createNormalizedKeySet(scheduledIds));
-          applySelectedStaffList(scheduledIds);
         }
       }).catch(err => console.warn("[Dashboard] Background attendance fetch warning:", err));
     };
@@ -488,7 +448,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [currentDate, allStaff, scheduleEvents]);
+  }, [currentDate]);
 
   // Listen to background attendance refreshes to dynamically update punch/checkout status without UI freeze
   useEffect(() => {
@@ -503,29 +463,6 @@ export default function DashboardPage() {
         setPresentStaffIds(new Set(data.staffIds));
         if (data.scheduledStaffIds && data.scheduledStaffIds.length > 0) {
           setScheduledStaffIds(new Set(data.scheduledStaffIds));
-          if (allStaff && allStaff.length > 0) {
-            const activeStaffIdsForToday: string[] = [];
-            allStaff.forEach(staff => {
-              const isScheduled = isStaffMatched(staff, data.scheduledStaffIds);
-              const isManuallySelected = appliedSelectedStaffIds && (
-                appliedSelectedStaffIds.includes(staff.id) || 
-                appliedSelectedStaffIds.includes(staff.name)
-              );
-              if (isScheduled || isManuallySelected) {
-                if (staff.id) activeStaffIdsForToday.push(staff.id);
-              }
-            });
-            if (appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0) {
-              appliedSelectedStaffIds.forEach(id => {
-                if (!activeStaffIdsForToday.includes(id)) {
-                  activeStaffIdsForToday.push(id);
-                }
-              });
-            }
-            if (activeStaffIdsForToday.length > 0) {
-              setSelectedStaffIds(Array.from(new Set(activeStaffIdsForToday)));
-            }
-          }
         }
       }
     };
@@ -534,7 +471,7 @@ export default function DashboardPage() {
     return () => {
       window.removeEventListener('attendance_refreshed', handleAttendanceRefresh);
     };
-  }, [currentDate, allStaff, appliedSelectedStaffIds]);
+  }, [currentDate]);
 
   // Persistent selection hooks and auto-refresh logic
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
