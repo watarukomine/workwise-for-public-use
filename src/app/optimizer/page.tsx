@@ -39,29 +39,9 @@ function OptimizerPageContent() {
     }
   }, [isProfileLoading, profile, router]);
 
-  // Extract ONLY active staff who are logged in today AND have valid GPS location data
+  // Extract ONLY active staff who have sent/updated location coordinates (e.g. DEMO2)
   const staffWithLocation = React.useMemo(() => {
     if (!allStaff || allStaff.length === 0) return [];
-
-    const isTodayDate = (dateVal: any): boolean => {
-      if (!dateVal) return false;
-      try {
-        let d: Date;
-        if (typeof dateVal === 'number') d = new Date(dateVal);
-        else if (typeof dateVal === 'string') d = new Date(dateVal);
-        else if (dateVal instanceof Date) d = dateVal;
-        else if (typeof dateVal === 'object' && typeof dateVal.seconds === 'number') d = new Date(dateVal.seconds * 1000);
-        else return false;
-
-        if (isNaN(d.getTime())) return false;
-        const now = new Date();
-        return d.getFullYear() === now.getFullYear() &&
-               d.getMonth() === now.getMonth() &&
-               d.getDate() === now.getDate();
-      } catch {
-        return false;
-      }
-    };
 
     return allStaff
       .map(staffMember => {
@@ -81,16 +61,7 @@ function OptimizerPageContent() {
           return null;
         }
 
-        // 2. Check if logged in / active today
-        const lastActiveTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || (staffMember as any).lastLoginAt || (staffMember as any).updatedAt;
-        const isOnline = (staffMember as any).isOnline === true;
-        const loggedInToday = isOnline || isTodayDate(lastActiveTime);
-
-        if (!loggedInToday) {
-          return null;
-        }
-
-        // 3. Check coordinates directly on staffMember (user account doc updated by check-in / location update)
+        // 2. Extract coordinates updated directly on user profile (e.g. via check-in or location update)
         let rawStrLat: number | null = null;
         let rawStrLng: number | null = null;
         const locStr = (staffMember as any).lastLocation || (staffMember as any).location;
@@ -105,7 +76,7 @@ function OptimizerPageContent() {
         const actualLat = parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? rawStrLat;
         const actualLng = parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? rawStrLng;
 
-        // Exclude staff who do NOT have actual user location coordinates
+        // 3. Exclude staff who have NOT updated their actual location coordinates
         if (actualLat === null || actualLng === null) {
           return null;
         }
