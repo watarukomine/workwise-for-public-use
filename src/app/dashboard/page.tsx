@@ -167,13 +167,18 @@ export default function DashboardPage() {
 
   const { isLoading: isLoadingCustomers } = useCustomer();
   const { profile, isLoading: isProfileLoading } = useUserProfile();
-  const { allStaff, appliedSelectedStaffIds, setSelectedStaffIds, isLoading: isStaffLoading } = useSelectedStaff();
+  const { allStaff, appliedSelectedStaffIds, setSelectedStaffIds, setCurrentDateStr, isLoading: isStaffLoading } = useSelectedStaff();
   const [checkedOutStaffIds, setCheckedOutStaffIds] = useState<Set<string>>(new Set());
   const [presentStaffIds, setPresentStaffIds] = useState<Set<string>>(new Set());
   const [scheduledStaffIds, setScheduledStaffIds] = useState<Set<string>>(new Set());
   const isDateLoading = useRef(false);
   const [isSyncing, setIsSyncing] = useState(true); // Add syncing state, default true for initial load
   const { toast } = useToast();
+
+  useEffect(() => {
+    const formattedDateStr = format(currentDate, 'yyyy-MM-dd');
+    setCurrentDateStr(formattedDateStr);
+  }, [currentDate, setCurrentDateStr]);
 
   useEffect(() => {
     if (!isProfileLoading && !profile) {

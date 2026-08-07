@@ -6,7 +6,7 @@ import {
 } from '../ui/table';
 import { Card, CardContent } from '../ui/card';
 import { Input } from '../ui/input';
-import { Search, Trash2, Download, Loader2, Check, Settings2, ArrowUp, ArrowDown, Upload } from 'lucide-react';
+import { Search, Trash2, Download, Loader2, Check, Settings2, ArrowUp, ArrowDown, Upload, RotateCcw } from 'lucide-react';
 import { cn, isStaffMatched } from '../../lib/utils';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -194,7 +194,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
   const { profile } = useUserProfile();
   const { toast } = useToast();
-  const { pendingSelectedStaffIds, togglePendingStaffSelection, applyPendingSelection, appliedSelectedStaffIds, setSelectedStaffIds } = useSelectedStaff();
+  const { pendingSelectedStaffIds, togglePendingStaffSelection, applyPendingSelection, clearDateSelection, appliedSelectedStaffIds, setSelectedStaffIds } = useSelectedStaff();
   const { scheduleEvents, orders } = useOrder();
   const roleStr = String(profile?.role || '').toLowerCase();
   const isAdmin = roleStr === 'admin' || roleStr === 'admin/staff';
@@ -321,7 +321,10 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   <div className="space-y-1.5">{allColumns.map(col => (<label key={col} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"><Checkbox checked={visibleColumns.has(col)} onCheckedChange={() => toggleColumn(col)} className="h-3.5 w-3.5" /><span className="truncate">{col}</span></label>))}</div>
                 </PopoverContent>
               </Popover>
-              <Button onClick={applyPendingSelection} size="sm" className="gap-1.5"><Check className="h-3.5 w-3.5" /> 選択を適用</Button>
+              <Button onClick={() => applyPendingSelection()} size="sm" className="gap-1.5"><Check className="h-3.5 w-3.5" /> 選択を適用</Button>
+              {appliedSelectedStaffIds.length > 0 && (
+                <Button onClick={() => clearDateSelection()} variant="outline" size="sm" className="gap-1.5 text-muted-foreground"><RotateCcw className="h-3.5 w-3.5" /> シフト通りに戻す</Button>
+              )}
               <ImportModal
                 targetCollection="users"
                 trigger={
