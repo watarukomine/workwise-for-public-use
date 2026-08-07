@@ -103,16 +103,31 @@ export function useAppShell() {
     return context;
 }
 
+const checkUserHasRole = (userRoleRaw: string | undefined | null, allowedRoles: string[]): boolean => {
+    const raw = String(userRoleRaw || 'staff').trim().toLowerCase();
+    
+    // admin, admin/staff, admin_staff, controller, 管理者 などの場合は admin 権限
+    const isAdmin = raw.includes('admin') || raw.includes('管理者') || raw.includes('controller');
+    
+    // staff 権限（未設定時も基本スタッフ扱い）
+    const isStaff = raw.includes('staff') || raw.includes('スタッフ') || isAdmin || raw === 'staff';
+
+    return allowedRoles.some(allowed => {
+        if (allowed === 'admin') return isAdmin;
+        if (allowed === 'staff') return isStaff;
+        return raw.includes(allowed);
+    });
+};
+
 const DesktopNav = () => {
     const { profile, isLoading } = useUserProfile();
     const pathname = usePathname();
     const userRole = profile?.role;
 
     const navItems = React.useMemo(() => {
-        if (isLoading || !profile) return [];
+        if (isLoading) return [];
         return allNavItems.filter(item => {
-            const normalizedUserRole = (userRole || 'staff').trim().toLowerCase();
-            const roleMatch = item.roles.includes(normalizedUserRole);
+            const roleMatch = checkUserHasRole(userRole, item.roles);
             const deviceMatch = !item.mobileOnly;
             return roleMatch && deviceMatch;
         });
@@ -189,9 +204,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         const { adminWantsTimelineView, setAdminWantsTimelineView } = useAppShell();
 
         const navItems = React.useMemo(() => {
-            if (isLoading || !profile) return [];
-            const normalizedUserRole = (userRole || 'staff').trim().toLowerCase();
-            return allNavItems.filter(item => item.roles.includes(normalizedUserRole) && !item.hideOnMobile);
+            if (isLoading) return [];
+            return allNavItems.filter(item => {
+                const roleMatch = checkUserHasRole(userRole, item.roles);
+                const deviceMatch = !item.hideOnMobile;
+                return roleMatch && deviceMatch;
+            });
         }, [profile, isLoading, userRole]);
 
         if (isLoading) {
@@ -204,6 +222,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )
         }
 
+        const isAdmin = checkUserHasRole(userRole, ['admin']);
+
         return (
             <SidebarMenu>
                 {navItems.map((item) => (
@@ -212,35 +232,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                             asChild
                             isActive={pathname === item.href}
                             tooltip={item.label}
-                            className="!font-bold h-16 text-lg"
+                            className="!font-bold h-16 text-lg text-foreground hover:text-foreground"
                             onClick={() => {
                                 if (isMobile) {
                                     setOpenMobile(false);
                                 }
                             }}
                         >
-                            <Link href={item.href} target={undefined} className="gap-4">
-                                <item.icon className="!h-6 !w-6" />
+                            <Link href={item.href} target={undefined} className="gap-4 flex items-center text-foreground">
+                                <item.icon className="!h-6 !w-6 text-primary shrink-0" />
                                 <span>{item.label}</span>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 ))}
                 {/* Admin-only view toggle button */}
-                {profile?.role === 'admin' && (
+                {isAdmin && (
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             tooltip={adminWantsTimelineView ? 'カード表示に切り替え' : 'PC表示（タイムライン）に切り替え'}
-                            className="!font-bold h-16 text-lg"
+                            className="!font-bold h-16 text-lg text-foreground hover:text-foreground"
                             onClick={() => {
                                 setAdminWantsTimelineView(prev => !prev);
                                 if (isMobile) setOpenMobile(false);
                             }}
                         >
                             {adminWantsTimelineView ? (
-                                <><LayoutList className="!h-6 !w-6" /><span>カード表示に切替</span></>
+                                <><LayoutList className="!h-6 !w-6 text-primary shrink-0" /><span className="text-foreground">カード表示に切替</span></>
                             ) : (
-                                <><Monitor className="!h-6 !w-6" /><span>PC表示に切替</span></>
+                                <><Monitor className="!h-6 !w-6 text-primary shrink-0" /><span className="text-foreground">PC表示に切替</span></>
                             )}
                         </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -322,17 +342,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         </div>
                     </SidebarHeader>
                     <SidebarContent>
-                        {profile && <NavMenu />}
+                        <NavMenu />
                     </SidebarContent>
-                    <SidebarFooter className="p-2">
+                    <SidebarFooter className="p-2 border-t border-border">
                         {isLoading ? (
                             <div className="flex items-center justify-center p-4">
                                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                             </div>
+                        ) : profile ? (
+                            <Button
+                                variant="outline"
+                                className="w-full justify-start gap-2 h-12 text-base font-medium text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={handleSignOut}
+                            >
+                                <LogOut className="h-5 w-5" />
+                                ログアウト
+                            </Button>
                         ) : showLoginButton ? (
-                            <Button asChild className="w-full">
+                            <Button asChild className="w-full h-12 text-base font-medium">
                                 <Link href="/login">
-                                    <LogIn className="mr-2 h-4 w-4" />
+                                    <LogIn className="mr-2 h-5 w-5" />
                                     ログイン
                                 </Link>
                             </Button>
