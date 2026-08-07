@@ -194,7 +194,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
   const { profile } = useUserProfile();
   const { toast } = useToast();
-  const { pendingSelectedStaffIds, togglePendingStaffSelection, applyPendingSelection, clearDateSelection, appliedSelectedStaffIds, currentScheduledStaffIds, setSelectedStaffIds } = useSelectedStaff();
+  const { pendingSelectedStaffIds, togglePendingStaffSelection, applyPendingSelection, clearDateSelection, appliedSelectedStaffIds, currentScheduledStaffIds, setSelectedStaffIds, currentDateStr } = useSelectedStaff();
   const { scheduleEvents, orders } = useOrder();
   const roleStr = String(profile?.role || '').toLowerCase();
   const isAdmin = roleStr === 'admin' || roleStr === 'admin/staff';
@@ -207,17 +207,35 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     }
     if (scheduleEvents && scheduleEvents.length > 0) {
       scheduleEvents.forEach(e => {
-        if (e.staffId && e.staffId !== 'unassigned') ids.add(String(e.staffId).trim());
+        let eDateStr = '';
+        const evDate = e.scheduledDate || (e as any).date || (e as any).作業予定日;
+        if (evDate) {
+          try {
+            eDateStr = typeof evDate === 'string' ? evDate.substring(0, 10) : format(evDate, 'yyyy-MM-dd');
+          } catch {}
+        }
+        if ((!eDateStr || eDateStr === currentDateStr) && e.staffId && e.staffId !== 'unassigned') {
+          ids.add(String(e.staffId).trim());
+        }
       });
     }
     if (orders && orders.length > 0) {
       orders.forEach(o => {
-        if (o.staffId && o.staffId !== 'unassigned' && o.status !== '作業完了' && o.status !== 'キャンセル') ids.add(String(o.staffId).trim());
-        if (o.staffName) ids.add(String(o.staffName).trim());
+        let oDateStr = '';
+        const oDate = o.scheduledDate || (o as any).作業予定日;
+        if (oDate) {
+          try {
+            oDateStr = typeof oDate === 'string' ? oDate.substring(0, 10) : format(oDate, 'yyyy-MM-dd');
+          } catch {}
+        }
+        if (oDateStr === currentDateStr && o.status !== '作業完了' && o.status !== 'キャンセル') {
+          if (o.staffId && o.staffId !== 'unassigned') ids.add(String(o.staffId).trim());
+          if (o.staffName) ids.add(String(o.staffName).trim());
+        }
       });
     }
     return ids;
-  }, [currentScheduledStaffIds, scheduleEvents, orders]);
+  }, [currentScheduledStaffIds, scheduleEvents, orders, currentDateStr]);
 
   const allColumns = React.useMemo(() => extractColumns(staffList), [staffList]);
 
@@ -241,7 +259,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   }, [staffList, searchTerm, displayColumns]);
 
   const isMemberSelected = React.useCallback((member: WithId<Staff>) => {
-    const hasManualSelection = appliedSelectedStaffIds.length > 0 || pendingSelectedStaffIds.length > 0;
+    const hasManualSelection = appliedSelectedStaffIds.length > 0;
     if (hasManualSelection) {
       return pendingSelectedStaffIds.includes(member.id);
     }
