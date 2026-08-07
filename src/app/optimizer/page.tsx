@@ -45,26 +45,49 @@ function OptimizerPageContent() {
 
     return allStaff
       .map(staffMember => {
-        const status = contextStatuses?.find(s => s.staffId === staffMember.id);
+        const status = contextStatuses?.find(s => s.staffId === staffMember.id || (s.staffId && (staffMember as any)._docId && s.staffId === (staffMember as any)._docId));
         const storeLoc = getStoreLocation(staffMember['母店']);
 
-        // Resolve latitude and longitude with fallbacks
-        const rawLat = status?.latitude ?? (status as any)?.lat ?? (status as any)?.currentLocation?.latitude ?? (staffMember as any).latitude ?? (staffMember as any).lat ?? storeLoc.latitude;
+        const parseCoord = (val: any): number | null => {
+          if (val === undefined || val === null || val === '') return null;
+          const num = Number(val);
+          return !isNaN(num) && num !== 0 ? num : null;
+        };
 
-        const rawLng = status?.longitude ?? (status as any)?.lng ?? (status as any)?.currentLocation?.longitude ?? (staffMember as any).longitude ?? (staffMember as any).lng ?? storeLoc.longitude;
+        let rawStrLat: number | null = null;
+        let rawStrLng: number | null = null;
+        const locStr = (staffMember as any).lastLocation || (staffMember as any).location || status?.lastAction;
+        if (typeof locStr === 'string' && locStr.includes(',')) {
+          const parts = locStr.split(',').map(p => parseFloat(p.trim()));
+          if (!isNaN(parts[0]) && !isNaN(parts[1])) {
+            rawStrLat = parts[0];
+            rawStrLng = parts[1];
+          }
+        }
 
-        const lat = rawLat !== undefined && rawLat !== null ? Number(rawLat) : storeLoc.latitude;
-        const lng = rawLng !== undefined && rawLng !== null ? Number(rawLng) : storeLoc.longitude;
+        const resolvedLat = parseCoord(status?.latitude) ??
+          parseCoord((status as any)?.lat) ??
+          parseCoord((status as any)?.currentLocation?.latitude) ??
+          parseCoord((staffMember as any).latitude) ??
+          parseCoord((staffMember as any).lat) ??
+          parseCoord((staffMember as any).currentLocation?.latitude) ??
+          rawStrLat ??
+          storeLoc.latitude;
+
+        const resolvedLng = parseCoord(status?.longitude) ??
+          parseCoord((status as any)?.lng) ??
+          parseCoord((status as any)?.currentLocation?.longitude) ??
+          parseCoord((staffMember as any).longitude) ??
+          parseCoord((staffMember as any).lng) ??
+          parseCoord((staffMember as any).currentLocation?.longitude) ??
+          rawStrLng ??
+          storeLoc.longitude;
 
         const currentStatus = String(status?.status || (staffMember as any).currentStatus || '').trim();
         const isLoggedOut = currentStatus === 'ログアウト' || currentStatus === '退勤' || (staffMember as any).isOnline === false;
-        const hasGps = (status?.latitude !== undefined && status?.latitude !== null) || ((staffMember as any).latitude !== undefined && (staffMember as any).latitude !== null);
-
-        // Active working status list
-        const isWorkingStatus = ['作業中', '移動中', '帰社中', '待機中', '出勤中', '確定済'].includes(currentStatus);
 
         // Exclude logged-out or off-duty staff from map display
-        if (isLoggedOut || !hasGps || !isWorkingStatus) {
+        if (isLoggedOut) {
           return null;
         }
 
@@ -75,12 +98,14 @@ function OptimizerPageContent() {
           ...status,
           id: staffMember.id,
           name: displayName,
-          latitude: lat,
-          longitude: lng,
+          latitude: resolvedLat,
+          longitude: resolvedLng,
           lastAction: status?.lastAction || currentStatus || (staffMember['母店'] ? `${staffMember['母店']}` : '拠点位置')
         };
       })
-      .filter((s): s is WithId<Staff> & { latitude: number; longitude: number; lastAction: string } => s !== null && s !== undefined && !isNaN(s.latitude) && !isNaN(s.longitude));
+      .filter((s): s is WithId<Staff> & { latitude: number; longitude: number; lastAction: string } =>
+        s !== null && s !== undefined && typeof s.latitude === 'number' && typeof s.longitude === 'number' && !isNaN(s.latitude) && !isNaN(s.longitude)
+      );
   }, [allStaff, contextStatuses]);
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {

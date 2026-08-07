@@ -17,6 +17,63 @@ import type { Staff, WithId } from '@/lib/types';
 
 const COLLECTION = 'users';
 
+function mergeStaffDocs(existing: WithId<Staff>, current: WithId<Staff>): WithId<Staff> {
+    const isStaffCode = (x: any) => /^STAFF\d+/i.test(String(x.id || '')) || /^STAFF\d+/i.test(String((x as any).staffCode || '')) || /^STAFF\d+/i.test(String((x as any)._docId || ''));
+
+    const getTime = (obj: any) => {
+        const t = obj.lastLocationUpdatedAt || obj.updatedAt || obj.statusUpdatedAt;
+        if (!t) return 0;
+        const d = new Date(t);
+        return isNaN(d.getTime()) ? 0 : d.getTime();
+    };
+
+    const existingTime = getTime(existing);
+    const currentTime = getTime(current);
+
+    const hasLocation = (obj: any) => {
+        const lat = Number(obj.latitude ?? obj.lat ?? obj.currentLocation?.latitude);
+        const lng = Number(obj.longitude ?? obj.lng ?? obj.currentLocation?.longitude);
+        return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+    };
+
+    const existingHasLoc = hasLocation(existing);
+    const currentHasLoc = hasLocation(current);
+
+    let newerDoc = current;
+    let olderDoc = existing;
+
+    if (currentHasLoc && !existingHasLoc) {
+        newerDoc = current;
+        olderDoc = existing;
+    } else if (!currentHasLoc && existingHasLoc) {
+        newerDoc = existing;
+        olderDoc = current;
+    } else if (currentTime >= existingTime) {
+        newerDoc = current;
+        olderDoc = existing;
+    } else {
+        newerDoc = existing;
+        olderDoc = current;
+    }
+
+    const preferredId = isStaffCode(existing) ? existing.id : (isStaffCode(current) ? current.id : (existing.id || current.id));
+
+    return {
+        ...olderDoc,
+        ...newerDoc,
+        id: preferredId,
+        _docId: (existing as any)._docId || (current as any)._docId,
+        latitude: (newerDoc as any).latitude ?? (newerDoc as any).lat ?? (olderDoc as any).latitude ?? (olderDoc as any).lat,
+        longitude: (newerDoc as any).longitude ?? (newerDoc as any).lng ?? (olderDoc as any).longitude ?? (olderDoc as any).lng,
+        currentStatus: (newerDoc as any).currentStatus || (olderDoc as any).currentStatus,
+        lastAction: (newerDoc as any).lastAction || (olderDoc as any).lastAction,
+        estimatedArrivalTime: (newerDoc as any).estimatedArrivalTime || (olderDoc as any).estimatedArrivalTime,
+        nextDestination: (newerDoc as any).nextDestination || (olderDoc as any).nextDestination,
+        lastLocationUpdatedAt: (newerDoc as any).lastLocationUpdatedAt || (olderDoc as any).lastLocationUpdatedAt,
+        updatedAt: (newerDoc as any).updatedAt || (olderDoc as any).updatedAt,
+    } as unknown as WithId<Staff>;
+}
+
 export const StaffService = {
     /**
      * Subscribes to real-time updates for all staff members (users).
@@ -60,25 +117,18 @@ export const StaffService = {
                 return true;
             });
 
-            // 氏名による完全一意化（重複ドキュメントの統合）
+            // 氏名による完全一意化（重複ドキュメントの統合と動的データの結合）
             const nameMap = new Map<string, WithId<Staff>>();
             for (const s of staffList) {
                 const data = s as any;
                 const nameKey = String(s.name || data['氏名'] || data['名前'] || '').replace(/[\s\u3000]+/g, '');
                 if (!nameKey) continue;
 
-                const isStaffCode = (x: any) => /^STAFF\d+/i.test(String(x.id || '')) || /^STAFF\d+/i.test(String((x as any).staffCode || '')) || /^STAFF\d+/i.test(String((x as any)._docId || ''));
-
                 if (!nameMap.has(nameKey)) {
                     nameMap.set(nameKey, s);
                 } else {
-                    // 既存のものと比べ、STAFFコード形式、メールアドレス、詳細情報を持っている方を優位保存
                     const existing = nameMap.get(nameKey)!;
-                    const existingScore = (isStaffCode(existing) ? 10 : 0) + (existing.email ? 2 : 0) + ((existing as any).sortOrder !== undefined ? 1 : 0);
-                    const currentScore = (isStaffCode(s) ? 10 : 0) + (s.email ? 2 : 0) + ((s as any).sortOrder !== undefined ? 1 : 0);
-                    if (currentScore > existingScore) {
-                        nameMap.set(nameKey, s);
-                    }
+                    nameMap.set(nameKey, mergeStaffDocs(existing, s));
                 }
             }
 
@@ -144,11 +194,7 @@ export const StaffService = {
                 nameMap.set(nameKey, s);
             } else {
                 const existing = nameMap.get(nameKey)!;
-                const existingScore = (existing.email ? 2 : 0) + ((existing as any).sortOrder !== undefined ? 1 : 0);
-                const currentScore = (s.email ? 2 : 0) + ((s as any).sortOrder !== undefined ? 1 : 0);
-                if (currentScore > existingScore) {
-                    nameMap.set(nameKey, s);
-                }
+                nameMap.set(nameKey, mergeStaffDocs(existing, s));
             }
         }
 

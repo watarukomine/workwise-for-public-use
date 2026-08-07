@@ -308,31 +308,21 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
   }, [state.data, state.options, onRouteOptimized]);
 
   const predefinedLocations = React.useMemo(() => {
-    const staffWithLocation = staff.map(s => {
-      const status = staffStatus.find(ss => ss.staffId === s.id);
-      const lat = status?.latitude !== undefined && status?.latitude !== null ? Number(status.latitude) : ((s as any).latitude !== undefined && (s as any).latitude !== null ? Number((s as any).latitude) : undefined);
-      const lng = status?.longitude !== undefined && status?.longitude !== null ? Number(status.longitude) : ((s as any).longitude !== undefined && (s as any).longitude !== null ? Number((s as any).longitude) : undefined);
-      return {
-        ...s,
-        ...status,
+    const staffLocs: Location[] = (staff || [])
+      .filter(s => {
+        const lat = Number((s as any).latitude);
+        const lng = Number((s as any).longitude);
+        const isLoggedOut = (s as any).currentStatus === 'ログアウト' || (s as any).status === 'ログアウト' || (s as any).isOnline === false;
+        return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && !isLoggedOut;
+      })
+      .map(s => ({
+        id: s.id,
         name: s.name || (s as any)['氏名'] || (s as any)['名前'] || (s as any)['担当'] || '名前未設定',
-        latitude: lat,
-        longitude: lng,
-        lastAction: status?.lastAction || (s as any).currentStatus || '現在地'
-      };
-    }).filter(s =>
-      s.latitude !== undefined && s.longitude !== undefined && !isNaN(s.latitude) && !isNaN(s.longitude) &&
-      (s as any).currentStatus !== 'ログアウト' && (s as any).status !== 'ログアウト' && (s as any).isOnline !== false
-    );
-
-    const staffLocs: Location[] = staffWithLocation.map(s => ({
-      id: s.id,
-      name: s.name,
-      address: s.lastAction || '現在地',
-      latitude: s.latitude!,
-      longitude: s.longitude!,
-      type: 'staff',
-    }));
+        address: (s as any).lastAction || (s as any).currentStatus || '現在地',
+        latitude: Number((s as any).latitude),
+        longitude: Number((s as any).longitude),
+        type: 'staff' as const,
+      }));
 
     const customerLocs = (allCustomers || []).map(c => {
       let latitude = Number(findKey(c, ['緯度']));
