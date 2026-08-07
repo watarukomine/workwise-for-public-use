@@ -845,17 +845,19 @@ export function isStaffMatched(staff: any, entries: (string | undefined | null)[
     const n = norm(entry);
     if (!n) return false;
 
-    // 1. 完全一致・相互包含 (ID, 氏名, メール, コード)
-    if (sId && (sId === n || sId.includes(n) || n.includes(sId))) return true;
-    if (sName && (sName === n || sName.includes(n) || n.includes(sName))) return true;
-    if (sCode && (sCode === n || sCode.includes(n) || n.includes(sCode))) return true;
-    if (sEmail && (sEmail === n || sEmail.includes(n) || n.includes(sEmail))) return true;
-    if (sPrefix && (sPrefix === n || sPrefix.includes(n) || n.includes(sPrefix))) return true;
+    // 1. 名前・ID・メール・コードの完全一致 (スペース除去後)
+    if (sName && sName === n) return true;
+    if (sId && sId === n) return true;
+    if (sCode && sCode === n) return true;
+    if (sEmail && sEmail === n) return true;
+    if (sPrefix && sPrefix === n) return true;
 
-    // 2. 苗字・名前の部分マッチ (例: "古石", "小堀", "小出")
-    if (sName && n.length >= 2 && (sName.startsWith(n) || n.startsWith(sName))) return true;
+    // 2. ID・メール・コードの部分一致 (IDまたはメールプレフィックス)
+    if (sId && (sId.includes(n) || n.includes(sId))) return true;
+    if (sCode && (sCode.includes(n) || n.includes(sCode))) return true;
+    if (sEmail && (sEmail.includes(n) || n.includes(sEmail))) return true;
 
-    // Bracketed name support (e.g. "杉山（和）")
+    // 3. 括弧書き名前のサポート (例: "杉山（和）" vs "杉山和彦")
     const rawEntry = String(entry).trim();
     const bracketMatch = rawEntry.match(/^(.*?)[（(](.*?)[）)]$/);
     if (bracketMatch) {
