@@ -222,7 +222,7 @@ export default function DashboardPage() {
       });
     }
 
-    // レ点チェックがONになっているスタッフをタイムラインに表示
+    // レ点チェックがONになっているスタッフ、シフト出勤者、当日のタスク割当者を完全合成してタイムラインに表示
     let selectedStaff = staffToUse.filter((staff: any) => {
       const isShiftScheduled = scheduledStaffIds && scheduledStaffIds.size > 0 && isStaffMatched(staff, Array.from(scheduledStaffIds));
       const hasTask = isStaffMatched(staff, Array.from(activeStaffKeys));
@@ -232,20 +232,15 @@ export default function DashboardPage() {
       const staffNameOrig = String(staff.name || '').trim();
       const staffShiMeiClean = String(staff['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
 
-      const isManuallySelected = appliedSelectedStaffIds && (
+      const isManuallySelected = !!(appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0 && (
         appliedSelectedStaffIds.includes(staffIdClean) ||
         appliedSelectedStaffIds.includes(staffNameOrig) ||
         appliedSelectedStaffIds.includes(staffNameClean) ||
         appliedSelectedStaffIds.includes(staffShiMeiClean)
-      );
+      ));
 
-      // 手動選択がある場合は手動選択・シフト出勤者・タスク割当者を合成表示
-      if (appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0) {
-        return isManuallySelected || isShiftScheduled || hasTask;
-      }
-
-      // 手動選択がないデフォルト時はシフト出勤者またはタスク割当者を表示
-      return isShiftScheduled || hasTask;
+      // シフト出勤者 OR 当日タスク割当者 OR 手動選択チェックのスタッフを全て合成表示
+      return isShiftScheduled || hasTask || isManuallySelected;
     });
 
     // スイッチOFF時は純粋管理者(Admin)のみ非表示(現場兼務者は表示)
