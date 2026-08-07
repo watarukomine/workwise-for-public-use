@@ -65,23 +65,26 @@ function OptimizerPageContent() {
           }
         }
 
-        const resolvedLat = parseCoord(status?.latitude) ??
+        const actualLat = parseCoord(status?.latitude) ??
           parseCoord((status as any)?.lat) ??
           parseCoord((status as any)?.currentLocation?.latitude) ??
           parseCoord((staffMember as any).latitude) ??
           parseCoord((staffMember as any).lat) ??
           parseCoord((staffMember as any).currentLocation?.latitude) ??
-          rawStrLat ??
-          storeLoc.latitude;
+          rawStrLat;
 
-        const resolvedLng = parseCoord(status?.longitude) ??
+        const actualLng = parseCoord(status?.longitude) ??
           parseCoord((status as any)?.lng) ??
           parseCoord((status as any)?.currentLocation?.longitude) ??
           parseCoord((staffMember as any).longitude) ??
           parseCoord((staffMember as any).lng) ??
           parseCoord((staffMember as any).currentLocation?.longitude) ??
-          rawStrLng ??
-          storeLoc.longitude;
+          rawStrLng;
+
+        // Exclude staff who do NOT have actual GPS location data
+        if (actualLat === null || actualLng === null) {
+          return null;
+        }
 
         const currentStatus = String(status?.status || (staffMember as any).currentStatus || '').trim();
         const isLoggedOut = currentStatus === 'ログアウト' || currentStatus === '退勤' || (staffMember as any).isOnline === false;
@@ -98,9 +101,9 @@ function OptimizerPageContent() {
           ...status,
           id: staffMember.id,
           name: displayName,
-          latitude: resolvedLat,
-          longitude: resolvedLng,
-          lastAction: status?.lastAction || currentStatus || (staffMember['母店'] ? `${staffMember['母店']}` : '拠点位置')
+          latitude: actualLat,
+          longitude: actualLng,
+          lastAction: status?.lastAction || currentStatus || '現在地'
         };
       })
       .filter((s): s is WithId<Staff> & { latitude: number; longitude: number; lastAction: string } =>
