@@ -588,16 +588,11 @@ const getOptimisticAttendance = (date: Date): { staffIds: string[], checkedOutId
         };
     }
 
-    // Default Fallback
-    const defaultStaffs = [
-      "佐藤耕次", "坂本幸夫", "杉山和彦", "福原泰弘", "水野一也", "内田巧", "千葉征英", "古石翔", 
-      "小堀健太", "湯川浩道", "岡本正博", "小松佑輔", "關 雄弥", "桑原和裕", "足立正道", "木村 駿", 
-      "杉山恭平", "小出達人"
-    ];
+    // Default Fallback when no shift data configured for date
     return {
-        staffIds: defaultStaffs,
+        staffIds: [],
         checkedOutIds: [],
-        scheduledStaffIds: defaultStaffs
+        scheduledStaffIds: []
     };
 };
 
