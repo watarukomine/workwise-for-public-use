@@ -23,7 +23,7 @@ interface SelectedStaffContextType {
   currentDateStr: string;
   setCurrentDateStr: (dateStr: string) => void;
   setAllStaff: (staff: WithId<Staff>[]) => void;
-  togglePendingStaffSelection: (staffId: string) => void;
+  togglePendingStaffSelection: (staffId: string, currentActiveIds?: string[]) => void;
   setPendingSelection: (staffIds: string[]) => void;
   applyPendingSelection: (targetDateStr?: string) => void;
   clearDateSelection: (targetDateStr?: string) => void;
@@ -136,14 +136,18 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     setAllStaffState(staff);
   }, []);
 
-  const togglePendingStaffSelection = React.useCallback((staffId: string) => {
+  const togglePendingStaffSelection = React.useCallback((staffId: string, currentActiveIds?: string[]) => {
     if (!staffId) return;
     const cleanId = String(staffId).trim();
-    setPendingSelectedStaffIds(prevIds =>
-      prevIds.includes(cleanId)
-        ? prevIds.filter(id => id !== cleanId)
-        : [...prevIds, cleanId]
-    );
+    setPendingSelectedStaffIds(prevIds => {
+      let base = prevIds;
+      if (base.length === 0 && currentActiveIds && currentActiveIds.length > 0) {
+        base = currentActiveIds;
+      }
+      return base.includes(cleanId)
+        ? base.filter(id => id !== cleanId)
+        : [...base, cleanId];
+    });
   }, []);
 
   const setPendingSelection = React.useCallback((staffIds: string[]) => {

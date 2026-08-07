@@ -313,6 +313,16 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     }
   }, [filteredStaff, toast]);
 
+  const currentlyActiveStaffIds = React.useMemo(() => {
+    const ids: string[] = [];
+    staffList.forEach(s => {
+      if (isMemberSelected(s)) {
+        if (s.id) ids.push(s.id);
+      }
+    });
+    return ids;
+  }, [staffList, isMemberSelected]);
+
   return (
     <>
       <Card className="shadow-sm">
@@ -370,7 +380,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                         <TableCell className="py-1 px-1">
                           <Checkbox
                             checked={isSelected}
-                            onCheckedChange={() => togglePendingStaffSelection(member.id)}
+                            onCheckedChange={() => togglePendingStaffSelection(member.id, currentlyActiveStaffIds)}
                           />
                         </TableCell>
                       {isAdmin && (
