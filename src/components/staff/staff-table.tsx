@@ -194,7 +194,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
   const { profile } = useUserProfile();
   const { toast } = useToast();
-  const { pendingSelectedStaffIds, togglePendingStaffSelection, applyPendingSelection, clearDateSelection, appliedSelectedStaffIds, setSelectedStaffIds } = useSelectedStaff();
+  const { pendingSelectedStaffIds, togglePendingStaffSelection, applyPendingSelection, clearDateSelection, appliedSelectedStaffIds, currentScheduledStaffIds, setSelectedStaffIds } = useSelectedStaff();
   const { scheduleEvents, orders } = useOrder();
   const roleStr = String(profile?.role || '').toLowerCase();
   const isAdmin = roleStr === 'admin' || roleStr === 'admin/staff';
@@ -202,19 +202,22 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
 
   const activeStaffIds = React.useMemo(() => {
     const ids = new Set<string>();
+    if (currentScheduledStaffIds && currentScheduledStaffIds.length > 0) {
+      currentScheduledStaffIds.forEach(id => ids.add(String(id).trim()));
+    }
     if (scheduleEvents && scheduleEvents.length > 0) {
       scheduleEvents.forEach(e => {
-        if (e.staffId && e.staffId !== 'unassigned') ids.add(e.staffId);
+        if (e.staffId && e.staffId !== 'unassigned') ids.add(String(e.staffId).trim());
       });
     }
     if (orders && orders.length > 0) {
       orders.forEach(o => {
-        if (o.staffId && o.staffId !== 'unassigned' && o.status !== '作業完了' && o.status !== 'キャンセル') ids.add(o.staffId);
-        if (o.staffName) ids.add(o.staffName);
+        if (o.staffId && o.staffId !== 'unassigned' && o.status !== '作業完了' && o.status !== 'キャンセル') ids.add(String(o.staffId).trim());
+        if (o.staffName) ids.add(String(o.staffName).trim());
       });
     }
     return ids;
-  }, [scheduleEvents, orders]);
+  }, [currentScheduledStaffIds, scheduleEvents, orders]);
 
   const allColumns = React.useMemo(() => extractColumns(staffList), [staffList]);
 
@@ -242,10 +245,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     if (hasManualSelection) {
       return pendingSelectedStaffIds.includes(member.id);
     }
-    const cleanId = String(member.id || '').trim();
-    const cleanName = String(member.name || '').trim();
-    const cleanShiMei = String((member as any)['氏名'] || '').trim();
-    return activeStaffIds.has(cleanId) || activeStaffIds.has(cleanName) || activeStaffIds.has(cleanShiMei);
+    return isStaffMatched(member, Array.from(activeStaffIds));
   }, [appliedSelectedStaffIds, pendingSelectedStaffIds, activeStaffIds]);
 
   const isAllSelected = filteredStaff.length > 0 && filteredStaff.every(s => isMemberSelected(s));

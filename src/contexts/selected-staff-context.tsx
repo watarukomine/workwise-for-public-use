@@ -19,6 +19,7 @@ const simpleHash = (str: string) => {
 interface SelectedStaffContextType {
   pendingSelectedStaffIds: string[];
   appliedSelectedStaffIds: string[];
+  currentScheduledStaffIds: string[];
   allStaff: WithId<Staff>[];
   currentDateStr: string;
   setCurrentDateStr: (dateStr: string) => void;
@@ -28,6 +29,7 @@ interface SelectedStaffContextType {
   applyPendingSelection: (targetDateStr?: string) => void;
   clearDateSelection: (targetDateStr?: string) => void;
   setSelectedStaffIds: (ids: string[] | ((prev: string[]) => string[])) => void;
+  setScheduledStaffIdsForDate: (dateStr: string, ids: string[]) => void;
   isLoading: boolean;
   isStaffLoading: boolean;
   error: string | null;
@@ -54,6 +56,8 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
 
   // 日付ごとの手動選択マップ { [dateStr: string]: string[] }
   const [selectionsByDate, setSelectionsByDate] = useState<Record<string, string[]>>({});
+  // 日付ごとのシフト出勤者マップ { [dateStr: string]: string[] }
+  const [scheduledStaffIdsByDate, setScheduledStaffIdsByDate] = useState<Record<string, string[]>>({});
   const [pendingSelectedStaffIds, setPendingSelectedStaffIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +65,18 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const LOCAL_STORAGE_DATE_SELECTION_KEY = 'workwise_staff_selection_by_date_v1';
   const STAFF_CACHE_KEY = 'cached_staff_data_v4';
   const initialLoadDone = useRef(false);
+
+  const setScheduledStaffIdsForDate = React.useCallback((dateStr: string, ids: string[]) => {
+    if (!dateStr) return;
+    setScheduledStaffIdsByDate(prev => {
+      if (JSON.stringify(prev[dateStr]) === JSON.stringify(ids)) return prev;
+      return { ...prev, [dateStr]: ids };
+    });
+  }, []);
+
+  const currentScheduledStaffIds = React.useMemo(() => {
+    return scheduledStaffIdsByDate[currentDateStr] || [];
+  }, [scheduledStaffIdsByDate, currentDateStr]);
 
   // Restore date-specific selections on mount
   useEffect(() => {
@@ -208,6 +224,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
   const contextValue = React.useMemo(() => ({
     pendingSelectedStaffIds,
     appliedSelectedStaffIds,
+    currentScheduledStaffIds,
     allStaff,
     currentDateStr,
     setCurrentDateStr,
@@ -217,12 +234,14 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     applyPendingSelection,
     clearDateSelection,
     setSelectedStaffIds,
+    setScheduledStaffIdsForDate,
     isLoading: isLoading,
     isStaffLoading: isLoading,
     error,
   }), [
     pendingSelectedStaffIds,
     appliedSelectedStaffIds,
+    currentScheduledStaffIds,
     allStaff,
     currentDateStr,
     setCurrentDateStr,
@@ -232,6 +251,7 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
     applyPendingSelection,
     clearDateSelection,
     setSelectedStaffIds,
+    setScheduledStaffIdsForDate,
     isLoading,
     error,
   ]);
