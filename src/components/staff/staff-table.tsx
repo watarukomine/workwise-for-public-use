@@ -259,7 +259,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   }, [staffList, searchTerm, displayColumns]);
 
   const isMemberSelected = React.useCallback((member: WithId<Staff>) => {
-    const hasManualSelection = appliedSelectedStaffIds.length > 0;
+    const hasManualSelection = pendingSelectedStaffIds.length > 0 || appliedSelectedStaffIds.length > 0;
     if (hasManualSelection) {
       return pendingSelectedStaffIds.includes(member.id);
     }
