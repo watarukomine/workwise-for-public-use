@@ -39,9 +39,44 @@ function OptimizerPageContent() {
     }
   }, [isProfileLoading, profile, router]);
 
-  // Extract ONLY active staff who have sent/updated location coordinates (e.g. DEMO2)
+  // Extract ONLY staff who have updated their location TODAY with valid coordinates
   const staffWithLocation = React.useMemo(() => {
     if (!allStaff || allStaff.length === 0) return [];
+
+    const isToday = (dateInput: any): boolean => {
+      if (!dateInput) return false;
+      try {
+        let d: Date | null = null;
+        if (typeof dateInput === 'string') {
+          d = new Date(dateInput);
+        } else if (typeof dateInput === 'number') {
+          d = new Date(dateInput.toString().length === 10 ? dateInput * 1000 : dateInput);
+        } else if (dateInput instanceof Date) {
+          d = dateInput;
+        } else if (typeof dateInput === 'object' && dateInput !== null) {
+          if (typeof dateInput.seconds === 'number') {
+            d = new Date(dateInput.seconds * 1000);
+          } else if (typeof dateInput.toDate === 'function') {
+            d = dateInput.toDate();
+          }
+        }
+
+        if (!d || isNaN(d.getTime())) return false;
+
+        const now = new Date();
+        const isSameLocal = d.getFullYear() === now.getFullYear() &&
+                            d.getMonth() === now.getMonth() &&
+                            d.getDate() === now.getDate();
+
+        const isSameUtc = d.getUTCFullYear() === now.getUTCFullYear() &&
+                           d.getUTCMonth() === now.getUTCMonth() &&
+                           d.getUTCDate() === now.getUTCDate();
+
+        return isSameLocal || isSameUtc;
+      } catch {
+        return false;
+      }
+    };
 
     return allStaff
       .map(staffMember => {
@@ -53,6 +88,7 @@ function OptimizerPageContent() {
           return !isNaN(num) && num !== 0 ? num : null;
         };
 
+        const displayName = staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定';
         const currentStatus = String((staffMember as any).currentStatus || status?.status || '').trim();
         const isLoggedOut = currentStatus === 'ログアウト' || currentStatus === '退勤' || (staffMember as any).isOnline === false;
 
@@ -61,7 +97,7 @@ function OptimizerPageContent() {
           return null;
         }
 
-        // 2. Extract coordinates updated directly on user profile (e.g. via check-in or location update)
+        // 2. Extract location coordinates updated directly on user profile
         let rawStrLat: number | null = null;
         let rawStrLng: number | null = null;
         const locStr = (staffMember as any).lastLocation || (staffMember as any).location;
@@ -76,12 +112,29 @@ function OptimizerPageContent() {
         const actualLat = parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? rawStrLat;
         const actualLng = parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? rawStrLng;
 
-        // 3. Exclude staff who have NOT updated their actual location coordinates
+        // 3. Must have valid coordinates
         if (actualLat === null || actualLng === null) {
           return null;
         }
 
-        const displayName = staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定';
+        // 4. Must have location updated TODAY (from check-in / location update timestamp)
+        const locTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || (staffMember as any).updatedAt || status?.lastUpdate;
+        const isLocToday = isToday(locTime);
+
+        console.log('[Optimizer Staff Filter]', {
+          name: displayName,
+          id: staffMember.id,
+          lat: actualLat,
+          lng: actualLng,
+          locTime,
+          isLocToday,
+          isLoggedOut
+        });
+
+        // Exclude staff whose location was NOT updated today
+        if (!isLocToday) {
+          return null;
+        }
 
         return {
           ...staffMember,
