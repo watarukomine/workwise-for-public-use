@@ -237,7 +237,18 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
     return staffList.filter(s => displayColumns.some(col => String(s[col as keyof typeof s] || '').toLowerCase().includes(term)));
   }, [staffList, searchTerm, displayColumns]);
 
-  const isAllSelected = filteredStaff.length > 0 && filteredStaff.every(s => pendingSelectedStaffIds.includes(s.id));
+  const isMemberSelected = React.useCallback((member: WithId<Staff>) => {
+    const hasManualSelection = appliedSelectedStaffIds.length > 0 || pendingSelectedStaffIds.length > 0;
+    if (hasManualSelection) {
+      return pendingSelectedStaffIds.includes(member.id);
+    }
+    const cleanId = String(member.id || '').trim();
+    const cleanName = String(member.name || '').trim();
+    const cleanShiMei = String((member as any)['氏名'] || '').trim();
+    return activeStaffIds.has(cleanId) || activeStaffIds.has(cleanName) || activeStaffIds.has(cleanShiMei);
+  }, [appliedSelectedStaffIds, pendingSelectedStaffIds, activeStaffIds]);
+
+  const isAllSelected = filteredStaff.length > 0 && filteredStaff.every(s => isMemberSelected(s));
   const isSelectionChanged = JSON.stringify([...pendingSelectedStaffIds].sort()) !== JSON.stringify([...appliedSelectedStaffIds].sort());
 
   const handleSelectAll = () => {
@@ -352,7 +363,7 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
                   <TableRow><TableCell colSpan={displayColumns.length + 1 + (isAdmin ? 2 : 0)} className="h-32 text-center"><div className="flex items-center justify-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />読み込み中...</div></TableCell></TableRow>
                 ) : filteredStaff.length > 0 ? (
                   filteredStaff.map((member, idx) => {
-                    const isSelected = pendingSelectedStaffIds.includes(member.id);
+                    const isSelected = isMemberSelected(member);
 
                     return (
                       <TableRow key={member.id} data-state={isSelected ? 'selected' : ''} className={cn("transition-colors", editingCell?.rowId === member.id && "bg-primary/[0.02]", member['母店'] ? STORE_COLORS[member['母店']] || '' : '')}>
