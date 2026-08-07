@@ -65,23 +65,45 @@ function OptimizerPageContent() {
           }
         }
 
-        const actualLat = parseCoord(status?.latitude) ??
-          parseCoord((status as any)?.lat) ??
-          parseCoord((status as any)?.currentLocation?.latitude) ??
-          parseCoord((staffMember as any).latitude) ??
-          parseCoord((staffMember as any).lat) ??
-          parseCoord((staffMember as any).currentLocation?.latitude) ??
-          rawStrLat;
+        const isUpdatedToday = (dateVal: any): boolean => {
+          if (!dateVal) return false;
+          try {
+            const d = typeof dateVal === 'string' ? new Date(dateVal) : (dateVal instanceof Date ? dateVal : new Date(dateVal?.seconds ? dateVal.seconds * 1000 : dateVal));
+            if (isNaN(d.getTime())) return false;
+            const now = new Date();
+            return d.getFullYear() === now.getFullYear() &&
+                   d.getMonth() === now.getMonth() &&
+                   d.getDate() === now.getDate();
+          } catch {
+            return false;
+          }
+        };
 
-        const actualLng = parseCoord(status?.longitude) ??
-          parseCoord((status as any)?.lng) ??
-          parseCoord((status as any)?.currentLocation?.longitude) ??
-          parseCoord((staffMember as any).longitude) ??
-          parseCoord((staffMember as any).lng) ??
-          parseCoord((staffMember as any).currentLocation?.longitude) ??
-          rawStrLng;
+        const staffLat = parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? rawStrLat;
+        const staffLng = parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? rawStrLng;
+        const staffTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || (staffMember as any).updatedAt;
+        const hasStaffTodayLoc = staffLat !== null && staffLng !== null && isUpdatedToday(staffTime);
 
-        // Exclude staff who do NOT have actual GPS location data
+        const statusLat = parseCoord(status?.latitude) ?? parseCoord((status as any)?.lat);
+        const statusLng = parseCoord(status?.longitude) ?? parseCoord((status as any)?.lng);
+        const statusTime = status?.lastUpdate;
+        const hasStatusTodayLoc = statusLat !== null && statusLng !== null && isUpdatedToday(statusTime);
+
+        let actualLat: number | null = null;
+        let actualLng: number | null = null;
+
+        if (hasStaffTodayLoc) {
+          actualLat = staffLat;
+          actualLng = staffLng;
+        } else if (hasStatusTodayLoc) {
+          actualLat = statusLat;
+          actualLng = statusLng;
+        } else if (staffLat !== null && staffLng !== null && (staffMember as any).lastLocationUpdatedAt && isUpdatedToday((staffMember as any).lastLocationUpdatedAt)) {
+          actualLat = staffLat;
+          actualLng = staffLng;
+        }
+
+        // Exclude staff who do NOT have actual GPS location data updated today
         if (actualLat === null || actualLng === null) {
           return null;
         }
