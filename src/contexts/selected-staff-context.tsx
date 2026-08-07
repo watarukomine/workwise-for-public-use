@@ -61,17 +61,8 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
         const parsed = JSON.parse(saved);
         const ids = Array.isArray(parsed) ? parsed : (parsed.ids || []);
         if (Array.isArray(ids)) {
-          // 【汚染データ自動クリーンアップ安全装置】
-          // 過去に保存されてしまった多数選択（10名以上）の旧デフォルトデータが残っている場合、
-          // 強制削除してシフト出勤者ベースの動的デフォルト表示に委ねる
-          if (ids.length >= 10) {
-            localStorage.removeItem(LOCAL_STORAGE_SELECTION_KEY);
-            setAppliedSelectedStaffIds([]);
-            setPendingSelectedStaffIds([]);
-          } else {
-            setAppliedSelectedStaffIds(ids);
-            setPendingSelectedStaffIds(ids);
-          }
+          setAppliedSelectedStaffIds(ids);
+          setPendingSelectedStaffIds(ids);
         }
       }
     } catch (e) {
@@ -124,13 +115,9 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
             try {
               const parsed = JSON.parse(saved);
               const ids = Array.isArray(parsed) ? parsed : (parsed?.ids || []);
-              if (Array.isArray(ids) && ids.length < 10) {
+              if (Array.isArray(ids)) {
                 setAppliedSelectedStaffIds(ids);
                 setPendingSelectedStaffIds(ids);
-              } else {
-                localStorage.removeItem(LOCAL_STORAGE_SELECTION_KEY);
-                setAppliedSelectedStaffIds([]);
-                setPendingSelectedStaffIds([]);
               }
             } catch (e) {}
           }

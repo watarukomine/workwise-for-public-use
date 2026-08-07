@@ -447,12 +447,24 @@ export default function DashboardPage() {
         allStaff.forEach(staff => {
           const isScheduled = scheduledEntries.length > 0 && isStaffMatched(staff, scheduledEntries);
           const hasTask = isStaffMatched(staff, Array.from(activeTaskStaffKeys));
-          if (isScheduled || hasTask) {
+          const isManuallySelected = appliedSelectedStaffIds && (
+            appliedSelectedStaffIds.includes(staff.id) || 
+            appliedSelectedStaffIds.includes(staff.name)
+          );
+          if (isScheduled || hasTask || isManuallySelected) {
             if (staff.id) activeStaffIdsForToday.push(staff.id);
           }
         });
 
         const nextSelectedIds = Array.from(new Set(activeStaffIdsForToday));
+        // appliedSelectedStaffIds に含まれているが nextSelectedIds に含まれていない手動選択項目も保持
+        if (appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0) {
+          appliedSelectedStaffIds.forEach(id => {
+            if (!nextSelectedIds.includes(id)) {
+              nextSelectedIds.push(id);
+            }
+          });
+        }
         setSelectedStaffIds(nextSelectedIds);
       };
 
@@ -494,10 +506,22 @@ export default function DashboardPage() {
           if (allStaff && allStaff.length > 0) {
             const activeStaffIdsForToday: string[] = [];
             allStaff.forEach(staff => {
-              if (isStaffMatched(staff, data.scheduledStaffIds)) {
+              const isScheduled = isStaffMatched(staff, data.scheduledStaffIds);
+              const isManuallySelected = appliedSelectedStaffIds && (
+                appliedSelectedStaffIds.includes(staff.id) || 
+                appliedSelectedStaffIds.includes(staff.name)
+              );
+              if (isScheduled || isManuallySelected) {
                 if (staff.id) activeStaffIdsForToday.push(staff.id);
               }
             });
+            if (appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0) {
+              appliedSelectedStaffIds.forEach(id => {
+                if (!activeStaffIdsForToday.includes(id)) {
+                  activeStaffIdsForToday.push(id);
+                }
+              });
+            }
             if (activeStaffIdsForToday.length > 0) {
               setSelectedStaffIds(Array.from(new Set(activeStaffIdsForToday)));
             }
@@ -510,7 +534,7 @@ export default function DashboardPage() {
     return () => {
       window.removeEventListener('attendance_refreshed', handleAttendanceRefresh);
     };
-  }, [currentDate, allStaff]);
+  }, [currentDate, allStaff, appliedSelectedStaffIds]);
 
   // Persistent selection hooks and auto-refresh logic
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
