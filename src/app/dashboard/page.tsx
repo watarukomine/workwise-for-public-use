@@ -425,7 +425,39 @@ export default function DashboardPage() {
       const dateStr = `${yr}-${String(mo).padStart(2, '0')}-${String(dy).padStart(2, '0')}`;
       const finalScheduledEntries = (dateStr === '2026-08-01' ? august1DefaultStaff : augustCsvNames);
 
+      const applySelectedStaffList = (scheduledEntries: string[]) => {
+        if (!allStaff || allStaff.length === 0) return;
+        const activeStaffIdsForToday: string[] = [];
+
+        // 当日の作業チップ割り当て済みスタッフキーを抽出
+        const activeTaskStaffKeys = new Set<string>();
+        if (scheduleEvents && scheduleEvents.length > 0) {
+          const targetDateStr = format(currentDate, 'yyyy-MM-dd');
+          scheduleEvents.forEach(e => {
+            const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
+            if (isValid(evStart) && format(evStart, 'yyyy-MM-dd') === targetDateStr) {
+              if (e.staffId && e.staffId !== 'unassigned') {
+                activeTaskStaffKeys.add(String(e.staffId).trim());
+                activeTaskStaffKeys.add(String(e.staffId).trim().replace(/[\s\u3000]+/g, ''));
+              }
+            }
+          });
+        }
+
+        allStaff.forEach(staff => {
+          const isScheduled = scheduledEntries.length > 0 && isStaffMatched(staff, scheduledEntries);
+          const hasTask = isStaffMatched(staff, Array.from(activeTaskStaffKeys));
+          if (isScheduled || hasTask) {
+            if (staff.id) activeStaffIdsForToday.push(staff.id);
+          }
+        });
+
+        const nextSelectedIds = Array.from(new Set(activeStaffIdsForToday));
+        setSelectedStaffIds(nextSelectedIds);
+      };
+
       setScheduledStaffIds(createNormalizedKeySet(finalScheduledEntries));
+      applySelectedStaffList(finalScheduledEntries);
 
       // Trigger background fetch without blocking date switch (0ms transition!)
       getDailyAttendanceDetails(currentDate).then(({ staffIds: attendedStaffIds, checkedOutIds = [], scheduledStaffIds: scheduledIds = [] }) => {
@@ -434,44 +466,9 @@ export default function DashboardPage() {
         setPresentStaffIds(new Set(attendedStaffIds));
         if (scheduledIds && scheduledIds.length > 0) {
           setScheduledStaffIds(createNormalizedKeySet(scheduledIds));
+          applySelectedStaffList(scheduledIds);
         }
       }).catch(err => console.warn("[Dashboard] Background attendance fetch warning:", err));
-
-        // シフト出勤者および作業チップ割当者のみをデフォルトでレ点チェックONに設定
-        if (allStaff && allStaff.length > 0) {
-          const activeStaffIdsForToday: string[] = [];
-
-          // 当日の作業チップ割り当て済みスタッフキーを抽出
-          const activeTaskStaffKeys = new Set<string>();
-          if (scheduleEvents && scheduleEvents.length > 0) {
-            const targetDateStr = format(currentDate, 'yyyy-MM-dd');
-            scheduleEvents.forEach(e => {
-              const evStart = typeof e.start === 'string' ? parseISO(e.start) : e.start;
-              if (isValid(evStart) && format(evStart, 'yyyy-MM-dd') === targetDateStr) {
-                if (e.staffId && e.staffId !== 'unassigned') {
-                  activeTaskStaffKeys.add(String(e.staffId).trim());
-                  activeTaskStaffKeys.add(String(e.staffId).trim().replace(/[\s\u3000]+/g, ''));
-                }
-              }
-            });
-          }
-
-          allStaff.forEach(staff => {
-            const isScheduled = finalScheduledEntries.length > 0 && isStaffMatched(staff, finalScheduledEntries);
-            const hasTask = isStaffMatched(staff, Array.from(activeTaskStaffKeys));
-            if (isScheduled || hasTask) {
-              if (staff.id) activeStaffIdsForToday.push(staff.id);
-            }
-          });
-
-          // 出勤者＋タスク割当者のみをレ点チェックONに設定（変更があった場合のみState更新）
-          const nextSelectedIds = Array.from(new Set(activeStaffIdsForToday));
-          const isSame = appliedSelectedStaffIds.length === nextSelectedIds.length && 
-                         nextSelectedIds.every(id => appliedSelectedStaffIds.includes(id));
-          if (!isSame) {
-            setSelectedStaffIds(nextSelectedIds);
-          }
-        }
     };
 
     syncAttendance();
@@ -479,7 +476,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [currentDate]);
+  }, [currentDate, allStaff, scheduleEvents]);
 
   // Listen to background attendance refreshes to dynamically update punch/checkout status without UI freeze
   useEffect(() => {
@@ -492,7 +489,20 @@ export default function DashboardPage() {
         console.log(`[Dashboard] Dynamically updating background attendance for ${docId}`);
         setCheckedOutStaffIds(new Set(data.checkedOutIds));
         setPresentStaffIds(new Set(data.staffIds));
-        setScheduledStaffIds(new Set(data.scheduledStaffIds));
+        if (data.scheduledStaffIds && data.scheduledStaffIds.length > 0) {
+          setScheduledStaffIds(new Set(data.scheduledStaffIds));
+          if (allStaff && allStaff.length > 0) {
+            const activeStaffIdsForToday: string[] = [];
+            allStaff.forEach(staff => {
+              if (isStaffMatched(staff, data.scheduledStaffIds)) {
+                if (staff.id) activeStaffIdsForToday.push(staff.id);
+              }
+            });
+            if (activeStaffIdsForToday.length > 0) {
+              setSelectedStaffIds(Array.from(new Set(activeStaffIdsForToday)));
+            }
+          }
+        }
       }
     };
 
@@ -500,7 +510,7 @@ export default function DashboardPage() {
     return () => {
       window.removeEventListener('attendance_refreshed', handleAttendanceRefresh);
     };
-  }, [currentDate]);
+  }, [currentDate, allStaff]);
 
   // Persistent selection hooks and auto-refresh logic
   const [isAutoRefreshing, setIsAutoRefreshing] = useState(false);
