@@ -39,14 +39,33 @@ function OptimizerPageContent() {
     }
   }, [isProfileLoading, profile, router]);
 
-  // Extract ONLY active & attending staff who have location data or are on duty
+  // Extract ONLY active staff who are logged in today AND have valid GPS location data
   const staffWithLocation = React.useMemo(() => {
     if (!allStaff || allStaff.length === 0) return [];
+
+    const isTodayDate = (dateVal: any): boolean => {
+      if (!dateVal) return false;
+      try {
+        let d: Date;
+        if (typeof dateVal === 'number') d = new Date(dateVal);
+        else if (typeof dateVal === 'string') d = new Date(dateVal);
+        else if (dateVal instanceof Date) d = dateVal;
+        else if (typeof dateVal === 'object' && typeof dateVal.seconds === 'number') d = new Date(dateVal.seconds * 1000);
+        else return false;
+
+        if (isNaN(d.getTime())) return false;
+        const now = new Date();
+        return d.getFullYear() === now.getFullYear() &&
+               d.getMonth() === now.getMonth() &&
+               d.getDate() === now.getDate();
+      } catch {
+        return false;
+      }
+    };
 
     return allStaff
       .map(staffMember => {
         const status = contextStatuses?.find(s => s.staffId === staffMember.id || (s.staffId && (staffMember as any)._docId && s.staffId === (staffMember as any)._docId));
-        const storeLoc = getStoreLocation(staffMember['母店']);
 
         const parseCoord = (val: any): number | null => {
           if (val === undefined || val === null || val === '') return null;
@@ -54,9 +73,27 @@ function OptimizerPageContent() {
           return !isNaN(num) && num !== 0 ? num : null;
         };
 
+        const currentStatus = String((staffMember as any).currentStatus || status?.status || '').trim();
+        const isLoggedOut = currentStatus === 'ログアウト' || currentStatus === '退勤' || (staffMember as any).isOnline === false;
+
+        // 1. Exclude logged-out or off-duty staff
+        if (isLoggedOut) {
+          return null;
+        }
+
+        // 2. Check if logged in / active today
+        const lastActiveTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || (staffMember as any).lastLoginAt || (staffMember as any).updatedAt;
+        const isOnline = (staffMember as any).isOnline === true;
+        const loggedInToday = isOnline || isTodayDate(lastActiveTime);
+
+        if (!loggedInToday) {
+          return null;
+        }
+
+        // 3. Check coordinates directly on staffMember (user account doc updated by check-in / location update)
         let rawStrLat: number | null = null;
         let rawStrLng: number | null = null;
-        const locStr = (staffMember as any).lastLocation || (staffMember as any).location || status?.lastAction;
+        const locStr = (staffMember as any).lastLocation || (staffMember as any).location;
         if (typeof locStr === 'string' && locStr.includes(',')) {
           const parts = locStr.split(',').map(p => parseFloat(p.trim()));
           if (!isNaN(parts[0]) && !isNaN(parts[1])) {
@@ -65,28 +102,11 @@ function OptimizerPageContent() {
           }
         }
 
-        // 1. Check coordinates directly on staffMember (user account doc)
-        const staffLat = parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? rawStrLat;
-        const staffLng = parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? rawStrLng;
+        const actualLat = parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? rawStrLat;
+        const actualLng = parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? rawStrLng;
 
-        // 2. Check coordinates from order status if available
-        const statusLat = parseCoord(status?.latitude) ?? parseCoord((status as any)?.lat);
-        const statusLng = parseCoord(status?.longitude) ?? parseCoord((status as any)?.lng);
-
-        // Prefer staffMember direct location coordinates, fallback to status location coordinates
-        const actualLat = staffLat ?? statusLat;
-        const actualLng = staffLng ?? statusLng;
-
-        // Exclude staff who do NOT have location coordinates
+        // Exclude staff who do NOT have actual user location coordinates
         if (actualLat === null || actualLng === null) {
-          return null;
-        }
-
-        const currentStatus = String((staffMember as any).currentStatus || status?.status || '').trim();
-        const isLoggedOut = currentStatus === 'ログアウト' || currentStatus === '退勤' || (staffMember as any).isOnline === false;
-
-        // Exclude logged-out or off-duty staff from map display
-        if (isLoggedOut) {
           return null;
         }
 
