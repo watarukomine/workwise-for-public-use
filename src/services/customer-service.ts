@@ -17,7 +17,50 @@ const COLLECTION = 'customers';
 
 export const CustomerService = {
     /**
-     * Fetches all customers.
+     * Fetches customer data from Google Sheets via GAS endpoint as fallback/supplement.
+     */
+    async fetchFromGas(): Promise<WithId<Customer>[]> {
+        try {
+            const url = `${CUSTOMER_GAS_URL}?action=getCustomers&sheet=customers`;
+            const res = await fetch(url);
+            if (!res.ok) return [];
+            const data = await res.json();
+            const list = Array.isArray(data) ? data : (data.customers || data.data || []);
+            
+            return list.map((item: any, index: number) => {
+                const userCode = String(item['ユーザーコード'] || item.userCode || '').trim().padStart(5, '0');
+                const storeName = String(item['店舗'] || item['店舗名'] || item.storeName || item.name || '').trim();
+                const address = String(item['住所'] || item.address || '').trim();
+                const mainStore = String(item['母店'] || item.mainStore || '').trim();
+                const rawLat = item['緯度'] ?? item.latitude ?? item.lat;
+                const rawLng = item['経度'] ?? item.longitude ?? item.lng;
+                const lat = rawLat !== undefined && rawLat !== null && rawLat !== '' ? Number(rawLat) : undefined;
+                const lng = rawLng !== undefined && rawLng !== null && rawLng !== '' ? Number(rawLng) : undefined;
+
+                return {
+                    id: item.id || `gas-cust-${userCode || index}`,
+                    userCode,
+                    storeName,
+                    name: storeName,
+                    address,
+                    mainStore,
+                    latitude: (lat !== undefined && !isNaN(lat)) ? lat : undefined,
+                    longitude: (lng !== undefined && !isNaN(lng)) ? lng : undefined,
+                    'ユーザーコード': userCode,
+                    '店舗': storeName,
+                    '店舗名': storeName,
+                    '住所': address,
+                    '母店': mainStore,
+                } as WithId<Customer>;
+            }).filter((c: any) => !!c.storeName && c.storeName !== '名称未設定');
+        } catch (e) {
+            console.warn('Failed to fetch customers from GAS:', e);
+            return [];
+        }
+    },
+
+    /**
+     * Fetches all customers from Firestore, with GAS fallback.
      */
     async getAllCustomers(): Promise<WithId<Customer>[]> {
         const { firestore } = initializeFirebase();
@@ -46,7 +89,26 @@ export const CustomerService = {
             } as WithId<Customer>;
         };
 
-        return snapshot.docs.map(doc => normalizeCustomer(doc.data(), doc.id));
+        const firestoreCustomers = snapshot.docs.map(doc => normalizeCustomer(doc.data(), doc.id));
+
+        // If Firestore has very few records, supplement from GAS (Google Sheets 218 stores)
+        if (firestoreCustomers.length < 50) {
+            const gasCustomers = await this.fetchFromGas();
+            if (gasCustomers.length > 0) {
+                const map = new Map<string, WithId<Customer>>();
+                gasCustomers.forEach(c => {
+                    const key = (c.userCode ? c.userCode : c.storeName) || c.id;
+                    map.set(key, c);
+                });
+                firestoreCustomers.forEach(c => {
+                    const key = (c.userCode ? c.userCode : c.storeName) || c.id;
+                    map.set(key, c);
+                });
+                return Array.from(map.values());
+            }
+        }
+
+        return firestoreCustomers;
     },
 
     /**

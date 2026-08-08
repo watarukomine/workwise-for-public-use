@@ -22,7 +22,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const [error, setErrorState] = useState<string | null>(null);
   const { user, isUserLoading } = useUser();
 
-  const CUSTOMER_CACHE_KEY = 'cached_customer_data_v4'; // Incremented key to populate all stores from orders
+  const CUSTOMER_CACHE_KEY = 'cached_customer_data_v5'; // Incremented key to sync full 218 stores from GAS/Firestore/orders
 
   const setCustomers = (data: any[]) => {
     const map = new Map<string, string>();
