@@ -32,16 +32,6 @@ export default function CustomersPage() {
     );
   }
 
-  if (!isAdmin) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>権限がありません</AlertTitle>
-        <AlertDescription>このページは管理者のみがアクセスできます。</AlertDescription>
-      </Alert>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div>

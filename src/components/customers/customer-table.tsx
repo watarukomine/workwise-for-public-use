@@ -180,7 +180,11 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
     setVisibleColumns(prev => { const next = new Set(prev); if (next.has(col)) next.delete(col); else next.add(col); try { localStorage.setItem(COLUMN_VISIBILITY_KEY, JSON.stringify(Array.from(next))); } catch {} return next; });
   };
 
-  const displayColumns = React.useMemo(() => allColumns.filter(c => visibleColumns.has(c)), [allColumns, visibleColumns]);
+  const displayColumns = React.useMemo(() => {
+    const list = allColumns.filter(c => visibleColumns.has(c));
+    if (list.length > 0) return list;
+    return PRIORITY_FIELDS;
+  }, [allColumns, visibleColumns]);
 
   const filteredCustomers = React.useMemo(() => {
     const list = rawCustomers || [];

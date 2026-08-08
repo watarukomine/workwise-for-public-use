@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import type { Customer, WithId } from '@/lib/types';
 import { CUSTOMER_GAS_URL } from '@/lib/settings';
+import CUSTOMER_MASTER from '@/data/customer-master.json';
 
 const COLLECTION = 'customers';
 
@@ -91,22 +92,24 @@ export const CustomerService = {
 
         const firestoreCustomers = snapshot.docs.map(doc => normalizeCustomer(doc.data(), doc.id));
 
-        // If Firestore has very few records, supplement from GAS (Google Sheets 218 stores)
-        if (firestoreCustomers.length < 50) {
-            const gasCustomers = await this.fetchFromGas();
-            if (gasCustomers.length > 0) {
-                const map = new Map<string, WithId<Customer>>();
-                gasCustomers.forEach(c => {
-                    const key = (c.userCode ? c.userCode : c.storeName) || c.id;
-                    map.set(key, c);
-                });
-                firestoreCustomers.forEach(c => {
-                    const key = (c.userCode ? c.userCode : c.storeName) || c.id;
-                    map.set(key, c);
-                });
-                return Array.from(map.values());
-            }
-        }
+        // Always merge embedded CUSTOMER_MASTER (221 stores) to guarantee complete data with coordinates
+        const map = new Map<string, WithId<Customer>>();
+        (CUSTOMER_MASTER as any[]).forEach(c => {
+            const key = (c.userCode ? c.userCode : c.storeName) || c.id;
+            map.set(key, c as WithId<Customer>);
+        });
+        firestoreCustomers.forEach(c => {
+            const key = (c.userCode ? c.userCode : c.storeName) || c.id;
+            const existing = map.get(key);
+            map.set(key, {
+                ...existing,
+                ...c,
+                latitude: c.latitude ?? existing?.latitude,
+                longitude: c.longitude ?? existing?.longitude,
+            } as WithId<Customer>);
+        });
+
+        return Array.from(map.values());
 
         return firestoreCustomers;
     },

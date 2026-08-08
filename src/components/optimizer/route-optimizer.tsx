@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { STORE_LOCATIONS, STORE_ORDER } from '@/lib/constants';
+import CUSTOMER_MASTER from '@/data/customer-master.json';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
@@ -382,20 +383,37 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
       }))
       .filter(s => s.latitude !== 0 && s.longitude !== 0);
 
-    const customerLocs: Location[] = (allCustomers || [])
+    // Merge allCustomers from context with embedded CUSTOMER_MASTER to guarantee all 221 stores appear in dropdown list
+    const combinedCustomerList = [...(allCustomers || [])];
+    const seenCodes = new Set(combinedCustomerList.map(c => (c as any).userCode || c.name));
+    
+    (CUSTOMER_MASTER as any[]).forEach(cm => {
+      const code = cm.userCode || cm.storeName;
+      if (!seenCodes.has(code)) {
+        seenCodes.add(code);
+        combinedCustomerList.push(cm as any);
+      }
+    });
+
+    const customerLocs: Location[] = combinedCustomerList
       .map(c => {
         const linkedOrder = orders.find(o => (o as any).userCode === (c as any).userCode || (o as any).customerName === c.name);
+        const storeNameVal = c.name || (c as any)['店舗'] || (c as any)['店舗名'] || (c as any)['販売店名'] || (c as any)['顧客名'] || '店舗名未設定';
+        const addressVal = c.address || (c as any)['住所'] || '';
+        const latVal = Number((c as any)['緯度'] ?? c.latitude ?? (c as any).lat ?? 0);
+        const lngVal = Number((c as any)['経度'] ?? c.longitude ?? (c as any).lng ?? 0);
+
         return {
           id: c.id,
-          name: c.name || (c as any)['販売店名'] || (c as any)['顧客名'] || '店舗名未設定',
-          address: c.address || (c as any)['住所'] || '',
-          latitude: Number((c as any)['緯度'] ?? c.latitude ?? (c as any).lat ?? 0),
-          longitude: Number((c as any)['経度'] ?? c.longitude ?? (c as any).lng ?? 0),
+          name: storeNameVal,
+          address: addressVal,
+          latitude: isNaN(latVal) ? 0 : latVal,
+          longitude: isNaN(lngVal) ? 0 : lngVal,
           type: 'customer' as const,
           orderId: linkedOrder?.id
         };
       })
-      .filter(c => c.latitude !== 0 && c.longitude !== 0);
+      .filter(c => !!c.name && c.name !== '店舗名未設定');
 
     return [...storeLocs, ...staffLocs, ...customerLocs];
   }, [staff, allCustomers, orders]);
