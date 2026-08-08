@@ -226,7 +226,6 @@ const PlacesAutocompleteSelector: React.FC<{
         <Command>
           <CommandInput
             placeholder="拠点名、出勤スタッフ、販売店名で検索..."
-            disabled={!ready}
             value={inputValue}
             onValueChange={setValue}
           />

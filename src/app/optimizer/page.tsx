@@ -224,7 +224,7 @@ function OptimizerPageContent() {
     }
   };
 
-  const baseIsLoading = isProfileLoading || isStaffLoading || isLoadingCustomers || isLoadingOrders;
+  const baseIsLoading = isProfileLoading;
 
   const mapLocations = React.useMemo(() => {
     const customLocationsInRoute = optimizedRoute?.optimizedRoute
@@ -246,7 +246,7 @@ function OptimizerPageContent() {
 
   if (baseIsLoading || !profile) {
     return (
-      <div className="flex items-center justify-center p-10">
+      <div className="flex items-center justify-center p-10 min-h-[300px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -262,20 +262,14 @@ function OptimizerPageContent() {
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-1">
-          {!placesLibrary ? (
-            <div className="flex items-center justify-center p-10 rounded-lg border border-dashed">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <RouteOptimizer
-              onRouteOptimized={handleRouteOptimized}
-              staff={staffWithLocation}
-              staffStatus={contextStatuses || []}
-              allCustomers={allCustomers || []}
-              orders={orders}
-              placesLibraryReady={!!placesLibrary}
-            />
-          )}
+          <RouteOptimizer
+            onRouteOptimized={handleRouteOptimized}
+            staff={staffWithLocation}
+            staffStatus={contextStatuses || []}
+            allCustomers={allCustomers || []}
+            orders={orders}
+            placesLibraryReady={!!placesLibrary}
+          />
         </div>
         <div className="lg:col-span-2">
           <RouteMap
@@ -309,7 +303,7 @@ export default function OptimizerPage() {
   }
 
   return (
-    <APIProvider apiKey={apiKey} libraries={['places']}>
+    <APIProvider apiKey={apiKey} libraries={['places', 'routes', 'geometry']}>
       <OptimizerPageContent />
     </APIProvider>
   );
