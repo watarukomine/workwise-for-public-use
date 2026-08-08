@@ -45,8 +45,13 @@ function Directions({ route, avoidHighways }: { route: Location[], avoidHighways
     }));
   }, [routesLibrary, map]);
 
+  const routeKey = React.useMemo(() => {
+    if (!route || route.length < 2) return '';
+    return route.map(r => `${r.id}:${r.latitude.toFixed(5)},${r.longitude.toFixed(5)}`).join('|') + `|avoid:${avoidHighways}`;
+  }, [route, avoidHighways]);
+
   React.useEffect(() => {
-    if (!directionsService || !directionsRenderer || !route || route.length < 2) {
+    if (!directionsService || !directionsRenderer || !route || route.length < 2 || !routeKey) {
       if (directionsRenderer) {
         directionsRenderer.set('directions', null);
       }
@@ -78,7 +83,7 @@ function Directions({ route, avoidHighways }: { route: Location[], avoidHighways
         directionsRenderer.set('directions', null);
       }
     }
-  }, [directionsService, directionsRenderer, route, avoidHighways]);
+  }, [directionsService, directionsRenderer, routeKey]);
 
   return null;
 }
