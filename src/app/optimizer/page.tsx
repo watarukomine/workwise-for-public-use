@@ -43,24 +43,31 @@ function OptimizerPageContent() {
   const staffWithLocation = React.useMemo(() => {
     if (!allStaff || allStaff.length === 0) return [];
 
-    const isToday = (dateInput: any): boolean => {
+    const isRecentlyUpdated = (dateInput: any): boolean => {
       if (!dateInput) return false;
       try {
-        let d: Date | null = null;
-        if (typeof dateInput === 'string') d = new Date(dateInput);
-        else if (typeof dateInput === 'number') d = new Date(dateInput.toString().length === 10 ? dateInput * 1000 : dateInput);
-        else if (dateInput instanceof Date) d = dateInput;
-        else if (typeof dateInput === 'object' && dateInput !== null) {
-          if (typeof dateInput.seconds === 'number') d = new Date(dateInput.seconds * 1000);
-          else if (typeof dateInput.toDate === 'function') d = dateInput.toDate();
+        let timeMs = 0;
+        if (typeof dateInput === 'string') {
+          timeMs = new Date(dateInput).getTime();
+        } else if (typeof dateInput === 'number') {
+          timeMs = dateInput.toString().length === 10 ? dateInput * 1000 : dateInput;
+        } else if (dateInput instanceof Date) {
+          timeMs = dateInput.getTime();
+        } else if (typeof dateInput === 'object' && dateInput !== null) {
+          if (typeof dateInput.seconds === 'number') {
+            timeMs = dateInput.seconds * 1000;
+          } else if (typeof dateInput.toDate === 'function') {
+            timeMs = dateInput.toDate().getTime();
+          }
         }
 
-        if (!d || isNaN(d.getTime())) return false;
+        if (isNaN(timeMs) || timeMs === 0) return false;
 
-        const now = new Date();
-        return d.getFullYear() === now.getFullYear() &&
-               d.getMonth() === now.getMonth() &&
-               d.getDate() === now.getDate();
+        const nowMs = Date.now();
+        const diffHours = (nowMs - timeMs) / (1000 * 60 * 60);
+
+        // Allow position updates within last 24 hours, plus slight clock skew tolerance
+        return diffHours >= -2 && diffHours <= 24;
       } catch {
         return false;
       }
@@ -110,12 +117,11 @@ function OptimizerPageContent() {
           return null;
         }
 
-        // 3. MUST have location updated TODAY (from check-in / location update timestamp)
-        const locTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt;
-        const isLocToday = isToday(locTime);
+        // 3. MUST have location updated recently (within 24 hours) for real-time immediate response!
+        const locTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || (staffMember as any).updatedAt;
+        const isRecent = isRecentlyUpdated(locTime);
 
-        // Exclude anyone who has NOT updated location TODAY!
-        if (!isLocToday) {
+        if (!isRecent) {
           return null;
         }
 
