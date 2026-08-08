@@ -397,14 +397,16 @@ function CheckInClient() {
 
           // Calculate ETA for Clock Out (帰社中) or Start Travel (移動中)
           if (action === 'Clock Out') {
+            const userStore = profile?.['母店'] || (profile as any)?.mainStore || (profile as any)?.storeName;
+            const targetOfficeLocation = getStoreLocation(userStore);
             const travelMin = await fetchRealtimeTravelMinutes(
               latitude,
               longitude,
-              DEFAULT_OFFICE_LOCATION.latitude,
-              DEFAULT_OFFICE_LOCATION.longitude
+              targetOfficeLocation.latitude,
+              targetOfficeLocation.longitude
             );
             const etaDate = new Date(now.getTime() + travelMin * 60000);
-            firestoreFields.nextDestination = DEFAULT_OFFICE_LOCATION.name;
+            firestoreFields.nextDestination = targetOfficeLocation.name;
             firestoreFields.estimatedArrivalTime = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           } else if (action === 'Start Travel') {
             const todayStr = formatDate(now.toISOString(), 'yyyy-MM-dd');

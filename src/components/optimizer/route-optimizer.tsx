@@ -8,12 +8,13 @@ import type { Customer, Order, Staff, StaffStatus, WithId } from '@/lib/types';
 import { optimizeRoute, OptimizeRouteInput, OptimizeRouteOutput } from '@/ai/flows/optimize-route-for-efficiency';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon, ExternalLink, Flag, Navigation } from 'lucide-react';
+import { ChevronsUpDown, Loader2, MapPinned, Route as RouteIcon, PlusCircle, X, MapPin as MapPinIcon, User as UserIcon, ExternalLink, Flag, Navigation, Building2 } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { cn, findKey } from '@/lib/utils';
+import { STORE_LOCATIONS, STORE_ORDER } from '@/lib/constants';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
 import usePlacesAutocomplete, { getGeocode, getLatLng } from 'use-places-autocomplete';
@@ -196,6 +197,7 @@ const PlacesAutocompleteSelector: React.FC<{
     }
   };
 
+  const storeLocations = predefinedLocations.filter(loc => loc.type === 'custom' && loc.id.startsWith('store-'));
   const staffLocations = predefinedLocations.filter(loc => loc.type === 'staff');
   const customerLocations = predefinedLocations.filter(loc => loc.type === 'customer');
 
@@ -207,6 +209,7 @@ const PlacesAutocompleteSelector: React.FC<{
     );
   }
 
+  const filteredStores = filterLocations(storeLocations, inputValue);
   const filteredStaff = filterLocations(staffLocations, inputValue);
   const filteredCustomers = filterLocations(customerLocations, inputValue);
 
@@ -246,17 +249,45 @@ const PlacesAutocompleteSelector: React.FC<{
               </CommandItem>
             </CommandGroup>
 
+            {filteredStores.length > 0 && (
+              <CommandGroup heading="自社店舗・拠点">
+                {filteredStores.map((location) => (
+                  <CommandItem
+                    key={location.id}
+                    value={`${location.name} ${location.address}`}
+                    onSelect={() => handlePredefinedSelect(location)}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center truncate mr-2">
+                      <Building2 className="mr-2 h-4 w-4 shrink-0 text-purple-600 dark:text-purple-400" />
+                      <span className="truncate font-medium">{location.name}</span>
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground truncate max-w-[140px]">
+                      {location.address}
+                    </span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            )}
+
             {filteredStaff.length > 0 && (
-              <CommandGroup heading="スタッフ">
+              <CommandGroup heading="出勤スタッフ">
                 {filteredStaff.map((location) => (
                   <CommandItem
                     key={location.id}
-                    value={`${location.name}`}
+                    value={`${location.name} ${(location as any).mainStore || ''}`}
                     onSelect={() => handlePredefinedSelect(location)}
-                    className="flex items-center"
+                    className="flex items-center justify-between"
                   >
-                    <UserIcon className="mr-2 h-4 w-4" style={{ color: (location as any).color }} />
-                    <p className="truncate">{location.name}</p>
+                    <div className="flex items-center truncate mr-2">
+                      <UserIcon className="mr-2 h-4 w-4 shrink-0 text-blue-500" style={{ color: (location as any).color }} />
+                      <span className="truncate">{location.name}</span>
+                    </div>
+                    {(location as any).mainStore && (
+                      <span className="shrink-0 px-1.5 py-0.5 text-[10px] rounded bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300 font-medium">
+                        {(location as any).mainStore}
+                      </span>
+                    )}
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -308,14 +339,33 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
   }, [state.data, state.options, onRouteOptimized]);
 
   const predefinedLocations = React.useMemo(() => {
-    const staffLocs: Location[] = (staff || []).map(s => ({
-      id: s.id,
-      name: s.name || (s as any)['氏名'] || (s as any)['名前'] || (s as any)['担当'] || '名前未設定',
-      address: (s as any).lastAction || (s as any).currentStatus || '現在地',
-      latitude: Number((s as any).latitude),
-      longitude: Number((s as any).longitude),
-      type: 'staff' as const,
+    const storeLocs: Location[] = Object.values(STORE_LOCATIONS).map(store => ({
+      id: `store-${store.name}`,
+      name: store.name,
+      address: store.address,
+      latitude: store.latitude,
+      longitude: store.longitude,
+      type: 'custom' as const,
     }));
+
+    const staffLocs: Location[] = (staff || [])
+      .slice()
+      .sort((a, b) => {
+        const storeA = String((a as any)['母店'] || (a as any).mainStore || (a as any).storeName || '').trim();
+        const storeB = String((b as any)['母店'] || (b as any).mainStore || (b as any).storeName || '').trim();
+        const orderA = STORE_ORDER[storeA] || 99;
+        const orderB = STORE_ORDER[storeB] || 99;
+        return orderA - orderB;
+      })
+      .map(s => ({
+        id: s.id,
+        name: s.name || (s as any)['氏名'] || (s as any)['名前'] || (s as any)['担当'] || '名前未設定',
+        address: (s as any).lastAction || (s as any).currentStatus || '現在地',
+        latitude: Number((s as any).latitude),
+        longitude: Number((s as any).longitude),
+        type: 'staff' as const,
+        mainStore: (s as any)['母店'] || (s as any).mainStore || (s as any).storeName || '',
+      }));
 
     const customerLocs = (allCustomers || []).map(c => {
       let latitude = Number(findKey(c, ['緯度']));
@@ -357,7 +407,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
       };
     });
 
-    return [...staffLocs, ...customerLocs];
+    return [...storeLocs, ...staffLocs, ...customerLocs];
   }, [staff, staffStatus, allCustomers]);
 
   const addWaypoint = () => {
