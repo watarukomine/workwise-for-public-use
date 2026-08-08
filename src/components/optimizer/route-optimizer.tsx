@@ -293,7 +293,7 @@ const PlacesAutocompleteSelector: React.FC<{
 
             {filteredCustomers.length > 0 && (
               <CommandGroup heading="登録販売店">
-                {filteredCustomers.slice(0, 30).map((location) => (
+                {filteredCustomers.slice(0, 300).map((location) => (
                   <CommandItem
                     key={location.id}
                     value={`${location.name} ${location.address}`}

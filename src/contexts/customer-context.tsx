@@ -22,7 +22,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const [error, setErrorState] = useState<string | null>(null);
   const { user, isUserLoading } = useUser();
 
-  const CUSTOMER_CACHE_KEY = 'cached_customer_data_v3'; // Incremented key to clear stale cache
+  const CUSTOMER_CACHE_KEY = 'cached_customer_data_v4'; // Incremented key to populate all stores from orders
 
   const setCustomers = (data: any[]) => {
     const map = new Map<string, string>();
@@ -63,57 +63,103 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         console.warn('Failed to load cached customer data:', e);
       }
 
-      // 2. Fetch fresh data from Firestore
+      // 2. Fetch fresh data from Firestore and supplement from orders
       try {
         if (customers.length === 0) {
           setIsLoading(true);
         }
 
         const customerData = await CustomerService.getAllCustomers();
+        const { firestore } = await import('@/firebase').then(m => m.initializeFirebase());
+        const { collection, getDocs } = await import('firebase/firestore');
 
-        if (customerData.length > 0) {
-          // Normalize and Cleanse data: Ensure userCode is 5 digits and unify all property keys
-          const normalizedData = customerData.map((customer: any) => {
-            const rawCode = customer['ユーザーコード'] || customer.userCode || '';
-            let normalizedCode = rawCode;
-            if (rawCode !== '') {
-              normalizedCode = String(rawCode).trim().padStart(5, '0');
+        // Extract extra store entries from orders collection as fallback
+        const ordersSnapshot = await getDocs(collection(firestore, 'orders'));
+        const orderStoresMap = new Map<string, any>();
+
+        ordersSnapshot.docs.forEach(docSnap => {
+          const o = docSnap.data();
+          const code = String(o.userCode || o['ユーザーコード'] || o.customerCode || '').trim();
+          const storeName = String(o.storeName || o['店舗名'] || o['店舗'] || o.customerName || o['顧客名'] || '').trim();
+          const address = String(o.address || o['住所'] || '').trim();
+          const lat = o.latitude ?? o.lat ?? o['緯度'];
+          const lng = o.longitude ?? o.lng ?? o['経度'];
+          const mainStore = o.mainStore || o['母店'] || '';
+
+          if (storeName && storeName !== '名称未設定') {
+            const key = code ? code : storeName;
+            if (!orderStoresMap.has(key)) {
+              orderStoresMap.set(key, {
+                id: `order-cust-${docSnap.id}`,
+                userCode: code ? code.padStart(5, '0') : '',
+                storeName,
+                name: storeName,
+                address,
+                mainStore,
+                latitude: (lat !== undefined && lat !== null && !isNaN(Number(lat))) ? Number(lat) : undefined,
+                longitude: (lng !== undefined && lng !== null && !isNaN(Number(lng))) ? Number(lng) : undefined,
+                'ユーザーコード': code ? code.padStart(5, '0') : '',
+                '店舗': storeName,
+                '店舗名': storeName,
+                '住所': address,
+                '母店': mainStore,
+              });
             }
+          }
+        });
 
-            const storeNameVal = customer.storeName || customer['店舗'] || customer['店舗名'] || customer['販売店名'] || customer['顧客名'] || customer.name || '';
-            const addressVal = customer.address || customer['住所'] || '';
-            
-            const latVal = customer.latitude !== undefined ? customer.latitude : (customer['緯度'] !== undefined ? Number(customer['緯度']) : undefined);
-            const lngVal = customer.longitude !== undefined ? customer.longitude : (customer['経度'] !== undefined ? Number(customer['経度']) : undefined);
-            
-            const mainStoreVal = customer.mainStore || customer['母店'] || '';
+        // Combine Firestore customers with extracted order stores
+        const combinedMap = new Map<string, any>();
 
-            const cleansed: any = {
-              ...customer,
-              userCode: normalizedCode,
-              storeName: storeNameVal,
-              name: storeNameVal,
-              address: addressVal,
-              mainStore: mainStoreVal,
-              'ユーザーコード': normalizedCode,
-              '店舗': storeNameVal,
-              '店舗名': storeNameVal,
-              '住所': addressVal,
-              '母店': mainStoreVal,
-            };
+        // First add order stores
+        orderStoresMap.forEach((v, k) => combinedMap.set(k, v));
 
-            if (latVal !== undefined && !isNaN(latVal)) {
-              cleansed.latitude = latVal;
-              cleansed['緯度'] = latVal;
-            }
-            if (lngVal !== undefined && !isNaN(lngVal)) {
-              cleansed.longitude = lngVal;
-              cleansed['経度'] = lngVal;
-            }
+        // Then overwrite with explicit customer documents
+        customerData.forEach((customer: any) => {
+          const rawCode = customer['ユーザーコード'] || customer.userCode || '';
+          let normalizedCode = rawCode;
+          if (rawCode !== '') {
+            normalizedCode = String(rawCode).trim().padStart(5, '0');
+          }
 
-            return cleansed;
-          });
+          const storeNameVal = customer.storeName || customer['店舗'] || customer['店舗名'] || customer['販売店名'] || customer['顧客名'] || customer.name || '';
+          const addressVal = customer.address || customer['住所'] || '';
+          
+          const latVal = customer.latitude !== undefined ? customer.latitude : (customer['緯度'] !== undefined ? Number(customer['緯度']) : undefined);
+          const lngVal = customer.longitude !== undefined ? customer.longitude : (customer['経度'] !== undefined ? Number(customer['経度']) : undefined);
+          
+          const mainStoreVal = customer.mainStore || customer['母店'] || '';
 
+          const cleansed: any = {
+            ...customer,
+            userCode: normalizedCode,
+            storeName: storeNameVal,
+            name: storeNameVal,
+            address: addressVal,
+            mainStore: mainStoreVal,
+            'ユーザーコード': normalizedCode,
+            '店舗': storeNameVal,
+            '店舗名': storeNameVal,
+            '住所': addressVal,
+            '母店': mainStoreVal,
+          };
+
+          if (latVal !== undefined && !isNaN(latVal)) {
+            cleansed.latitude = latVal;
+            cleansed['緯度'] = latVal;
+          }
+          if (lngVal !== undefined && !isNaN(lngVal)) {
+            cleansed.longitude = lngVal;
+            cleansed['経度'] = lngVal;
+          }
+
+          const key = normalizedCode ? normalizedCode : storeNameVal;
+          combinedMap.set(key, cleansed);
+        });
+
+        const normalizedData = Array.from(combinedMap.values());
+
+        if (normalizedData.length > 0) {
           setCustomers(normalizedData);
 
           // Cache the fresh data
