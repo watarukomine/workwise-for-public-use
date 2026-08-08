@@ -75,9 +75,9 @@ function solveInstantFallback(start: Location, end: Location, waypoints: Locatio
   const resultRoute = route.map((loc, i) => {
     if (i === 0) return { ...loc, travelTimeFromPrevious: 0 };
     const d = calculateDistanceFallback(route[i - 1].latitude, route[i - 1].longitude, loc.latitude, loc.longitude);
-    const estLegKm = d * 1.3;
+    const estLegKm = d * 1.25;
     totalDistanceKm += estLegKm;
-    const speed = avoidHighways ? 25 : 35;
+    const speed = avoidHighways ? 30 : (estLegKm > 25 ? 60 : 40);
     const legMins = Math.round((estLegKm / speed) * 60);
     return {
       ...loc,
@@ -86,8 +86,8 @@ function solveInstantFallback(start: Location, end: Location, waypoints: Locatio
     };
   });
 
-  const speed = avoidHighways ? 25 : 35;
-  const totalMins = Math.round((totalDistanceKm / speed) * 60);
+  const overallSpeed = avoidHighways ? 30 : (totalDistanceKm > 25 ? 60 : 40);
+  const totalMins = Math.round((totalDistanceKm / overallSpeed) * 60);
   const hours = Math.floor(totalMins / 60);
   const mins = totalMins % 60;
 
@@ -429,7 +429,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
     const validWaypoints = waypoints.filter((w): w is Location => w !== null && !!w.latitude && !!w.longitude);
 
     try {
-      // 1. Race promise with ultra-fast 2-second timeout
+      // 1. Race promise with 12-second timeout to allow complete Google Routes API calculation
       const apiPromise = optimizeRoute({
         startLocation,
         endLocation,
@@ -438,7 +438,7 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
         avoidHighways,
       });
 
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000));
 
       const result = await Promise.race([apiPromise, timeoutPromise]);
 
