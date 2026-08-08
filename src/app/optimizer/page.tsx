@@ -107,13 +107,11 @@ function OptimizerPageContent() {
         const displayName = staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定';
         const currentStatus = String((staffMember as any).currentStatus || status?.status || '').trim();
 
-        // 1. Exclude off-duty, logged out, or un-clocked-in staff
+        // 1. Exclude off-duty or logged out staff (Allow staff who sent location updates even if un-clocked-in)
         const isInactive =
           currentStatus === 'ログアウト' ||
           currentStatus === '退勤' ||
-          currentStatus === '未出勤' ||
-          (staffMember as any).isOnline === false ||
-          (staffMember as any).isAttending === false;
+          (staffMember as any).isOnline === false;
 
         if (isInactive) {
           return null;
