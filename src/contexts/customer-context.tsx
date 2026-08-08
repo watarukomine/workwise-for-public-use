@@ -22,7 +22,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const [error, setErrorState] = useState<string | null>(null);
   const { user, isUserLoading } = useUser();
 
-  const CUSTOMER_CACHE_KEY = 'cached_customer_data_v2'; // Changed key
+  const CUSTOMER_CACHE_KEY = 'cached_customer_data_v3'; // Incremented key to clear stale cache
 
   const setCustomers = (data: any[]) => {
     const map = new Map<string, string>();
@@ -50,22 +50,20 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
     const fetchCustomers = async () => {
       setErrorState(null);
 
-      // Step 1: Load cached data immediately (optimistic)
+      // 1. Try to load cached data first for instant render
       try {
         const cachedData = localStorage.getItem(CUSTOMER_CACHE_KEY);
         if (cachedData) {
           const { customers: cachedCustomers } = JSON.parse(cachedData);
           if (cachedCustomers && cachedCustomers.length > 0) {
             setCustomers(cachedCustomers);
-            // Show UI immediately with cached data
-            setIsLoading(false);
           }
         }
       } catch (e) {
         console.warn('Failed to load cached customer data:', e);
       }
 
-      // Step 2: Fetch fresh data from Firestore
+      // 2. Fetch fresh data from Firestore
       try {
         if (customers.length === 0) {
           setIsLoading(true);
@@ -74,7 +72,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         const customerData = await CustomerService.getAllCustomers();
 
         if (customerData.length > 0) {
-          // Normalize and Cleanse data: Ensure userCode is 5 digits and unify duplicate keys
+          // Normalize and Cleanse data: Ensure userCode is 5 digits and unify all property keys
           const normalizedData = customerData.map((customer: any) => {
             const rawCode = customer['ユーザーコード'] || customer.userCode || '';
             let normalizedCode = rawCode;
@@ -82,7 +80,7 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
               normalizedCode = String(rawCode).trim().padStart(5, '0');
             }
 
-            const storeNameVal = customer.storeName || customer['店舗'] || customer.name || '';
+            const storeNameVal = customer.storeName || customer['店舗'] || customer['店舗名'] || customer['販売店名'] || customer['顧客名'] || customer.name || '';
             const addressVal = customer.address || customer['住所'] || '';
             
             const latVal = customer.latitude !== undefined ? customer.latitude : (customer['緯度'] !== undefined ? Number(customer['緯度']) : undefined);
@@ -94,25 +92,27 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
               ...customer,
               userCode: normalizedCode,
               storeName: storeNameVal,
+              name: storeNameVal,
               address: addressVal,
+              mainStore: mainStoreVal,
+              'ユーザーコード': normalizedCode,
+              '店舗': storeNameVal,
+              '店舗名': storeNameVal,
+              '住所': addressVal,
+              '母店': mainStoreVal,
             };
 
-            if (latVal !== undefined && !isNaN(latVal)) cleansed.latitude = latVal;
-            if (lngVal !== undefined && !isNaN(lngVal)) cleansed.longitude = lngVal;
-            if (mainStoreVal) cleansed.mainStore = mainStoreVal;
-
-            // Remove duplicate Japanese keys to prevent duplicate columns in UI
-            delete cleansed['ユーザーコード'];
-            delete cleansed['店舗'];
-            delete cleansed['住所'];
-            delete cleansed['緯度'];
-            delete cleansed['経度'];
-            delete cleansed['母店'];
-            delete cleansed.name;
+            if (latVal !== undefined && !isNaN(latVal)) {
+              cleansed.latitude = latVal;
+              cleansed['緯度'] = latVal;
+            }
+            if (lngVal !== undefined && !isNaN(lngVal)) {
+              cleansed.longitude = lngVal;
+              cleansed['経度'] = lngVal;
+            }
 
             return cleansed;
           });
-
 
           setCustomers(normalizedData);
 
