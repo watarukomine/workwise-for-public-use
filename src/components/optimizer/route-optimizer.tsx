@@ -339,14 +339,21 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
   }, [state.data, state.options, onRouteOptimized]);
 
   const predefinedLocations = React.useMemo(() => {
-    const storeLocs: Location[] = Object.values(STORE_LOCATIONS).map(store => ({
-      id: `store-${store.name}`,
-      name: store.name,
-      address: store.address,
-      latitude: store.latitude,
-      longitude: store.longitude,
-      type: 'custom' as const,
-    }));
+    const seenStores = new Set<string>();
+    const storeLocs: Location[] = [];
+    Object.values(STORE_LOCATIONS).forEach(store => {
+      if (!seenStores.has(store.name)) {
+        seenStores.add(store.name);
+        storeLocs.push({
+          id: `store-${store.name}`,
+          name: store.name,
+          address: store.address,
+          latitude: store.latitude,
+          longitude: store.longitude,
+          type: 'custom' as const,
+        });
+      }
+    });
 
     const staffLocs: Location[] = (staff || [])
       .slice()
