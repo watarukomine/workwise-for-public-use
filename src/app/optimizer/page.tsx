@@ -62,24 +62,33 @@ function OptimizerPageContent() {
     const isUpdatedToday = (dateInput: any): boolean => {
       if (!dateInput) return false;
       try {
+        let timeMs = 0;
         let d: Date | null = null;
         if (typeof dateInput === 'string') {
           d = new Date(dateInput);
+          timeMs = d.getTime();
         } else if (typeof dateInput === 'number') {
-          d = new Date(dateInput.toString().length === 10 ? dateInput * 1000 : dateInput);
+          timeMs = dateInput.toString().length === 10 ? dateInput * 1000 : dateInput;
+          d = new Date(timeMs);
         } else if (dateInput instanceof Date) {
           d = dateInput;
+          timeMs = d.getTime();
         } else if (typeof dateInput === 'object' && dateInput !== null) {
           if (typeof dateInput.seconds === 'number') {
-            d = new Date(dateInput.seconds * 1000);
+            timeMs = dateInput.seconds * 1000;
+            d = new Date(timeMs);
           } else if (typeof dateInput.toDate === 'function') {
             d = dateInput.toDate();
+            if (d) timeMs = d.getTime();
           }
         }
 
-        if (!d || isNaN(d.getTime())) return false;
+        if (isNaN(timeMs) || timeMs === 0 || !d) return false;
 
         const now = new Date();
+        const diffHours = (now.getTime() - timeMs) / (1000 * 60 * 60);
+
+        // Check if within last 24 hours OR same calendar date (Local/UTC)
         const isSameLocal = d.getFullYear() === now.getFullYear() &&
                             d.getMonth() === now.getMonth() &&
                             d.getDate() === now.getDate();
@@ -88,7 +97,7 @@ function OptimizerPageContent() {
                            d.getUTCMonth() === now.getUTCMonth() &&
                            d.getUTCDate() === now.getUTCDate();
 
-        return isSameLocal || isSameUtc;
+        return (diffHours >= -2 && diffHours <= 20) || isSameLocal || isSameUtc;
       } catch {
         return false;
       }
