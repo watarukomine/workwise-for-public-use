@@ -162,6 +162,9 @@ const optimizeRouteFlow = ai.defineFlow(
           units: 'METRIC',
         };
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
         const response = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', {
           method: 'POST',
           headers: {
@@ -170,7 +173,9 @@ const optimizeRouteFlow = ai.defineFlow(
             'X-Goog-FieldMask': 'routes.optimizedIntermediateWaypointIndex,routes.duration,routes.distanceMeters,routes.legs.duration,routes.legs.distanceMeters',
           },
           body: JSON.stringify(body),
+          signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           const errorData = await response.text();
