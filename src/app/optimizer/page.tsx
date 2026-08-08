@@ -110,6 +110,15 @@ function OptimizerPageContent() {
           return null;
         }
 
+        // 3. MUST have location updated TODAY (from check-in / location update timestamp)
+        const locTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt;
+        const isLocToday = isToday(locTime);
+
+        // Exclude anyone who has NOT updated location TODAY!
+        if (!isLocToday) {
+          return null;
+        }
+
         console.log('[Optimizer Staff Filter Active]', {
           name: displayName,
           id: staffMember.id,
