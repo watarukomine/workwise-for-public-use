@@ -39,9 +39,32 @@ function OptimizerPageContent() {
     }
   }, [isProfileLoading, profile, router]);
 
-  // Extract ONLY active staff who are attending / online AND have valid GPS location data
+  // Extract ONLY staff who have updated location TODAY via check-in or location update
   const staffWithLocation = React.useMemo(() => {
     if (!allStaff || allStaff.length === 0) return [];
+
+    const isToday = (dateInput: any): boolean => {
+      if (!dateInput) return false;
+      try {
+        let d: Date | null = null;
+        if (typeof dateInput === 'string') d = new Date(dateInput);
+        else if (typeof dateInput === 'number') d = new Date(dateInput.toString().length === 10 ? dateInput * 1000 : dateInput);
+        else if (dateInput instanceof Date) d = dateInput;
+        else if (typeof dateInput === 'object' && dateInput !== null) {
+          if (typeof dateInput.seconds === 'number') d = new Date(dateInput.seconds * 1000);
+          else if (typeof dateInput.toDate === 'function') d = dateInput.toDate();
+        }
+
+        if (!d || isNaN(d.getTime())) return false;
+
+        const now = new Date();
+        return d.getFullYear() === now.getFullYear() &&
+               d.getMonth() === now.getMonth() &&
+               d.getDate() === now.getDate();
+      } catch {
+        return false;
+      }
+    };
 
     return allStaff
       .map(staffMember => {
@@ -56,7 +79,7 @@ function OptimizerPageContent() {
         const displayName = staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定';
         const currentStatus = String((staffMember as any).currentStatus || status?.status || '').trim();
 
-        // 1. Exclude off-duty, logged out, or un-clocked-in staff to prevent showing all inactive staff
+        // 1. Exclude off-duty, logged out, or un-clocked-in staff
         const isInactive =
           currentStatus === 'ログアウト' ||
           currentStatus === '退勤' ||
@@ -83,8 +106,16 @@ function OptimizerPageContent() {
         const actualLat = parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? rawStrLat;
         const actualLng = parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? rawStrLng;
 
-        // 3. Must have valid coordinates
         if (actualLat === null || actualLng === null) {
+          return null;
+        }
+
+        // 3. Must have location updated TODAY (from check-in / location update timestamp)
+        const locTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt;
+        const isLocToday = isToday(locTime);
+
+        // If not updated today, exclude the 8/1 default store location staff!
+        if (!isLocToday) {
           return null;
         }
 

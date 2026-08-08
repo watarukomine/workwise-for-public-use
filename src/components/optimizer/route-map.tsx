@@ -85,14 +85,7 @@ function Directions({ route, avoidHighways }: { route: Location[], avoidHighways
 
 
 export function RouteMap({ staff, customers, customLocations, optimizedRoute, avoidHighways }: RouteMapProps) {
-  const activeStaff = React.useMemo(() => {
-    return staff.filter(s => {
-      const lat = Number(s.latitude);
-      const lng = Number(s.longitude);
-      const isLoggedOut = (s as any).currentStatus === 'ログアウト' || (s as any).status === 'ログアウト' || (s as any).isOnline === false;
-      return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && !isLoggedOut;
-    });
-  }, [staff]);
+  const activeStaff = staff;
 
   const allCoordinates = [
     ...activeStaff.map(s => ({ lat: Number(s.latitude), lng: Number(s.longitude) })),
