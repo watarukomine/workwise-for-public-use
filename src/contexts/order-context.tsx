@@ -179,8 +179,10 @@ const processOrderData = (
         }
 
         if (shouldUpdate) {
-            let lat = order.latitude !== undefined && order.latitude !== null ? parseFloat(String(order.latitude)) : NaN;
-            let lon = order.longitude !== undefined && order.longitude !== null ? parseFloat(String(order.longitude)) : NaN;
+            const rawLat = order.latitude ?? (order as any).lat ?? (order as any)['緯度'];
+            const rawLng = order.longitude ?? (order as any).lng ?? (order as any)['経度'];
+            let lat = rawLat !== undefined && rawLat !== null ? parseFloat(String(rawLat)) : NaN;
+            let lon = rawLng !== undefined && rawLng !== null ? parseFloat(String(rawLng)) : NaN;
             
             if (isNaN(lat) || isNaN(lon)) {
                 const locationStr: string = findKey(rawOrder, ['最終位置情報（緯度,経度）', '最終位置情報(緯度,経度)', 'Location']) || '';

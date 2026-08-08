@@ -361,15 +361,15 @@ export function RouteOptimizer({ onRouteOptimized, staff, staffStatus, allCustom
         id: s.id,
         name: s.name || (s as any)['氏名'] || (s as any)['名前'] || (s as any)['担当'] || '名前未設定',
         address: (s as any).lastAction || (s as any).currentStatus || '現在地',
-        latitude: Number((s as any).latitude),
-        longitude: Number((s as any).longitude),
+        latitude: Number((s as any)['緯度'] ?? (s as any).latitude ?? (s as any).lat ?? 0),
+        longitude: Number((s as any)['経度'] ?? (s as any).longitude ?? (s as any).lng ?? 0),
         type: 'staff' as const,
         mainStore: (s as any)['母店'] || (s as any).mainStore || (s as any).storeName || '',
       }));
 
     const customerLocs = (allCustomers || []).map(c => {
-      let latitude = Number(findKey(c, ['緯度']));
-      let longitude = Number(findKey(c, ['経度']));
+      let latitude = Number(findKey(c, ['緯度', 'latitude', 'lat']));
+      let longitude = Number(findKey(c, ['経度', 'longitude', 'lng']));
 
       if (isNaN(latitude) || isNaN(longitude) || !latitude || !longitude) {
         const coordsValue = findKey(c, ['緯度・経度', '座標', '緯度経度', '緯度,経度']);

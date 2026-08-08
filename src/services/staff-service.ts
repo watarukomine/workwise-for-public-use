@@ -31,8 +31,8 @@ function mergeStaffDocs(existing: WithId<Staff>, current: WithId<Staff>): WithId
     const currentTime = getTime(current);
 
     const hasLocation = (obj: any) => {
-        const lat = Number(obj.latitude ?? obj.lat ?? obj.currentLocation?.latitude);
-        const lng = Number(obj.longitude ?? obj.lng ?? obj.currentLocation?.longitude);
+        const lat = Number(obj.latitude ?? obj.lat ?? obj['緯度'] ?? obj.currentLocation?.latitude);
+        const lng = Number(obj.longitude ?? obj.lng ?? obj['経度'] ?? obj.currentLocation?.longitude);
         return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
     };
 
@@ -63,13 +63,13 @@ function mergeStaffDocs(existing: WithId<Staff>, current: WithId<Staff>): WithId
         ...newerDoc,
         id: preferredId,
         _docId: (existing as any)._docId || (current as any)._docId,
-        latitude: (newerDoc as any).latitude ?? (newerDoc as any).lat ?? (olderDoc as any).latitude ?? (olderDoc as any).lat,
-        longitude: (newerDoc as any).longitude ?? (newerDoc as any).lng ?? (olderDoc as any).longitude ?? (olderDoc as any).lng,
-        currentStatus: (newerDoc as any).currentStatus || (olderDoc as any).currentStatus,
+        latitude: (newerDoc as any)['緯度'] ?? (newerDoc as any).latitude ?? (newerDoc as any).lat ?? (olderDoc as any)['緯度'] ?? (olderDoc as any).latitude ?? (olderDoc as any).lat,
+        longitude: (newerDoc as any)['経度'] ?? (newerDoc as any).longitude ?? (newerDoc as any).lng ?? (olderDoc as any)['経度'] ?? (olderDoc as any).longitude ?? (olderDoc as any).lng,
+        currentStatus: (newerDoc as any)['ステータス'] || (newerDoc as any).currentStatus || (newerDoc as any).status || (olderDoc as any)['ステータス'] || (olderDoc as any).currentStatus || (olderDoc as any).status,
         lastAction: (newerDoc as any).lastAction || (olderDoc as any).lastAction,
         estimatedArrivalTime: (newerDoc as any).estimatedArrivalTime || (olderDoc as any).estimatedArrivalTime,
         nextDestination: (newerDoc as any).nextDestination || (olderDoc as any).nextDestination,
-        lastLocationUpdatedAt: (newerDoc as any).lastLocationUpdatedAt || (olderDoc as any).lastLocationUpdatedAt,
+        lastLocationUpdatedAt: (newerDoc as any)['最終位置更新日時'] || (newerDoc as any).lastLocationUpdatedAt || (newerDoc as any).statusUpdatedAt || (olderDoc as any)['最終位置更新日時'] || (olderDoc as any).lastLocationUpdatedAt,
         updatedAt: (newerDoc as any).updatedAt || (olderDoc as any).updatedAt,
     } as unknown as WithId<Staff>;
 }

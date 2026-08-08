@@ -78,7 +78,7 @@ function CheckInClient() {
         newStatus = '待機中';
       } else if (step === 'return_office') {
         newStatus = '帰社中';
-        const staffStore = profile?.['母店'] || '横浜店';
+        const staffStore = profile?.['母店'] || (profile as any)?.mainStore || (profile as any)?.storeName || '横浜店';
         const targetOfficeLocation = getStoreLocation(staffStore);
         nextDest = targetOfficeLocation.name;
 

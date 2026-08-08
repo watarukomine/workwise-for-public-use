@@ -84,19 +84,35 @@ function Directions({ route, avoidHighways }: { route: Location[], avoidHighways
 }
 
 
+const getSafeLat = (obj: any): number | null => {
+  if (!obj) return null;
+  const val = obj.latitude ?? obj.lat ?? obj['緯度'];
+  if (val === undefined || val === null || val === '') return null;
+  const num = Number(val);
+  return !isNaN(num) && num !== 0 ? num : null;
+};
+
+const getSafeLng = (obj: any): number | null => {
+  if (!obj) return null;
+  const val = obj.longitude ?? obj.lng ?? obj['経度'];
+  if (val === undefined || val === null || val === '') return null;
+  const num = Number(val);
+  return !isNaN(num) && num !== 0 ? num : null;
+};
+
 export function RouteMap({ staff, customers, customLocations, optimizedRoute, avoidHighways }: RouteMapProps) {
   const activeStaff = staff;
 
   const allCoordinates = [
-    ...activeStaff.map(s => ({ lat: Number(s.latitude), lng: Number(s.longitude) })),
-    ...customers.filter(c => c.latitude && c.longitude).map(c => ({ lat: c.latitude!, lng: c.longitude! })),
-    ...(customLocations || []).map(l => ({ lat: l.latitude, lng: l.longitude }))
+    ...activeStaff.map(s => ({ lat: getSafeLat(s), lng: getSafeLng(s) })).filter(c => c.lat !== null && c.lng !== null) as { lat: number; lng: number }[],
+    ...customers.map(c => ({ lat: getSafeLat(c), lng: getSafeLng(c) })).filter(c => c.lat !== null && c.lng !== null) as { lat: number; lng: number }[],
+    ...(customLocations || []).map(l => ({ lat: getSafeLat(l), lng: getSafeLng(l) })).filter(c => c.lat !== null && c.lng !== null) as { lat: number; lng: number }[]
   ];
 
   const defaultCenter = React.useMemo(() => {
     if (optimizedRoute && optimizedRoute.length > 0) {
-      const latSum = optimizedRoute.reduce((sum, loc) => sum + loc.latitude, 0);
-      const lngSum = optimizedRoute.reduce((sum, loc) => sum + loc.longitude, 0);
+      const latSum = optimizedRoute.reduce((sum, loc) => sum + (getSafeLat(loc) || 0), 0);
+      const lngSum = optimizedRoute.reduce((sum, loc) => sum + (getSafeLng(loc) || 0), 0);
       return { lat: latSum / optimizedRoute.length, lng: lngSum / optimizedRoute.length };
     }
     if (allCoordinates.length === 0) {
@@ -122,12 +138,12 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
             mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID"}
           >
             {activeStaff.map((s) => {
-              const lat = Number(s.latitude);
-              const lng = Number(s.longitude);
+              const lat = getSafeLat(s);
+              const lng = getSafeLng(s);
               const displayName = s.name || (s as any)['氏名'] || (s as any)['名前'] || (s as any)['担当'] || '名前未設定';
               const markerColor = s.color || '#3b82f6';
 
-              return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 ? (
+              return lat !== null && lng !== null ? (
                 <AdvancedMarker key={`staff-${s.id}`} position={{ lat, lng }}>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -154,14 +170,14 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
                 </AdvancedMarker>
               ) : null;
             })}
-            {customers.map((c) =>
-              c.latitude && c.longitude ? (
+            {customers.map((c) => {
+              const lat = getSafeLat(c);
+              const lng = getSafeLng(c);
+
+              return lat !== null && lng !== null ? (
                 <AdvancedMarker
-                  key={`customer-${c.userCode}`}
-                  position={{
-                    lat: c.latitude,
-                    lng: c.longitude
-                  }}
+                  key={`customer-${c.userCode || c.id}`}
+                  position={{ lat, lng }}
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -170,21 +186,21 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
                       </div>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="font-bold">{c['店舗'] || c.name}</p>
-                      <p>{c.address}</p>
+                      <p className="font-bold">{c['店舗'] || (c as any).storeName || c.name}</p>
+                      <p>{c.address || (c as any)['住所']}</p>
                     </TooltipContent>
                   </Tooltip>
                 </AdvancedMarker>
-              ) : null
-            )}
-            {customLocations?.map((l) =>
-              l.latitude && l.longitude ? (
+              ) : null;
+            })}
+            {customLocations?.map((l) => {
+              const lat = getSafeLat(l);
+              const lng = getSafeLng(l);
+
+              return lat !== null && lng !== null ? (
                 <AdvancedMarker
                   key={`custom-${l.id}`}
-                  position={{
-                    lat: l.latitude,
-                    lng: l.longitude
-                  }}
+                  position={{ lat, lng }}
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -198,8 +214,8 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
                     </TooltipContent>
                   </Tooltip>
                 </AdvancedMarker>
-              ) : null
-            )}
+              ) : null;
+            })}
             {showRoute && optimizedRoute && optimizedRoute.length > 0 && (
               <AdvancedMarker
                 key={`start-${optimizedRoute[0].id}`}

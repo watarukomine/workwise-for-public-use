@@ -24,10 +24,29 @@ export const CustomerService = {
         const colRef = collection(firestore, COLLECTION);
         const snapshot = await getDocs(colRef);
 
-        return snapshot.docs.map(doc => ({
-            ...doc.data(),
-            id: doc.id
-        } as WithId<Customer>));
+        const normalizeCustomer = (data: any, id: string): WithId<Customer> => {
+            const rawLat = data.latitude ?? data.lat ?? data['緯度'];
+            const rawLng = data.longitude ?? data.lng ?? data['経度'];
+            const lat = rawLat !== undefined && rawLat !== null && rawLat !== '' ? Number(rawLat) : undefined;
+            const lng = rawLng !== undefined && rawLng !== null && rawLng !== '' ? Number(rawLng) : undefined;
+            const name = data.name || data['店舗'] || data['店舗名'] || data['販売店名'] || data['顧客名'] || '名称未設定';
+            const address = data.address || data['住所'] || '';
+
+            return {
+                ...data,
+                id,
+                name,
+                address,
+                latitude: (lat !== undefined && !isNaN(lat)) ? lat : undefined,
+                longitude: (lng !== undefined && !isNaN(lng)) ? lng : undefined,
+                '店舗': name,
+                '住所': address,
+                '緯度': lat,
+                '経度': lng
+            } as WithId<Customer>;
+        };
+
+        return snapshot.docs.map(doc => normalizeCustomer(doc.data(), doc.id));
     },
 
     /**
@@ -40,9 +59,25 @@ export const CustomerService = {
 
         if (!snapshot.exists()) return null;
 
+        const data = snapshot.data();
+        const rawLat = data.latitude ?? data.lat ?? data['緯度'];
+        const rawLng = data.longitude ?? data.lng ?? data['経度'];
+        const lat = rawLat !== undefined && rawLat !== null && rawLat !== '' ? Number(rawLat) : undefined;
+        const lng = rawLng !== undefined && rawLng !== null && rawLng !== '' ? Number(rawLng) : undefined;
+        const name = data.name || data['店舗'] || data['店舗名'] || data['販売店名'] || data['顧客名'] || '名称未設定';
+        const address = data.address || data['住所'] || '';
+
         return {
-            ...snapshot.data(),
-            id: snapshot.id
+            ...data,
+            id: snapshot.id,
+            name,
+            address,
+            latitude: (lat !== undefined && !isNaN(lat)) ? lat : undefined,
+            longitude: (lng !== undefined && !isNaN(lng)) ? lng : undefined,
+            '店舗': name,
+            '住所': address,
+            '緯度': lat,
+            '経度': lng
         } as WithId<Customer>;
     },
 
