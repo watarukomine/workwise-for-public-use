@@ -39,44 +39,9 @@ function OptimizerPageContent() {
     }
   }, [isProfileLoading, profile, router]);
 
-  // Extract ONLY staff who have updated their location TODAY with valid coordinates
+  // Extract ONLY active staff who are attending / online AND have valid GPS location data
   const staffWithLocation = React.useMemo(() => {
     if (!allStaff || allStaff.length === 0) return [];
-
-    const isToday = (dateInput: any): boolean => {
-      if (!dateInput) return false;
-      try {
-        let d: Date | null = null;
-        if (typeof dateInput === 'string') {
-          d = new Date(dateInput);
-        } else if (typeof dateInput === 'number') {
-          d = new Date(dateInput.toString().length === 10 ? dateInput * 1000 : dateInput);
-        } else if (dateInput instanceof Date) {
-          d = dateInput;
-        } else if (typeof dateInput === 'object' && dateInput !== null) {
-          if (typeof dateInput.seconds === 'number') {
-            d = new Date(dateInput.seconds * 1000);
-          } else if (typeof dateInput.toDate === 'function') {
-            d = dateInput.toDate();
-          }
-        }
-
-        if (!d || isNaN(d.getTime())) return false;
-
-        const now = new Date();
-        const isSameLocal = d.getFullYear() === now.getFullYear() &&
-                            d.getMonth() === now.getMonth() &&
-                            d.getDate() === now.getDate();
-
-        const isSameUtc = d.getUTCFullYear() === now.getUTCFullYear() &&
-                           d.getUTCMonth() === now.getUTCMonth() &&
-                           d.getUTCDate() === now.getUTCDate();
-
-        return isSameLocal || isSameUtc;
-      } catch {
-        return false;
-      }
-    };
 
     return allStaff
       .map(staffMember => {
@@ -90,10 +55,16 @@ function OptimizerPageContent() {
 
         const displayName = staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定';
         const currentStatus = String((staffMember as any).currentStatus || status?.status || '').trim();
-        const isLoggedOut = currentStatus === 'ログアウト' || currentStatus === '退勤' || (staffMember as any).isOnline === false;
 
-        // 1. Exclude logged-out or off-duty staff
-        if (isLoggedOut) {
+        // 1. Exclude off-duty, logged out, or un-clocked-in staff to prevent showing all inactive staff
+        const isInactive =
+          currentStatus === 'ログアウト' ||
+          currentStatus === '退勤' ||
+          currentStatus === '未出勤' ||
+          (staffMember as any).isOnline === false ||
+          (staffMember as any).isAttending === false;
+
+        if (isInactive) {
           return null;
         }
 
@@ -117,24 +88,13 @@ function OptimizerPageContent() {
           return null;
         }
 
-        // 4. Must have location updated TODAY (from check-in / location update timestamp)
-        const locTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || (staffMember as any).updatedAt || status?.lastUpdate;
-        const isLocToday = isToday(locTime);
-
-        console.log('[Optimizer Staff Filter]', {
+        console.log('[Optimizer Staff Filter Active]', {
           name: displayName,
           id: staffMember.id,
+          status: currentStatus,
           lat: actualLat,
-          lng: actualLng,
-          locTime,
-          isLocToday,
-          isLoggedOut
+          lng: actualLng
         });
-
-        // Exclude staff whose location was NOT updated today
-        if (!isLocToday) {
-          return null;
-        }
 
         return {
           ...staffMember,
