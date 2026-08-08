@@ -97,6 +97,17 @@ function solveTSPFallback(start: any, end: any, waypoints: any[]): any[] {
   return result;
 }
 
+function parseDurationSeconds(val: any): number {
+  if (val === undefined || val === null) return 0;
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') {
+    const clean = val.replace('s', '').trim();
+    const num = parseFloat(clean);
+    return !isNaN(num) ? num : 0;
+  }
+  return 0;
+}
+
 /**
  * Main Flow for Route Optimization.
  * Calls Google Maps Routes API to get the same logic as Google Maps.
@@ -143,7 +154,7 @@ const optimizeRouteFlow = ai.defineFlow(
           travelMode: 'DRIVE',
           routingPreference: 'TRAFFIC_AWARE_OPTIMAL',
           departureTime: new Date().toISOString(),
-          optimizeWaypointOrder: true,
+          optimizeWaypointOrder: input.waypoints.length > 0,
           routeModifiers: {
             avoidHighways: input.avoidHighways || false,
           },
@@ -162,7 +173,7 @@ const optimizeRouteFlow = ai.defineFlow(
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
+          const errorData = await response.text();
           console.warn('[ROUTES_API_WARNING] Response not OK:', errorData);
           throw new Error('API request failed');
         }
@@ -172,16 +183,14 @@ const optimizeRouteFlow = ai.defineFlow(
 
         if (route) {
           // Reorder waypoints based on optimized index
-          const optimizedIdx = route.optimizedIntermediateWaypointIndex || [];
-          const optimizedWaypoints = optimizedIdx.map((idx: number) => input.waypoints[idx]);
+          const optimizedIdx = route.optimizedIntermediateWaypointIndex || input.waypoints.map((_, i) => i);
+          const optimizedWaypoints = optimizedIdx.map((idx: number) => input.waypoints[idx]).filter(Boolean);
           
-          // Handle cases where some indexes might be missing if no optimization was needed or error
+          // Handle cases where some indexes might be missing
           const resultWaypoints = optimizedWaypoints.map((wp: any, i: number) => {
-            const leg = route.legs?.[i]; // Leg i goes from waypoint i to i+1 (or origin to waypoint 0)
-            if (!leg) return wp;
-            
-            const durationSec = parseInt(leg.duration.replace('s', ''));
-            const distKm = (leg.distanceMeters / 1000).toFixed(1);
+            const leg = route.legs?.[i];
+            const durationSec = parseDurationSeconds(leg?.duration);
+            const distKm = leg?.distanceMeters ? (leg.distanceMeters / 1000).toFixed(1) : '0.0';
             
             return {
               ...wp,
@@ -198,18 +207,19 @@ const optimizeRouteFlow = ai.defineFlow(
           const lastLeg = route.legs?.[route.legs.length - 1];
           const endLoc = { ...input.endLocation };
           if (lastLeg) {
-             const durationSec = parseInt(lastLeg.duration.replace('s', ''));
+             const durationSec = parseDurationSeconds(lastLeg.duration);
+             const distKm = lastLeg.distanceMeters ? (lastLeg.distanceMeters / 1000).toFixed(1) : '0.0';
              (endLoc as any).travelTimeFromPrevious = Math.round(durationSec / 60);
-             (endLoc as any).travelDistanceFromPrevious = `${(lastLeg.distanceMeters / 1000).toFixed(1)} km`;
+             (endLoc as any).travelDistanceFromPrevious = `${distKm} km`;
           }
 
           const resultRoute = [startLoc, ...resultWaypoints, endLoc];
 
           // Format distance
-          const distanceKm = (route.distanceMeters / 1000).toFixed(1);
+          const distanceKm = route.distanceMeters ? (route.distanceMeters / 1000).toFixed(1) : '0.0';
           
-          // Format duration (e.g. "3600s" -> "1時間0分")
-          const durationSeconds = parseInt(route.duration.replace('s', ''));
+          // Format duration
+          const durationSeconds = parseDurationSeconds(route.duration);
           const totalMinutes = Math.round(durationSeconds / 60);
           const hours = Math.floor(totalMinutes / 60);
           const mins = totalMinutes % 60;
