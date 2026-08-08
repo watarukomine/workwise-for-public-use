@@ -110,7 +110,6 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
 
   const allCoordinates = [
     ...activeStaff.map(s => ({ lat: getSafeLat(s), lng: getSafeLng(s) })).filter(c => c.lat !== null && c.lng !== null) as { lat: number; lng: number }[],
-    ...customers.map(c => ({ lat: getSafeLat(c), lng: getSafeLng(c) })).filter(c => c.lat !== null && c.lng !== null) as { lat: number; lng: number }[],
     ...(customLocations || []).map(l => ({ lat: getSafeLat(l), lng: getSafeLng(l) })).filter(c => c.lat !== null && c.lng !== null) as { lat: number; lng: number }[]
   ];
 
@@ -175,29 +174,7 @@ export function RouteMap({ staff, customers, customLocations, optimizedRoute, av
                 </AdvancedMarker>
               ) : null;
             })}
-            {customers.map((c) => {
-              const lat = getSafeLat(c);
-              const lng = getSafeLng(c);
-
-              return lat !== null && lng !== null ? (
-                <AdvancedMarker
-                  key={`customer-${c.userCode || c.id}`}
-                  position={{ lat, lng }}
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="w-8 h-8 rounded-full bg-blue-500 border-2 border-white shadow-md flex items-center justify-center">
-                        <Building2 className="w-5 h-5 text-white" />
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="font-bold">{c['店舗'] || (c as any).storeName || c.name}</p>
-                      <p>{c.address || (c as any)['住所']}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </AdvancedMarker>
-              ) : null;
-            })}
+            {/* Sales store building markers are hidden per user request to keep map clean */}
             {customLocations?.map((l) => {
               const lat = getSafeLat(l);
               const lng = getSafeLng(l);
