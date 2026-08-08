@@ -59,31 +59,36 @@ function OptimizerPageContent() {
   const staffWithLocation = React.useMemo(() => {
     if (!allStaff || allStaff.length === 0) return [];
 
-    const isRecentlyUpdated = (dateInput: any): boolean => {
+    const isUpdatedToday = (dateInput: any): boolean => {
       if (!dateInput) return false;
       try {
-        let timeMs = 0;
+        let d: Date | null = null;
         if (typeof dateInput === 'string') {
-          timeMs = new Date(dateInput).getTime();
+          d = new Date(dateInput);
         } else if (typeof dateInput === 'number') {
-          timeMs = dateInput.toString().length === 10 ? dateInput * 1000 : dateInput;
+          d = new Date(dateInput.toString().length === 10 ? dateInput * 1000 : dateInput);
         } else if (dateInput instanceof Date) {
-          timeMs = dateInput.getTime();
+          d = dateInput;
         } else if (typeof dateInput === 'object' && dateInput !== null) {
           if (typeof dateInput.seconds === 'number') {
-            timeMs = dateInput.seconds * 1000;
+            d = new Date(dateInput.seconds * 1000);
           } else if (typeof dateInput.toDate === 'function') {
-            timeMs = dateInput.toDate().getTime();
+            d = dateInput.toDate();
           }
         }
 
-        if (isNaN(timeMs) || timeMs === 0) return false;
+        if (!d || isNaN(d.getTime())) return false;
 
-        const nowMs = Date.now();
-        const diffHours = (nowMs - timeMs) / (1000 * 60 * 60);
+        const now = new Date();
+        const isSameLocal = d.getFullYear() === now.getFullYear() &&
+                            d.getMonth() === now.getMonth() &&
+                            d.getDate() === now.getDate();
 
-        // Allow position updates within last 24 hours, plus slight clock skew tolerance
-        return diffHours >= -2 && diffHours <= 24;
+        const isSameUtc = d.getUTCFullYear() === now.getUTCFullYear() &&
+                           d.getUTCMonth() === now.getUTCMonth() &&
+                           d.getUTCDate() === now.getUTCDate();
+
+        return isSameLocal || isSameUtc;
       } catch {
         return false;
       }
@@ -133,11 +138,12 @@ function OptimizerPageContent() {
           return null;
         }
 
-        // 3. MUST have location updated recently (within 24 hours) for real-time immediate response!
+        // 3. MUST have location updated TODAY (from check-in / location update timestamp)
         const locTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || (staffMember as any).updatedAt;
-        const isRecent = isRecentlyUpdated(locTime);
+        const isTodayUpdated = isUpdatedToday(locTime);
 
-        if (!isRecent) {
+        // Exclude anyone who has NOT updated location TODAY (like DEMO2 from past sessions)
+        if (!isTodayUpdated) {
           return null;
         }
 
