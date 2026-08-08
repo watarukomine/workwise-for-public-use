@@ -39,6 +39,22 @@ function OptimizerPageContent() {
     }
   }, [isProfileLoading, profile, router]);
 
+  useEffect(() => {
+    if (allStaff && allStaff.length > 0) {
+      console.group('📡 [API リアルタイム位置信号デバッグログ]');
+      console.table(allStaff.map(s => ({
+        ID: s.id,
+        名前: s.name,
+        母店: (s as any)['母店'] || (s as any).mainStore || (s as any).storeName || '-',
+        緯度: (s as any).latitude ?? '-',
+        経度: (s as any).longitude ?? '-',
+        最終位置更新日時: (s as any).lastLocationUpdatedAt || (s as any).statusUpdatedAt || (s as any).updatedAt || '-',
+        ステータス: (s as any).currentStatus || (s as any).status || '-'
+      })));
+      console.groupEnd();
+    }
+  }, [allStaff]);
+
   // Extract ONLY staff who have updated location TODAY via check-in or location update
   const staffWithLocation = React.useMemo(() => {
     if (!allStaff || allStaff.length === 0) return [];
