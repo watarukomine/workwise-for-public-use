@@ -660,7 +660,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     <Input
                       id="userCode"
                       value={editForm['ユーザーコード'] || ''}
-                      onChange={(e) => {
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'ユーザーコード': e.target.value }))}
+                      onBlur={(e) => {
                         const val = toHalfWidthAlphanumeric(e.target.value, 'userCode');
                         setEditForm(prev => ({ ...prev, 'ユーザーコード': val }));
                       }}
@@ -768,7 +769,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     <Input
                       id="tireNumber"
                       value={editForm['タイヤ品番'] || ''}
-                      onChange={(e) => {
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'タイヤ品番': e.target.value }))}
+                      onBlur={(e) => {
                         const val = toHalfWidthAlphanumeric(e.target.value, 'tireNumber');
                         setEditForm(prev => ({ ...prev, 'タイヤ品番': val }));
                       }}
@@ -779,7 +781,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     <Input
                       id="tireSize"
                       value={editForm['タイヤサイズ'] || ''}
-                      onChange={(e) => {
+                      onChange={(e) => setEditForm(prev => ({ ...prev, 'タイヤサイズ': e.target.value }))}
+                      onBlur={(e) => {
                         const val = toHalfWidthAlphanumeric(e.target.value, 'tireSize');
                         setEditForm(prev => ({ ...prev, 'タイヤサイズ': val }));
                       }}
@@ -849,7 +852,8 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                     <Input
                       id="regNo"
                       value={editForm['登録ナンバー(下４桁)'] || ''}
-                      onChange={(e) => {
+                      onChange={(e) => setEditForm(prev => ({ ...prev, '登録ナンバー(下４桁)': e.target.value }))}
+                      onBlur={(e) => {
                         const val = toHalfWidthAlphanumeric(e.target.value, 'regNo');
                         setEditForm(prev => ({ ...prev, '登録ナンバー(下４桁)': val }));
                       }}

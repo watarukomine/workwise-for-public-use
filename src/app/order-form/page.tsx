@@ -213,6 +213,12 @@ export default function OrderFormPage() {
                 submissionData.quantity = data.customQuantity;
             }
 
+            // 0. Clean and sanitize half-width alphanumeric values before submit
+            if (submissionData.userCode) submissionData.userCode = toHalfWidthAlphanumeric(submissionData.userCode, 'userCode');
+            if (submissionData.regNo) submissionData.regNo = toHalfWidthAlphanumeric(submissionData.regNo, 'regNo');
+            if (submissionData.tireNumber) submissionData.tireNumber = toHalfWidthAlphanumeric(submissionData.tireNumber, 'tireNumber');
+            if (submissionData.tireSize) submissionData.tireSize = toHalfWidthAlphanumeric(submissionData.tireSize, 'tireSize');
+
             // 1. Generate IDs locally
             const nextDisplayId = await CounterService.getNextOrderId();
             const displayId = String(nextDisplayId);
@@ -391,10 +397,11 @@ export default function OrderFormPage() {
                                             type="text"
                                             placeholder="12345"
                                             {...register('userCode', {
-                                                onChange: (e) => {
-                                                    e.target.value = toHalfWidthAlphanumeric(e.target.value, 'userCode');
-                                                },
-                                                onBlur: (e) => handleUserCodeLookup(e.target.value)
+                                                onBlur: (e) => {
+                                                    const cleanVal = toHalfWidthAlphanumeric(e.target.value, 'userCode');
+                                                    setValue('userCode', cleanVal);
+                                                    handleUserCodeLookup(cleanVal);
+                                                }
                                             })}
                                             className={errors.userCode ? "border-red-500" : ""}
                                         />
@@ -483,8 +490,9 @@ export default function OrderFormPage() {
                                             id="regNo"
                                             placeholder="1234"
                                             {...register('regNo', {
-                                                onChange: (e) => {
-                                                    e.target.value = toHalfWidthAlphanumeric(e.target.value, 'regNo');
+                                                onBlur: (e) => {
+                                                    const cleanVal = toHalfWidthAlphanumeric(e.target.value, 'regNo');
+                                                    setValue('regNo', cleanVal);
                                                 }
                                             })}
                                             className={errors.regNo ? "border-red-500" : ""}
@@ -508,8 +516,9 @@ export default function OrderFormPage() {
                                         <Input
                                             id="tireNumber"
                                             {...register('tireNumber', {
-                                                onChange: (e) => {
-                                                    e.target.value = toHalfWidthAlphanumeric(e.target.value, 'tireNumber');
+                                                onBlur: (e) => {
+                                                    const cleanVal = toHalfWidthAlphanumeric(e.target.value, 'tireNumber');
+                                                    setValue('tireNumber', cleanVal);
                                                 }
                                             })}
                                             className={errors.tireNumber ? "border-red-500" : ""}
@@ -522,8 +531,9 @@ export default function OrderFormPage() {
                                             id="tireSize"
                                             placeholder="195/65R15"
                                             {...register('tireSize', {
-                                                onChange: (e) => {
-                                                    e.target.value = toHalfWidthAlphanumeric(e.target.value, 'tireSize');
+                                                onBlur: (e) => {
+                                                    const cleanVal = toHalfWidthAlphanumeric(e.target.value, 'tireSize');
+                                                    setValue('tireSize', cleanVal);
                                                 }
                                             })}
                                             className={errors.tireSize ? "border-red-500" : ""}

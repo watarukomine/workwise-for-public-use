@@ -2264,7 +2264,8 @@ export function ScheduleView({
             <Input 
               type={type} 
               defaultValue={editOrderForm[field] || ''} 
-              onChange={(e) => {
+              onBlur={(e) => {
+                let val = e.target.value;
                 let fieldType: 'userCode' | 'regNo' | 'tireNumber' | 'tireSize' | null = null;
                 if (field === 'customerCode' || field === 'userCode') fieldType = 'userCode';
                 else if (field === 'regNo') fieldType = 'regNo';
@@ -2272,10 +2273,11 @@ export function ScheduleView({
                 else if (field === 'tireSize') fieldType = 'tireSize';
 
                 if (fieldType) {
-                  e.target.value = toHalfWidthAlphanumeric(e.target.value, fieldType);
+                  val = toHalfWidthAlphanumeric(val, fieldType);
+                  e.target.value = val;
                 }
-              }}
-              onBlur={(e) => setEditOrderForm((prev: any) => ({ ...prev, [field]: e.target.value }))} 
+                setEditOrderForm((prev: any) => ({ ...prev, [field]: val }));
+              }} 
               className="h-8 text-sm" 
             />
           )

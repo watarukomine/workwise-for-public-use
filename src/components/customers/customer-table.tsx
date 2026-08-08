@@ -360,7 +360,8 @@ export function CustomerTable({ customers: rawCustomers, isLoading }: CustomerTa
                   id="add-userCode"
                   placeholder="例: 49698"
                   value={newCustomerForm.userCode}
-                  onChange={(e) => {
+                  onChange={(e) => setNewCustomerForm(prev => ({ ...prev, userCode: e.target.value }))}
+                  onBlur={(e) => {
                     const val = toHalfWidthAlphanumeric(e.target.value, 'userCode');
                     setNewCustomerForm(prev => ({ ...prev, userCode: val }));
                   }}
