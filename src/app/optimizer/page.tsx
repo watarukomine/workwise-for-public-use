@@ -114,15 +114,18 @@ function OptimizerPageContent() {
         };
 
         const displayName = staffMember.name || (staffMember as any)['氏名'] || (staffMember as any)['名前'] || (staffMember as any)['担当'] || '名前未設定';
-        const currentStatus = String((staffMember as any).currentStatus || status?.status || '').trim();
+        const currentStatus = String(
+          (staffMember as any)['ステータス'] ||
+          (staffMember as any).currentStatus ||
+          status?.status ||
+          ''
+        ).trim();
 
-        // 1. Exclude off-duty, logged out, or un-clocked-in staff
+        // 1. Exclude off-duty or logged out staff
         const isInactive =
           currentStatus === 'ログアウト' ||
           currentStatus === '退勤' ||
-          currentStatus === '未出勤' ||
-          (staffMember as any).isOnline === false ||
-          (staffMember as any).isAttending === false;
+          currentStatus === '未出勤';
 
         if (isInactive) {
           return null;
@@ -131,7 +134,7 @@ function OptimizerPageContent() {
         // 2. Extract location coordinates updated directly on user profile
         let rawStrLat: number | null = null;
         let rawStrLng: number | null = null;
-        const locStr = (staffMember as any).lastLocation || (staffMember as any).location;
+        const locStr = (staffMember as any)['位置情報'] || (staffMember as any).lastLocation || (staffMember as any).location;
         if (typeof locStr === 'string' && locStr.includes(',')) {
           const parts = locStr.split(',').map(p => parseFloat(p.trim()));
           if (!isNaN(parts[0]) && !isNaN(parts[1])) {
@@ -140,15 +143,20 @@ function OptimizerPageContent() {
           }
         }
 
-        const actualLat = parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? rawStrLat;
-        const actualLng = parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? rawStrLng;
+        const actualLat = parseCoord((staffMember as any)['緯度']) ?? parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? rawStrLat;
+        const actualLng = parseCoord((staffMember as any)['経度']) ?? parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? rawStrLng;
 
         if (actualLat === null || actualLng === null) {
           return null;
         }
 
         // 3. MUST have location updated TODAY (from check-in / location update timestamp)
-        const locTime = (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || (staffMember as any).updatedAt;
+        const locTime =
+          (staffMember as any)['最終位置更新日時'] ||
+          (staffMember as any).lastLocationUpdatedAt ||
+          (staffMember as any).statusUpdatedAt ||
+          (staffMember as any).updatedAt;
+
         const isTodayUpdated = isUpdatedToday(locTime);
 
         // Exclude anyone who has NOT updated location TODAY (like DEMO2 from past sessions)
