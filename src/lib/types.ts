@@ -60,6 +60,8 @@ export type Order = {
   tripId?: string;
   customerCode?: string;
   customerName?: string;
+  destination?: string;
+  storeName?: string;
   address: string;
   taskDetails: string;
   title?: string;

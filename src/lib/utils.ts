@@ -451,7 +451,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     customerCode: String(
       findKey(rawOrder, ['customerCode', 'userCode', 'ユーザーコード', 'usercode', '顧客コード']) ||
       (rawOrder.raw ? findKey(rawOrder.raw, ['customerCode', 'userCode', 'ユーザーコード', 'usercode', '顧客コード']) : undefined) ||
-      '00000'
+      ''
     ),
     taskDetails: rawTaskDetails,
     status: (() => {
@@ -482,7 +482,13 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     })(),
     staffId: findKey(rawOrder, ['スタッフID', 'スタッフコード', 'staffId', '担当者ID', '担当ID', '社員ID', '社員コード', 'staff_id']) || '',
     mainStore: findKey(rawOrder, ['主管店舗', 'mainStore', '主管']) || '',
-    customerName: findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '名称', 'お名前', 'Customer', 'storeName']) || '（店舗名未設定）',
+    customerName: (() => {
+      const rawName = findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '名称', 'お名前', 'Customer', 'storeName']);
+      if (rawName && rawName !== '（店舗名未設定）' && rawName !== '(店舗名未設定)' && rawName !== '店舗名未設定') {
+        return String(rawName).trim();
+      }
+      return isGenericTask ? (rawTaskDetails || '') : '（店舗名未設定）';
+    })(),
     address: findKey(rawOrder, ['住所', 'Address', '納品先', 'お届け先', '納品先住所', 'お届け先住所', '現場住所']) || '',
     scheduledEndTime: scheduledEndTime || '',
     actualStartTime: (() => {

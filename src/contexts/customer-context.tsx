@@ -22,14 +22,17 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
   const [error, setErrorState] = useState<string | null>(null);
   const { user, isUserLoading } = useUser();
 
-  const CUSTOMER_CACHE_KEY = 'cached_customer_data_v5'; // Incremented key to sync full 218 stores from GAS/Firestore/orders
+  const CUSTOMER_CACHE_KEY = 'cached_customer_data_v6'; // Incremented key to sync full 218 stores and ignore generic tasks
 
   const setCustomers = (data: any[]) => {
     const map = new Map<string, string>();
     data.forEach(c => {
       const code = c.userCode || c['ユーザーコード'] || '';
       if (code) {
-        map.set(String(code).trim().padStart(5, '0'), c.storeName || c['店舗'] || '');
+        const padded = String(code).trim().padStart(5, '0');
+        if (padded !== '00000' && padded !== '0') {
+          map.set(padded, c.storeName || c['店舗'] || '');
+        }
       }
     });
     (data as any)._mapByCode = map;
@@ -76,17 +79,33 @@ export function CustomerProvider({ children }: { children: ReactNode }) {
         // Extract extra store entries from orders collection as fallback
         const ordersSnapshot = await getDocs(collection(firestore, 'orders'));
         const orderStoresMap = new Map<string, any>();
+        const genericKeywords = ['移動', '業務', '休憩', '研修', '同行', '商談', '会議'];
 
         ordersSnapshot.docs.forEach(docSnap => {
           const o = docSnap.data();
+          const docId = String(docSnap.id);
+          const isGeneric = Boolean(o.isGeneric) || 
+            o._type === 'task' || 
+            docId.startsWith('task-') || 
+            docId.startsWith('generic-') || 
+            docId.startsWith('trip-temp-task-');
+
+          if (isGeneric) return; // Skip generic tasks from customer master!
+
           const code = String(o.userCode || o['ユーザーコード'] || o.customerCode || '').trim();
+          if (code === '00000' || code === '0') return; // Skip dummy 00000 codes
+
           const storeName = String(o.storeName || o['店舗名'] || o['店舗'] || o.customerName || o['顧客名'] || '').trim();
+          if (storeName.startsWith('社員') || genericKeywords.includes(storeName) || storeName === '名称未設定' || storeName === '（店舗名未設定）') {
+            return; // Skip internal staff/generic task names
+          }
+
           const address = String(o.address || o['住所'] || '').trim();
           const lat = o.latitude ?? o.lat ?? o['緯度'];
           const lng = o.longitude ?? o.lng ?? o['経度'];
           const mainStore = o.mainStore || o['母店'] || '';
 
-          if (storeName && storeName !== '名称未設定') {
+          if (storeName) {
             const key = code ? code : storeName;
             if (!orderStoresMap.has(key)) {
               orderStoresMap.set(key, {

@@ -193,26 +193,48 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
   const { customers: allCustomers } = useCustomer();
   const [line1, line2] = String(order.taskDetails || '').split(/\r?\n/);
 
+  const isGeneric = ['移動', '業務', '休憩', '研修', '同行', '商談', '会議'].some(t => String(line1 || order.taskDetails || order.title || '').includes(t)) || isGenericTask(order);
+
+  const rawGenericTaskName = order.taskDetails || order.title || line1 || '汎用タスク';
+  const genericDest = (order as any).destination || (order as any).storeName || (order.customerName && order.customerName !== '（店舗名未設定）' && order.customerName !== '(店舗名未設定)' && order.customerName !== '店舗名未設定' ? order.customerName : undefined);
+  const cleanGenericDest = (genericDest &&
+    !genericDest.startsWith('社員') &&
+    !['移動', '業務', '休憩', '研修', '同行', '商談', '会議', '汎用タスク', '社内作業'].includes(genericDest))
+    ? String(genericDest).trim()
+    : undefined;
+
   // Resolve storeName from master (skip for generic tasks like Break, Travel, etc.)
-  let resolvedStoreName = order.customerName || '';
-  const isGeneric = ['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t));
-  if (!isGeneric && (resolvedStoreName === '' || resolvedStoreName === '（店舗名未設定）' || resolvedStoreName === '(店舗名未設定)' || resolvedStoreName === '店舗名未設定')) {
-    const code = order.customerCode || (order as any).userCode || findKey(order.raw, ["ユーザーコード", "顧客コード"]);
-    if (code && allCustomers) {
-      const paddedCode = String(code).trim().padStart(5, '0');
-      // High performance lookup
-      const storeName = (allCustomers as any)._mapByCode?.get(paddedCode);
-      if (storeName) {
-        resolvedStoreName = storeName;
-      } else {
-        const match = allCustomers.find(c => {
-          const cCode = c.userCode || c['ユーザーコード'] || '';
-          return String(cCode).trim().padStart(5, '0') === paddedCode;
-        });
-        resolvedStoreName = match?.storeName || '(店舗名未設定)';
-      }
+  let resolvedStoreName = '';
+  if (isGeneric) {
+    if (cleanGenericDest && !rawGenericTaskName.includes(cleanGenericDest)) {
+      resolvedStoreName = `${rawGenericTaskName}：${cleanGenericDest}`;
     } else {
-      resolvedStoreName = '(店舗名未設定)';
+      resolvedStoreName = rawGenericTaskName;
+    }
+  } else {
+    resolvedStoreName = order.customerName || '';
+    if (resolvedStoreName === '' || resolvedStoreName === '（店舗名未設定）' || resolvedStoreName === '(店舗名未設定)' || resolvedStoreName === '店舗名未設定') {
+      const code = order.customerCode || (order as any).userCode || findKey(order.raw, ["ユーザーコード", "顧客コード"]);
+      if (code && code !== '00000' && code !== '0' && allCustomers) {
+        const paddedCode = String(code).trim().padStart(5, '0');
+        if (paddedCode !== '00000') {
+          // High performance lookup
+          const storeName = (allCustomers as any)._mapByCode?.get(paddedCode);
+          if (storeName) {
+            resolvedStoreName = storeName;
+          } else {
+            const match = allCustomers.find(c => {
+              const cCode = c.userCode || c['ユーザーコード'] || '';
+              return cCode && String(cCode).trim().padStart(5, '0') === paddedCode && paddedCode !== '00000';
+            });
+            resolvedStoreName = match?.storeName || '(店舗名未設定)';
+          }
+        } else {
+          resolvedStoreName = '(店舗名未設定)';
+        }
+      } else {
+        resolvedStoreName = '(店舗名未設定)';
+      }
     }
   }
 
@@ -237,10 +259,12 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
     return `${str}本`;
   };
 
-  const titleText = `${resolvedStoreName || line1}` +
-    `${!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) ? ` (${equipmentSymbol})` : ''}` +
+  const displayName = isGeneric ? resolvedStoreName : (resolvedStoreName || (order as any).title || line1 || <span className="text-xs font-normal opacity-70">ID:{order.rawOrderId || order.id}</span>);
+
+  const titleText = `${displayName}` +
+    `${!isGeneric ? ` (${equipmentSymbol})` : ''}` +
     `${scheduledTime ? ` ${scheduledTime}` : ''}` +
-    `${(order.tireSize || order['本数']) ? `\n${order.tireSize || ''}${order.tireSize && order['本数'] ? ' ' : ''}${order['本数'] ? formatHonsu(order['本数']) : ''}` : ''}`;
+    `${(!isGeneric && (order.tireSize || order['本数'])) ? `\n${order.tireSize || ''}${order.tireSize && order['本数'] ? ' ' : ''}${order['本数'] ? formatHonsu(order['本数']) : ''}` : ''}`;
 
   const content = (
     <div {...{ 'style': style as any }} title={titleText} className={cn("group h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight relative", style && "dynamic-width", className)}>
@@ -253,9 +277,8 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
 
       <div className="flex justify-between items-center w-full overflow-hidden">
         <span className="font-bold truncate mr-1 flex-1">
-          {resolvedStoreName || (order as any).title || line1 || <span className="text-xs font-normal opacity-70">ID:{order.rawOrderId || order.id}</span>}
-          {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) &&
-            (resolvedStoreName || (order as any).title) && `(${equipmentSymbol})`}
+          {displayName}
+          {!isGeneric && (resolvedStoreName || (order as any).title) && `(${equipmentSymbol})`}
         </span>
         <span className="shrink-0 font-medium">{scheduledTime}</span>
       </div>
@@ -263,7 +286,7 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
 
 
       {/* Row 2: TireSize Quantity (Only for non-generic tasks) */}
-      {!['移動', '業務', '休憩', '研修', '同行', '商談'].some(t => String(line1 || '').includes(t)) && (
+      {!isGeneric && (
         <div className="flex justify-start items-center gap-2 w-full overflow-hidden opacity-90 mt-0.5">
           <span className="truncate">{order.tireSize}</span>
           <span className="shrink-0">{formatHonsu(order['本数'])}</span>
@@ -400,15 +423,18 @@ const UnassignedTasks = React.memo(({ orders, customers, date, onDoubleClickOrde
       const cCode = c.userCode || c['ユーザーコード'] || '';
       if (cCode) {
         const paddedCode = String(cCode).trim().padStart(5, '0');
-        map.set(paddedCode, c);
+        if (paddedCode !== '00000' && paddedCode !== '0') {
+          map.set(paddedCode, c);
+        }
       }
     });
     return map;
   }, [customers]);
 
   const getCustomerByCode = React.useCallback((code: string | undefined): WithId<Customer> | undefined => {
-    if (!code) return undefined;
+    if (!code || code === '00000' || code === '0') return undefined;
     const paddedCode = String(code).trim().padStart(5, '0');
+    if (paddedCode === '00000' || paddedCode === '0') return undefined;
     return customerMap.get(paddedCode);
   }, [customerMap]);
 
@@ -686,7 +712,14 @@ export function ScheduleView({
   const customerMap = React.useMemo(() => {
     const map = new Map<string, WithId<Customer>>();
     allCustomers?.forEach(c => {
-      if (c.userCode) map.set(c.userCode, c);
+      const cCode = c.userCode || c['ユーザーコード'] || '';
+      if (cCode) {
+        const padded = String(cCode).trim().padStart(5, '0');
+        if (padded !== '00000' && padded !== '0') {
+          map.set(padded, c);
+          map.set(cCode, c);
+        }
+      }
     });
     return map;
   }, [allCustomers]);
@@ -700,8 +733,10 @@ export function ScheduleView({
   }, [allStaff]);
 
   const getCustomerByCode = React.useCallback((code: string | undefined): WithId<Customer> | undefined => {
-    if (!code) return undefined;
-    return customerMap.get(code);
+    if (!code || code === '00000' || code === '0') return undefined;
+    const padded = String(code).trim().padStart(5, '0');
+    if (padded === '00000' || padded === '0') return undefined;
+    return customerMap.get(padded) || customerMap.get(code);
   }, [customerMap]);
 
   // Use allStaff instead of filtered staffData for lookup
@@ -1443,6 +1478,7 @@ export function ScheduleView({
 
       // Optimistic UI Update
       if (isGeneric) {
+        const taskTitle = order.taskDetails || order.title || '汎用タスク';
         if (isGenericAccompany) {
           const baseId = `event-${Date.now()}`;
           const derivedTripId = `trip-${baseId}`;
@@ -1456,30 +1492,36 @@ export function ScheduleView({
             start: travelStart.toISOString(),
             end: taskStart.toISOString(),
             raw: {},
-            customerCode: '', customerName: '', address: '', taskDetails: '移動', serviceType: '', status: '未割当', scheduledDate: '', estimatedDuration: 30, value: 0, staffName: staff.name, equipmentStatus: '',
-            tripId: derivedTripId
+            customerCode: '', customerName: '移動', address: '', taskDetails: '移動', serviceType: '移動', status: '未割当', scheduledDate: '', estimatedDuration: 30, value: 0, staffName: staff.name, equipmentStatus: '',
+            tripId: derivedTripId,
+            isGeneric: true,
+            _type: 'task'
           };
           const taskEvent: WithId<ScheduleEvent> = {
             id: `${derivedTripId}-task`,
-            title: order.taskDetails,
+            title: taskTitle,
             description: '',
             staffId: newStaffId, locationId: '',
             start: taskStart.toISOString(),
-            end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
+            end: addMinutes(taskStart, order.estimatedDuration || 60).toISOString(),
             raw: {},
-            customerCode: '', customerName: '', address: '', taskDetails: order.taskDetails, serviceType: '', status: '未割当', scheduledDate: '', estimatedDuration: order.estimatedDuration, value: 0, staffName: staff.name, equipmentStatus: '',
-            tripId: derivedTripId
+            customerCode: '', customerName: taskTitle, address: '', taskDetails: taskTitle, serviceType: '', status: '未割当', scheduledDate: '', estimatedDuration: order.estimatedDuration || 60, value: 0, staffName: staff.name, equipmentStatus: '',
+            tripId: derivedTripId,
+            isGeneric: true,
+            _type: 'task'
           };
           newEvents = [travelEvent, taskEvent];
         } else {
           const newEvent: WithId<ScheduleEvent> = {
             id: `event-${Date.now()}`,
-            title: order.taskDetails, description: '',
+            title: taskTitle, description: '',
             staffId: newStaffId, locationId: '',
             start: taskStart.toISOString(),
-            end: addMinutes(taskStart, order.estimatedDuration).toISOString(),
+            end: addMinutes(taskStart, order.estimatedDuration || 60).toISOString(),
             raw: {},
-            customerCode: '', customerName: '', address: '', taskDetails: order.taskDetails, serviceType: '', status: '未割当', scheduledDate: '', estimatedDuration: order.estimatedDuration, value: 0, staffName: staff.name, equipmentStatus: '',
+            customerCode: '', customerName: taskTitle, address: '', taskDetails: taskTitle, serviceType: '', status: '未割当', scheduledDate: '', estimatedDuration: order.estimatedDuration || 60, value: 0, staffName: staff.name, equipmentStatus: '',
+            isGeneric: true,
+            _type: 'task'
           };
           newEvents = [newEvent];
         }
@@ -1543,6 +1585,7 @@ export function ScheduleView({
                   isGeneric: true,
                   taskDetails: ev.title,
                   customerName: ev.title,
+                  customerCode: '',
                   staffId: newStaffId,
                   staffName: staff.name,
                   picName: staff.name,
@@ -1668,17 +1711,33 @@ export function ScheduleView({
   };
 
   const handleDoubleClickEvent = React.useCallback((event: WithId<ScheduleEvent>) => {
-    // Extract destination from description if present [行き先: xxx]
-    const destMatch = event.description?.match(/\[行き先: (.*?)\]/);
-    let destination = destMatch ? destMatch[1] : '';
-    const cleanResolvedName = event.customerName || (event as any).storeName;
-    if (cleanResolvedName && cleanResolvedName !== '同行' && cleanResolvedName !== '（店舗名未設定）') {
-      destination = cleanResolvedName;
+    // Extract destination
+    let destination = (event as any).destination || (event as any).storeName || '';
+    if (!destination) {
+      const destMatch = event.description?.match(/\[行き先: (.*?)\]/);
+      if (destMatch) destination = destMatch[1];
     }
+    if (!destination) {
+      const cleanResolvedName = event.customerName;
+      if (cleanResolvedName &&
+          cleanResolvedName !== '（店舗名未設定）' &&
+          cleanResolvedName !== '(店舗名未設定)' &&
+          cleanResolvedName !== '店舗名未設定' &&
+          !cleanResolvedName.startsWith('社員') &&
+          !['移動', '業務', '休憩', '研修', '同行', '商談', '会議', '汎用タスク', '社内作業'].includes(cleanResolvedName)) {
+        destination = cleanResolvedName;
+      }
+    }
+
+    let eventTitle = event.title || '';
+    if (destination && eventTitle.includes(`：${destination}`)) {
+      eventTitle = eventTitle.replace(`：${destination}`, '');
+    }
+
     const cleanDescription = event.description?.replace(/\[行き先: .*?\]/, '').trim() || '';
 
     setEditedEventDetails({
-      title: event.title || '',
+      title: eventTitle,
       description: cleanDescription,
       startTime: formatTime(event.start),
       endTime: formatTime(event.end),
@@ -1905,17 +1964,22 @@ export function ScheduleView({
         const frontendId = `TASK_${dateStrPrefix}_${timeStrSuffix}`;
         const derivedTripId = `trip-${frontendId}`;
 
+        const taskTitle = submitDetails.title || '社内作業';
+        const destination = submitDetails.destination ? String(submitDetails.destination).trim() : '';
+
         const newEvent: WithId<ScheduleEvent> = {
           id: frontendId,
-          title: submitDetails.title,
+          title: taskTitle,
           start: newStart.toISOString(),
           end: finalEnd.toISOString(),
           staffId: staff.id,
           locationId: '',
           customerCode: '',
-          customerName: submitDetails.title || '社内作業',
+          customerName: destination || taskTitle,
+          destination: destination,
+          storeName: destination,
           address: '',
-          taskDetails: submitDetails.description || submitDetails.title,
+          taskDetails: submitDetails.description || taskTitle,
           serviceType: '社内作業',
           status: '割当済',
           scheduledDate: format(newStart, 'yyyy/MM/dd'),
@@ -1924,6 +1988,8 @@ export function ScheduleView({
           staffName: staff.name,
           equipmentStatus: '',
           tripId: derivedTripId,
+          isGeneric: true,
+          _type: 'task',
           raw: {}
         };
 
@@ -1940,10 +2006,12 @@ export function ScheduleView({
           OrderService.createOrder({
             id: frontendId,
             systemId: frontendId,
-            title: submitDetails.title || '商談',
-            customerName: submitDetails.title || '商談',
+            title: taskTitle,
+            customerName: destination || taskTitle,
+            destination: destination,
+            storeName: destination,
             workType: '作業',
-            taskDetails: submitDetails.description || submitDetails.title || '商談',
+            taskDetails: submitDetails.description || taskTitle,
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             scheduledTime: format(newStart, "yyyy/MM/dd'T'HH:mm:ss"),
             scheduledEndTime: format(finalEnd, "yyyy/MM/dd'T'HH:mm:ss"),
@@ -1952,6 +2020,7 @@ export function ScheduleView({
             staffName: staff.name,
             picName: staff.name,
             status: '割当済',
+            isGeneric: true,
             _type: 'task' as any
           }).then(() => {
             refetchOrders();
@@ -1976,6 +2045,7 @@ export function ScheduleView({
         // Database or Sheet-based event (Order OR Generic Task)
         const isDatabaseOrSheetOrder = eventToUpdate.systemId || eventToUpdate.rawOrderId || eventToUpdate.customerCode || (eventToUpdate.id && (eventToUpdate.id.startsWith('task-') || eventToUpdate.id.startsWith('trip-') || eventToUpdate.id.startsWith('event-') || eventToUpdate.id.startsWith('ord-')));
         if (isDatabaseOrSheetOrder) {
+          const destination = submitDetails.destination !== undefined ? String(submitDetails.destination).trim() : ((eventToUpdate as any).destination || '');
           // Optimistic UI Update first
           const updatedEvent: WithId<ScheduleEvent> = {
             ...eventToUpdate,
@@ -1983,6 +2053,9 @@ export function ScheduleView({
             end: finalEnd.toISOString(),
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             title: title || eventToUpdate.title,
+            customerName: destination || eventToUpdate.customerName || title || eventToUpdate.title,
+            destination: destination,
+            storeName: destination,
             status: overrides.statusValue || eventToUpdate.status,
             estimatedDuration: durationMinutes,
             taskDetails: description || eventToUpdate.taskDetails
@@ -2017,9 +2090,11 @@ export function ScheduleView({
             if (dialogState.mode === 'edit') {
               if (submitDetails.title) {
                 updateFields.taskDetails = submitDetails.title;
+                updateFields.title = submitDetails.title;
               }
-              if (submitDetails.destination) {
-                updateFields.customerName = submitDetails.destination;
+              if (submitDetails.destination !== undefined) {
+                updateFields.destination = submitDetails.destination;
+                updateFields.customerName = submitDetails.destination || submitDetails.title;
                 updateFields.storeName = submitDetails.destination;
               }
               if (submitDetails.description) {
@@ -2745,8 +2820,8 @@ export function ScheduleView({
                       </div>
 
                       <div className="grid grid-cols-4 items-center gap-4 mt-2">
-                          <Label htmlFor="edit-destination" className="text-right">行き先</Label>
-                          <Input id="edit-destination" defaultValue={editedEventDetails.destination} className="col-span-3" placeholder="行き先を入力" />
+                          <Label htmlFor="edit-destination" className="text-right">行き先（店名）</Label>
+                          <Input id="edit-destination" defaultValue={editedEventDetails.destination} className="col-span-3" placeholder="例：城山店、港北店" />
                       </div>
                     </div>
                   </div>
@@ -2857,14 +2932,12 @@ export function ScheduleView({
                     <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="title" className="text-right">タスク名</Label>
-                      <Input id="title" defaultValue={editedEventDetails.title} className="col-span-3" placeholder="例：定期メンテナンス" />
+                      <Input id="title" defaultValue={editedEventDetails.title} className="col-span-3" placeholder="例：同行、商談、定期メンテナンス" />
                     </div>
-                    {/* 行き先欄は不要とのことで削除
                     <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="destination" className="text-right">行き先</Label>
-                      <Input id="destination" value={editedEventDetails.destination} onChange={(e) => setEditedEventDetails(prev => ({ ...prev, destination: e.target.value }))} className="col-span-3" placeholder="行き先を入力" />
+                      <Label htmlFor="destination" className="text-right">行き先（店名）</Label>
+                      <Input id="destination" defaultValue={editedEventDetails.destination} className="col-span-3" placeholder="例：城山店、港北店" />
                     </div>
-                    */}
                     <div className="grid grid-cols-4 items-center gap-4">
                       <Label htmlFor="description" className="text-right">詳細</Label>
                       <Textarea id="description" defaultValue={editedEventDetails.description} className="col-span-3" placeholder="予定の詳細やメモ" />
@@ -3204,6 +3277,16 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(targetEvent); };
 
+  const isGeneric = isGenericTask(targetEvent) ||
+    Boolean(targetEvent.isGeneric) ||
+    Boolean((targetEvent as any)._type === 'task') ||
+    Boolean(targetEvent.id?.startsWith('generic-')) ||
+    Boolean(targetEvent.id?.startsWith('event-')) ||
+    Boolean(targetEvent.id?.startsWith('task-')) ||
+    Boolean(targetEvent.rawOrderId?.startsWith('task-')) ||
+    Boolean(targetEvent.tripId?.includes('task-')) ||
+    ['移動', '業務', '休憩', '研修', '同行', '商談', '会議'].some(t => String(targetEvent.title || targetEvent.taskDetails || '').includes(t));
+
   const isTravelEvent = 
     Boolean(targetEvent.id?.endsWith('-travel')) ||
     Boolean(targetEvent.title?.startsWith('移動')) ||
@@ -3240,7 +3323,9 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
 
   const [line1, ...rest] = (targetEvent.title || '').split(/\r?\n/);
   const line2 = rest.join('\n');
-  const customer = targetEvent.locationId ? getCustomerByCode(targetEvent.locationId) : undefined;
+  const customer = (!isGeneric && targetEvent.locationId && targetEvent.locationId !== '00000' && targetEvent.locationId !== '0')
+    ? getCustomerByCode(targetEvent.locationId)
+    : undefined;
 
   // Get equipment status and other details from raw order data
   const getStatusSymbol = (status: any) => {
@@ -3272,14 +3357,38 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
   const rawCustomerName = targetEvent.customerName || (targetEvent.raw ? findKey(targetEvent.raw, ['店舗名', 'お取引先名', '店舗名称', '店舗', '取引先']) : undefined);
   const cleanCustomerName = (rawCustomerName && rawCustomerName !== '（店舗名未設定）' && rawCustomerName !== '(店舗名未設定)' && rawCustomerName !== '店舗名未設定') ? rawCustomerName : undefined;
   
-  const isAccompany = String(targetEvent.title || targetEvent.taskDetails || '').includes('同行');
-  let baseCustomerName = isTravelEvent ? '移動' : (cleanCustomerName || customer?.storeName || targetEvent.title || line1);
-  if (isAccompany && !isTravelEvent) {
-    if (cleanCustomerName && cleanCustomerName !== '同行') {
-      baseCustomerName = `同行：${cleanCustomerName}`;
+  // Extract destination / storeName for generic task
+  const rawGenericDest = (targetEvent as any).destination || 
+    (targetEvent as any).storeName || 
+    (cleanCustomerName && !cleanCustomerName.startsWith('社員') ? cleanCustomerName : undefined) ||
+    (targetEvent.raw ? findKey(targetEvent.raw, ['行き先', '目的地']) : undefined);
+
+  const cleanGenericDest = (rawGenericDest && 
+    rawGenericDest !== '（店舗名未設定）' && 
+    rawGenericDest !== '(店舗名未設定)' && 
+    rawGenericDest !== '店舗名未設定' && 
+    !rawGenericDest.startsWith('社員') && 
+    !['移動', '業務', '休憩', '研修', '同行', '商談', '会議', '汎用タスク', '社内作業'].includes(rawGenericDest)) 
+    ? String(rawGenericDest).trim() 
+    : undefined;
+
+  const mainTaskName = targetEvent.title || targetEvent.taskDetails || line1 || '汎用タスク';
+
+  let baseCustomerName = '';
+  if (isTravelEvent) {
+    baseCustomerName = '移動';
+  } else if (isGeneric) {
+    if (cleanGenericDest) {
+      if (mainTaskName.includes(cleanGenericDest)) {
+        baseCustomerName = mainTaskName;
+      } else {
+        baseCustomerName = `${mainTaskName}：${cleanGenericDest}`;
+      }
     } else {
-      baseCustomerName = '同行';
+      baseCustomerName = mainTaskName;
     }
+  } else {
+    baseCustomerName = cleanCustomerName || customer?.storeName || targetEvent.title || line1 || '店舗名未設定';
   }
 
   const customerName = isCancelled ? `【キャンセル】 ${baseCustomerName}` : baseCustomerName;
@@ -3331,9 +3440,9 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
   );
 
   const titleText = `${customerName || targetEvent.title || line1}` +
-    `${(!isTravelEvent && !['移動', '業務', '休憩'].some(t => String(targetEvent.title || '').includes(t))) ? ` (${equipmentSymbol})` : ''}` +
+    `${(!isTravelEvent && !isGeneric) ? ` (${equipmentSymbol})` : ''}` +
     ` ${formatTime(targetEvent.start)}` +
-    `${(!isTravelEvent && (tireSize || honsu)) ? `\n${tireSize ? tireSize : ''}${tireSize && honsu ? ' ' : ''}${honsu ? formatHonsu(honsu) : ''}` : ''}`;
+    `${(!isTravelEvent && !isGeneric && (tireSize || honsu)) ? `\n${tireSize ? tireSize : ''}${tireSize && honsu ? ' ' : ''}${honsu ? formatHonsu(honsu) : ''}` : ''}`;
 
   const style: any = isOverlay ?
     { touchAction: 'none', width: `${width}px` } :

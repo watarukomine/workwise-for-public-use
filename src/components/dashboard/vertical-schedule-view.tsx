@@ -33,8 +33,8 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
   const { profile } = useUserProfile();
 
   const getCustomerById = (id: string | undefined): WithId<Customer> | undefined => {
-    if (!id) return undefined;
-    return customers.find(c => c.id === id || c.userCode === id);
+    if (!id || id === '00000' || id === '0') return undefined;
+    return customers.find(c => (c.id === id || c.userCode === id) && c.userCode !== '00000' && c.userCode !== '0');
   };
 
   // Filter for events assigned to the currently displayed staff for the current date and sort by start time
@@ -106,19 +106,46 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
 
         const specialNotes = (targetOrder as any)?.specialNotes || (targetOrder as any)?.comment || (event as any).specialNotes || (raw ? findKey(raw, ['特記事項', '詳細', '連絡事項', '備考', 'リマーク1', 'リマーク2']) : undefined);
 
+        const isGeneric = (event as any).isGeneric ||
+          (targetOrder as any)?.isGeneric ||
+          event.id?.startsWith('generic-') ||
+          event.id?.startsWith('event-') ||
+          event.id?.startsWith('task-') ||
+          ['移動', '業務', '休憩', '研修', '同行', '商談', '会議'].some(t => String(event.title || (event as any).taskDetails || '').includes(t));
+
         // Resolve clean storeName for CardTitle
-        let resolvedStoreName = customer?.storeName || (targetOrder as any)?.customerName || (event as any).customerName || (raw ? findKey(raw, ['店舗名', '顧客名', '販売店名', '店舗']) : undefined);
+        let resolvedStoreName = '';
+        if (isGeneric) {
+          const mainTaskName = event.title || (event as any).taskDetails || '汎用タスク';
+          const rawDest = (event as any).destination || (event as any).storeName || (targetOrder as any)?.destination || (targetOrder as any)?.storeName || (event as any).customerName;
+          const cleanDest = (rawDest && 
+            rawDest !== '（店舗名未設定）' && 
+            rawDest !== '(店舗名未設定)' && 
+            rawDest !== '店舗名未設定' && 
+            !rawDest.startsWith('社員') && 
+            !['移動', '業務', '休憩', '研修', '同行', '商談', '会議', '汎用タスク', '社内作業'].includes(rawDest))
+            ? String(rawDest).trim()
+            : undefined;
+
+          resolvedStoreName = (cleanDest && !mainTaskName.includes(cleanDest))
+            ? `${mainTaskName}：${cleanDest}`
+            : mainTaskName;
+        } else {
+          resolvedStoreName = customer?.storeName || (targetOrder as any)?.customerName || (event as any).customerName || (raw ? findKey(raw, ['店舗名', '顧客名', '販売店名', '店舗']) : undefined);
+        }
         
-        if (!resolvedStoreName || resolvedStoreName.includes('店舗名未設定')) {
+        if (!isGeneric && (!resolvedStoreName || resolvedStoreName.includes('店舗名未設定'))) {
           const code = (event as any).customerCode || (targetOrder as any)?.customerCode || (event as any).userCode || (raw ? findKey(raw, ['ユーザーコード', '顧客コード']) : undefined);
-          if (code && customers) {
+          if (code && code !== '00000' && code !== '0' && customers) {
             const paddedCode = String(code).trim().padStart(5, '0');
-            const match = customers.find(c => {
-              const cCode = c.userCode || c['ユーザーコード'] || '';
-              return String(cCode).trim().padStart(5, '0') === paddedCode;
-            });
-            if (match?.storeName) {
-              resolvedStoreName = match.storeName;
+            if (paddedCode !== '00000') {
+              const match = customers.find(c => {
+                const cCode = c.userCode || c['ユーザーコード'] || '';
+                return cCode && String(cCode).trim().padStart(5, '0') === paddedCode && paddedCode !== '00000';
+              });
+              if (match?.storeName) {
+                resolvedStoreName = match.storeName;
+              }
             }
           }
         }

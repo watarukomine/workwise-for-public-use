@@ -289,13 +289,22 @@ const processOrderData = (
     let lastEndTime: Date | null = null;
 
     items.forEach(item => {
+      const isGeneric = item.isGeneric || Boolean(item.order.isGeneric) || item.order._type === 'task';
+      const taskTitle = isGeneric
+        ? (item.order.taskDetails || item.order.title || item.order.customerName || '汎用タスク')
+        : (item.order.customerName || item.order.taskDetails);
+
       const taskEvent: WithId<ScheduleEvent> = {
         ...item.order,
         id: `${item.tripId}-task`,
         tripId: item.tripId,
-        title: item.order.customerName || item.order.taskDetails,
+        title: taskTitle,
+        customerName: isGeneric ? taskTitle : item.order.customerName,
+        taskDetails: isGeneric ? taskTitle : item.order.taskDetails,
         staffId: item.staffId,
-        locationId: item.order.customerCode || '',
+        locationId: isGeneric ? '' : (item.order.customerCode || ''),
+        customerCode: isGeneric ? '' : (item.order.customerCode || ''),
+        isGeneric: isGeneric,
         start: item.start.toISOString(),
         end: item.end.toISOString(),
         rawOrderId: item.order.rawOrderId,
