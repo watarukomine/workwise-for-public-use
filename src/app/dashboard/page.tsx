@@ -560,9 +560,11 @@ export default function DashboardPage() {
         const etaTime = (staff as any).estimatedArrivalTime || orderStatusObj?.estimatedArrivalTime;
         const lastUpIso = orderStatusObj?.lastUpdate || (staff as any).updatedAt || (staff as any).lastLocationUpdatedAt || (staff as any).statusUpdatedAt;
 
-        // Check if staff has any tasks TODAY and active (incomplete) tasks TODAY
+        // Check if staff has tasks TODAY: active (incomplete), completed, or past start time
         let hasActiveTasksToday = false;
         let hasTasksToday = false;
+        let hasCompletedTasksToday = false;
+        let hasPastStartedTaskToday = false;
 
         if (scheduleEvents) {
           scheduleEvents.forEach(event => {
@@ -570,15 +572,28 @@ export default function DashboardPage() {
             const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
             if (isValid(start) && isSameDay(start, currentDate)) {
               hasTasksToday = true;
-              if (event.status !== '作業完了' && event.status !== 'キャンセル' && !event.actualEndTime) {
+              const isDone = event.status === '作業完了' || !!event.actualEndTime;
+              if (isDone) {
+                hasCompletedTasksToday = true;
+              } else if (event.status !== 'キャンセル') {
                 hasActiveTasksToday = true;
+              }
+              if (now >= start) {
+                hasPastStartedTaskToday = true;
               }
             }
           });
         }
 
+        // Check if staff is already active today (punched in, worked on tasks, returned, or past start time)
+        const isAlreadyActiveToday = presentStaffIds.has(staff.id) || 
+          hasCompletedTasksToday || 
+          hasPastStartedTaskToday || 
+          ['帰社', '帰社中', '待機中'].includes((staff as any).currentStatus) ||
+          (orderStatusObj?.lastAction && ['作業完了', '帰社', '現場到着', '作業開始', '移動開始'].includes(orderStatusObj.lastAction));
+
         const getFallbackStatus = () => {
-          if (presentStaffIds.has(staff.id)) {
+          if (isAlreadyActiveToday) {
             return '待機中';
           } else if (scheduledStaffIds.has(staff.id)) {
             return '出勤予定';
@@ -592,7 +607,7 @@ export default function DashboardPage() {
           return '移動中';
         }
         if (displayStatus === '帰社' || displayStatus === '帰社中') {
-          if (isEtaPassed(etaTime, lastUpIso)) return getFallbackStatus();
+          if (isEtaPassed(etaTime, lastUpIso)) return '待機中';
           return '帰社中';
         }
         if (displayStatus === '現場到着' || displayStatus === '作業待ち') {

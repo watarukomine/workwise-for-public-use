@@ -3293,13 +3293,24 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
           const lastUpIso = status.lastUpdate || (staff as any).updatedAt || (staff as any).lastLocationUpdatedAt || (staff as any).statusUpdatedAt;
           const etaOverdue = isEtaPassed(etaTime, lastUpIso);
 
-          // 本日の未完了作業イベント（作業チップ）が存在するかどうか
+          // 本日のタスク情報: 未完了作業、完了済み作業、開始時間を過ぎた作業
           const hasActiveTodayEvents = events && events.some(e => e.status !== '作業完了' && e.status !== 'キャンセル' && !e.actualEndTime);
-          
+          const hasCompletedTodayEvents = events && events.some(e => e.status === '作業完了' || !!e.actualEndTime);
+          const now = new Date();
+          const hasPastStartedTodayEvents = events && events.some(e => {
+            const start = typeof e.start === 'string' ? parseISO(e.start) : e.start;
+            return isValid(start) && now >= start;
+          });
+
+          const isAlreadyActiveToday = hasCompletedTodayEvents || 
+            hasPastStartedTodayEvents || 
+            ['帰社', '帰社中', '待機中'].includes((staff as any).currentStatus) ||
+            (status.lastAction && ['作業完了', '帰社', '現場到着', '作業開始', '移動開始'].includes(status.lastAction));
+
           let rawStatus = status.status;
           // 割当イベントが無い場合の「移動中」「作業中」「作業待ち」はアクティブなタスクが無いため補正
           if ((rawStatus === '移動中' || rawStatus === '作業中' || rawStatus === '作業待ち') && !hasActiveTodayEvents) {
-            rawStatus = isShiftOn ? '出勤予定' : '-';
+            rawStatus = isAlreadyActiveToday ? '待機中' : (isShiftOn ? '出勤予定' : '-');
           }
 
           const displayStatus = (etaOverdue && (rawStatus === '帰社中' || rawStatus === '移動中')) ? '待機中' : rawStatus;
