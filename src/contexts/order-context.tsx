@@ -291,7 +291,7 @@ const processOrderData = (
     items.forEach(item => {
       const isGeneric = item.isGeneric || Boolean(item.order.isGeneric) || item.order._type === 'task';
       const taskTitle = isGeneric
-        ? (item.order.taskDetails || item.order.title || item.order.customerName || '汎用タスク')
+        ? (item.order.taskDetails || item.order.title || '汎用タスク')
         : (item.order.customerName || item.order.taskDetails);
 
       const taskEvent: WithId<ScheduleEvent> = {
@@ -299,8 +299,10 @@ const processOrderData = (
         id: `${item.tripId}-task`,
         tripId: item.tripId,
         title: taskTitle,
-        customerName: isGeneric ? taskTitle : item.order.customerName,
-        taskDetails: isGeneric ? taskTitle : item.order.taskDetails,
+        customerName: item.order.customerName || item.order.destination || item.order.storeName || (isGeneric ? taskTitle : '（店舗名未設定）'),
+        destination: item.order.destination || '',
+        storeName: item.order.storeName || item.order.destination || '',
+        taskDetails: item.order.taskDetails || taskTitle,
         staffId: item.staffId,
         locationId: isGeneric ? '' : (item.order.customerCode || ''),
         customerCode: isGeneric ? '' : (item.order.customerCode || ''),

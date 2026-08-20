@@ -482,7 +482,13 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     })(),
     staffId: findKey(rawOrder, ['スタッフID', 'スタッフコード', 'staffId', '担当者ID', '担当ID', '社員ID', '社員コード', 'staff_id']) || '',
     mainStore: findKey(rawOrder, ['主管店舗', 'mainStore', '主管']) || '',
+    destination: String(findKey(rawOrder, ['destination', '行き先', '目的地', 'dest']) || '').trim(),
+    storeName: String(findKey(rawOrder, ['storeName', '店舗名', '店舗', 'お取引先名']) || '').trim(),
     customerName: (() => {
+      const dest = findKey(rawOrder, ['destination', '行き先', '目的地']);
+      if (dest && String(dest).trim() && !String(dest).startsWith('社員')) {
+        return String(dest).trim();
+      }
       const rawName = findKey(rawOrder, ['店舗名', 'お取引先名', '店舗名称', '店舗', '名称', 'お名前', 'Customer', 'storeName']);
       if (rawName && rawName !== '（店舗名未設定）' && rawName !== '(店舗名未設定)' && rawName !== '店舗名未設定') {
         return String(rawName).trim();

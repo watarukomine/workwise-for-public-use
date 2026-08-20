@@ -2100,9 +2100,10 @@ export function ScheduleView({
               if (submitDetails.description) {
                 updateFields.specialNotes = submitDetails.description;
               }
-            }
-            if (editOrderForm.storeName !== undefined) {
-              updateFields.customerName = editOrderForm.storeName;
+            } else if (dialogState.mode === 'details' || (dialogState as any).mode === 'order-details') {
+              if (editOrderForm.storeName !== undefined) {
+                updateFields.customerName = editOrderForm.storeName;
+              }
             }
             if (overrides.statusValue) {
               updateFields.status = overrides.statusValue;
