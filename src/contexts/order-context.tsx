@@ -210,6 +210,9 @@ const processOrderData = (
       }
 
       if (order.scheduledTime) {
+        if (order.status === '削除' || (order as any).statusValue === '削除' || (order as any).staffId === '__DELETED__') {
+          return; // Skip deleted orders from timeline
+        }
         // CRITICAL FIX: Only display events on timeline if order scheduledDate matches current viewed targetDateStr
         const normOrderDate = normalizeDateStr(order.scheduledDate);
         if (normOrderDate && targetDateStr && normOrderDate !== targetDateStr) {

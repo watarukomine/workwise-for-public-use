@@ -2214,80 +2214,106 @@ export function ScheduleView({
   const handleDeleteEvent = async () => {
     if (dialogState.mode !== 'details' && dialogState.mode !== 'edit') return;
     const eventToDelete = dialogState.event;
+    if (!eventToDelete) return;
 
     // Optimistic UI Update
-    setIsSaving(false);
+    setIsSaving(true);
     setDialogState({ mode: 'closed' });
 
     // Generic Task Deletion Logic
-    // Improved Generic Check: check ID OR title/content
-    const isGeneric = eventToDelete.id.startsWith('event-') || eventToDelete.id.startsWith('generic-') || !eventToDelete.customerCode || ['休憩', '移動', '業務', '研修', '同行', '商談'].some(t => eventToDelete.title.includes(t));
+    const isGeneric = isGenericTask(eventToDelete) ||
+      Boolean(eventToDelete.isGeneric) ||
+      eventToDelete.id.startsWith('event-') ||
+      eventToDelete.id.startsWith('generic-') ||
+      eventToDelete.id.startsWith('task-') ||
+      eventToDelete.id.startsWith('trip-') ||
+      !eventToDelete.customerCode ||
+      ['休憩', '移動', '業務', '研修', '同行', '商談', '会議'].some(t => String(eventToDelete.title || eventToDelete.taskDetails || '').includes(t));
 
     if (isGeneric) {
       const staff = allStaff?.find(s => s.id === eventToDelete.staffId);
-      // Priority: use staffName from event if available, otherwise lookup from allStaff
       const staffName = eventToDelete.staffName || staff?.name || '';
 
-      console.log('WorkWise Deletion Debug:', {
-        title: eventToDelete.title,
-        id: eventToDelete.id,
-        rawOrderId: eventToDelete.rawOrderId,
-        staffName: staffName,
-        scheduledTime: eventToDelete.start
-      });
+      const targetDocId = eventToDelete.systemId || 
+        eventToDelete.rawOrderId || 
+        (eventToDelete.id ? eventToDelete.id.replace(/-(task|travel)$/, '').replace(/^trip-/, '') : eventToDelete.id);
 
-      // Soft Delete: Mark as deleted to hide it, but keep it in local state to block backend Sync
-      saveLocalEvent({ ...eventToDelete, staffId: '__DELETED__' });
+      // 1. Permanent Delete from Firestore (Primary DB)
+      try {
+        const { OrderService } = await import('@/services/order-service');
+        if (targetDocId) {
+          await OrderService.deleteOrder(targetDocId).catch(err => console.warn('Failed to delete targetDocId from Firestore:', err));
+        }
+        if (eventToDelete.id && eventToDelete.id !== targetDocId) {
+          await OrderService.deleteOrder(eventToDelete.id).catch(err => console.warn('Failed to delete event.id from Firestore:', err));
+        }
+      } catch (fsErr) {
+        console.warn('Firestore generic task delete error:', fsErr);
+      }
 
-      // OPTIMISTIC UI: Immediately remove from view state
-      setScheduleEvents(prev => prev.filter(e => e.id !== eventToDelete.id));
-
-      // Also delete companion travel event if generic
+      // 2. Clear from localStorage cache
+      deleteLocalEvent(eventToDelete.id);
+      if (targetDocId) deleteLocalEvent(targetDocId);
       if (eventToDelete.tripId) {
-        // Find ANY event with same tripId that isn't this one
+        deleteLocalEvent(eventToDelete.tripId);
+        deleteLocalEvent(`${eventToDelete.tripId}-travel`);
+        deleteLocalEvent(`${eventToDelete.tripId}-task`);
+      }
+
+      // 3. OPTIMISTIC UI: Remove from view state & raw data
+      setScheduleEvents(prev => prev.filter(e => 
+        e.id !== eventToDelete.id && 
+        e.id !== targetDocId && 
+        (!eventToDelete.tripId || e.tripId !== eventToDelete.tripId)
+      ));
+
+      if (setRawOrdersData) {
+        setRawOrdersData(prev => prev.filter(o => 
+          o.id !== targetDocId && 
+          o.id !== eventToDelete.id && 
+          o.systemId !== targetDocId && 
+          o.rawOrderId !== targetDocId
+        ));
+      }
+
+      // 4. Update Backend GAS Spreadsheet (Mark as deleted / cancelled)
+      updateSheetStatus({
+        gasUrl: ORDER_GAS_URL,
+        eventTitle: eventToDelete.title || `(ID: ${targetDocId})`,
+        staffName: staffName,
+        statusValue: "削除",
+        cancelDate: new Date().toISOString(),
+        cancelContact: '汎用タスク削除',
+        timestamp: new Date().toISOString(),
+        systemId: targetDocId,
+        scheduledTime: eventToDelete.start instanceof Date ? eventToDelete.start.toISOString() : eventToDelete.start,
+        actionType: 'delete'
+      }).catch(err => console.warn('Failed to update sheet on generic task delete:', err));
+
+      if (eventToDelete.tripId) {
         const companionTravel = scheduleEvents.find(e => e.tripId === eventToDelete.tripId && e.id !== eventToDelete.id);
         if (companionTravel) {
-          saveLocalEvent({ ...companionTravel, staffId: '__DELETED__' });
-          // OPTIMISTIC UI: Immediately remove companion from view state
-          setScheduleEvents(prev => prev.filter(e => e.id !== companionTravel.id && e.id !== eventToDelete.id));
-
-           // CRITICAL: Also delete the companion event from GAS Backend
-          // Even if it doesn't have a task- ID, the fallback search in GAS (by Staff+Time) will catch it.
+          deleteLocalEvent(companionTravel.id);
           updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
             eventTitle: companionTravel.title,
             staffName: staffName,
-            statusValue: "キャンセル",
+            statusValue: "削除",
+            cancelDate: new Date().toISOString(),
+            cancelContact: '汎用タスク削除',
             timestamp: new Date().toISOString(),
             systemId: companionTravel.id,
-            scheduledTime: companionTravel.start instanceof Date ? companionTravel.start.toISOString() : companionTravel.start,
-            actionType: 'cancel'
-          }).catch(err => console.warn('Failed to update sheet on companion travel cancel:', err));
+            actionType: 'delete'
+          }).catch(err => console.warn('Failed to update sheet on companion travel delete:', err));
         }
       }
 
-      // Update Backend for Generic Task (Cancel status)
-      // Even if rawOrderId is missing, we send systemId (gen-HASH) and other details for content-based lookup in GAS
-      // CRITICAL: Strip "trip-" and "-task" prefixes if present to get the real GAS System ID
-      let cleanSystemId = eventToDelete.id;
-      if (cleanSystemId.startsWith('trip-task-') && cleanSystemId.endsWith('-task')) {
-        cleanSystemId = cleanSystemId.replace('trip-', '').replace('-task', '');
-      }
-
-      updateSheetStatus({
-        gasUrl: ORDER_GAS_URL,
-        eventTitle: eventToDelete.title || `(ID: ${eventToDelete.rawOrderId || 'N/A'})`,
-        staffName: staffName, // Needed for fallback search
-        statusValue: "キャンセル",
-        timestamp: new Date().toISOString(),
-        systemId: cleanSystemId, // Pass CLEAN stable ID
-        scheduledTime: eventToDelete.start instanceof Date ? eventToDelete.start.toISOString() : eventToDelete.start, // Pass Start Time for fallback search
-        actionType: 'cancel' // Optional context
-      }).catch(err => console.warn('Failed to update sheet on generic task delete:', err));
-
+      await refetchOrders();
+      setIsSaving(false);
       toast({ title: '汎用タスクを削除しました', duration: 3000 });
     } else {
       await unassignTask(eventToDelete);
+      setIsSaving(false);
     }
   };
 
