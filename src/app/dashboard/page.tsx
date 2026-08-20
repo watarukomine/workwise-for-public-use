@@ -560,41 +560,55 @@ export default function DashboardPage() {
         const etaTime = (staff as any).estimatedArrivalTime || orderStatusObj?.estimatedArrivalTime;
         const lastUpIso = orderStatusObj?.lastUpdate || (staff as any).updatedAt || (staff as any).lastLocationUpdatedAt || (staff as any).statusUpdatedAt;
 
-        if (displayStatus === '移動開始' || displayStatus === '移動中') {
-          if (isEtaPassed(etaTime, lastUpIso)) return '待機中';
-          // 本日作業タスク（作業チップ）が存在しない場合の「移動中」は目的地が無いため「待機中」に補正
-          let hasActiveTasksToday = false;
-          if (scheduleEvents) {
-            hasActiveTasksToday = scheduleEvents.some(event => {
-              if (event.staffId !== staff.id) return false;
-              const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-              return isValid(start) && isSameDay(start, currentDate) && event.status !== '作業完了' && event.status !== 'キャンセル';
-            });
+        // Check if staff has any tasks TODAY and active (incomplete) tasks TODAY
+        let hasActiveTasksToday = false;
+        let hasTasksToday = false;
+
+        if (scheduleEvents) {
+          scheduleEvents.forEach(event => {
+            if (event.staffId !== staff.id) return;
+            const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
+            if (isValid(start) && isSameDay(start, currentDate)) {
+              hasTasksToday = true;
+              if (event.status !== '作業完了' && event.status !== 'キャンセル' && !event.actualEndTime) {
+                hasActiveTasksToday = true;
+              }
+            }
+          });
+        }
+
+        const getFallbackStatus = () => {
+          if (presentStaffIds.has(staff.id)) {
+            return '待機中';
+          } else if (scheduledStaffIds.has(staff.id)) {
+            return '出勤予定';
           }
-          if (!hasActiveTasksToday) return '待機中';
+          return hasTasksToday ? '待機中' : '-';
+        };
+
+        if (displayStatus === '移動開始' || displayStatus === '移動中') {
+          if (isEtaPassed(etaTime, lastUpIso)) return getFallbackStatus();
+          if (!hasActiveTasksToday) return getFallbackStatus();
           return '移動中';
         }
         if (displayStatus === '帰社' || displayStatus === '帰社中') {
-          if (isEtaPassed(etaTime, lastUpIso)) return '待機中';
+          if (isEtaPassed(etaTime, lastUpIso)) return getFallbackStatus();
           return '帰社中';
         }
-        if (displayStatus === '現場到着' || displayStatus === '作業待ち') return '作業待ち';
-        if (displayStatus === '作業開始' || displayStatus === '作業中') return '作業中';
+        if (displayStatus === '現場到着' || displayStatus === '作業待ち') {
+          if (!hasActiveTasksToday) return getFallbackStatus();
+          return '作業待ち';
+        }
+        if (displayStatus === '作業開始' || displayStatus === '作業中') {
+          if (!hasActiveTasksToday) return getFallbackStatus();
+          return '作業中';
+        }
         // Note: '作業完了' falls through to step 3.
 
         // 3. Overdue Task Check (Implied Status)
         // If staff has a task that should have started but no button was pressed,
         // hint at the likely status with a question mark.
-        let hasTasksToday = false;
-
         if (scheduleEvents) {
-          // Check if staff has any tasks TODAY
-          hasTasksToday = scheduleEvents.some(event => {
-            if (event.staffId !== staff.id) return false;
-            const start = typeof event.start === 'string' ? parseISO(event.start) : event.start;
-            return isValid(start) && isSameDay(start, currentDate);
-          });
-
           // Find the active event for THIS moment
           const activeEvent = scheduleEvents.find(event => {
             if (event.staffId !== staff.id) return false;
@@ -608,7 +622,7 @@ export default function DashboardPage() {
 
           if (activeEvent) {
             // If the event has a completion time (済 mark), it's done — show 待機中
-            if (activeEvent.actualEndTime) return '待機中';
+            if (activeEvent.actualEndTime || activeEvent.status === '作業完了') return '待機中';
             const title = activeEvent.title || '';
             if (title.startsWith('移動')) return '移動中？';
             return '作業中？';
@@ -616,14 +630,7 @@ export default function DashboardPage() {
         }
 
         // 4. Attendance / Shift Status (Fallback)
-        if (presentStaffIds.has(staff.id)) {
-          return '待機中';
-        } else if (scheduledStaffIds.has(staff.id)) {
-          return '出勤予定';
-        }
-
-        // 5. Final Fallback
-        return hasTasksToday ? '待機中' : '-';
+        return getFallbackStatus();
       };
 
       let finalStatus = getDisplayStatus();

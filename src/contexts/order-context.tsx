@@ -159,7 +159,10 @@ const processOrderData = (
       const currentStatus = staffStatusMap.get(staffMember.id)!;
       const currentUpdate = currentStatus.lastUpdate ? new Date(currentStatus.lastUpdate) : new Date(0);
 
-      if (!isNaN(lastUpdate.getTime())) {
+      const normOrderDate = normalizeDateStr(order.scheduledDate);
+      const isOrderToday = normOrderDate && targetDateStr ? normOrderDate === targetDateStr : true;
+
+      if (!isNaN(lastUpdate.getTime()) && isOrderToday) {
         const status = order.status || findKey(rawOrder, ['受注ステータス']) || '待機中';
         const isNewer = lastUpdate.getTime() >= currentUpdate.getTime();
         const isCandidateActive = activeStatuses.includes(status);

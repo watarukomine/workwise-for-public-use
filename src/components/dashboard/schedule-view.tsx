@@ -3293,13 +3293,13 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
           const lastUpIso = status.lastUpdate || (staff as any).updatedAt || (staff as any).lastLocationUpdatedAt || (staff as any).statusUpdatedAt;
           const etaOverdue = isEtaPassed(etaTime, lastUpIso);
 
-          // 本日の割り当てイベント（作業チップ）が存在するかどうか
-          const hasTodayEvents = events && events.some(e => e.status !== '作業完了' && e.status !== 'キャンセル');
+          // 本日の未完了作業イベント（作業チップ）が存在するかどうか
+          const hasActiveTodayEvents = events && events.some(e => e.status !== '作業完了' && e.status !== 'キャンセル' && !e.actualEndTime);
           
-          // 割当イベントが無い場合の「移動中」は目的地が無いため「待機中」に補正
           let rawStatus = status.status;
-          if (rawStatus === '移動中' && !hasTodayEvents) {
-            rawStatus = '待機中';
+          // 割当イベントが無い場合の「移動中」「作業中」「作業待ち」はアクティブなタスクが無いため補正
+          if ((rawStatus === '移動中' || rawStatus === '作業中' || rawStatus === '作業待ち') && !hasActiveTodayEvents) {
+            rawStatus = isShiftOn ? '出勤予定' : '-';
           }
 
           const displayStatus = (etaOverdue && (rawStatus === '帰社中' || rawStatus === '移動中')) ? '待機中' : rawStatus;
@@ -3312,7 +3312,11 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
                 displayStatus === '帰社中' && "bg-indigo-100 text-indigo-800 font-bold border border-indigo-200",
                 displayStatus === '移動中' && "bg-purple-100 text-purple-800 font-bold border border-purple-200",
                 displayStatus === '作業中' && "bg-blue-100 text-blue-800 font-bold border border-blue-200",
-                displayStatus === '待機中' && "bg-gray-100 text-gray-700 border border-gray-200"
+                displayStatus === '作業待ち' && "bg-yellow-100 text-yellow-800 font-bold border border-yellow-200",
+                displayStatus === '待機中' && "bg-gray-100 text-gray-700 border border-gray-200",
+                displayStatus === '出勤予定' && "bg-amber-100 text-amber-800 font-bold border border-amber-200",
+                displayStatus === '退勤済' && "bg-slate-100 text-slate-500 border border-slate-200",
+                ['休憩中', '商談中', '研修中', '同行中', '業務中', '会議中'].some(t => displayStatus?.includes(t)) && "bg-teal-100 text-teal-800 font-bold border border-teal-200"
               )}>
                 {displayStatus}
               </span>
