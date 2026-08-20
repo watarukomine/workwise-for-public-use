@@ -54,13 +54,37 @@ export function AttendanceControls({ onStatusChange, variant = 'default' }: Atte
         }
     };
 
+    const getCurrentLocation = async (): Promise<{ latitude: number; longitude: number } | null> => {
+        if (typeof window === 'undefined' || !navigator.geolocation) return null;
+        try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 5000,
+                    maximumAge: 30000
+                });
+            });
+            return {
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude
+            };
+        } catch (err) {
+            console.warn('[AttendanceControls] Geolocation lookup failed/skipped:', err);
+            return null;
+        }
+    };
+
     const handleClockIn = async () => {
         if (!profile) return;
         setIsUpdating(true);
         try {
-            await updateStaffStatus(new Date(), profile.id, 'present');
+            const location = await getCurrentLocation();
+            await updateStaffStatus(new Date(), profile.id, 'present', location);
             setStatus('present');
-            toast({ title: '出勤しました', description: 'ダッシュボードに表示されます。' });
+            toast({ 
+                title: '出勤しました', 
+                description: location ? '現在地を取得しマップに表示しました。' : 'ダッシュボードに表示されます。' 
+            });
             onStatusChange?.();
         } catch (e) {
             toast({ variant: 'destructive', title: 'エラー', description: '出勤処理に失敗しました。' });
@@ -73,7 +97,8 @@ export function AttendanceControls({ onStatusChange, variant = 'default' }: Atte
         if (!profile) return;
         setIsUpdating(true);
         try {
-            await updateStaffStatus(new Date(), profile.id, 'checked_out');
+            const location = await getCurrentLocation();
+            await updateStaffStatus(new Date(), profile.id, 'checked_out', location);
             setStatus('checked_out');
             toast({ title: '退勤しました', description: 'お疲れ様でした。' });
             onStatusChange?.();

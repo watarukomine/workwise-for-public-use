@@ -726,7 +726,12 @@ export const saveDailySchedule = async (date: Date, staffIds: string[]): Promise
  * Updates a specific staff's status for a date.
  * status: 'present' (Clock In) | 'checked_out' (Clock Out) | 'absent' (Remove from both)
  */
-export const updateStaffStatus = async (date: Date, staffId: string, status: 'present' | 'checked_out' | 'absent'): Promise<void> => {
+export const updateStaffStatus = async (
+    date: Date, 
+    staffId: string, 
+    status: 'present' | 'checked_out' | 'absent',
+    location?: { latitude: number; longitude: number } | null
+): Promise<void> => {
     const docId = getAttendanceDocId(date);
     const db = getDb();
     const docRef = doc(db, COLLECTION_NAME, docId);
@@ -756,7 +761,28 @@ export const updateStaffStatus = async (date: Date, staffId: string, status: 'pr
             updatedAt: serverTimestamp(),
         }, { merge: true });
 
-        console.log(`[AttendanceService] Updated status for ${staffId} to ${status}`);
+        // If location is provided or staff clocks in, update staff document with GPS coordinates
+        if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
+            const staffDocRef = doc(db, 'staff', staffId);
+            const nowIso = new Date().toISOString();
+            await setDoc(staffDocRef, {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                lat: location.latitude,
+                lng: location.longitude,
+                '緯度': location.latitude,
+                '経度': location.longitude,
+                '位置情報': `${location.latitude},${location.longitude}`,
+                lastLocationUpdatedAt: nowIso,
+                '最終位置更新日時': nowIso,
+                statusUpdatedAt: nowIso,
+                currentStatus: status === 'present' ? '待機中' : (status === 'checked_out' ? '退勤' : '未出勤'),
+                lastAction: status === 'present' ? '出勤' : (status === 'checked_out' ? '退勤' : ''),
+                updatedAt: serverTimestamp()
+            }, { merge: true }).catch(err => console.warn('[AttendanceService] Failed to update staff location on clock in:', err));
+        }
+
+        console.log(`[AttendanceService] Updated status for ${staffId} to ${status}`, location ? `Location: ${location.latitude}, ${location.longitude}` : '');
 
     } catch (e) {
         console.error("Failed to update staff status", e);
