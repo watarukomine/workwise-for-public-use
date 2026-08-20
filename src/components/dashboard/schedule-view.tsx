@@ -195,8 +195,18 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
 
   const isGeneric = ['移動', '業務', '休憩', '研修', '同行', '商談', '会議'].some(t => String(line1 || order.taskDetails || order.title || '').includes(t)) || isGenericTask(order);
 
-  const rawGenericTaskName = order.taskDetails || order.title || line1 || '汎用タスク';
-  const genericDest = (order as any).destination || (order as any).storeName || (order.customerName && order.customerName !== '（店舗名未設定）' && order.customerName !== '(店舗名未設定)' && order.customerName !== '店舗名未設定' ? order.customerName : undefined);
+  let rawGenericTaskName = order.taskDetails || order.title || line1 || '汎用タスク';
+  let genericDest = (order as any).destination || (order as any).storeName || (order.customerName && order.customerName !== '（店舗名未設定）' && order.customerName !== '(店舗名未設定)' && order.customerName !== '店舗名未設定' ? order.customerName : undefined);
+  if (rawGenericTaskName.includes('：') || rawGenericTaskName.includes(':')) {
+    const parts = rawGenericTaskName.split(/[：:]/);
+    if (parts.length >= 2) {
+      rawGenericTaskName = parts[0].trim();
+      if (!genericDest) {
+        genericDest = parts.slice(1).join('：').trim();
+      }
+    }
+  }
+
   const cleanGenericDest = (genericDest &&
     !genericDest.startsWith('社員') &&
     !['移動', '業務', '休憩', '研修', '同行', '商談', '会議', '汎用タスク', '社内作業'].includes(genericDest))
@@ -206,7 +216,7 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
   // Resolve storeName from master (skip for generic tasks like Break, Travel, etc.)
   let resolvedStoreName = '';
   if (isGeneric) {
-    if (cleanGenericDest && !rawGenericTaskName.includes(cleanGenericDest)) {
+    if (cleanGenericDest) {
       resolvedStoreName = `${rawGenericTaskName}：${cleanGenericDest}`;
     } else {
       resolvedStoreName = rawGenericTaskName;
@@ -1729,9 +1739,17 @@ export function ScheduleView({
       }
     }
 
-    let eventTitle = event.title || '';
-    if (destination && eventTitle.includes(`：${destination}`)) {
+    let eventTitle = event.title || event.taskDetails || '';
+    if (!destination && (eventTitle.includes('：') || eventTitle.includes(':'))) {
+      const parts = eventTitle.split(/[：:]/);
+      if (parts.length >= 2) {
+        eventTitle = parts[0].trim();
+        destination = parts.slice(1).join('：').trim();
+      }
+    } else if (destination && eventTitle.includes(`：${destination}`)) {
       eventTitle = eventTitle.replace(`：${destination}`, '');
+    } else if (destination && eventTitle.includes(`:${destination}`)) {
+      eventTitle = eventTitle.replace(`:${destination}`, '');
     }
 
     const cleanDescription = event.description?.replace(/\[行き先: .*?\]/, '').trim() || '';
@@ -2114,12 +2132,20 @@ export function ScheduleView({
             });
             const targetId = eventToUpdate.systemId || eventToUpdate.rawOrderId || eventToUpdate.id;
             await OrderService.updateOrder(targetId, updateFields);
+            if (setRawOrdersData) {
+              setRawOrdersData(prev => prev.map(o => {
+                if (o.id === targetId || o.systemId === targetId || o.rawOrderId === targetId) {
+                  return { ...o, ...updateFields };
+                }
+                return o;
+              }));
+            }
           } catch (fsErr) {
             console.error("Firestore sync error on save event:", fsErr);
           }
 
           // 2. Backup to GAS (Asynchronous - Background)
-          updateSheetStatus({
+          const gasPayload: any = {
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`,
             systemId: eventToUpdate.systemId,
@@ -2137,7 +2163,23 @@ export function ScheduleView({
             staffName: staff?.name,
             shouldSendEmail: !!emailParams,
             emailParams: emailParams
-          }).catch(gasErr => {
+          };
+
+          if (dialogState.mode === 'edit') {
+            if (submitDetails.destination) {
+              gasPayload.storeName = submitDetails.destination;
+              gasPayload.customerName = submitDetails.destination;
+              gasPayload['店舗名'] = submitDetails.destination;
+              gasPayload['お取引先名'] = submitDetails.destination;
+            }
+            if (submitDetails.title) {
+              gasPayload.taskDetails = submitDetails.title;
+              gasPayload['作業内容'] = submitDetails.title;
+              gasPayload['業務内容'] = submitDetails.title;
+            }
+          }
+
+          updateSheetStatus(gasPayload).catch(gasErr => {
             console.warn('Failed to update sheet on save event:', gasErr);
           });
 
@@ -3359,10 +3401,22 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
   const cleanCustomerName = (rawCustomerName && rawCustomerName !== '（店舗名未設定）' && rawCustomerName !== '(店舗名未設定)' && rawCustomerName !== '店舗名未設定') ? rawCustomerName : undefined;
   
   // Extract destination / storeName for generic task
-  const rawGenericDest = (targetEvent as any).destination || 
+  let rawGenericDest = (targetEvent as any).destination || 
     (targetEvent as any).storeName || 
     (cleanCustomerName && !cleanCustomerName.startsWith('社員') ? cleanCustomerName : undefined) ||
-    (targetEvent.raw ? findKey(targetEvent.raw, ['行き先', '目的地']) : undefined);
+    (targetEvent.raw ? findKey(targetEvent.raw, ['行き先', '目的地', '店舗名', '店舗']) : undefined);
+
+  let mainTaskName = targetEvent.title || targetEvent.taskDetails || line1 || '汎用タスク';
+
+  if (mainTaskName.includes('：') || mainTaskName.includes(':')) {
+    const parts = mainTaskName.split(/[：:]/);
+    if (parts.length >= 2) {
+      mainTaskName = parts[0].trim();
+      if (!rawGenericDest) {
+        rawGenericDest = parts.slice(1).join('：').trim();
+      }
+    }
+  }
 
   const cleanGenericDest = (rawGenericDest && 
     rawGenericDest !== '（店舗名未設定）' && 
@@ -3373,18 +3427,12 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     ? String(rawGenericDest).trim() 
     : undefined;
 
-  const mainTaskName = targetEvent.title || targetEvent.taskDetails || line1 || '汎用タスク';
-
   let baseCustomerName = '';
   if (isTravelEvent) {
     baseCustomerName = '移動';
   } else if (isGeneric) {
     if (cleanGenericDest) {
-      if (mainTaskName.includes(cleanGenericDest)) {
-        baseCustomerName = mainTaskName;
-      } else {
-        baseCustomerName = `${mainTaskName}：${cleanGenericDest}`;
-      }
+      baseCustomerName = `${mainTaskName}：${cleanGenericDest}`;
     } else {
       baseCustomerName = mainTaskName;
     }
