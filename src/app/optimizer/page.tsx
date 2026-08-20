@@ -131,7 +131,7 @@ function OptimizerPageContent() {
           return null;
         }
 
-        // 2. Extract location coordinates updated directly on user profile
+        // 2. Extract location coordinates updated directly on user profile or status
         let rawStrLat: number | null = null;
         let rawStrLng: number | null = null;
         const locStr = (staffMember as any)['位置情報'] || (staffMember as any).lastLocation || (staffMember as any).location;
@@ -143,24 +143,25 @@ function OptimizerPageContent() {
           }
         }
 
-        const actualLat = parseCoord((staffMember as any)['緯度']) ?? parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? rawStrLat;
-        const actualLng = parseCoord((staffMember as any)['経度']) ?? parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? rawStrLng;
+        const actualLat = parseCoord((staffMember as any)['緯度']) ?? parseCoord((staffMember as any).latitude) ?? parseCoord((staffMember as any).lat) ?? parseCoord(status?.latitude) ?? rawStrLat;
+        const actualLng = parseCoord((staffMember as any)['経度']) ?? parseCoord((staffMember as any).longitude) ?? parseCoord((staffMember as any).lng) ?? parseCoord(status?.longitude) ?? rawStrLng;
 
         if (actualLat === null || actualLng === null) {
           return null;
         }
 
-        // 3. MUST have location updated TODAY (from check-in / location update timestamp)
+        // 3. Check location update timestamp (from check-in / location update timestamp)
         const locTime =
           (staffMember as any)['最終位置更新日時'] ||
           (staffMember as any).lastLocationUpdatedAt ||
           (staffMember as any).statusUpdatedAt ||
+          status?.lastUpdate ||
           (staffMember as any).updatedAt;
 
         const isTodayUpdated = isUpdatedToday(locTime);
 
-        // Exclude anyone who has NOT updated location TODAY (like DEMO2 from past sessions)
-        if (!isTodayUpdated) {
+        // Exclude anyone who has NOT updated location TODAY (if timestamp is known and not today)
+        if (locTime && !isTodayUpdated) {
           return null;
         }
 
@@ -179,7 +180,7 @@ function OptimizerPageContent() {
           name: displayName,
           latitude: actualLat,
           longitude: actualLng,
-          lastAction: (staffMember as any).lastAction || status?.lastAction || currentStatus || '現在地'
+          lastAction: (staffMember as any).lastAction || status?.lastAction || currentStatus || '出勤中（現在地）'
         };
       })
       .filter((s): s is WithId<Staff> & { latitude: number; longitude: number; lastAction: string } =>

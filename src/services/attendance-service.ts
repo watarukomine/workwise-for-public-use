@@ -761,11 +761,10 @@ export const updateStaffStatus = async (
             updatedAt: serverTimestamp(),
         }, { merge: true });
 
-        // If location is provided or staff clocks in, update staff document with GPS coordinates
+        // If location is provided or staff clocks in, update staff document in users and staff collection with GPS coordinates
         if (location && typeof location.latitude === 'number' && typeof location.longitude === 'number') {
-            const staffDocRef = doc(db, 'staff', staffId);
             const nowIso = new Date().toISOString();
-            await setDoc(staffDocRef, {
+            const locationPayload = {
                 latitude: location.latitude,
                 longitude: location.longitude,
                 lat: location.latitude,
@@ -779,7 +778,29 @@ export const updateStaffStatus = async (
                 currentStatus: status === 'present' ? '待機中' : (status === 'checked_out' ? '退勤' : '未出勤'),
                 lastAction: status === 'present' ? '出勤' : (status === 'checked_out' ? '退勤' : ''),
                 updatedAt: serverTimestamp()
-            }, { merge: true }).catch(err => console.warn('[AttendanceService] Failed to update staff location on clock in:', err));
+            };
+
+            // 1. Primary write to 'users' collection (Used by StaffService and active map view)
+            const userDocRef = doc(db, 'users', staffId);
+            await setDoc(userDocRef, locationPayload, { merge: true }).catch(err => console.warn('[AttendanceService] Failed to update users doc on clock in:', err));
+
+            // 2. Secondary write to 'staff' collection for backwards compatibility
+            const staffDocRef = doc(db, 'staff', staffId);
+            await setDoc(staffDocRef, locationPayload, { merge: true }).catch(err => console.warn('[AttendanceService] Failed to update staff doc on clock in:', err));
+
+            // 3. Update query match if staffId is a code like STAFF001
+            try {
+                const usersCol = collection(db, 'users');
+                const q = query(usersCol, where('staffCode', '==', staffId));
+                const snap = await getDocs(q);
+                for (const d of snap.docs) {
+                    if (d.id !== staffId) {
+                        await setDoc(d.ref, locationPayload, { merge: true }).catch(() => {});
+                    }
+                }
+            } catch (queryErr) {
+                console.warn('[AttendanceService] Secondary query update skipped:', queryErr);
+            }
         }
 
         console.log(`[AttendanceService] Updated status for ${staffId} to ${status}`, location ? `Location: ${location.latitude}, ${location.longitude}` : '');
