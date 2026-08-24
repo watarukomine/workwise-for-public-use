@@ -66,7 +66,7 @@ import { useOrder } from '../../contexts/order-context';
 import { OrderService } from '../../services/order-service';
 import { updateSheetStatus, sendIcsEmail, createTask, updateOrderDateTime } from '../../app/actions/gas-actions';
 import { ORDER_GAS_URL } from '../../lib/settings';
-import { Mail, Pencil, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Mail, Pencil, Loader2, CheckCircle, AlertTriangle, Clock } from 'lucide-react';
 import { createContext, useContext, useState } from 'react';
 import { STORE_COLORS } from '../../lib/constants';
 import { useUserProfile } from '../../hooks/use-user-profile';
@@ -2377,6 +2377,75 @@ export function ScheduleView({
     value ? <div className="text-sm"><span className="font-semibold text-muted-foreground">{label}:</span> {String(value)}</div> : null
   );
 
+  const renderScheduleComparison = (target: any) => {
+    if (!target) return null;
+
+    // 1. フォーム入力時の当初予定 (作業予定日 / 予定時間)
+    const rawData = target.raw || {};
+    const originalDateRaw = findKey(rawData, ['作業予定日', '予定日', '日付', 'scheduledDate']) || target.scheduledDate || '';
+    const originalDate = originalDateRaw ? (originalDateRaw instanceof Date ? format(originalDateRaw, 'yyyy/MM/dd') : formatDate(String(originalDateRaw), 'yyyy/MM/dd') || String(originalDateRaw)) : '';
+
+    const originalTimeRaw = findKey(rawData, ['予定時間', '作業予定時間', '希望時間', '開始時間']) || target.scheduledTime || '';
+    const originalTime = originalTimeRaw ? formatTime(originalTimeRaw) : '';
+
+    // 2. 実際のチップ配置時刻 (チップ配置作業予定 / チップ配置作業完了予定 または target.start / target.end)
+    const chipStartRaw = findKey(rawData, ['チップ配置作業予定', 'chipWorkScheduled']) || target.start;
+    const chipEndRaw = findKey(rawData, ['チップ配置作業完了予定', 'chipWorkCompleted']) || target.end;
+
+    const chipDate = chipStartRaw ? (chipStartRaw instanceof Date ? format(chipStartRaw, 'yyyy/MM/dd') : formatDate(String(chipStartRaw), 'yyyy/MM/dd') || (originalDate || '---')) : (originalDate || '---');
+    const chipStartTime = chipStartRaw ? formatTime(chipStartRaw) : '';
+    const chipEndTime = chipEndRaw ? formatTime(chipEndRaw) : '';
+
+    // 3. ズレの判定
+    const hasDateDiff = Boolean(originalDate && chipDate && originalDate !== chipDate && originalDate !== '---' && chipDate !== '---');
+    const hasTimeDiff = Boolean(originalTime && chipStartTime && originalTime !== chipStartTime);
+    const hasScheduleDiff = hasDateDiff || hasTimeDiff;
+
+    return (
+      <div className="col-span-full bg-slate-50/90 dark:bg-slate-900/60 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 my-2 shadow-xs">
+        <div className="flex items-center justify-between mb-2.5">
+          <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            作業予定日時の照合（当初予定 vs チップ配置時刻）
+          </h4>
+          {hasScheduleDiff ? (
+            <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-300 font-bold text-[10px] px-2 py-0.5 shadow-xs">
+              ⚠️ 予定と配置時刻にズレあり
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">
+              ✓ 当初予定通り
+            </Badge>
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div className={cn(
+            "p-2.5 rounded-lg border transition-all",
+            hasScheduleDiff ? "bg-amber-50/80 dark:bg-amber-950/20 border-amber-300 dark:border-amber-900/50" : "bg-white dark:bg-slate-800 border-slate-200/70"
+          )}>
+            <div className="text-[11px] font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+              <span>📋</span> フォーム入力時の当初予定
+            </div>
+            <div className="font-bold text-foreground text-sm tracking-tight">
+              {originalDate || '日付未設定'} {originalTime ? `${originalTime}` : '時間指定なし'}
+            </div>
+          </div>
+          <div className={cn(
+            "p-2.5 rounded-lg border transition-all",
+            hasScheduleDiff ? "bg-blue-50/80 dark:bg-blue-950/20 border-blue-300 dark:border-blue-900/50" : "bg-white dark:bg-slate-800 border-slate-200/70"
+          )}>
+            <div className="text-[11px] font-semibold text-muted-foreground mb-1 flex items-center gap-1">
+              <span>⏱️</span> 実際のチップ配置時刻（タイムライン）
+            </div>
+            <div className="font-bold text-blue-600 dark:text-blue-400 text-sm tracking-tight">
+              {chipDate || '日付未設定'} {chipStartTime ? `${chipStartTime} 〜 ${chipEndTime || '未設定'}` : '未割当'}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderEditableItem = (label: string, field: string, type: 'text' | 'textarea' | 'date' | 'time' | 'number' | 'select' = 'text', options: string[] = []) => {
     if (!isEditingOrderDetails && !editOrderForm[field]) return null;
     return (
@@ -2814,8 +2883,9 @@ export function ScheduleView({
                     {dialogState.mode === 'details' && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
                         {renderDetailItem('担当者', staff?.name)}
-                        {renderDetailItem('フォーム入力者', event.submitter)}
+                        {renderDetailItem('フォーム入力者', event.submitter || (event.raw ? findKey(event.raw, ['フォーム入力者', '入力者', 'Submitter', '連絡者名']) : undefined) || '---')}
                         {renderDetailItem('受注日時', event.createdAt ? (event.createdAt instanceof Date ? format(event.createdAt, 'yyyy/MM/dd HH:mm:ss') : formatDate(event.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(event.createdAt)) : '---')}
+                        {renderScheduleComparison(event)}
                         {event.status === 'キャンセル' && (
                           <>
                             {renderDetailItem('キャンセル日時', event.cancelDate ? (formatDate(event.cancelDate, 'yyyy/MM/dd HH:mm:ss') || String(event.cancelDate)) : '---')}
@@ -2870,6 +2940,7 @@ export function ScheduleView({
 
                     {/* Edit form */}
                     <div className="grid gap-4 pt-4 border-t">
+                      {renderScheduleComparison(event)}
                       <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
                       {!event.rawOrderId && (
                         <div className="grid grid-cols-4 items-center gap-4">
@@ -3048,7 +3119,9 @@ export function ScheduleView({
                   <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
                       {renderDetailItem('受注ID', dialogState.order.id)}
+                      {renderDetailItem('フォーム入力者', dialogState.order.submitter || (dialogState.order.raw ? findKey(dialogState.order.raw, ['フォーム入力者', '入力者', 'Submitter', '連絡者名']) : undefined) || '---')}
                       {renderDetailItem('受注日時', dialogState.order.createdAt ? (dialogState.order.createdAt instanceof Date ? format(dialogState.order.createdAt, 'yyyy/MM/dd HH:mm:ss') : formatDate(dialogState.order.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(dialogState.order.createdAt)) : '---')}
+                      {renderScheduleComparison(dialogState.order)}
                       {dialogState.order.status === 'キャンセル' && (
                         <>
                           {renderDetailItem('キャンセル日時', dialogState.order.cancelDate ? (formatDate(dialogState.order.cancelDate, 'yyyy/MM/dd HH:mm:ss') || String(dialogState.order.cancelDate)) : '---')}
