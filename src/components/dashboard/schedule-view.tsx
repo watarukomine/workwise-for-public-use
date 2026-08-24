@@ -2940,7 +2940,6 @@ export function ScheduleView({
 
                     {/* Edit form */}
                     <div className="grid gap-4 pt-4 border-t">
-                      {renderScheduleComparison(event)}
                       <div className="text-sm"><p><span className="font-semibold text-muted-foreground">担当:</span> {staff?.name}</p></div>
                       {!event.rawOrderId && (
                         <div className="grid grid-cols-4 items-center gap-4">
