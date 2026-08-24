@@ -1,5 +1,22 @@
-# Firebase Studio
+# WorkWise (データベース版)
 
-This is a NextJS starter in Firebase Studio.
+トヨタモビリティパーツ株式会社 神奈川支社向け フィールドサービス管理・スケジュール最適化アプリケーション。
 
-To get started, take a look at src/app/page.tsx.
+## 主な機能
+
+- **ダッシュボード (ガントチャート)**: ドラッグ＆ドロップによる案件割り当て、リアルタイムステータス追跡、緊急連絡アラート監視。
+- **受注管理 (`/orders`)**: Firestoreデータベース直結の一覧テーブル、セル直接インライン編集。
+- **新規受注フォーム (`/order-form`)**: 販売店マスタ自動補完、自動採番カウンターによる案件登録。
+- **スタッフ管理 & 月間シフト (`/staff`)**: スタッフマスタ管理、月間シフト表カレンダー、Excel/CSVシフト一括インポート。
+- **販売店情報 (`/customers`)**: 顧客マスタ管理、インライン編集、位置情報管理。
+- **データ一括インポート (`/import`)**: CSV/Excelからの高速一括取り込み、自動ジオコーディング（緯度経度取得）、マージ/上書きモード。
+- **分析レポート (`/admin/analytics`)**: 日別推移、スタッフ稼働状況、店舗分布、移動時間、タイヤサイズ別分析、Excel/PDF出力。
+- **ルート最適化 (`/optimizer`)**: Google Maps Routes API を利用した巡回ルート最適化。
+- **現場スタッフ画面 (`/check-in`)**: 出勤/退勤打刻、ステータス順序制御（移動開始→現場到着→作業開始→作業完了）、GPS位置情報取得、緊急連絡・解除。
+- **マニュアル・ドキュメント (`/manuals`)**: 各種PDFマニュアルの閲覧・ダウンロード、データ登録用CSVテンプレート提供、トラブルシューティングガイド。
+
+## アーキテクチャ
+
+- **フロントエンド**: Next.js 16 (App Router), React 18, TypeScript, Tailwind CSS, Radix UI
+- **バックエンド/DB**: Google Cloud Firestore, Firebase Authentication, Firebase Storage
+- **外部サービス**: Google Maps Platform (Maps, Geocoding, Places, Routes)

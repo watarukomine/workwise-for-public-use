@@ -2,83 +2,96 @@
 <div class="cover-page">
   <img src="file:///Users/tmpmarketingsectionofkanagawa/WorkWise/public/icons/icon-512x512.png" alt="WorkWise Logo" class="cover-logo" />
   <h1 class="cover-title">WorkWise</h1>
-  <p class="cover-subtitle">システム仕様書</p>
+  <p class="cover-subtitle">システム仕様書 (データベース版)</p>
   <p class="cover-footer">TOYOTA MOBILITY PARTS　KANAGAWA BRANCH</p>
 </div>
 
 <div style="page-break-after: always;"></div>
 
-# WorkWise システム仕様書
+# WorkWise システム仕様書 (データベース版)
 
 ## 1. システム概要
 
-**WorkWise** は、フィールドスタッフのスケジュール管理、オーダー受注、作業報告、および管理者による分析・モニタリングを一元化するWebアプリケーションです。
-Googleスプレッドシートをバックエンドのデータソースとして利用し、リアルタイムな情報共有と柔軟なデータ管理を実現しています。
+**WorkWise (ワークワイズ)** は、トヨタモビリティパーツ株式会社 神奈川支社向けに設計されたフィールドサービス管理・スケジュール最適化Webアプリケーションです。
+現場スタッフへの案件（受注）の配車・割当、リアルタイムの作業進捗追跡、GPS位置情報管理、および業務パフォーマンスの高度な分析・レポーティングをワンストップで実現します。
 
-## 2. システム構成
+本システムは、**Firebase Firestore データベース** を主軸とした高可用性・低遅延のリアルタイムアーキテクチャを採用しており、複数端末間での即時データ同期、オフライン耐性、直感的なインラインデータ編集、およびCSV/Excelによるデータ一括処理を提供します。
 
-### 2.1. アーキテクチャ
+---
 
-- **フロントエンド**: Next.js (App Router), React, Tailwind CSS
-- **バックエンド/DB**: Google Sheets (データマスター), Firebase (認証・補助DB), Google Apps Script (API)
-- **認証**: Firebase Authentication (Email/Password)
-- **インフラ**: Vercel (フロントエンドホスティング)
+## 2. システム構成・アーキテクチャ
 
-### 2.2. 主要ライブラリ
+### 2.1. フロントエンド
+- **フレームワーク**: Next.js 16 (App Router) / React 18
+- **開発言語**: TypeScript 5
+- **スタイリング**: Tailwind CSS, CSS Modules
+- **UIコンポーネント**: Radix UI (shadcn/ui ベース), Lucide React
+- **ドラッグ＆ドロップ**: @dnd-kit/core
+- **データ可視化 (チャート)**: Recharts
+- **状態管理**: React Context API (`OrderContext`, `CustomerContext`, `SelectedStaffContext`, `UserProfileContext`)
 
-- **UIコンポーネント**: Shadcn UI, Radix UI
-- **チャート**: Recharts
-- **地図・ルート**: Google Maps JavaScript API
-- **PDF生成**: html2canvas, jsPDF
-- **Excel生成**: xlsx
-- **カレンダー連携**: ics (iCal生成)
+### 2.2. バックエンド & データベース
+- **プライマリデータベース**: Google Cloud Firestore (NoSQL Document Database)
+  - コレクション単位のリアルタイムリスナー (`onSnapshot`) によるミリ秒単位の双方向同期。
+  - バッチ書き込み (`writeBatch`) による大量データの一括コミット。
+- **認証**: Firebase Authentication (Email/Password) + Firestore Users プロファイル
+- **地図・位置情報**: Google Maps JavaScript API, Google Places Autocomplete, Geocoding API, Routes API
+- **AI / 最適化基盤**: Genkit, Google Gemini API
+- **帳票・エクスポート**: jsPDF, jspdf-autotable, xlsx (ExcelJS / SheetJS), ics (iCalendar)
 
-## 3. 機能一覧
+---
 
-### 3.1. ダッシュボード (管理者向け)
+## 3. データベース設計 (Firestore コレクション仕様)
 
-- **タイムライン表示**: スタッフごとのスケジュールをガントチャート形式で表示。ドラッグ＆ドロップによるオーダー割り当てが可能。
-- **リアルタイム更新**: 1分ごとの自動データリフレッシュ。
-- **未割当オーダー管理**: 担当者未定の案件をリスト化し、ドラッグ＆ドロップでアサイン可能。
-- **スタッフフィルタリング**: スタッフごとの表示・非表示切り替え。
-- **緊急連絡管理**: スタッフからの緊急連絡に対し、管理者による「返信」および「解除」が可能。
+| コレクション名 | 用途 | 主要フィールド |
+| :--- | :--- | :--- |
+| **`orders`** | 受注・案件情報 | `id`, `displayId`, `orderNo`, `customerName`, `assignedStaffId`, `scheduledDate`, `startTime`, `endTime`, `status`, `tireSize`, `tireCount`, `address`, `latitude`, `longitude`, `memo`, `emergencyReply`, `updatedAt` |
+| **`users`** (`staff`) | スタッフ・ユーザー情報 | `id`, `name`, `email`, `role` (admin/staff), `branch` (母店), `color`, `phone`, `isActive`, `createdAt` |
+| **`customers`** | 販売店・顧客マスタ | `id`, `customerCode`, `name`, `mainBranch`, `address`, `phone`, `contactPerson`, `latitude`, `longitude`, `updatedAt` |
+| **`workSchedules`** | シフトスケジュール | `id`, `staffId`, `date`, `shiftType`, `startTime`, `endTime`, `note` |
+| **`daily_attendance`** | 日次勤怠・打刻データ | `id` (`YYYY-MM-DD_staffId`), `staffId`, `date`, `clockInTime`, `clockOutTime`, `status`, `lastAction`, `latitude`, `longitude` |
+| **`employeeActions`** | 現場行動ログ・履歴 | `id`, `staffId`, `orderId`, `actionType` (出勤/移動/到着/開始/完了/退勤), `timestamp`, `latitude`, `longitude` |
+| **`counters`** | 自動採番カウンター | `id` (`orders`), `currentCount`, `prefix`, `lastUpdated` |
 
-### 3.2. 分析レポート (管理者向け)
+---
 
-- **ダッシュボード**:
-  - **日別推移**: 受注件数と稼働時間の推移（全幅表示）。
-  - **スタッフ稼働状況**: 担当件数と実稼働時間の比較（全幅表示）。
-  - **店舗別シェア**: 「母店別」「主管店舗別」の構成比を円グラフ表示。
-  - **曜日別・時間帯別**: 曜日や時間帯（8:00-19:00）による傾向分析。
-  - **移動時間分析**: スタッフごとの移動時間と移動効率を可視化。
-  - **タイヤサイズ別**: 作業時間の平均値をタイヤサイズごとに算出・比較（手入力時間も考慮）。
-- **エクスポート機能**:
-  - **PDF出力**: 全グラフをA4用紙1枚に収まるよう自動レイアウト調整して出力（html2canvas + jsPDF）。
-  - **Excel出力**: ダッシュボードの全データを「日別」「スタッフ別」「移動時間」など8つのシートに分割して出力 (.xlsx)。
+## 4. 主要機能詳細
 
-### 3.3. モバイル画面 (フィールドスタッフ向け)
+### 4.1. 認証と権限管理 (RBAC)
+- **管理者 (Admin)**:
+  - ダッシュボード（配車・タイムライン）、受注管理（全件編集）、スタッフ管理、販売店情報、データ一括インポート、分析レポート、ルート最適化への完全アクセス。
+- **現場スタッフ (Staff)**:
+  - チェックイン画面（出勤・退勤・作業進捗報告・緊急連絡）、個人スケジュール確認。
 
-- **業務ステータス管理**: 「出勤」「移動開始」「現場到着」「作業開始」「作業終了」の順次報告フロー。
-- **修正モード**: 誤操作時のステータス修正機能。
-- **緊急連絡**: ワンタップで管理者へアラートを通知。
+### 4.2. ダッシュボード (スケジュール・配車管理)
+- **インタラクティブ・ガントチャート**: スタッフごとの当日スケジュールをタイムライン表示。
+- **ドラッグ＆ドロップ割当**: 未割当オーダーをスタッフのタイムラインへ直感的に配置。
+- **自動同期 & 競合防止**: Firestoreのリアルタイム更新により、他ユーザーによる変更を画面リロード不要で即座に反映。
+- **緊急通知と対応**: 現場からの緊急連絡を画面最上部にバナー通知。管理者からの即時返信・解除機能を搭載。
 
-### 3.4. その他機能
+### 4.3. 受注管理 & 新規受注フォーム
+- **インライン直接編集**: 受注一覧テーブル上でセルをクリックして各項目の直接編集・即時保存が可能。
+- **新規受注フォーム (`/order-form`)**:
+  - 顧客マスタとの自動補完連携（店舗名選択で住所・電話番号を自動入力）。
+  - カウンターサービスによる自動ID採番。
 
-- **販売店管理**: 顧客情報の閲覧・検索・スプレッドシート連携。
-- **受注管理**: 全オーダーの閲覧・編集・スプレッドシート連携。
-- **ルート最適化**: Google Maps APIを用いた巡回ルートの最適化提案。
+### 4.4. データ一括インポート (`/import`)
+- CSV / Excel ファイルから `orders`, `users`, `customers` への一括取り込み。
+- 日本語ヘッダーの自動マッピング。
+- 住所からの緯度経度自動取得（ジオコーディング機能）。
+- マージ（追加/更新）モードおよび全件上書きモードのサポート。
 
-## 4. データ連携仕様
+### 4.5. 分析レポート & エクスポート
+- 日別推移、スタッフ稼働状況、店舗別シェア、曜日・時間帯別傾向、移動効率、タイヤサイズ別作業時間の分析。
+- **マルチシートExcel出力 (`.xlsx`)** & **A4用紙自動最適化PDF出力 (`.pdf`)**。
 
-- **Google Sheets**:
-  - `Orders`: オーダー情報（日時、場所、内容、ステータス）
-  - `Staff`: スタッフ情報（ID、名前、母店、色設定）
-  - `Customers`: 販売店マスタ
-- **同期仕様**:
-  - GASを介してJSON形式でデータを取得。
-  - 更新系（ステータス変更、アサイン）はPOSTリクエストでGAS経由でシートに書き込み。
+### 4.6. ルート最適化
+- Google Maps APIを活用した最短巡回ルートおよび移動時間の算出・スケジュール反映。
 
-## 5. 動作環境
+---
 
-- **PC (管理者)**: Google Chrome, Microsoft Edge (最新版)
-- **Mobile (スタッフ)**: iOS Safari, Android Chrome (最新版)
+## 5. 動作環境・セキュリティ
+
+- **通信**: HTTPS (TLS 1.3) による全通信の暗号化。
+- **データベースセキュリティ**: Firestore Security Rules による厳格なアクセス制御（認証必須・ロール別操作制御）。
+- **バックアップ**: Firestore 自動エクスポートおよび管理画面からのCSVエクスポートに対応。

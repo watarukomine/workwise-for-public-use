@@ -26,19 +26,19 @@ export default function TroubleshootingPage() {
             </div>
 
             <div className="mb-8">
-                <h1 className="text-3xl font-bold tracking-tight mb-2">エラーとトラブルシューティング一覧</h1>
+                <h1 className="text-3xl font-bold tracking-tight mb-2">エラーとトラブルシューティング (データベース版)</h1>
                 <p className="text-muted-foreground">
-                    WorkWiseアプリケーションで発生する可能性のあるエラーメッセージ、その原因、および対処方法をまとめています。
+                    WorkWise データベース版（Firebase Firestore）で発生する可能性のあるエラーメッセージ、その原因、および対処方法をまとめています。
                 </p>
             </div>
 
             <div className="space-y-8">
-                {/* 通信・システムエラー */}
+                {/* データベース・通信エラー */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>通信・システムエラー</CardTitle>
+                        <CardTitle>データベース・通信エラー</CardTitle>
                         <CardDescription>
-                            Google Apps Script (GAS) や Firebase (Firestore) との通信に関連するエラーです。
+                            Firebase (Firestore / Authentication) とのリアルタイム通信に関連するエラーです。
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -48,50 +48,40 @@ export default function TroubleshootingPage() {
                                     <TableHead className="w-[30%]">エラーメッセージ / 現象</TableHead>
                                     <TableHead className="w-[30%]">考えられる原因</TableHead>
                                     <TableHead className="w-[40%]">対処方法</TableHead>
-                                </TableRow>
+                                    </TableRow>
                             </TableHeader>
                             <TableBody>
                                 <TableRow>
-                                    <TableCell className="font-medium">GAS URLが設定されていません。</TableCell>
-                                    <TableCell>環境変数 `NEXT_PUBLIC_GAS_API_URL` または `NEXT_PUBLIC_ORDER_GAS_API_URL` が設定されていません。</TableCell>
-                                    <TableCell>システム管理者に連絡し、環境変数の設定を確認してください。</TableCell>
+                                    <TableCell className="font-medium">データ取得エラー / Failed to get orders</TableCell>
+                                    <TableCell>端末のオフライン状態、またはFirestoreのセキュリティルール・認証セッション切れ。</TableCell>
+                                    <TableCell>ネットワーク接続を確認し、ページをリロードしてください。改善しない場合は再ログインをお試しください。</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium">GASへのアクセス権限がありません。</TableCell>
-                                    <TableCell>GASのデプロイ設定で、アクセス権限が正しく設定されていません。</TableCell>
-                                    <TableCell>GASのデプロイ設定を開き、「アクセスできるユーザー」を「全員（Anyone）」に変更して再デプロイしてください。</TableCell>
+                                    <TableCell className="font-medium">Missing or insufficient permissions (権限エラー)</TableCell>
+                                    <TableCell>ログイン中のユーザーのロール（管理者/スタッフ）に必要なアクセス権が付与されていません。</TableCell>
+                                    <TableCell>システム管理者に連絡し、スタッフマスタまたはFirestore上の `role` 設定（`admin`）を確認・更新してもらってください。</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium">GASへのリクエストに失敗しました。<br /><span className="text-xs text-muted-foreground">Status: ...</span></TableCell>
-                                    <TableCell>ネットワークの問題、またはGAS側で予期しないエラーが発生しています。</TableCell>
-                                    <TableCell>ネットワーク接続を確認し、しばらく待ってから再試行してください。解消しない場合はGASの実行ログを確認してください。</TableCell>
+                                    <TableCell className="font-medium">Client is offline / ネットワーク接続エラー</TableCell>
+                                    <TableCell>インターネット接続が切断されているか、電波が不安定です。</TableCell>
+                                    <TableCell>電波の良好な環境に移動し、接続が復旧したことを確認した上で操作を再試行してください。</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium">GASスクリプトエラー: ...</TableCell>
-                                    <TableCell>GASの処理中にエラーが発生しました（例：スプレッドシートが見つからない、不正なデータ形式など）。</TableCell>
-                                    <TableCell>システム管理者に連絡し、GASの実行ログから詳細なエラー原因を特定してください。</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell className="font-medium">Sync Orders Error: ...</TableCell>
-                                    <TableCell>スプレッドシートからFirestoreへのデータ同期中にエラーが発生しました。</TableCell>
-                                    <TableCell>手動で同期ボタン（もしあれば）を押すか、ページをリロードしてください。GASのURL設定やネットワークを確認してください。</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell className="font-medium">Failed to get orders for ...</TableCell>
-                                    <TableCell>Firestoreからのデータ取得に失敗しました。</TableCell>
-                                    <TableCell>ネットワーク接続を確認してください。Firebaseのセキュリティルールやクォータ制限の可能性があります。</TableCell>
+                                    <TableCell className="font-medium">Quota exceeded (クォータ超過)</TableCell>
+                                    <TableCell>FirebaseまたはGoogle Cloud APIの一時的なリクエスト上限に達しました。</TableCell>
+                                    <TableCell>しばらく時間を置いてから再度アクセスしてください。頻発する場合は管理者にクォータ引き上げを依頼してください。</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
                     </CardContent>
                 </Card>
 
-                {/* 操作・入力エラー */}
+                {/* 操作・入力・インライン編集エラー */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>操作・入力エラー</CardTitle>
+                        <CardTitle>操作・入力・インライン編集エラー</CardTitle>
                         <CardDescription>
-                            日々の業務操作（スケジュールの変更、勤怠打刻など）で発生するエラーです。
+                            スケジュールの変更、セル直接編集、勤怠打刻、新規登録フォームで発生するエラーです。
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -105,41 +95,36 @@ export default function TroubleshootingPage() {
                             </TableHeader>
                             <TableBody>
                                 <TableRow>
-                                    <TableCell className="font-medium">担当スタッフが見つかりません。</TableCell>
-                                    <TableCell>操作対象のスタッフデータがシステム上に存在しない、またはIDが一致しません。</TableCell>
-                                    <TableCell>スタッフ一覧画面で該当スタッフが登録されているか確認してください。ブラウザをリロードして最新のデータを取得してください。</TableCell>
+                                    <TableCell className="font-medium">データの更新に失敗しました</TableCell>
+                                    <TableCell>インライン編集時のネットワーク切断、または他ユーザーによる同時削除など。</TableCell>
+                                    <TableCell>ページを再読み込みして最新データを表示し、再度セルを編集してください。</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium">更新エラー: シートの更新に失敗しました</TableCell>
-                                    <TableCell>スケジュール変更時にGAS（スプレッドシート）への書き込みに失敗しました。</TableCell>
-                                    <TableCell>変更は保存されていません。再試行してください。頻発する場合はGASの稼働状況を確認してください。</TableCell>
+                                    <TableCell className="font-medium">担当スタッフが見つかりません</TableCell>
+                                    <TableCell>指定されたスタッフがデータベースに存在しないか、無効化されています。</TableCell>
+                                    <TableCell>スタッフ管理画面で該当スタッフが正しく登録されているか確認してください。</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium">割当エラー: タスクの割り当てに失敗しました</TableCell>
-                                    <TableCell>ドラッグ＆ドロップによるタスク割り当て処理が失敗しました。</TableCell>
-                                    <TableCell>画面をリロードして最新の状態にしてから、再度操作を行ってください。</TableCell>
+                                    <TableCell className="font-medium">無効な時間形式です</TableCell>
+                                    <TableCell>時間入力形式が「HH:MM」の形式に合致していません。</TableCell>
+                                    <TableCell>半角数字で「09:30」「14:00」のように入力してください。</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium">エラー: 無効な時間形式です。</TableCell>
-                                    <TableCell>新規予定作成や編集ダイアログで、時間の入力形式が正しくありません。</TableCell>
-                                    <TableCell>「HH:MM」（例: 09:30）の形式で入力してください。</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell className="font-medium">エラー: 出勤/退勤処理に失敗しました。</TableCell>
-                                    <TableCell>ボタンを押した際の打刻処理に失敗しました。</TableCell>
-                                    <TableCell>ネットワーク接続を確認し、再試行してください。</TableCell>
+                                    <TableCell className="font-medium">出勤 / 退勤打刻に失敗しました</TableCell>
+                                    <TableCell>位置情報の取得拒否、または通信エラー。</TableCell>
+                                    <TableCell>ブラウザの位置情報（GPS）権限を許可し、電波の良い場所で再度打刻ボタンを押してください。</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
                     </CardContent>
                 </Card>
 
-                {/* インポート・データ処理エラー */}
+                {/* CSV / Excel インポートエラー */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>インポート・データ処理エラー</CardTitle>
+                        <CardTitle>CSV / Excel インポートエラー</CardTitle>
                         <CardDescription>
-                            Excelファイルのインポート機能などで発生するエラーです。
+                            データ一括インポート画面（`/import`）やシフト取り込みで発生するエラーです。
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -153,58 +138,61 @@ export default function TroubleshootingPage() {
                             </TableHeader>
                             <TableBody>
                                 <TableRow>
-                                    <TableCell className="font-medium">シートが空です。</TableCell>
-                                    <TableCell>アップロードされたExcelファイルにデータが含まれていません。</TableCell>
-                                    <TableCell>正しいファイルを選択しているか、ファイルの中身が空でないか確認してください。</TableCell>
+                                    <TableCell className="font-medium">ファイル形式エラー / 解析できません</TableCell>
+                                    <TableCell>破損したファイル、または対応外のフォーマットが指定されています。</TableCell>
+                                    <TableCell>標準的な `.csv` または `.xlsx` ファイルを使用してください。文字コードは UTF-8 を推奨します。</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium">読み込みエラー: ...</TableCell>
-                                    <TableCell>Excelファイルの形式が不正であるか、解析できないデータが含まれています。</TableCell>
-                                    <TableCell>ファイルが破損していないか、パスワード保護されていないか確認してください。`.xlsx` 形式を推奨します。</TableCell>
+                                    <TableCell className="font-medium">必須ヘッダーが見つかりません</TableCell>
+                                    <TableCell>CSV/Excelの列名がテンプレートと異なっています。</TableCell>
+                                    <TableCell>マニュアル画面から「CSVテンプレート」をダウンロードし、列名を合わせた上で再度アップロードしてください。</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium">取り込み失敗: スタッフ名のマッチングに失敗し...</TableCell>
-                                    <TableCell>Excel内のスタッフ名とシステム上のスタッフ名が一致しませんでした。</TableCell>
-                                    <TableCell>Excelのスタッフ名とシステム登録名（漢字、スペースの有無など）が一致しているか確認してください。</TableCell>
+                                    <TableCell className="font-medium">ジオコーディング失敗（位置情報取得不可）</TableCell>
+                                    <TableCell>住所の表記が不正（存在しない地名や番地の欠損）です。</TableCell>
+                                    <TableCell>住所が都道府県から正しく記載されているか確認してください。</TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium">マージ失敗: 現在のデータの取得に失敗しました。</TableCell>
-                                    <TableCell>「ファイルに含まれるスタッフのみ更新」モードでの処理中にエラーが発生しました。</TableCell>
-                                    <TableCell>ネットワークを確認するか、「ファイルに含まれるスタッフのみ更新」のチェックを外して（上書きモードで）試してください。</TableCell>
+                                    <TableCell className="font-medium">スタッフ名のマッチングに失敗しました</TableCell>
+                                    <TableCell>インポートデータ内の氏名と登録済みスタッフマスタの表記（姓名間のスペース等）に差異があります。</TableCell>
+                                    <TableCell>スタッフマスタの登録名とファイル内の氏名を一致させてください。</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
                     </CardContent>
                 </Card>
 
-                {/* その他 */}
+                {/* 表示・ブラウザ環境 */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>その他</CardTitle>
+                        <CardTitle>表示・ブラウザ環境トラブル</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead className="w-[30%]">現象・メッセージ</TableHead>
+                                    <TableHead className="w-[30%]">現象</TableHead>
                                     <TableHead className="w-[70%]">対処方法</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 <TableRow>
-                                    <TableCell className="font-medium">画面が真っ白になる / 読み込みが終わらない</TableCell>
-                                    <TableCell>ブラウザのキャッシュクリアを試すか、シークレットウィンドウでアクセスしてください。解消しない場合は開発者に問い合わせてください。</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell className="font-medium">「データを読み込み中...」のまま進まない (v1.1.25〜)</TableCell>
+                                    <TableCell className="font-medium">画面が更新されない / 古い情報が表示される</TableCell>
                                     <TableCell>
-                                        通信環境の影響によりGASからのレスポンスが遅延している可能性があります。<br />
-                                        <strong>対策:</strong> 30秒経過すると自動的に読み込みが解除されます。また、途中で表示される「キャンセル」ボタンを押して手動で中断し、電波の良い場所で再試行してください。
+                                        ブラウザのハード再読み込み（Ctrl + F5 または Shift + Command + R）を実行するか、キャッシュをクリアしてください。
                                     </TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell className="font-medium">「接続テスト失敗」</TableCell>
-                                    <TableCell>シフトインポート画面の「接続テスト」で失敗する場合、Firebaseへの書き込み権限がない可能性があります。管理者に確認してください。</TableCell>
+                                    <TableCell className="font-medium">地図（Google Maps）が表示されない</TableCell>
+                                    <TableCell>
+                                        ネットワーク制限（プロキシ等）でGoogle Mapsスクリプトがブロックされていないか確認してください。
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell className="font-medium">PDF出力で日本語が正しく出ない</TableCell>
+                                    <TableCell>
+                                        フォント読み込みが完了する前に出力が行われた可能性があります。ページをリロードして安定した回線で再度PDF出力を実行してください。
+                                    </TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
