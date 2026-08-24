@@ -374,7 +374,12 @@ export const OrderService = {
             '特記事項': specialNotesVal,
             '受注日時': (order as any).createdAt ? String((order as any).createdAt) : new Date().toISOString(),
             'createdAt': (order as any).createdAt ? String((order as any).createdAt) : new Date().toISOString(),
+            'updatedAt': new Date().toISOString(),
             'フォーム入力者': submitterVal,
+            'フォーム入力日時': (order as any).createdAt ? String((order as any).createdAt) : new Date().toISOString(),
+            '最終更新日時': new Date().toISOString(),
+            'formInputDate': (order as any).createdAt ? String((order as any).createdAt) : new Date().toISOString(),
+            'lastUpdatedAt': new Date().toISOString(),
         };
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {

@@ -162,6 +162,49 @@ export default function TroubleshootingPage() {
                     </CardContent>
                 </Card>
 
+                {/* スプレッドシート連携・自動バックアップ */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>スプレッドシート連携・自動バックアップトラブル</CardTitle>
+                        <CardDescription>
+                            Googleスプレッドシート（受注管理・汎用行動予定シート）への自動同期・数式に関連するエラーです。
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="w-[30%]">現象 / エラーメッセージ</TableHead>
+                                    <TableHead className="w-[30%]">考えられる原因</TableHead>
+                                    <TableHead className="w-[40%]">対処方法</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow>
+                                    <TableCell className="font-medium">受注Noや主管店舗・機材有無の数式がエラーになる（#REF!）</TableCell>
+                                    <TableCell>3行目以降のセル（A列、E列、F列）に値が直接書き込まれ、2行目のARRAYFORMULA自動展開がブロックされています。</TableCell>
+                                    <TableCell>3行目以降のA列・E列・F列の値を消去（クリア）してください。またはGASエディタで `repairAndCleanOrderSheet` 関数を実行してください。</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell className="font-medium">汎用チップ（移動・休憩等）が受注管理シートに出てくる</TableCell>
+                                    <TableCell>古い同期スクリプトやタスク型判定の不一致。</TableCell>
+                                    <TableCell>受注管理シート上の該当タスク行を削除してください。最新のバックアップスクリプトでは汎用行動予定シートへ自動分別されます。</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell className="font-medium">AR列の緊急フラグに「FALSE」が表示される</TableCell>
+                                    <TableCell>インポートデータ由来の文字列 `"FALSE"` が反映されていたため。</TableCell>
+                                    <TableCell>最新版 `Backup.gs` を実行すると、通常時のセルはすべて自動的に綺麗な空欄（ブランク）に更新されます。</TableCell>
+                                </TableRow>
+                                <TableRow>
+                                    <TableCell className="font-medium">Specified permissions are not sufficient (GASエラー)</TableCell>
+                                    <TableCell>スクリプトからのトリガー自動作成権限（`scriptapp`）が未承認です。</TableCell>
+                                    <TableCell>GASエディタ左メニューの「⏰ トリガー」から手動で10分おきトリガー（関数: `runFirestoreBackup`）を追加してください。</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
                 {/* 表示・ブラウザ環境 */}
                 <Card>
                     <CardHeader>
