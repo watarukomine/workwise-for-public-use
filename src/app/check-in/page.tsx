@@ -12,8 +12,8 @@ import { useUserProfile } from '@/hooks/use-user-profile';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
-import { updateStaffStatus } from '@/services/attendance-service';
-import { cn, findKey, calculateTravelTimeMinutes, fetchRealtimeTravelMinutes, getStoreLocation, DEFAULT_OFFICE_LOCATION, formatDate } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { cn, findKey, calculateTravelTimeMinutes, fetchRealtimeTravelMinutes, getStoreLocation, DEFAULT_OFFICE_LOCATION, formatDate, formatTime } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
 import {
@@ -613,6 +613,113 @@ function CheckInClient() {
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {currentOrder && (
+            <div className="bg-slate-50 dark:bg-slate-900/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-xs text-muted-foreground font-semibold">
+                    {currentOrder.orderNo ? `受注No: ${currentOrder.orderNo}` : `ID: ${orderId}`}
+                  </div>
+                  <h3 className="text-base font-bold text-foreground">
+                    {currentOrder.customerName || (currentOrder as any).storeName || '店舗・現場名未設定'}
+                  </h3>
+                </div>
+                <Badge variant="outline" className="text-xs font-semibold">
+                  {currentOrder.serviceType || currentOrder.taskDetails || '作業'}
+                </Badge>
+              </div>
+
+              {/* 作業予定日時の照合カード（当初予定 vs チップ配置時刻） */}
+              {(() => {
+                const rawData = currentOrder.raw || {};
+                const origDateRaw = findKey(rawData, ['作業予定日', '予定日', '日付', 'scheduledDate']) || currentOrder.scheduledDate || '';
+                const origDate = origDateRaw ? (origDateRaw instanceof Date ? formatDate(origDateRaw.toISOString(), 'yyyy/MM/dd') : formatDate(String(origDateRaw), 'yyyy/MM/dd') || String(origDateRaw)) : '';
+                const origTimeRaw = findKey(rawData, ['予定時間', '作業予定時間', '希望時間', '開始時間']) || currentOrder.scheduledTime || '';
+                const origTime = origTimeRaw ? formatTime(origTimeRaw) : '';
+
+                const chipStartRaw = findKey(rawData, ['チップ配置作業予定', 'chipWorkScheduled']) || (currentOrder as any).start;
+                const chipEndRaw = findKey(rawData, ['チップ配置作業完了予定', 'chipWorkCompleted']) || (currentOrder as any).end;
+                const chipDate = chipStartRaw ? (chipStartRaw instanceof Date ? formatDate(chipStartRaw.toISOString(), 'yyyy/MM/dd') : formatDate(String(chipStartRaw), 'yyyy/MM/dd') || (origDate || '---')) : (origDate || '---');
+                const chipStartTime = chipStartRaw ? formatTime(chipStartRaw) : '';
+                const chipEndTime = chipEndRaw ? formatTime(chipEndRaw) : '';
+
+                const hasDateDiff = Boolean(origDate && chipDate && origDate !== chipDate && origDate !== '---' && chipDate !== '---');
+                const hasTimeDiff = Boolean(origTime && chipStartTime && origTime !== chipStartTime);
+                const hasDiff = hasDateDiff || hasTimeDiff;
+
+                return (
+                  <div className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold flex items-center gap-1 text-slate-700 dark:text-slate-300">
+                        <Clock className="w-3.5 h-3.5 text-blue-600" />
+                        作業予定日時の確認
+                      </span>
+                      {hasDiff ? (
+                        <Badge variant="outline" className="bg-amber-100 text-amber-900 border-amber-300 text-[10px] font-bold">
+                          ⚠️ 予定と配置時刻にズレあり
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">
+                          ✓ 当初予定通り
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className={cn("p-2 rounded border", hasDiff ? "bg-amber-50/70 dark:bg-amber-950/20 border-amber-200" : "bg-slate-50 dark:bg-slate-900/40 border-slate-100")}>
+                        <div className="text-[10px] text-muted-foreground font-semibold">📋 フォーム当初予定</div>
+                        <div className="font-bold text-foreground mt-0.5 text-xs">
+                          {origDate || '日付未設定'}<br />{origTime ? origTime : '時間指定なし'}
+                        </div>
+                      </div>
+                      <div className={cn("p-2 rounded border", hasDiff ? "bg-blue-50/70 dark:bg-blue-950/20 border-blue-200" : "bg-slate-50 dark:bg-slate-900/40 border-slate-100")}>
+                        <div className="text-[10px] text-muted-foreground font-semibold">⏱️ 実際の配置時刻</div>
+                        <div className="font-bold text-blue-600 dark:text-blue-400 mt-0.5 text-xs">
+                          {chipDate || '日付未設定'}<br />{chipStartTime ? `${chipStartTime}〜${chipEndTime || ''}` : '未割当'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 基本情報グリッド */}
+              <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-200/60 dark:border-slate-800">
+                <div>
+                  <span className="text-muted-foreground">フォーム入力者: </span>
+                  <span className="font-semibold text-foreground">
+                    {currentOrder.submitter || (currentOrder.raw ? findKey(currentOrder.raw, ['フォーム入力者', '入力者', 'Submitter', '連絡者名']) : undefined) || '---'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">担当者: </span>
+                  <span className="font-semibold text-foreground">{currentOrder.staffName || profile?.name || '---'}</span>
+                </div>
+                {(currentOrder.carName || currentOrder.regNo) && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">車両: </span>
+                    <span className="font-semibold text-foreground">
+                      {currentOrder.carName || ''} {currentOrder.regNo ? `(${currentOrder.regNo})` : ''}
+                    </span>
+                  </div>
+                )}
+                {(currentOrder.tireSize || currentOrder.quantity) && (
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">タイヤ: </span>
+                    <span className="font-semibold text-foreground">
+                      {currentOrder.tireSize || ''} {currentOrder.quantity ? `(${currentOrder.quantity}本)` : ''}
+                    </span>
+                  </div>
+                )}
+                {currentOrder.specialNotes && (
+                  <div className="col-span-2 bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 text-amber-900 dark:text-amber-200">
+                    <span className="font-bold">特記事項: </span>
+                    <span>{currentOrder.specialNotes}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             {actionButtons.map(({ action, label, icon: Icon }) => (
               <Button
