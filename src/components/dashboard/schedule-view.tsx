@@ -3386,7 +3386,22 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
           }
 
           const displayStatus = (etaOverdue && (rawStatus === '帰社中' || rawStatus === '移動中')) ? '待機中' : rawStatus;
-          const destName = status.nextDestination || (events && events.length > 0 ? (events[0].customerName || (events[0] as any).storeName) : '');
+
+          // Resolve destination name with smart fallback (Active event > Upcoming non-completed event > Latest event)
+          let destName = status.nextDestination;
+          if (!destName && events && events.length > 0) {
+            const activeEvent = events.find(e => ['移動中', '作業中', '作業待ち'].includes(e.status || ''));
+            if (activeEvent) {
+              destName = activeEvent.customerName || (activeEvent as any).storeName || (activeEvent as any).destination;
+            } else {
+              const pendingEvent = events.find(e => e.status !== '作業完了' && e.status !== 'キャンセル');
+              if (pendingEvent) {
+                destName = pendingEvent.customerName || (pendingEvent as any).storeName || (pendingEvent as any).destination;
+              } else {
+                destName = events[events.length - 1].customerName || (events[events.length - 1] as any).storeName || (events[events.length - 1] as any).destination;
+              }
+            }
+          }
 
           return (
             <div className="text-xs text-center font-medium leading-snug">

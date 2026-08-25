@@ -92,12 +92,22 @@ function CheckInClient() {
         etaStr = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
       } else if (step === 'next_task') {
         newStatus = '移動中';
-        // Find next scheduled order for today
+        // Find next scheduled order for today for this staff
         const todayStr = formatDate(now.toISOString(), 'yyyy-MM-dd');
-        const nextOrder = orders.find(o => {
+        const staffOrders = orders.filter(o => {
           const oDate = o.scheduledDate ? formatDate(o.scheduledDate, 'yyyy-MM-dd') : '';
-          return oDate === todayStr && o.status !== '作業完了' && o.status !== 'キャンセル' && o.id !== currentOrder?.id;
+          const isMyOrder = (profile?.name && o.staffName === profile.name) || (profile?.id && o.staffId === profile.id);
+          return oDate === todayStr && isMyOrder && o.status !== '作業完了' && o.status !== 'キャンセル' && o.id !== currentOrder?.id;
         });
+
+        // Sort by scheduledTime
+        staffOrders.sort((a, b) => {
+          const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0;
+          const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0;
+          return tA - tB;
+        });
+
+        const nextOrder = staffOrders[0];
 
         if (nextOrder) {
           nextDest = nextOrder.customerName || (nextOrder as any).storeName || '次の現場';
@@ -349,16 +359,12 @@ function CheckInClient() {
               destStr = DEFAULT_OFFICE_LOCATION.name;
               etaStr = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
             } else if (action === 'Start Travel') {
-              const todayStr = formatDate(now.toISOString(), 'yyyy-MM-dd');
-              const nextOrder = orders.find(o => {
-                const oDate = o.scheduledDate ? formatDate(o.scheduledDate, 'yyyy-MM-dd') : '';
-                return oDate === todayStr && o.status !== '作業完了' && o.status !== 'キャンセル' && o.id !== currentOrder?.id;
-              });
-
-              if (nextOrder) {
-                destStr = nextOrder.customerName || (nextOrder as any).storeName || '次の現場';
-                const destLat = nextOrder.latitude || DEFAULT_OFFICE_LOCATION.latitude;
-                const destLng = nextOrder.longitude || DEFAULT_OFFICE_LOCATION.longitude;
+              // Target destination is the currentOrder itself
+              const targetOrder = currentOrder;
+              if (targetOrder) {
+                destStr = targetOrder.customerName || (targetOrder as any).storeName || targetOrder.title || '現場';
+                const destLat = targetOrder.latitude || DEFAULT_OFFICE_LOCATION.latitude;
+                const destLng = targetOrder.longitude || DEFAULT_OFFICE_LOCATION.longitude;
                 const travelMin = await fetchRealtimeTravelMinutes(latitude, longitude, destLat, destLng);
                 const etaDate = new Date(now.getTime() + travelMin * 60000);
                 etaStr = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
@@ -409,18 +415,15 @@ function CheckInClient() {
             firestoreFields.nextDestination = targetOfficeLocation.name;
             firestoreFields.estimatedArrivalTime = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
           } else if (action === 'Start Travel') {
-            const todayStr = formatDate(now.toISOString(), 'yyyy-MM-dd');
-            const nextOrder = orders.find(o => {
-              const oDate = o.scheduledDate ? formatDate(o.scheduledDate, 'yyyy-MM-dd') : '';
-              return oDate === todayStr && o.status !== '作業完了' && o.status !== 'キャンセル' && o.id !== currentOrder?.id;
-            });
-
-            if (nextOrder) {
-              firestoreFields.nextDestination = nextOrder.customerName || (nextOrder as any).storeName || '次の現場';
-              const destLat = nextOrder.latitude || DEFAULT_OFFICE_LOCATION.latitude;
-              const destLng = nextOrder.longitude || DEFAULT_OFFICE_LOCATION.longitude;
+            // Target destination is the currentOrder itself
+            const targetOrder = currentOrder;
+            if (targetOrder) {
+              const targetDest = targetOrder.customerName || (targetOrder as any).storeName || targetOrder.title || '現場';
+              const destLat = targetOrder.latitude || DEFAULT_OFFICE_LOCATION.latitude;
+              const destLng = targetOrder.longitude || DEFAULT_OFFICE_LOCATION.longitude;
               const travelMin = await fetchRealtimeTravelMinutes(latitude, longitude, destLat, destLng);
               const etaDate = new Date(now.getTime() + travelMin * 60000);
+              firestoreFields.nextDestination = targetDest;
               firestoreFields.estimatedArrivalTime = etaDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
             }
           }
