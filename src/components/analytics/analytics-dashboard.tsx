@@ -549,7 +549,8 @@ export function AnalyticsDashboard() {
                 }
             }
 
-            if (duration === 0) return;
+            // If 0 or negative, skip this order for average calculation
+            if (duration <= 0) return;
 
             // Extract Inch
             const tireSize = order.tireSize || '';

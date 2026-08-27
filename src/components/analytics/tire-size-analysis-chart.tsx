@@ -82,8 +82,8 @@ export function TireSizeAnalysisChart({ orders }: TireSizeAnalysisChartProps) {
                 }
             }
 
-            // If still 0, we skip this order for the average calculation
-            if (duration === 0) return;
+            // If 0 or negative, we skip this order for the average calculation
+            if (duration <= 0) return;
 
 
             // Extract Inch
