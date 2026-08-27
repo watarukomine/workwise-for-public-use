@@ -13,7 +13,7 @@ import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
 import type { StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
-import { cn, findKey, calculateTravelTimeMinutes, fetchRealtimeTravelMinutes, getStoreLocation, DEFAULT_OFFICE_LOCATION, formatDate, formatTime } from '@/lib/utils';
+import { cn, findKey, calculateTravelTimeMinutes, fetchRealtimeTravelMinutes, getStoreLocation, DEFAULT_OFFICE_LOCATION, formatDate, formatTime, calculateWorkDurationMinutes } from '@/lib/utils';
 import { useSearchParams } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
 import {
@@ -439,10 +439,25 @@ function CheckInClient() {
             firestoreFields[mappedField] = now.toISOString();
           }
 
+          const currentStart = action === 'Begin Task' ? now.toISOString() : (currentOrder as any)?.actualStartTime;
+          const currentArrival = action === 'Arrive' ? now.toISOString() : (currentOrder as any)?.arrivalTimestamp;
+          const currentEnd = action === 'Finish Task' ? now.toISOString() : (currentOrder as any)?.actualEndTime;
+          const computedDuration = calculateWorkDurationMinutes(currentStart, currentArrival, currentEnd);
+
+          if (computedDuration !== null) {
+            firestoreFields.workDuration = computedDuration;
+            firestoreFields.actualDuration = computedDuration;
+          }
+
           await OrderService.updateOrder(sysId, firestoreFields);
         }
 
         // 3. Async Background Backup to GAS Spreadsheet (non-blocking)
+        const currentStartForGas = action === 'Begin Task' ? now.toISOString() : (currentOrder as any)?.actualStartTime;
+        const currentArrivalForGas = action === 'Arrive' ? now.toISOString() : (currentOrder as any)?.arrivalTimestamp;
+        const currentEndForGas = action === 'Finish Task' ? now.toISOString() : (currentOrder as any)?.actualEndTime;
+        const computedDurationForGas = calculateWorkDurationMinutes(currentStartForGas, currentArrivalForGas, currentEndForGas);
+
         updateSheetStatus({
           gasUrl: ORDER_GAS_URL,
           eventTitle: eventTitleForUpdate,
@@ -457,9 +472,13 @@ function CheckInClient() {
           emergencyFlag: (action as string) === 'Emergency' ? true : undefined,
           systemId: sysId,
           startTravelTime: action === 'Start Travel' ? now.toISOString() : (currentOrder as any)?.startTravelTime,
-          arrivalTimestamp: action === 'Arrive' ? now.toISOString() : (currentOrder as any)?.arrivalTimestamp,
-          actualStartTime: action === 'Begin Task' ? now.toISOString() : (currentOrder as any)?.actualStartTime,
-          actualEndTime: action === 'Finish Task' ? now.toISOString() : (currentOrder as any)?.actualEndTime,
+          arrivalTimestamp: currentArrivalForGas,
+          actualStartTime: currentStartForGas,
+          actualEndTime: currentEndForGas,
+          workDuration: computedDurationForGas,
+          actualDuration: computedDurationForGas,
+          '所要時間': computedDurationForGas ?? '',
+          '作業時間（分）': computedDurationForGas ?? '',
         }).catch(gasErr => {
           console.warn("GAS background sync skipped or warning:", gasErr);
         });

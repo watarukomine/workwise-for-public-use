@@ -88,6 +88,8 @@ export async function updateSheetStatus(args: {
     scheduledDate?: string | null;
     comment?: string | null;
     estimatedDuration?: number | null;
+    workDuration?: number | string | null;
+    actualDuration?: number | string | null;
     cancelDate?: string | null;
     cancelContact?: string | null;
     systemId?: string | null;

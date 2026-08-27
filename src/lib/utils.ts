@@ -901,3 +901,50 @@ export function createNormalizedKeySet(entries: (string | undefined | null)[]): 
   });
   return set;
 }
+
+/**
+ * 作業完了時刻と、作業開始時刻（未設定の場合は現場到着時刻）から所要時間（分）を算出します。
+ * @param startTime 作業開始時刻 (ISO文字列、Date、またはHH:mm)
+ * @param arrivalTime 現場到着時刻 (ISO文字列、Date、またはHH:mm)
+ * @param endTime 作業完了時刻 (ISO文字列、Date、またはHH:mm)
+ * @returns 所要時間（分単位の整数値）。算出できない場合は null
+ */
+export function calculateWorkDurationMinutes(
+  startTime?: string | Date | null,
+  arrivalTime?: string | Date | null,
+  endTime?: string | Date | null
+): number | null {
+  if (!endTime) return null;
+  const startTarget = startTime || arrivalTime;
+  if (!startTarget) return null;
+
+  try {
+    const parseToDate = (val: string | Date): Date | null => {
+      if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+      const str = String(val).trim();
+      if (!str) return null;
+      if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(str)) {
+        const parts = str.split(':').map(Number);
+        const d = new Date();
+        d.setHours(parts[0], parts[1], parts[2] || 0, 0);
+        return d;
+      }
+      const d = new Date(str);
+      return isNaN(d.getTime()) ? null : d;
+    };
+
+    const sDate = parseToDate(startTarget);
+    const eDate = parseToDate(endTime);
+
+    if (!sDate || !eDate) return null;
+
+    const diffMs = eDate.getTime() - sDate.getTime();
+    if (diffMs < 0) {
+      return 0;
+    }
+    return Math.round(diffMs / (1000 * 60));
+  } catch {
+    return null;
+  }
+}
+

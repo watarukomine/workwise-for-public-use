@@ -1,8 +1,6 @@
 "use client";
 
-import { findKey } from '@/lib/utils';
-
-
+import { findKey, calculateWorkDurationMinutes } from '@/lib/utils';
 import { useState, useMemo, useEffect } from 'react';
 import { useOrder } from '@/contexts/order-context';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
@@ -101,16 +99,14 @@ export function AnalyticsDashboard() {
             return isWithinInterval(orderDate, { start, end });
         });
 
-        // Staff Filter
-        if (selectedStaffId && selectedStaffId !== 'all') {
+        // Filter by Staff
+        if (selectedStaffId !== 'all') {
+            const targetStaff = allStaff.find(s => s.id === selectedStaffId);
+            const targetName = targetStaff?.name;
+
             relevantOrders = relevantOrders.filter(order => {
-                // Check ID match
                 if (order.staffId === selectedStaffId) return true;
-                // Check Name match if ID missing (fallback)
-                if (!order.staffId && order.staffName) {
-                    const staff = allStaff.find(s => s.id === selectedStaffId);
-                    return staff && staff.name === order.staffName;
-                }
+                if (targetName && order.staffName === targetName) return true;
                 return false;
             });
         }
@@ -120,18 +116,16 @@ export function AnalyticsDashboard() {
 
     // Helper to calculate duration
     const getOrderDuration = (order: Order) => {
-        // Prefer actual time difference if available
-        if (order.actualStartTime && order.actualEndTime) {
-            const start = new Date(order.actualStartTime);
-            const end = new Date(order.actualEndTime);
-            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-                const diffMs = end.getTime() - start.getTime();
-                if (diffMs > 0) {
-                    return diffMs / (1000 * 60 * 60); // Hours
-                }
-            }
+        if (typeof order.workDuration === 'number' && order.workDuration > 0) {
+            return order.workDuration / 60; // Hours
         }
-        // Fallback to estimated duration
+        if (typeof (order as any).actualDuration === 'number' && (order as any).actualDuration > 0) {
+            return (order as any).actualDuration / 60; // Hours
+        }
+        const computedMin = calculateWorkDurationMinutes(order.actualStartTime, order.arrivalTimestamp, order.actualEndTime);
+        if (computedMin && computedMin > 0) {
+            return computedMin / 60; // Hours
+        }
         return (order.estimatedDuration || 60) / 60; // Hours
     };
 
@@ -165,13 +159,18 @@ export function AnalyticsDashboard() {
 
                 // Calculate actual duration if timestamps exist
                 let durationHours = (order.estimatedDuration || 60) / 60;
-                // Calculate actual duration
-                // Priority: Raw "Work Duration" column > Timestamp Diff
                 let actualDurationHours = 0;
 
-                // 1. Try raw data column first (User Request)
-                if (order.raw) {
-                    const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration', '実稼働時間']);
+                // 0. Pre-computed workDuration from Firestore (Highest Priority)
+                if (typeof order.workDuration === 'number' && order.workDuration > 0) {
+                    actualDurationHours = order.workDuration / 60;
+                } else if (typeof (order as any).actualDuration === 'number' && (order as any).actualDuration > 0) {
+                    actualDurationHours = (order as any).actualDuration / 60;
+                }
+
+                // 1. Try raw data column if workDuration is not yet set
+                if (actualDurationHours === 0 && order.raw) {
+                    const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration', '実稼働時間', '所要時間']);
                     if (rawDuration) {
                         const valStr = String(rawDuration);
                         // Handle "1:30" or "1:30:00" format (H:mm)
@@ -202,15 +201,11 @@ export function AnalyticsDashboard() {
                     }
                 }
 
-                // 2. Fallback to timestamps if column is empty
-                if (actualDurationHours === 0 && order.actualStartTime && order.actualEndTime) {
-                    const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
-                    const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
-                    if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
-                        const diffMs = end.getTime() - start.getTime();
-                        if (diffMs > 0) {
-                            actualDurationHours = diffMs / (1000 * 60 * 60); // Hours
-                        }
+                // 2. Fallback to timestamps (with arrivalTimestamp fallback)
+                if (actualDurationHours === 0 && (order.actualStartTime || order.arrivalTimestamp) && order.actualEndTime) {
+                    const computedMin = calculateWorkDurationMinutes(order.actualStartTime, order.arrivalTimestamp, order.actualEndTime);
+                    if (computedMin && computedMin > 0) {
+                        actualDurationHours = computedMin / 60; // Hours
                     }
                 }
 
@@ -370,51 +365,48 @@ export function AnalyticsDashboard() {
                     const estimated = (order.estimatedDuration || 60) / 60; // Hours
 
                     // Actual Hours
-                    // Actual Hours
                     let actual = 0;
 
-                    // 1. Try raw data column first (User Request)
-                    if (order.raw) {
-                        const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration', '実稼働時間']);
+                    // 0. Pre-computed workDuration from Firestore
+                    if (typeof order.workDuration === 'number' && order.workDuration > 0) {
+                        actual = order.workDuration / 60;
+                    } else if (typeof (order as any).actualDuration === 'number' && (order as any).actualDuration > 0) {
+                        actual = (order as any).actualDuration / 60;
+                    }
+
+                    // 1. Try raw data column if workDuration not set
+                    if (actual === 0 && order.raw) {
+                        const rawDuration = findKey(order.raw, ['作業所要時間', '作業時間', '作業時間（分）', '作業時間(分)', 'workTime', 'actualDuration', '実稼働時間', '所要時間']);
                         if (rawDuration) {
                             const valStr = String(rawDuration);
-                            // Handle "1:30" or "1:30:00" format (H:mm)
                             if (valStr.includes(':') && !valStr.includes('1899')) {
                                 const parts = valStr.split(':');
                                 if (parts.length >= 2) {
                                     const h = parseInt(parts[0], 10);
                                     const m = parseInt(parts[1], 10);
                                     if (!isNaN(h) && !isNaN(m)) {
-                                        actual = h + (m / 60); // Hours
+                                        actual = h + (m / 60);
                                     }
                                 }
-                            }
-                            // Handle GAS Date object string (1899-12-30...)
-                            else if (valStr.includes('1899')) {
+                            } else if (valStr.includes('1899')) {
                                 const date = new Date(valStr);
                                 if (!isNaN(date.getTime())) {
-                                    actual = (date.getHours() * 60 + date.getMinutes()) / 60; // Minutes to Hours
+                                    actual = (date.getHours() * 60 + date.getMinutes()) / 60;
                                 }
-                            }
-                            // Handle raw minutes (90)
-                            else {
+                            } else {
                                 const parsed = parseFloat(valStr);
                                 if (!isNaN(parsed) && parsed > 0) {
-                                    actual = parsed / 60; // Minutes to Hours
+                                    actual = parsed / 60;
                                 }
                             }
                         }
                     }
 
-                    // 2. Fallback to timestamps if column is empty
-                    if (actual === 0 && order.actualStartTime && order.actualEndTime) {
-                        const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
-                        const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
-                        if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
-                            const diffMs = end.getTime() - start.getTime();
-                            if (diffMs > 0) {
-                                actual = diffMs / (1000 * 60 * 60); // Hours
-                            }
+                    // 2. Fallback to timestamps
+                    if (actual === 0 && (order.actualStartTime || order.arrivalTimestamp) && order.actualEndTime) {
+                        const computedMin = calculateWorkDurationMinutes(order.actualStartTime, order.arrivalTimestamp, order.actualEndTime);
+                        if (computedMin && computedMin > 0) {
+                            actual = computedMin / 60;
                         }
                     }
 
@@ -441,15 +433,24 @@ export function AnalyticsDashboard() {
     const handleExportExcel = () => {
         const title = `${format(filteredData.start, 'yyyy年MM月')}活動レポート`;
 
-        // 1. Staff Workload
-        const workloadSheet = staffWorkloadData.map(d => ({
+        // 1. Overview Sheet
+        const overviewSheet = [
+            { '項目': '集計期間', '値': `${format(filteredData.start, 'yyyy/MM/dd')} 〜 ${format(filteredData.end, 'yyyy/MM/dd')}` },
+            { '項目': '総作業件数', '値': filteredData.orders.length },
+            { '項目': '総稼働予定時間 (h)', '値': (filteredData.orders.reduce((acc, o) => acc + (o.estimatedDuration || 60), 0) / 60).toFixed(1) },
+            { '項目': '稼働スタッフ数', '値': staffWorkloadData.length }
+        ];
+
+        // 2. Staff Workload Sheet
+        const staffSheet = staffWorkloadData.map(d => ({
             'スタッフ名': d.name,
             '担当件数': d.tasks,
-            '推定稼働時間(h)': d.hours.toFixed(1),
-            '実稼働時間(h)': d.actualHours.toFixed(1)
+            '予定総時間(h)': parseFloat(d.hours.toFixed(1)),
+            '実績総時間(h)': parseFloat((d.actualHours || 0).toFixed(1)),
+            '乖離(h)': parseFloat(((d.actualHours || 0) - d.hours).toFixed(1))
         }));
 
-        // 2. Daily Trend
+        // 3. Daily Trend Sheet
         const trendSheet = dailyTrendData.map(d => ({
             '日付': `${format(filteredData.start, 'yyyy/MM')}/${d.date}`,
             '受注件数': d.count,
@@ -457,33 +458,33 @@ export function AnalyticsDashboard() {
             '実作業時間(h)': d.actualHours
         }));
 
-        // 3. Shop Distribution
+        // 4. Shop Distribution Sheet
         const shopSheet = shopDistributionData.map(d => ({
-            '店舗名': d.name,
-            '受注件数': d.value
+            '拠点（母店）': d.name,
+            '作業件数': d.value,
+            'シェア(%)': ((d.value / filteredData.orders.length) * 100).toFixed(1) + '%'
         }));
 
-        // 4. Main Store Share
+        // 5. Main Store Share Sheet
         const mainStoreSheet = mainStoreShareData.map(d => ({
-            '主管店舗名': d.name,
-            '受注件数': d.value
+            '担当店舗': d.name,
+            '作業件数': d.value,
+            'シェア(%)': ((d.value / filteredData.orders.length) * 100).toFixed(1) + '%'
         }));
 
-        // 5. Day of Week
-        const daySheet = dayOfWeekData.map(d => ({
+        // 6. Day of Week Sheet
+        const dowSheet = dayOfWeekData.map(d => ({
             '曜日': d.day,
-            '受注件数': d.count,
-            '稼働時間(h)': d.hours
+            '件数': d.count
         }));
 
-        // 6. Time of Day
+        // 7. Time of Day Sheet
         const timeSheet = timeOfDayData.map(d => ({
             '時間帯': d.hour,
-            '受注件数': d.count,
-            '稼働時間(h)': d.hours
+            '件数': d.count
         }));
 
-        // 7. Travel Time (Logic replicated from StaffTravelTimeChart)
+        // 8. Travel Time (Logic replicated from StaffTravelTimeChart)
         const travelMap = new Map<string, { totalMinutes: number; count: number }>();
         filteredData.orders.forEach(order => {
             if (!order.startTravelTime || !order.arrivalTimestamp) return;
@@ -506,12 +507,25 @@ export function AnalyticsDashboard() {
         })).sort((a, b) => parseFloat(b['総移動時間(h)']) - parseFloat(a['総移動時間(h)']));
 
 
-        // 8. Tire Size (Logic replicated from TireSizeAnalysisChart)
+        // 9. Tire Size (Logic replicated from TireSizeAnalysisChart)
         const tireMap = new Map<string, { totalMinutes: number; count: number }>();
         filteredData.orders.forEach(order => {
             let duration = 0;
-            // Priority 1
-            if (order.actualStartTime && order.actualEndTime) {
+            // Priority 0: workDuration
+            if (typeof order.workDuration === 'number' && order.workDuration > 0) {
+                duration = order.workDuration;
+            } else if (typeof (order as any).actualDuration === 'number' && (order as any).actualDuration > 0) {
+                duration = (order as any).actualDuration;
+            }
+            // Priority 1: Timestamps
+            if (duration === 0 && (order.actualStartTime || order.arrivalTimestamp) && order.actualEndTime) {
+                const computedMin = calculateWorkDurationMinutes(order.actualStartTime, order.arrivalTimestamp, order.actualEndTime);
+                if (computedMin && computedMin > 0 && computedMin <= 600) {
+                    duration = computedMin;
+                }
+            }
+            // Priority 2: Fallback Logic
+            if (duration === 0 && order.actualStartTime && order.actualEndTime) {
                 const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
                 const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
                 if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {
@@ -519,29 +533,17 @@ export function AnalyticsDashboard() {
                     if (diff > 0 && diff <= 600) duration = diff;
                 }
             }
-            // Priority 2
+            // Priority 3: Raw column
             if (duration === 0 && order.raw) {
-                // Simplified check as per chart
-                const keys = ['作業時間（分）', '作業時間(分)', '作業時間', 'workTime', '作業所要時間'];
+                const keys = ['作業時間（分）', '作業時間(分)', '作業時間', 'workTime', '作業所要時間', '所要時間'];
                 let val: any;
-                for (const k of keys) { if (order.raw[k]) { val = order.raw[k]; break; } } // Simple search
-
-                // Better: use findKey utility if exported, or just manual check
-                // We don't have findKey imported, let's just do manual logic for consistency with chart
-                const rawDuration = (() => {
-                    for (const k of keys) {
-                        // case insensitive check? logic from utils is safer but we are inside component.
-                        // let's assume raw keys match what we saw.
-                        if (order.raw[k]) return order.raw[k];
-                    }
-                })();
-
-                if (rawDuration) {
-                    if (typeof rawDuration === 'string' && (rawDuration.includes('T') || rawDuration.includes('1899-'))) {
-                        const d = parseISO(rawDuration);
+                for (const k of keys) { if (order.raw[k]) { val = order.raw[k]; break; } }
+                if (val) {
+                    if (typeof val === 'string' && (val.includes('T') || val.includes('1899-'))) {
+                        const d = parseISO(val);
                         if (!isNaN(d.getTime())) duration = d.getHours() * 60 + d.getMinutes();
                     } else {
-                        const p = parseInt(String(rawDuration), 10);
+                        const p = parseInt(String(val), 10);
                         if (!isNaN(p) && p > 0 && p !== 1899) duration = p;
                     }
                 }
@@ -575,11 +577,12 @@ export function AnalyticsDashboard() {
 
 
         exportToExcel([
+            { name: '概要', data: overviewSheet },
             { name: '日別推移', data: trendSheet },
-            { name: 'スタッフ稼働', data: workloadSheet },
+            { name: 'スタッフ稼働', data: staffSheet },
             { name: '母店別シェア', data: shopSheet },
             { name: '主管店舗別シェア', data: mainStoreSheet },
-            { name: '曜日別', data: daySheet },
+            { name: '曜日別', data: dowSheet },
             { name: '時間帯別', data: timeSheet },
             { name: '移動時間', data: travelSheet },
             { name: 'タイヤサイズ別', data: tireSheet }

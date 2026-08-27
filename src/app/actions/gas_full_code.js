@@ -943,8 +943,14 @@ function updateSheetWithOrderInfo(params) {
         if (params.startTravelTime !== undefined) updateColumn(["移動開始"], params.startTravelTime ? parseSafeDate(params.startTravelTime, true) : "");
         if (params.arrivalTimestamp !== undefined) updateColumn(["現場到着"], params.arrivalTimestamp ? parseSafeDate(params.arrivalTimestamp, true) : "");
         if (params.actualStartTime !== undefined) updateColumn(["作業開始", "実績開始"], params.actualStartTime ? parseSafeDate(params.actualStartTime, true) : "");
-        if (params.actualEndTime !== undefined) updateColumn(["作業完了", "実績完了", "実績終了"], params.actualEndTime ? parseSafeDate(params.actualEndTime, true) : "");
-        if (params.actualDuration !== undefined) updateColumn(["作業時間（分）", "所要時間"], params.actualDuration);
+        const durationToUpdate = params.workDuration !== undefined && params.workDuration !== null && params.workDuration !== ''
+            ? params.workDuration
+            : (params.actualDuration !== undefined && params.actualDuration !== null && params.actualDuration !== ''
+                ? params.actualDuration
+                : params['所要時間']);
+        if (durationToUpdate !== undefined && durationToUpdate !== null && durationToUpdate !== '') {
+            updateColumn(["作業時間（分）", "所要時間"], Number(durationToUpdate));
+        }
         if (actionType && actionTimestamp) {
             const dateValue = parseSafeDate(actionTimestamp, true);
             const actionColMap = {

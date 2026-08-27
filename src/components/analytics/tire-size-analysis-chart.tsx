@@ -19,9 +19,17 @@ export function TireSizeAnalysisChart({ orders }: TireSizeAnalysisChartProps) {
             // 1. Calculate Duration
             let duration = 0;
 
-            // Priority 1: Actual Timestamps
-            if (order.actualStartTime && order.actualEndTime) {
-                const start = typeof order.actualStartTime === 'string' ? parseISO(order.actualStartTime) : order.actualStartTime;
+            // Priority 0: Pre-computed workDuration from Firestore
+            if (typeof order.workDuration === 'number' && order.workDuration > 0) {
+                duration = order.workDuration;
+            } else if (typeof (order as any).actualDuration === 'number' && (order as any).actualDuration > 0) {
+                duration = (order as any).actualDuration;
+            }
+
+            // Priority 1: Actual Timestamps (fallback to arrivalTimestamp if actualStartTime is missing)
+            if (duration === 0 && (order.actualStartTime || order.arrivalTimestamp) && order.actualEndTime) {
+                const startTarget = order.actualStartTime || order.arrivalTimestamp;
+                const start = typeof startTarget === 'string' ? parseISO(startTarget) : startTarget;
                 const end = typeof order.actualEndTime === 'string' ? parseISO(order.actualEndTime) : order.actualEndTime;
 
                 if ((start instanceof Date) && !isNaN(start.getTime()) && (end instanceof Date) && !isNaN(end.getTime())) {

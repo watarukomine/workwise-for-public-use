@@ -458,6 +458,24 @@ function updateSheetWithOrderInfo(params) {
         if (scheduledDate) updateColumn("作業予定日", new Date(scheduledDate));
         if (comment) updateColumn("任意コメント", comment);
         if (specialNotes !== undefined) updateColumn("特記事項", specialNotes);
+
+        // 訪問履歴・実績時刻の更新
+        if (params.startTravelTime) updateColumn("移動開始", new Date(params.startTravelTime));
+        if (params.arrivalTimestamp) updateColumn("現場到着", new Date(params.arrivalTimestamp));
+        if (params.actualStartTime) updateColumn("作業開始", new Date(params.actualStartTime));
+        if (params.actualEndTime) updateColumn("作業完了", new Date(params.actualEndTime));
+
+        // 所要時間（分）の更新
+        const durationVal = params.workDuration !== undefined && params.workDuration !== null && params.workDuration !== '' 
+            ? params.workDuration 
+            : (params.actualDuration !== undefined && params.actualDuration !== null && params.actualDuration !== '' 
+                ? params.actualDuration 
+                : params['所要時間']);
+        if (durationVal !== undefined && durationVal !== null && durationVal !== '') {
+            updateColumn("所要時間", Number(durationVal));
+            updateColumn("作業時間（分）", Number(durationVal));
+        }
+
         if (actionType && actionTimestamp) {
             const dateValue = new Date(actionTimestamp);
             const actionColMap = {

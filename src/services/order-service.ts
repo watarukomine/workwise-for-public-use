@@ -18,6 +18,7 @@ import type { Order, WithId } from '@/lib/types';
 import { CounterService } from './counter-service';
 import { ORDER_GAS_URL } from '@/lib/settings';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
+import { calculateWorkDurationMinutes } from '@/lib/utils';
 
 const COLLECTION = 'orders';
 
@@ -210,6 +211,12 @@ export const OrderService = {
         const docRef = doc(colRef, systemId);
         const now = serverTimestamp();
 
+        const computedDuration = calculateWorkDurationMinutes(
+          data.actualStartTime,
+          data.arrivalTimestamp,
+          data.actualEndTime
+        );
+
         const orderData = {
           ...data,
           id: systemId,
@@ -219,7 +226,8 @@ export const OrderService = {
           createdAt: now,
           updatedAt: now,
           status: data.status || '割当済',
-          isGasSynced: false
+          isGasSynced: false,
+          ...(computedDuration !== null ? { workDuration: computedDuration, actualDuration: computedDuration } : {})
         };
 
         // 2. Firestore Sync
@@ -248,10 +256,39 @@ export const OrderService = {
         const { firestore } = initializeFirebase();
         const docRef = doc(firestore, COLLECTION, id);
         
-        const updateData = {
+        let computedDuration: number | null = null;
+        if (data.actualStartTime !== undefined || data.arrivalTimestamp !== undefined || data.actualEndTime !== undefined) {
+            // Check if we need to fetch existing values to compute duration
+            let start = data.actualStartTime;
+            let arrival = data.arrivalTimestamp;
+            let end = data.actualEndTime;
+
+            if ((!start && !arrival) || !end) {
+                try {
+                    const existingDoc = await getDoc(docRef);
+                    if (existingDoc.exists()) {
+                        const d = existingDoc.data() as Order;
+                        if (start === undefined) start = d.actualStartTime;
+                        if (arrival === undefined) arrival = d.arrivalTimestamp;
+                        if (end === undefined) end = d.actualEndTime;
+                    }
+                } catch (fetchErr) {
+                    console.warn('[OrderService] Failed to fetch doc for duration calculation:', fetchErr);
+                }
+            }
+            computedDuration = calculateWorkDurationMinutes(start, arrival, end);
+        } else if (data.workDuration !== undefined) {
+            computedDuration = typeof data.workDuration === 'number' ? data.workDuration : parseInt(String(data.workDuration), 10) || null;
+        }
+
+        const updateData: any = {
             ...data,
             updatedAt: serverTimestamp()
         };
+        if (computedDuration !== null) {
+            updateData.workDuration = computedDuration;
+            updateData.actualDuration = computedDuration;
+        }
 
         await updateDoc(docRef, updateData);
 
@@ -296,6 +333,12 @@ export const OrderService = {
         const staffNameVal = order.staffName || (order as any).staff || (order as any)['作業担当者'] || (order as any)['担当者'] || (order as any)['スタッフ名'] || '';
         const staffIdVal = order.staffId || (order as any)['スタッフID'] || '';
 
+        const workDurationVal = order.workDuration !== undefined && order.workDuration !== null && order.workDuration !== ''
+            ? order.workDuration
+            : (order as any).actualDuration !== undefined && (order as any).actualDuration !== null && (order as any).actualDuration !== ''
+                ? (order as any).actualDuration
+                : calculateWorkDurationMinutes(order.actualStartTime, order.arrivalTimestamp, order.actualEndTime) ?? '';
+
         const customGasUrl = (order as any).gasUrl || (typeof window !== 'undefined' ? localStorage.getItem('custom_order_gas_url') : undefined) || ORDER_GAS_URL;
 
         const payload = {
@@ -331,6 +374,8 @@ export const OrderService = {
             submitter: submitterVal,
             staffName: staffNameVal,
             staffId: staffIdVal,
+            workDuration: workDurationVal,
+            actualDuration: workDurationVal,
             // Japanese column names matching exact Sheet headers
             SystemID: order.systemId || order.id,
             '作業担当者': staffNameVal,
@@ -372,6 +417,12 @@ export const OrderService = {
             '廃タイヤ処分': disposalVal,
             '連絡先': contactVal,
             '特記事項': specialNotesVal,
+            '所要時間': workDurationVal,
+            '作業時間（分）': workDurationVal,
+            '移動開始': order.startTravelTime ? (typeof order.startTravelTime === 'string' ? order.startTravelTime : order.startTravelTime.toISOString()) : '',
+            '現場到着': order.arrivalTimestamp ? (typeof order.arrivalTimestamp === 'string' ? order.arrivalTimestamp : order.arrivalTimestamp.toISOString()) : '',
+            '作業開始': order.actualStartTime ? (typeof order.actualStartTime === 'string' ? order.actualStartTime : order.actualStartTime.toISOString()) : '',
+            '作業完了': order.actualEndTime ? (typeof order.actualEndTime === 'string' ? order.actualEndTime : order.actualEndTime.toISOString()) : '',
             '受注日時': (order as any).createdAt ? String((order as any).createdAt) : new Date().toISOString(),
             'createdAt': (order as any).createdAt ? String((order as any).createdAt) : new Date().toISOString(),
             'updatedAt': new Date().toISOString(),
