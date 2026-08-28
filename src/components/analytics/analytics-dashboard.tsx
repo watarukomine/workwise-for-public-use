@@ -3,6 +3,7 @@
 import { findKey, calculateWorkDurationMinutes } from '@/lib/utils';
 import { useState, useMemo, useEffect } from 'react';
 import { useOrder } from '@/contexts/order-context';
+import { useCustomer } from '@/contexts/customer-context';
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { StaffWorkloadChart } from './staff-workload-chart';
@@ -26,6 +27,7 @@ import { Staff, Order } from '@/lib/types';
 
 export function AnalyticsDashboard() {
     const { orders: allOrders = [], isLoading: isOrdersLoading } = useOrder();
+    const { customers = [] } = useCustomer();
     const { allStaff = [], isLoading: isStaffLoading } = useSelectedStaff();
     const { profile, isLoading: isProfileLoading } = useUserProfile();
     const { loadRange } = useOrder();
@@ -246,12 +248,55 @@ export function AnalyticsDashboard() {
         }));
     }, [allStaff, filteredData.orders]);
 
+    // Helper to resolve Main Store from order or customers master
+    const getOrderMainStore = (order: Order) => {
+        if (order.mainStore && String(order.mainStore).trim() !== '') {
+            return String(order.mainStore).trim();
+        }
+        if ((order as any).mainBranch && String((order as any).mainBranch).trim() !== '') {
+            return String((order as any).mainBranch).trim();
+        }
+        if (order.raw && (order.raw['主管店舗'] || (order.raw as any).mainStore)) {
+            const rawStore = order.raw['主管店舗'] || (order.raw as any).mainStore;
+            if (rawStore && String(rawStore).trim() !== '') return String(rawStore).trim();
+        }
+
+        // Search in customers master
+        const code = order.customerCode || (order as any).userCode || (order.raw ? order.raw['ユーザーコード'] || order.raw['顧客コード'] : '');
+        if (code) {
+            const codeStr = String(code).trim();
+            const paddedCode = codeStr.padStart(5, '0');
+            const found = customers.find(c => {
+                const cCode = String(c.userCode || (c as any)['ユーザーコード'] || c.id || '').trim();
+                return cCode === codeStr || cCode === paddedCode || cCode.padStart(5, '0') === paddedCode;
+            });
+            if (found && (found.mainStore || (found as any)['主管店舗'])) {
+                return String(found.mainStore || (found as any)['主管店舗']).trim();
+            }
+        }
+
+        // Match by store name
+        const storeName = order.customerName || (order as any).storeName || (order.raw ? order.raw['店舗名'] || order.raw['店舗'] : '');
+        if (storeName) {
+            const nameStr = String(storeName).trim();
+            const found = customers.find(c => {
+                const cName = String(c.storeName || c.name || (c as any)['店舗名'] || (c as any)['店舗'] || '').trim();
+                return cName === nameStr || (cName && nameStr.includes(cName)) || (nameStr && cName.includes(nameStr));
+            });
+            if (found && (found.mainStore || (found as any)['主管店舗'])) {
+                return String(found.mainStore || (found as any)['主管店舗']).trim();
+            }
+        }
+
+        return '主管店舗不明';
+    };
+
     // Aggregation Logic (Main Store Share)
     const mainStoreShareData = useMemo(() => {
         const storeMap = new Map<string, number>();
 
         filteredData.orders.forEach((order: Order) => {
-            const storeName = order.mainStore || '主管店舗不明';
+            const storeName = getOrderMainStore(order);
             storeMap.set(storeName, (storeMap.get(storeName) || 0) + 1);
         });
 
@@ -262,7 +307,7 @@ export function AnalyticsDashboard() {
             value,
             color: colors[index % colors.length]
         }));
-    }, [filteredData.orders]);
+    }, [filteredData.orders, customers]);
 
     // Aggregation: Day of Week
     const dayOfWeekData = useMemo(() => {
