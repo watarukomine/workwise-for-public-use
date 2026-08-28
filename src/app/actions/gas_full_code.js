@@ -652,11 +652,44 @@ function createOrderSingleSheet(targetSsId, params) {
             }
         });
         sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
+        ensureArrayFormulas(sheet);
         sendFirebaseSignal('update');
         return successResponse("注文を登録しました。", { orderId: newSystemId, displayId: targetRow - 1 });
     } catch (error) {
         console.error("createOrderSingleSheet Error:", error);
         throw error;
+    }
+}
+
+/**
+ * A2, E2, F2 の ARRAYFORMULA 数式を検証し、消えていれば自動復元する自己修復関数
+ */
+function ensureArrayFormulas(sheet) {
+    try {
+        if (!sheet || sheet.getName() !== ORDER_SHEET_NAME) return;
+
+        // A2 (受注No)
+        const formulaA2 = '=ARRAYFORMULA(IF(B2:B<>"", ROW(B2:B)-1, ""))';
+        const cellA2 = sheet.getRange("A2");
+        if (!cellA2.getFormula() || !cellA2.getFormula().toUpperCase().includes("ARRAYFORMULA")) {
+            cellA2.setFormula(formulaA2);
+        }
+
+        // E2 (主管店舗)
+        const formulaE2 = '=ARRAYFORMULA(IF(C2:C<>"", IFERROR(XLOOKUP(TO_TEXT(C2:C), TO_TEXT(\'販売店情報 のコピー\'!B:B), \'販売店情報 のコピー\'!D:D, ""), ""), ""))';
+        const cellE2 = sheet.getRange("E2");
+        if (!cellE2.getFormula() || !cellE2.getFormula().toUpperCase().includes("ARRAYFORMULA")) {
+            cellE2.setFormula(formulaE2);
+        }
+
+        // F2 (機材有無)
+        const formulaF2 = '=ARRAYFORMULA(IF(C2:C<>"", IFERROR(XLOOKUP(TO_TEXT(C2:C), TO_TEXT(\'販売店情報 のコピー\'!B:B), \'販売店情報 のコピー\'!I:I, ""), ""), ""))';
+        const cellF2 = sheet.getRange("F2");
+        if (!cellF2.getFormula() || !cellF2.getFormula().toUpperCase().includes("ARRAYFORMULA")) {
+            cellF2.setFormula(formulaF2);
+        }
+    } catch (e) {
+        console.warn("ensureArrayFormulas error:", e);
     }
 }
 /**
