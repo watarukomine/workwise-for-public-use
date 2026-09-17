@@ -191,6 +191,23 @@ export default function DashboardPage() {
 
   const [showManagement, setShowManagement] = React.useState(false); // Default to OFF
 
+  // 「自分のタスクのみ」モード（モバイル用・localStorageで永続化）
+  const [myTasksOnly, setMyTasksOnly] = React.useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('workwise_my_tasks_only') === 'true';
+    }
+    return false;
+  });
+  const toggleMyTasksOnly = React.useCallback(() => {
+    setMyTasksOnly(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('workwise_my_tasks_only', String(next));
+      }
+      return next;
+    });
+  }, []);
+
   const fallbackAugust1StaffObjects = React.useMemo(() => [
     { id: "STAFF002", name: "佐藤 耕次", role: "staff" },
     { id: "STAFF004", name: "坂本 幸夫", role: "staff" },
@@ -818,8 +835,18 @@ export default function DashboardPage() {
               </Popover>
             </div>
 
-            {/* Mobile Actions: Form Link & Attendance */}
+            {/* Mobile Actions: Form Link, My Tasks Toggle & Attendance */}
             <div className="flex md:hidden items-center gap-1 ml-auto md:ml-0">
+              {showVerticalView && (
+                <Button
+                  variant={myTasksOnly ? "default" : "outline"}
+                  size="sm"
+                  onClick={toggleMyTasksOnly}
+                  className="text-xs h-8 px-2"
+                >
+                  {myTasksOnly ? "👤 自分のみ" : "👥 全員"}
+                </Button>
+              )}
               <Button variant="ghost" size="icon" asChild className="mr-1">
                 <Link href="/order-form">
                   <ExternalLink className="h-5 w-5" />
@@ -876,6 +903,7 @@ export default function DashboardPage() {
             currentDate={currentDate}
             checkedOutStaffIds={checkedOutStaffIds}
             scheduledStaffIds={scheduledStaffIds}
+            myTasksOnly={myTasksOnly}
           />
         ) : (
           <ScheduleView

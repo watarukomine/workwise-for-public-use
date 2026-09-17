@@ -27,6 +27,7 @@ interface VerticalScheduleViewProps {
   currentDate: Date;
   checkedOutStaffIds?: Set<string>;
   scheduledStaffIds?: Set<string>;
+  myTasksOnly?: boolean;
 }
 
 const formatTime = (date: Date | string | undefined) => {
@@ -36,7 +37,7 @@ const formatTime = (date: Date | string | undefined) => {
   return format(d, 'HH:mm');
 };
 
-export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffIds, scheduledStaffIds }: VerticalScheduleViewProps) {
+export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffIds, scheduledStaffIds, myTasksOnly }: VerticalScheduleViewProps) {
   const { customers } = useCustomer();
   const { scheduleEvents, orders } = useOrder();
   const { profile } = useUserProfile();
@@ -64,7 +65,12 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
       return startA.getTime() - startB.getTime();
     });
 
-  if (relevantEvents.length === 0) {
+  // myTasksOnly: ログインユーザーのタスクのみに絞り込み
+  const displayEvents = myTasksOnly && profile
+    ? relevantEvents.filter(e => e.staffId === profile.id)
+    : relevantEvents;
+
+  if (displayEvents.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -73,8 +79,17 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
         <CardContent>
           <div className="flex flex-col items-center justify-center h-48 text-center text-muted-foreground">
             <Briefcase className="h-12 w-12 mb-4" />
-            <p className="font-semibold">本日の予定はまだありません。</p>
-            <p className="text-sm">管理者がタスクを割り当てるのをお待ちください。</p>
+            {myTasksOnly ? (
+              <>
+                <p className="font-semibold">本日、自分のタスクはありません。</p>
+                <p className="text-sm mt-1">「👤 自分のみ」モードで表示中です。</p>
+              </>
+            ) : (
+              <>
+                <p className="font-semibold">本日の予定はまだありません。</p>
+                <p className="text-sm">管理者がタスクを割り当てるのをお待ちください。</p>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -83,7 +98,12 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
 
   return (
     <div className="space-y-4">
-      {relevantEvents.map((event) => {
+      {myTasksOnly && (
+        <div className="text-xs text-muted-foreground text-center py-1">
+          👤 自分のタスクのみ表示中（{displayEvents.length}件）
+        </div>
+      )}
+      {displayEvents.map((event) => {
         const customer = getCustomerById(event.locationId);
         const isTravel = event.title.includes('移動');
         const staffMember = staffData.find(s => s.id === event.staffId);
