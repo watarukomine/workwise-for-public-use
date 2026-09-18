@@ -50,7 +50,7 @@ body {
     --radius: 0.5rem;
 
     /* Timeline Constants */
-    --staff-col-width: 144px;
+    --staff-col-width: 225px;
     --status-col-width: 120px;
     --pixels-per-minute: 1.5;
   }

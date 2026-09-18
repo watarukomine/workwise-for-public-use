@@ -68,7 +68,7 @@ import { updateSheetStatus, sendIcsEmail, createTask, updateOrderDateTime } from
 import { ORDER_GAS_URL } from '../../lib/settings';
 import { Mail, Pencil, Loader2, CheckCircle, AlertTriangle, Clock } from 'lucide-react';
 import { createContext, useContext, useState } from 'react';
-import { STORE_COLORS } from '../../lib/constants';
+import { STORE_COLORS, MAIN_STORES } from '../../lib/constants';
 import { useUserProfile } from '../../hooks/use-user-profile';
 
 const PIXELS_PER_MINUTE = 1.5;
@@ -79,7 +79,9 @@ const TRAVEL_TIME_MINUTES = 30;
 const UNASSIGNED_TASKS_DROPPABLE_ID = 'unassigned-tasks-droppable-area';
 
 
-const STAFF_COL_WIDTH = 144;
+const STAFF_NAME_COL_WIDTH = 130;
+const STAFF_STORE_COL_WIDTH = 95;
+const STAFF_COL_WIDTH = STAFF_NAME_COL_WIDTH + STAFF_STORE_COL_WIDTH; // 225px
 const STATUS_COL_WIDTH = 120;
 const TOTAL_TIMELINE_WIDTH = STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH;
 const EMPTY_EVENTS: WithId<ScheduleEvent>[] = [];
@@ -1116,7 +1118,7 @@ export function ScheduleView({
     if (scrollContainer && scrollContainerRectRef.current && active.rect.current.translated) {
       // Calculate drop X position relative to the timeline grid starting point (adding scroll offset and subtracting staff column width)
       const relativeLeftToScrollContainer = active.rect.current.translated.left - scrollContainerRectRef.current.left;
-      const dropX = relativeLeftToScrollContainer + scrollContainer.scrollLeft - 144;
+      const dropX = relativeLeftToScrollContainer + scrollContainer.scrollLeft - STAFF_COL_WIDTH;
       
       const minutes = pixelsToMinutes(dropX);
       const baseDate = new Date(currentDate);
@@ -1127,7 +1129,7 @@ export function ScheduleView({
       // Directly update DOM elements without triggering React re-renders for high performance on low-spec PCs
       if (guidelineEl && guidelineTextEl) {
         guidelineEl.style.display = 'block';
-        guidelineEl.style.left = `${dropX + 144}px`;
+        guidelineEl.style.left = `${dropX + STAFF_COL_WIDTH}px`;
         guidelineEl.style.top = `${staffRowWrapper.offsetTop}px`;
         guidelineEl.style.height = `${staffRowWrapper.offsetHeight}px`;
         guidelineTextEl.innerText = timeStr;
@@ -1258,7 +1260,7 @@ export function ScheduleView({
         return new Date();
       }
       const relativeLeftToScrollContainer = active.rect.current.translated.left - scrollContainerRectRef.current.left;
-      const dropX = relativeLeftToScrollContainer + scrollContainer.scrollLeft - 144;
+      const dropX = relativeLeftToScrollContainer + scrollContainer.scrollLeft - STAFF_COL_WIDTH;
       const newStartMinutes = pixelsToMinutes(dropX);
       
       const startOfTimelineDay = new Date(currentDate);
@@ -2351,6 +2353,27 @@ export function ScheduleView({
     }
   };
 
+  const handleStoreChange = async (staffId: string, newStore: string) => {
+    try {
+      const { StaffService } = await import('@/services/staff-service');
+      await StaffService.updateStaff(staffId, {
+        '母店': newStore,
+        mainStore: newStore,
+        storeName: newStore
+      });
+      toast({
+        title: '拠点を変更しました',
+        description: `所属拠点を「${newStore}」に更新しました。`
+      });
+    } catch (e: any) {
+      toast({
+        variant: 'destructive',
+        title: '拠点更新エラー',
+        description: e.message || '拠点の更新に失敗しました。'
+      });
+    }
+  };
+
   const getDialogDetails = () => {
     if (dialogState.mode === 'details') {
       const { event } = dialogState;
@@ -2642,7 +2665,8 @@ export function ScheduleView({
 
                     {/* Header Row - Now inside ScrollArea for perfect alignment */}
                     <div className="sticky top-0 z-40 flex h-[34px] border-b bg-background/95 backdrop-blur-sm">
-                      <div className="sticky left-0 z-50 flex-shrink-0 font-semibold p-2 border-r bg-background w-[144px]">スタッフ</div>
+                      <div className="sticky left-0 z-50 flex-shrink-0 font-semibold px-2 py-1 border-r bg-background w-[130px] text-xs flex items-center">スタッフ</div>
+                      <div className="sticky left-[130px] z-50 flex-shrink-0 font-semibold px-2 py-1 border-r bg-background w-[95px] text-xs flex items-center justify-center">拠点</div>
                       <div className="relative flex-1 h-full">
                         {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                           <div key={i} className="absolute h-full border-l dynamic-left" {...{ 'style': { '--dynamic-left': `calc(${i * 60} * var(--pixels-per-minute) * 1px)` } as any }}>
@@ -2686,6 +2710,7 @@ export function ScheduleView({
                             onDoubleClickTimeline={handleDoubleClickTimeline} 
                             isToday={isToday(currentDate)}
                             scheduledStaffIds={scheduledStaffIds}
+                            onStoreChange={handleStoreChange}
                           />
                         );
                       })}
@@ -3315,12 +3340,14 @@ interface StaffRowProps {
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
   isToday: boolean;
   scheduledStaffIds?: Set<string>;
+  onStoreChange?: (staffId: string, newStore: string) => void;
 }
 
-const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomerByCode, onDoubleClickEvent, onDoubleClickTimeline, isToday, scheduledStaffIds }) => {
+const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomerByCode, onDoubleClickEvent, onDoubleClickTimeline, isToday, scheduledStaffIds, onStoreChange }) => {
   const { setNodeRef, isOver } = useDroppable({ id: staff.id });
   const { toggleTripSuppression } = useOrder();
-  const areaBgClass = staff['母店'] ? STORE_COLORS[staff['母店']] || 'bg-background' : 'bg-background';
+  const currentStore = staff['母店'] || (staff as any).mainStore || (staff as any).storeName || '';
+  const areaBgClass = currentStore ? STORE_COLORS[currentStore] || 'bg-background' : 'bg-background';
 
   const isShiftOn = !scheduledStaffIds || scheduledStaffIds.size === 0 || isStaffMatched(staff, Array.from(scheduledStaffIds));
 
@@ -3343,16 +3370,35 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
           </span>
         </div>
       )}
-      <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit w-[144px]")}>
+      {/* 1列目: スタッフ名 */}
+      <div className={cn("sticky left-0 z-20 flex-shrink-0 px-2 flex items-center border-r bg-inherit w-[130px]")}>
         <div className="font-semibold flex items-center gap-1.5 w-full truncate">
           <div className='w-2 h-8 rounded-full dynamic-bg shrink-0' {...{ 'style': { '--dynamic-bg-color': staff.color } as any }}></div>
-          <span className='truncate flex-1 min-w-0'>{staff.name}</span>
+          <span className='truncate flex-1 min-w-0 text-sm'>{staff.name}</span>
           {!isShiftOn && (
             <Badge variant="outline" className="text-[9px] px-1 py-0 bg-amber-100 text-amber-800 border-amber-300 font-bold shrink-0 leading-tight dark:bg-amber-950 dark:text-amber-300 dark:border-amber-700">
-              シフト外
+              外
             </Badge>
           )}
         </div>
+      </div>
+      {/* 2列目: 拠点プルダウン */}
+      <div className={cn("sticky left-[130px] z-20 flex-shrink-0 px-1 flex items-center justify-center border-r bg-inherit w-[95px]")}>
+        <Select
+          value={currentStore}
+          onValueChange={(val) => onStoreChange && onStoreChange(staff.id, val)}
+        >
+          <SelectTrigger className="h-7 text-xs font-semibold px-1.5 py-0 border-slate-300/80 dark:border-slate-700 bg-background/90 shadow-xs hover:bg-background focus:ring-1">
+            <SelectValue placeholder="未定" />
+          </SelectTrigger>
+          <SelectContent>
+            {MAIN_STORES.map((store) => (
+              <SelectItem key={store} value={store} className="text-xs">
+                {store}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
         <div className="absolute top-0 left-0 h-full w-full">
