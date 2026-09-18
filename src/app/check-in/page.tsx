@@ -5,16 +5,16 @@ import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw, BadgeCheck, Truck, Building, PauseCircle } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw, BadgeCheck, Truck, Building, PauseCircle, Car, CheckCheck, ArrowRightCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { ORDER_GAS_URL, STATUS_COLUMN_NAME } from '@/lib/settings';
-import type { StaffStatus, WithId, ScheduleEvent } from '@/lib/types';
+import type { StaffStatus, WithId, ScheduleEvent, Order } from '@/lib/types';
 import { Badge } from '@/components/ui/badge';
 import { cn, findKey, calculateTravelTimeMinutes, fetchRealtimeTravelMinutes, getStoreLocation, DEFAULT_OFFICE_LOCATION, formatDate, formatTime, calculateWorkDurationMinutes } from '@/lib/utils';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useOrder } from '@/contexts/order-context';
 import {
   Dialog,
@@ -37,6 +37,7 @@ function CheckInClient() {
   const [lastAction, setLastAction] = React.useState<{ action: ActionType, time: string } | null>(null);
   const { toast } = useToast();
   const { profile } = useUserProfile();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
   const { refetchOrders, orders, scheduleEvents, saveLocalEvent, deleteLocalEvent } = useOrder();
@@ -97,7 +98,7 @@ function CheckInClient() {
         const staffOrders = orders.filter(o => {
           const oDate = o.scheduledDate ? formatDate(o.scheduledDate, 'yyyy-MM-dd') : '';
           const isMyOrder = (profile?.name && o.staffName === profile.name) || (profile?.id && o.staffId === profile.id);
-          return oDate === todayStr && isMyOrder && o.status !== '作業完了' && o.status !== 'キャンセル' && o.id !== currentOrder?.id;
+          return oDate === todayStr && isMyOrder && o.status !== '作業完了' && o.status !== '完了' && o.id !== currentOrder?.id;
         });
 
         // Sort by scheduledTime
@@ -160,6 +161,165 @@ function CheckInClient() {
     const fromEvents = scheduleEvents.find(e => (e as any).systemId === cleanId || e.id === cleanId || e.id === orderId);
     return fromEvents || null;
   }, [orders, scheduleEvents, orderId]);
+
+  // 同一店舗の連続受注を判定・管理
+  const sameStoreOrdersInfo = React.useMemo(() => {
+    if (!currentOrder || !profile) {
+      return {
+        allSameStore: [] as Order[],
+        nextSameStoreOrders: [] as Order[],
+        precedingOrders: [] as Order[],
+        isContinuous: false,
+        currentIndex: 0,
+        totalCount: 0,
+        isArrivedAtStore: false,
+        nextOrder: null as Order | null,
+      };
+    }
+
+    const targetStore = currentOrder.customerName || (currentOrder as any).storeName || (currentOrder.raw ? findKey(currentOrder.raw, ['店舗名', '店舗', '顧客名']) : '') || '';
+    const targetCode = currentOrder.customerCode || (currentOrder as any).userCode || (currentOrder.raw ? findKey(currentOrder.raw, ['ユーザーコード', '顧客コード']) : '') || '';
+    const targetDate = currentOrder.scheduledDate ? formatDate(currentOrder.scheduledDate, 'yyyy-MM-dd') : formatDate(new Date().toISOString(), 'yyyy-MM-dd');
+
+    // 自分の当日の全オーダー
+    const myTodayOrders = orders.filter(o => {
+      const oDate = o.scheduledDate ? formatDate(o.scheduledDate, 'yyyy-MM-dd') : '';
+      const isMy = (profile?.name && o.staffName === profile.name) || (profile?.id && o.staffId === profile.id);
+      return isMy && oDate === targetDate && o.status !== 'キャンセル';
+    });
+
+    // 同じ店舗のオーダーを抽出
+    const sameStore = myTodayOrders.filter(o => {
+      const sName = o.customerName || (o as any).storeName || (o.raw ? findKey(o.raw, ['店舗名', '店舗', '顧客名']) : '') || '';
+      const sCode = o.customerCode || (o as any).userCode || (o.raw ? findKey(o.raw, ['ユーザーコード', '顧客コード']) : '') || '';
+
+      const codeMatch = targetCode && sCode && (targetCode === sCode || String(targetCode).padStart(5, '0') === String(sCode).padStart(5, '0'));
+      const nameMatch = targetStore && sName && (targetStore === sName || targetStore.includes(sName) || sName.includes(targetStore));
+      return codeMatch || nameMatch;
+    });
+
+    // 時間順にソート
+    sameStore.sort((a, b) => {
+      const tA = a.scheduledTime ? new Date(a.scheduledTime).getTime() : 0;
+      const tB = b.scheduledTime ? new Date(b.scheduledTime).getTime() : 0;
+      return tA - tB;
+    });
+
+    const currentCleanId = (currentOrder as any).systemId || currentOrder.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
+    const currentIndex = sameStore.findIndex(o => {
+      const oCleanId = (o as any).systemId || o.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
+      return oCleanId === currentCleanId || o.id === currentOrder.id;
+    });
+
+    const precedingOrders = currentIndex > 0 ? sameStore.slice(0, currentIndex) : [];
+    const nextSameStoreOrders = currentIndex >= 0 ? sameStore.slice(currentIndex + 1).filter(o => o.status !== '作業完了' && o.status !== '完了') : [];
+
+    // 先行タスクがすでに現場到着または作業中・完了しているか
+    const isArrivedAtStore = precedingOrders.some(o =>
+      ['作業待ち', '作業中', '作業完了', '完了'].includes(o.status || '') ||
+      !!(o as any).arrivalTimestamp || !!(o as any).actualStartTime
+    );
+
+    return {
+      allSameStore: sameStore,
+      nextSameStoreOrders,
+      precedingOrders,
+      isContinuous: sameStore.length > 1,
+      currentIndex: currentIndex >= 0 ? currentIndex : 0,
+      totalCount: sameStore.length,
+      isArrivedAtStore,
+      nextOrder: nextSameStoreOrders[0] || null,
+    };
+  }, [currentOrder, orders, profile]);
+
+  // 次の同店舗タスクへ進む
+  const handleProceedToNextSameStore = async (nextOrder: Order) => {
+    setIsProcessingNextStep(true);
+    try {
+      const nextSysId = (nextOrder as any).systemId || nextOrder.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || nextOrder.id;
+      // 次のオーダーのステータスが「未着手」等の場合、「作業待ち（到着済）」に更新
+      if (['未着手', '未割当', '割当済', '待機中', '出勤済', ''].includes(nextOrder.status || '')) {
+        const { OrderService } = await import('@/services/order-service');
+        const nowIso = new Date().toISOString();
+        const arrivalToUse = (currentOrder as any)?.arrivalTimestamp || (currentOrder as any)?.actualEndTime || nowIso;
+        await OrderService.updateOrder(nextSysId, {
+          status: '作業待ち',
+          arrivalTimestamp: arrivalToUse,
+          updatedAt: nowIso
+        });
+      }
+      setIsNextStepDialogOpen(false);
+      router.push(`/check-in?orderId=${nextSysId}`);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'エラー', description: e.message });
+    } finally {
+      setIsProcessingNextStep(false);
+    }
+  };
+
+  // 同店舗の残り全件を一括完了にする
+  const handleBatchCompleteRemainingSameStore = async () => {
+    if (!sameStoreOrdersInfo.nextSameStoreOrders || sameStoreOrdersInfo.nextSameStoreOrders.length === 0) return;
+    setIsProcessingNextStep(true);
+    try {
+      const { OrderService } = await import('@/services/order-service');
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const arrivalToUse = (currentOrder as any)?.arrivalTimestamp || (currentOrder as any)?.actualEndTime || nowIso;
+
+      const totalCount = sameStoreOrdersInfo.nextSameStoreOrders.length;
+      const totalDurationMin = calculateWorkDurationMinutes(arrivalToUse, null, nowIso) || (totalCount * 45);
+      const allocatedDurationPerOrder = Math.max(Math.round(totalDurationMin / (totalCount + 1)), 15);
+
+      for (let i = 0; i < sameStoreOrdersInfo.nextSameStoreOrders.length; i++) {
+        const target = sameStoreOrdersInfo.nextSameStoreOrders[i];
+        const sysId = (target as any).systemId || target.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || target.id;
+
+        const fields: any = {
+          status: '作業完了',
+          arrivalTimestamp: arrivalToUse,
+          actualStartTime: arrivalToUse,
+          actualEndTime: nowIso,
+          workDuration: allocatedDurationPerOrder,
+          actualDuration: allocatedDurationPerOrder,
+          updatedAt: nowIso
+        };
+
+        await OrderService.updateOrder(sysId, fields);
+
+        // GAS にもバックグラウンド通知
+        updateSheetStatus({
+          gasUrl: ORDER_GAS_URL,
+          eventTitle: `(ID: ${sysId})`,
+          staffName: profile?.name || '',
+          statusValue: '作業完了',
+          timestamp: nowIso,
+          actionType: 'Finish Task',
+          actionTimestamp: nowIso,
+          systemId: sysId,
+          arrivalTimestamp: arrivalToUse,
+          actualStartTime: arrivalToUse,
+          actualEndTime: nowIso,
+          workDuration: allocatedDurationPerOrder,
+          actualDuration: allocatedDurationPerOrder,
+          '所要時間': allocatedDurationPerOrder,
+          '作業時間（分）': allocatedDurationPerOrder,
+        }).catch(e => console.warn("Batch GAS sync skipped:", e));
+      }
+
+      toast({
+        title: '一括作業完了しました！',
+        description: `この店舗の残り全件（${totalCount}台）の作業を完了として記録しました。`
+      });
+
+      setIsNextStepDialogOpen(false);
+      refetchOrders().catch(e => console.error(e));
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: '一括完了エラー', description: e.message });
+    } finally {
+      setIsProcessingNextStep(false);
+    }
+  };
 
   // Use optimistic status if available, otherwise fall back to context data
   const currentStatus = optimisticStatus || currentOrder?.status || '未着手';
@@ -440,7 +600,15 @@ function CheckInClient() {
           }
 
           const currentStart = action === 'Begin Task' ? now.toISOString() : (currentOrder as any)?.actualStartTime;
-          const currentArrival = action === 'Arrive' ? now.toISOString() : (currentOrder as any)?.arrivalTimestamp;
+          let currentArrival = action === 'Arrive' ? now.toISOString() : (currentOrder as any)?.arrivalTimestamp;
+
+          // 同店舗ですでに現場到着済みの場合、先行タスクの到着時刻または完了時刻を引き継ぐ
+          if (!currentArrival && sameStoreOrdersInfo.isArrivedAtStore) {
+            const prev = sameStoreOrdersInfo.precedingOrders.find(o => (o as any).arrivalTimestamp || (o as any).actualEndTime);
+            currentArrival = (prev as any)?.arrivalTimestamp || (prev as any)?.actualEndTime || now.toISOString();
+            firestoreFields.arrivalTimestamp = currentArrival;
+          }
+
           const currentEnd = action === 'Finish Task' ? now.toISOString() : (currentOrder as any)?.actualEndTime;
 
           // 作業完了時に作業開始が未打刻の場合、現場到着時刻を作業開始時刻として自動補完
@@ -461,7 +629,11 @@ function CheckInClient() {
         }
 
         // 3. Async Background Backup to GAS Spreadsheet (non-blocking)
-        const currentArrivalForGas = action === 'Arrive' ? now.toISOString() : (currentOrder as any)?.arrivalTimestamp;
+        let currentArrivalForGas = action === 'Arrive' ? now.toISOString() : (currentOrder as any)?.arrivalTimestamp;
+        if (!currentArrivalForGas && sameStoreOrdersInfo.isArrivedAtStore) {
+          const prev = sameStoreOrdersInfo.precedingOrders.find(o => (o as any).arrivalTimestamp || (o as any).actualEndTime);
+          currentArrivalForGas = (prev as any)?.arrivalTimestamp || (prev as any)?.actualEndTime || now.toISOString();
+        }
         let resolvedStartForGas = action === 'Begin Task' ? now.toISOString() : (currentOrder as any)?.actualStartTime;
         if (action === 'Finish Task' && !resolvedStartForGas && currentArrivalForGas) {
           resolvedStartForGas = currentArrivalForGas;
@@ -566,13 +738,25 @@ function CheckInClient() {
 
     switch (action) {
       case 'Start Travel':
+        // 同じ店舗ですでに到着済みの場合は移動不要なので無効化（スキップ）
+        if (sameStoreOrdersInfo.isArrivedAtStore) return true;
         // Enable if not already started travel/task, or if in an initial/idle status
         return !['未着手', '未割当', '割当済', '待機中', '出勤済', ''].includes(currentStatus);
       case 'Arrive':
+        // 同じ店舗ですでに到着済みの場合は到着も不要なので無効化（スキップ）
+        if (sameStoreOrdersInfo.isArrivedAtStore) return true;
         return currentStatus !== '移動中';
       case 'Begin Task':
+        // 同店舗ですでに現場到着済みなら、未着手等の初期状態でも直接「作業開始」を押せる！
+        if (sameStoreOrdersInfo.isArrivedAtStore && ['未着手', '未割当', '割当済', '待機中', '出勤済', ''].includes(currentStatus)) {
+          return false;
+        }
         return currentStatus !== '作業待ち';
       case 'Finish Task':
+        // 同店舗ですでに現場到着済みなら、未着手等の初期状態でも直接「作業完了」を押せる！
+        if (sameStoreOrdersInfo.isArrivedAtStore && ['未着手', '未割当', '割当済', '待機中', '出勤済', ''].includes(currentStatus)) {
+          return false;
+        }
         // 「作業中」だけでなく、現場到着後の「作業待ち」でも作業完了を押せるように緩和
         return !['作業中', '作業待ち'].includes(currentStatus);
       default:
@@ -649,6 +833,21 @@ function CheckInClient() {
         <CardContent className="space-y-6">
           {currentOrder && (
             <div className="bg-slate-50 dark:bg-slate-900/70 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+              {/* 同店舗の連続作業バッジ */}
+              {sameStoreOrdersInfo.isContinuous && (
+                <div className="p-2 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-lg flex items-center justify-between text-xs">
+                  <span className="font-bold text-blue-900 dark:text-blue-200 flex items-center gap-1.5">
+                    <Car className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    同店舗での作業: <span className="underline decoration-blue-500 underline-offset-2">{sameStoreOrdersInfo.currentIndex + 1}台目</span> / 全{sameStoreOrdersInfo.totalCount}台
+                  </span>
+                  {sameStoreOrdersInfo.isArrivedAtStore && ['未着手', '未割当', '割当済', '待機中', '出勤済', ''].includes(currentStatus) && (
+                    <span className="text-[11px] bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-200 px-2 py-0.5 rounded-full font-bold shadow-xs">
+                      現場到着済（移動不要）
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-xs text-muted-foreground font-semibold">
@@ -754,11 +953,16 @@ function CheckInClient() {
             </div>
           )}
 
-          {/* 作業待ち時のヘルプ案内 */}
-          {currentStatus === '作業待ち' && (
+          {/* ヘルプ案内（作業待ち または 同店舗到着済みのとき） */}
+          {(currentStatus === '作業待ち' || (sameStoreOrdersInfo.isArrivedAtStore && ['未着手', '未割当', '割当済', '待機中', '出勤済', ''].includes(currentStatus))) && (
             <div className="p-2.5 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-800/50 rounded-md text-xs text-blue-800 dark:text-blue-300 flex items-start gap-1.5 leading-relaxed">
               <span className="font-bold shrink-0">💡 ヒント:</span>
-              <span>作業開始を押し忘れて作業に入った場合でも、作業終了後にそのまま<strong>「作業完了」</strong>を押せば、到着時刻からの所要時間が自動計算されます。</span>
+              <span>
+                {sameStoreOrdersInfo.isArrivedAtStore && ['未着手', '未割当', '割当済', '待機中', '出勤済', ''].includes(currentStatus)
+                  ? 'すでに同じ店舗に到着しているため、移動開始・現場到着は不要です。作業開始または作業完了をそのまま押してください。'
+                  : '作業開始を押し忘れて作業に入った場合でも、作業終了後にそのまま「作業完了」を押せば、到着時刻からの所要時間が自動計算されます。'
+                }
+              </span>
             </div>
           )}
 
@@ -978,38 +1182,95 @@ function CheckInClient() {
       <Dialog open={isNextStepDialogOpen} onOpenChange={setIsNextStepDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>作業完了後の移動先を選択</DialogTitle>
+            <DialogTitle>
+              {sameStoreOrdersInfo.nextSameStoreOrders.length > 0 ? "同店舗の次の作業を選択" : "作業完了後の移動先を選択"}
+            </DialogTitle>
             <DialogDescription>
-              作業が完了しました。次のアクションを選択してください。
+              {sameStoreOrdersInfo.nextSameStoreOrders.length > 0
+                ? `この店舗（${currentOrder?.customerName || '同店舗'}）には、続けて別の作業予定があります。`
+                : "作業が完了しました。次のアクションを選択してください。"
+              }
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-3 py-4">
-            <Button
-              className="w-full justify-start h-12 text-base gap-3"
-              onClick={() => handleNextStepAction('next_task')}
-              disabled={isProcessingNextStep}
-            >
-              <Truck className="h-5 w-5" />
-              次の現場へ移動開始
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full justify-start h-12 text-base gap-3"
-              onClick={() => handleNextStepAction('return_office')}
-              disabled={isProcessingNextStep}
-            >
-              <Building className="h-5 w-5" />
-              帰社する
-            </Button>
-            <Button
-              variant="secondary"
-              className="w-full justify-start h-12 text-base gap-3"
-              onClick={() => handleNextStepAction('wait')}
-              disabled={isProcessingNextStep}
-            >
-              <PauseCircle className="h-5 w-5" />
-              待機する
-            </Button>
+
+          <div className="flex flex-col gap-3 py-3">
+            {/* 同店舗の連続作業がある場合の優先メニュー */}
+            {sameStoreOrdersInfo.nextSameStoreOrders.length > 0 && (
+              <div className="p-3 bg-amber-50/90 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700 rounded-xl space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-900 dark:text-amber-200">
+                  <Car className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                  <span>この店舗で続けて作業（残り{sameStoreOrdersInfo.nextSameStoreOrders.length}台）</span>
+                </div>
+
+                {/* ボタン①: 続けて次の台（2台目）へ進む */}
+                {sameStoreOrdersInfo.nextOrder && (
+                  <Button
+                    className="w-full justify-start h-auto py-2.5 px-3.5 text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm flex items-center gap-2.5 rounded-lg"
+                    onClick={() => handleProceedToNextSameStore(sameStoreOrdersInfo.nextOrder!)}
+                    disabled={isProcessingNextStep}
+                  >
+                    <ArrowRightCircle className="h-5 w-5 shrink-0" />
+                    <div className="text-left leading-tight">
+                      <div className="text-sm font-bold">🚗 続けて{sameStoreOrdersInfo.currentIndex + 2}台目の作業へ進む</div>
+                      <div className="text-[11px] font-normal opacity-90 mt-0.5">
+                        {sameStoreOrdersInfo.nextOrder.carName || '車両'} {sameStoreOrdersInfo.nextOrder.regNo ? `(${sameStoreOrdersInfo.nextOrder.regNo})` : ''}
+                        {sameStoreOrdersInfo.nextOrder.tireSize ? ` / ${sameStoreOrdersInfo.nextOrder.tireSize}` : ''}
+                      </div>
+                    </div>
+                  </Button>
+                )}
+
+                {/* ボタン②: この店舗の残り全件もまとめて完了にする */}
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-auto py-2.5 px-3.5 text-xs font-bold border-green-400 bg-white dark:bg-slate-900 text-green-800 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/50 flex items-center gap-2 rounded-lg"
+                  onClick={handleBatchCompleteRemainingSameStore}
+                  disabled={isProcessingNextStep}
+                >
+                  <CheckCheck className="h-4.5 w-4.5 text-green-600 shrink-0" />
+                  <div className="text-left leading-tight">
+                    <div className="font-bold">✨ この店舗の残り全件（{sameStoreOrdersInfo.nextSameStoreOrders.length}台）もまとめて作業完了にする</div>
+                    <div className="text-[10px] font-normal text-muted-foreground mt-0.5">
+                      全台まとめて作業が終わった場合にワンタップで完了できます
+                    </div>
+                  </div>
+                </Button>
+              </div>
+            )}
+
+            {/* 通常の移動アクション */}
+            <div className="pt-1 space-y-2">
+              <div className="text-xs font-semibold text-muted-foreground px-0.5">
+                {sameStoreOrdersInfo.nextSameStoreOrders.length > 0 ? "または次の移動先へ:" : "移動先を選択:"}
+              </div>
+              <Button
+                variant={sameStoreOrdersInfo.nextSameStoreOrders.length > 0 ? "outline" : "default"}
+                className="w-full justify-start h-11 text-sm gap-2.5"
+                onClick={() => handleNextStepAction('next_task')}
+                disabled={isProcessingNextStep}
+              >
+                <Truck className="h-4.5 w-4.5" />
+                別の現場へ移動開始
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start h-11 text-sm gap-2.5"
+                onClick={() => handleNextStepAction('return_office')}
+                disabled={isProcessingNextStep}
+              >
+                <Building className="h-4.5 w-4.5" />
+                帰社する
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full justify-start h-11 text-sm gap-2.5"
+                onClick={() => handleNextStepAction('wait')}
+                disabled={isProcessingNextStep}
+              >
+                <PauseCircle className="h-4.5 w-4.5" />
+                待機する
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
