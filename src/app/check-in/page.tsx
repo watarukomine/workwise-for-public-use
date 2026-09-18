@@ -442,7 +442,15 @@ function CheckInClient() {
           const currentStart = action === 'Begin Task' ? now.toISOString() : (currentOrder as any)?.actualStartTime;
           const currentArrival = action === 'Arrive' ? now.toISOString() : (currentOrder as any)?.arrivalTimestamp;
           const currentEnd = action === 'Finish Task' ? now.toISOString() : (currentOrder as any)?.actualEndTime;
-          const computedDuration = calculateWorkDurationMinutes(currentStart, currentArrival, currentEnd);
+
+          // 作業完了時に作業開始が未打刻の場合、現場到着時刻を作業開始時刻として自動補完
+          let resolvedStartTime = currentStart;
+          if (action === 'Finish Task' && !resolvedStartTime && currentArrival) {
+            resolvedStartTime = currentArrival;
+            firestoreFields.actualStartTime = currentArrival;
+          }
+
+          const computedDuration = calculateWorkDurationMinutes(resolvedStartTime, currentArrival, currentEnd);
 
           if (computedDuration !== null) {
             firestoreFields.workDuration = computedDuration;
@@ -453,10 +461,13 @@ function CheckInClient() {
         }
 
         // 3. Async Background Backup to GAS Spreadsheet (non-blocking)
-        const currentStartForGas = action === 'Begin Task' ? now.toISOString() : (currentOrder as any)?.actualStartTime;
         const currentArrivalForGas = action === 'Arrive' ? now.toISOString() : (currentOrder as any)?.arrivalTimestamp;
+        let resolvedStartForGas = action === 'Begin Task' ? now.toISOString() : (currentOrder as any)?.actualStartTime;
+        if (action === 'Finish Task' && !resolvedStartForGas && currentArrivalForGas) {
+          resolvedStartForGas = currentArrivalForGas;
+        }
         const currentEndForGas = action === 'Finish Task' ? now.toISOString() : (currentOrder as any)?.actualEndTime;
-        const computedDurationForGas = calculateWorkDurationMinutes(currentStartForGas, currentArrivalForGas, currentEndForGas);
+        const computedDurationForGas = calculateWorkDurationMinutes(resolvedStartForGas, currentArrivalForGas, currentEndForGas);
 
         updateSheetStatus({
           gasUrl: ORDER_GAS_URL,
@@ -473,7 +484,7 @@ function CheckInClient() {
           systemId: sysId,
           startTravelTime: action === 'Start Travel' ? now.toISOString() : (currentOrder as any)?.startTravelTime,
           arrivalTimestamp: currentArrivalForGas,
-          actualStartTime: currentStartForGas,
+          actualStartTime: resolvedStartForGas,
           actualEndTime: currentEndForGas,
           workDuration: computedDurationForGas,
           actualDuration: computedDurationForGas,
@@ -562,7 +573,8 @@ function CheckInClient() {
       case 'Begin Task':
         return currentStatus !== '作業待ち';
       case 'Finish Task':
-        return currentStatus !== '作業中';
+        // 「作業中」だけでなく、現場到着後の「作業待ち」でも作業完了を押せるように緩和
+        return !['作業中', '作業待ち'].includes(currentStatus);
       default:
         return false;
     }
@@ -739,6 +751,14 @@ function CheckInClient() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* 作業待ち時のヘルプ案内 */}
+          {currentStatus === '作業待ち' && (
+            <div className="p-2.5 bg-blue-50/80 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-800/50 rounded-md text-xs text-blue-800 dark:text-blue-300 flex items-start gap-1.5 leading-relaxed">
+              <span className="font-bold shrink-0">💡 ヒント:</span>
+              <span>作業開始を押し忘れて作業に入った場合でも、作業終了後にそのまま<strong>「作業完了」</strong>を押せば、到着時刻からの所要時間が自動計算されます。</span>
             </div>
           )}
 

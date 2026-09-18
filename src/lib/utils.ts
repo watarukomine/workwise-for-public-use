@@ -904,6 +904,8 @@ export function createNormalizedKeySet(entries: (string | undefined | null)[]): 
 
 /**
  * 作業完了時刻と、作業開始時刻（未設定の場合は現場到着時刻）から所要時間（分）を算出します。
+ * 救済判定: 作業開始と作業完了の差が3分以内で、かつ現場到着時刻がそれより前に存在する場合、
+ * 押し忘れによる直前連打と判定し、現場到着時刻を起点として所要時間を計算します。
  * @param startTime 作業開始時刻 (ISO文字列、Date、またはHH:mm)
  * @param arrivalTime 現場到着時刻 (ISO文字列、Date、またはHH:mm)
  * @param endTime 作業完了時刻 (ISO文字列、Date、またはHH:mm)
@@ -915,8 +917,6 @@ export function calculateWorkDurationMinutes(
   endTime?: string | Date | null
 ): number | null {
   if (!endTime) return null;
-  const startTarget = startTime || arrivalTime;
-  if (!startTarget) return null;
 
   try {
     const parseToDate = (val: string | Date): Date | null => {
@@ -933,12 +933,26 @@ export function calculateWorkDurationMinutes(
       return isNaN(d.getTime()) ? null : d;
     };
 
-    const sDate = parseToDate(startTarget);
+    const sDate = startTime ? parseToDate(startTime) : null;
+    const aDate = arrivalTime ? parseToDate(arrivalTime) : null;
     const eDate = parseToDate(endTime);
 
-    if (!sDate || !eDate) return null;
+    if (!eDate) return null;
 
-    const diffMs = eDate.getTime() - sDate.getTime();
+    let targetStartDate = sDate || aDate;
+    if (!targetStartDate) return null;
+
+    // 救済判定: 作業開始と作業完了の差が3分以内で、現場到着時刻がそれより前にある場合
+    // (作業開始の押し忘れにより、作業完了直前に慌てて「開始」→「完了」と連続で押されたケース)
+    if (sDate && aDate && eDate) {
+      const durationWithStartMin = Math.round((eDate.getTime() - sDate.getTime()) / (1000 * 60));
+      const durationWithArrivalMin = Math.round((eDate.getTime() - aDate.getTime()) / (1000 * 60));
+      if (durationWithStartMin <= 3 && durationWithArrivalMin > durationWithStartMin) {
+        targetStartDate = aDate;
+      }
+    }
+
+    const diffMs = eDate.getTime() - targetStartDate.getTime();
     if (diffMs < 0) {
       return 0;
     }
