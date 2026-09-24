@@ -16,25 +16,11 @@ const MANUALS = [
         subtitle: 'ユーザー操作マニュアル'
     },
     {
-        id: 'specifications',
-        input: 'specifications.md',
-        output: 'specifications.pdf',
-        title: 'WorkWise',
-        subtitle: 'システム仕様書'
-    },
-    {
         id: 'field_staff_manual',
         input: 'FIELD_STAFF_MANUAL.md',
         output: 'FIELD_STAFF_MANUAL.pdf',
         title: 'WorkWise',
         subtitle: '現場スタッフ操作マニュアル'
-    },
-    {
-        id: 'security_rules',
-        input: 'security_rules.md',
-        output: 'security_rules.pdf',
-        title: 'WorkWise',
-        subtitle: 'セキュリティルール仕様書'
     }
 ];
 
@@ -104,6 +90,7 @@ async function generatePDFForManual(config) {
     // --- Parsing Markdown Content ---
     const lines = content.split('\n');
     let inCover = true;
+    let inCodeBlock = false;
 
     for (const line of lines) {
         if (line.trim().startsWith('<div') || line.trim().startsWith('</div>') || line.trim().startsWith('<img') || line.trim().startsWith('<h1') || line.trim().startsWith('<p')) {
@@ -121,9 +108,72 @@ async function generatePDFForManual(config) {
             inCover = false;
         }
 
+        // Code blocks / Mermaid diagrams
+        if (line.trim().startsWith('```')) {
+            inCodeBlock = !inCodeBlock;
+            continue;
+        }
+        if (inCodeBlock) {
+            continue; // Skip code / diagram lines in PDF
+        }
+
         if (line.trim() === '') {
             y += lineHeight / 2;
             continue;
+        }
+
+        // Image: ![alt](url)
+        const imgMatch = line.trim().match(/^!\[(.*?)\]\((.*?)\)/);
+        if (imgMatch) {
+            const altText = imgMatch[1];
+            let rawPath = imgMatch[2];
+            let imgFullPath = rawPath.startsWith('/')
+                ? path.join(rootDir, 'public', rawPath)
+                : path.join(rootDir, rawPath);
+
+            if (fs.existsSync(imgFullPath)) {
+                try {
+                    const imgData = fs.readFileSync(imgFullPath);
+                    const ext = path.extname(imgFullPath).toLowerCase();
+                    const format = (ext === '.jpg' || ext === '.jpeg') ? 'JPEG' : 'PNG';
+
+                    let imgProps = null;
+                    try {
+                        imgProps = doc.getImageProperties(imgData);
+                    } catch {
+                        imgProps = null;
+                    }
+
+                    const maxW = pageWidth - margin * 2;
+                    let targetW = Math.min(maxW, 110);
+                    let targetH = 65;
+                    if (imgProps && imgProps.width && imgProps.height) {
+                        const ratio = imgProps.height / imgProps.width;
+                        targetH = targetW * ratio;
+                        if (targetH > 85) {
+                            targetH = 85;
+                            targetW = targetH / ratio;
+                        }
+                    }
+
+                    checkPageBreak(targetH + 15);
+                    const imgX = margin + (maxW - targetW) / 2;
+                    doc.addImage(imgData, format, imgX, y, targetW, targetH);
+                    y += targetH + 3;
+
+                    if (altText) {
+                        doc.setFontSize(8);
+                        doc.setTextColor(110);
+                        doc.text(`【図】${altText}`, pageWidth / 2, y, { align: 'center' });
+                        doc.setTextColor(0);
+                        doc.setFontSize(9.5);
+                        y += 6;
+                    }
+                    continue;
+                } catch (imgErr) {
+                    console.warn(`Failed to embed image ${imgFullPath}:`, imgErr);
+                }
+            }
         }
 
         // Headers
