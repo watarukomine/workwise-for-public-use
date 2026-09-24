@@ -83,6 +83,9 @@ const STAFF_NAME_COL_WIDTH = 130;
 const STAFF_STORE_COL_WIDTH = 95;
 const STAFF_COL_WIDTH = STAFF_NAME_COL_WIDTH + STAFF_STORE_COL_WIDTH; // 225px
 const STATUS_COL_WIDTH = 120;
+const FIXED_COLS_WIDTH = STAFF_COL_WIDTH + STATUS_COL_WIDTH; // 225 + 120 = 345px
+const BASE_TIMELINE_MINUTES = timelineTotalHours * 60; // 600分
+const MIN_GRID_WIDTH = 900; // 600分 * 1.5px
 const TOTAL_TIMELINE_WIDTH = STAFF_COL_WIDTH + timelineTotalHours * 60 * PIXELS_PER_MINUTE + STATUS_COL_WIDTH;
 const EMPTY_EVENTS: WithId<ScheduleEvent>[] = [];
 
@@ -531,8 +534,8 @@ const TimeIndicator = ({ pixelsPerMinute = PIXELS_PER_MINUTE }: { pixelsPerMinut
 
   return (
     <div
-      className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none dynamic-left"
-      {...{ 'style': { '--dynamic-left': `${leftPosition}px` } as any }}
+      className="absolute top-0 h-full w-0.5 bg-red-500 pointer-events-none"
+      style={{ left: `${leftPosition}px` }}
     >
       <div className="absolute -top-1 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500"></div>
     </div>
@@ -635,34 +638,66 @@ export function ScheduleView({
   const timelineContainerRef = React.useRef<HTMLDivElement | null>(null);
   const timelineHeaderRef = React.useRef<HTMLDivElement | null>(null);
 
-  const [containerWidth, setContainerWidth] = React.useState<number>(0);
+  const [containerWidth, setContainerWidth] = React.useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      return Math.max(1245, window.innerWidth - 64);
+    }
+    return 0;
+  });
 
-  // ResizeObserver で timeline-scroll-container の実際の表示幅を監視
-  React.useEffect(() => {
-    const container = timelineContainerRef.current;
-    if (!container) return;
+  const resizeObserverRef = React.useRef<ResizeObserver | null>(null);
 
-    const updateWidth = () => {
-      const w = container.clientWidth;
-      if (w > 0) setContainerWidth(w);
-    };
+  // Callback ref により、DOM要素がマウント・再マウントされた瞬間に確実に幅を測定＆ResizeObserverを登録
+  const timelineContainerCallbackRef = React.useCallback((node: HTMLDivElement | null) => {
+    if (resizeObserverRef.current) {
+      resizeObserverRef.current.disconnect();
+      resizeObserverRef.current = null;
+    }
 
-    updateWidth();
+    timelineContainerRef.current = node;
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width;
-        if (w > 0) setContainerWidth(w);
-      }
-    });
+    if (node) {
+      const updateWidth = () => {
+        const w = node.clientWidth;
+        if (w > 0) {
+          setContainerWidth(w);
+        }
+      };
 
-    resizeObserver.observe(container);
-    return () => resizeObserver.disconnect();
+      updateWidth();
+
+      const ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const w = entry.contentRect.width;
+          if (w > 0) {
+            setContainerWidth(w);
+          }
+        }
+      });
+      ro.observe(node);
+      resizeObserverRef.current = ro;
+    }
   }, []);
 
-  const FIXED_COLS_WIDTH = STAFF_COL_WIDTH + STATUS_COL_WIDTH; // 225 + 120 = 345px
-  const BASE_TIMELINE_MINUTES = timelineTotalHours * 60; // 600分
-  const MIN_GRID_WIDTH = 900; // 600分 * 1.5px
+  // Window resize も監視して確実に幅を同期
+  React.useEffect(() => {
+    const handleResize = () => {
+      const container = timelineContainerRef.current;
+      if (container && container.clientWidth > 0) {
+        setContainerWidth(container.clientWidth);
+      } else if (typeof window !== 'undefined') {
+        setContainerWidth(Math.max(1245, window.innerWidth - 64));
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
+    };
+  }, []);
 
   // 利用可能な時間グリッド幅（画面が広ければ画面幅いっぱいに拡大、狭ければ900pxを維持して横スクロール）
   const currentGridWidth = React.useMemo(() => {
@@ -2764,19 +2799,32 @@ export function ScheduleView({
 
             <div>
               <div>
-                <div ref={timelineContainerRef} id="timeline-scroll-container" className="w-full border rounded-md h-auto overflow-x-auto overflow-y-visible">
-                  <div className="relative dynamic-width" {...{ 'style': { '--dynamic-width': `${totalTimelineWidth}px`, '--pixels-per-minute': currentPixelsPerMinute } as any }}>
+                <div ref={timelineContainerCallbackRef} id="timeline-scroll-container" className="w-full border rounded-md h-auto overflow-x-auto overflow-y-visible">
+                  <div 
+                    className="relative min-w-full" 
+                    style={{ 
+                      width: `${totalTimelineWidth}px`, 
+                      minWidth: '100%',
+                      '--dynamic-width': `${totalTimelineWidth}px`, 
+                      '--pixels-per-minute': currentPixelsPerMinute 
+                    } as any}
+                  >
 
                     {/* Header Row - Sticky top tracking on page scroll while preserving horizontal scroll sync */}
-                    <div ref={timelineHeaderRef} className="z-40 flex h-[34px] border-b bg-background transition-shadow duration-150" style={{ position: 'relative', top: 0 }}>
+                    <div ref={timelineHeaderRef} className="z-40 flex h-[34px] border-b bg-background transition-shadow duration-150 w-full" style={{ position: 'relative', top: 0, minWidth: '100%' }}>
                       <div className="sticky left-0 z-50 flex-shrink-0 font-semibold px-2 py-1 border-r bg-background w-[130px] text-xs flex items-center">スタッフ</div>
                       <div className="sticky left-[130px] z-50 flex-shrink-0 font-semibold px-2 py-1 border-r bg-background w-[95px] text-xs flex items-center justify-center">拠点</div>
-                      <div className="relative flex-1 h-full bg-background">
+                      <div className="relative flex-1 h-full bg-background" style={{ minWidth: `${MIN_GRID_WIDTH}px` }}>
                         {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => {
                           const isFirst = i === 0;
                           const isLast = i === timelineTotalHours;
+                          const leftPos = Math.round(i * 60 * currentPixelsPerMinute);
                           return (
-                            <div key={i} className="absolute h-full border-l dynamic-left" {...{ 'style': { '--dynamic-left': `calc(${i * 60} * var(--pixels-per-minute) * 1px)` } as any }}>
+                            <div 
+                              key={i} 
+                              className="absolute h-full border-l" 
+                              style={isLast ? { right: 0 } : { left: `${leftPos}px` }}
+                            >
                               <span className={cn(
                                 "absolute top-1 text-xs text-muted-foreground whitespace-nowrap",
                                 isFirst ? "left-0 translate-x-1" : isLast ? "right-0 -translate-x-1" : "-translate-x-1/2"
@@ -2787,7 +2835,7 @@ export function ScheduleView({
                           );
                         })}
                       </div>
-                      <div className="sticky right-0 z-50 flex-shrink-0 font-semibold p-2 border-l bg-background w-[120px]">ステータス</div>
+                      <div className="sticky right-0 z-50 flex-shrink-0 font-semibold p-2 border-l bg-background w-[120px] text-xs flex items-center justify-center">ステータス</div>
                     </div>
 
                     <div id="timeline-rows-container" className="relative space-y-2 pb-2">
@@ -2805,7 +2853,10 @@ export function ScheduleView({
                       </div>
 
                       {isToday(currentDate) && (
-                        <div className="absolute top-0 h-full pointer-events-none z-[15] dynamic-left dynamic-width" {...{ 'style': { '--dynamic-left': `var(--staff-col-width)`, '--dynamic-width': `calc(${timelineTotalHours * 60} * var(--pixels-per-minute) * 1px)` } as any }}>
+                        <div 
+                          className="absolute top-0 h-full pointer-events-none z-[15]" 
+                          style={{ left: `${STAFF_COL_WIDTH}px`, width: `${currentGridWidth}px` }}
+                        >
                           <TimeIndicator pixelsPerMinute={currentPixelsPerMinute} />
                         </div>
                       )}
@@ -3475,7 +3526,7 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
   }, [toggleTripSuppression]);
 
   return (
-    <div className={cn("flex relative h-14 border-b", areaBgClass)}>
+    <div className={cn("flex relative h-14 border-b w-full", areaBgClass)} style={{ minWidth: '100%' }}>
       {emergencyEvent && emergencyMessage && (
         <div className="absolute inset-0 z-[60] bg-red-600/90 flex items-center justify-center px-4 animate-pulse pointer-events-none">
           <span className="text-white font-bold text-lg flex items-center gap-2 drop-shadow-md">
@@ -3513,7 +3564,13 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
           </SelectContent>
         </Select>
       </div>
-      <div id={`staff-row-${staff.id}`} ref={setNodeRef} className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}>
+      <div 
+        id={`staff-row-${staff.id}`} 
+        ref={setNodeRef} 
+        className={cn("relative flex-1 h-full", isOver && "bg-primary/10")} 
+        style={{ minWidth: `${MIN_GRID_WIDTH}px` }}
+        onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
+      >
         <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (<DraggableEvent key={event.id} targetEvent={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={onDoubleClickEvent} onDelete={handleDeleteEvent} />))}
         </div>
