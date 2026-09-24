@@ -431,10 +431,32 @@ function CheckInClient() {
   const handleActionClick = (action: ActionType) => {
     if (isCorrectionMode) {
       setPendingAction(action);
-      // Default to current time in HH:mm format for input type="time"
-      const now = new Date();
-      const hours = now.getHours().toString().padStart(2, '0');
-      const minutes = now.getMinutes().toString().padStart(2, '0');
+
+      // 既存の記録時刻があればその時刻を初期値にセット、なければ現在時刻
+      let defaultDate = new Date();
+      let existingTimeStr: string | undefined;
+
+      if (action === 'Start Travel') {
+        existingTimeStr = currentOrder?.startTravelTime || (currentOrder?.raw ? findKey(currentOrder.raw, ['移動開始時刻', 'startTravelTime']) : undefined);
+      } else if (action === 'Arrive') {
+        existingTimeStr = currentOrder?.arrivalTimestamp || (currentOrder?.raw ? findKey(currentOrder.raw, ['現場到着時刻', 'arrivalTimestamp']) : undefined);
+      } else if (action === 'Begin Task') {
+        existingTimeStr = currentOrder?.actualStartTime || (currentOrder?.raw ? findKey(currentOrder.raw, ['作業開始時刻', 'actualStartTime']) : undefined);
+      } else if (action === 'Finish Task') {
+        existingTimeStr = currentOrder?.actualEndTime || (currentOrder?.raw ? findKey(currentOrder.raw, ['作業完了時刻', 'actualEndTime']) : undefined);
+      } else if (action === 'Confirm Read') {
+        existingTimeStr = currentOrder?.confirmedAt;
+      }
+
+      if (existingTimeStr) {
+        const parsed = new Date(existingTimeStr);
+        if (!isNaN(parsed.getTime())) {
+          defaultDate = parsed;
+        }
+      }
+
+      const hours = defaultDate.getHours().toString().padStart(2, '0');
+      const minutes = defaultDate.getMinutes().toString().padStart(2, '0');
       setManualTime(`${hours}:${minutes}`);
       setIsDialogOpen(true);
     } else {
@@ -446,6 +468,15 @@ function CheckInClient() {
     if (!pendingAction) return;
 
     let actionDate = new Date();
+    // 既存のタイムスタンプまたは予定日があればその日付をベースにする（日またぎや過去日付の考慮）
+    const baseDateStr = currentOrder?.actualEndTime || currentOrder?.actualStartTime || currentOrder?.arrivalTimestamp || currentOrder?.startTravelTime || currentOrder?.scheduledDate;
+    if (baseDateStr) {
+      const parsedBase = new Date(baseDateStr);
+      if (!isNaN(parsedBase.getTime())) {
+        actionDate = new Date(parsedBase);
+      }
+    }
+
     const [hours, minutes] = manualTime.split(':').map(Number);
     if (!isNaN(hours) && !isNaN(minutes)) {
       actionDate.setHours(hours, minutes, 0, 0);
@@ -495,6 +526,10 @@ function CheckInClient() {
 
         setIsConfirmedOptimistic(true);
         toast({ title: '確認済にしました', description: `${profile.name}として記録しました。` });
+        if (isManual && isCorrectionMode) {
+          setIsCorrectionMode(false);
+          setManualTime('');
+        }
         refetchOrders().catch(e => console.error(e));
       } catch (e: any) {
         toast({ variant: 'destructive', title: 'エラー', description: e.message });
@@ -536,6 +571,7 @@ function CheckInClient() {
       try {
         const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
         const sysId = (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || '';
+        const isOrderAlreadyCompleted = ['作業完了', '完了'].includes(currentOrder?.status || currentStatus);
 
         // 1. Direct Write to Staff User Document in Firestore (Primary for Staff Location & Status & ETA)
         if (profile?.id) {
@@ -578,10 +614,13 @@ function CheckInClient() {
               lastLocationUpdatedAt: nowIso,
               updatedAt: nowIso,
               statusUpdatedAt: nowIso,
-              currentStatus: statusValue
             };
-            if (etaStr) staffFields.estimatedArrivalTime = etaStr;
-            if (destStr) staffFields.nextDestination = destStr;
+            // 完了済みの過去タスクの打刻時刻修正（事後修正）の場合、スタッフの現在ステータスは上書きしない
+            if (!isOrderAlreadyCompleted || ['Clock Out', 'Wait'].includes(action)) {
+              staffFields.currentStatus = statusValue;
+              if (etaStr) staffFields.estimatedArrivalTime = etaStr;
+              if (destStr) staffFields.nextDestination = destStr;
+            }
 
             await updateDoc(userRef, staffFields).catch(async () => {
               await setDoc(userRef, staffFields, { merge: true });
@@ -594,8 +633,10 @@ function CheckInClient() {
         // 2. Direct Write to Order Firestore Document (Primary for Order Status & ETA)
         if (sysId) {
           const { OrderService } = await import('@/services/order-service');
+          // すでに完了しているタスクの過去打刻（移動開始・現場到着・作業開始など）を修正しても、タスクステータスは「作業完了」のまま維持する
+          const finalOrderStatus = (isOrderAlreadyCompleted && action !== 'Emergency') ? '作業完了' : statusValue;
           const firestoreFields: any = {
-            status: statusValue,
+            status: finalOrderStatus,
             updatedAt: new Date().toISOString()
           };
           if (latitude !== null) firestoreFields.latitude = latitude;
@@ -707,14 +748,17 @@ function CheckInClient() {
         });
 
         // Optimistic update done
-        setOptimisticStatus(statusValue);
+        const finalStatus = (isOrderAlreadyCompleted && action !== 'Emergency') ? '作業完了' : statusValue;
+        setOptimisticStatus(finalStatus);
 
         // Unblock UI immediately
         setIsLoading(null);
 
         toast({
-          title: (action as string) === 'Emergency' ? '緊急連絡を送信しました' : (isManual ? 'ステータス時間を修正しました' : 'ステータスを更新しました'),
-          description: `ステータスを「${statusValue}」に更新しました。`,
+          title: (action as string) === 'Emergency' ? '緊急連絡を送信しました' : (isManual ? '打刻時刻を修正しました' : 'ステータスを更新しました'),
+          description: isOrderAlreadyCompleted && action !== 'Finish Task'
+            ? `「${getJapaneseActionName(action as ActionType)}」の時刻を修正しました（作業完了ステータス維持）。`
+            : `ステータスを「${finalStatus}」に更新しました。`,
           variant: (action as string) === 'Emergency' ? 'destructive' : 'default',
         });
 
@@ -728,7 +772,7 @@ function CheckInClient() {
           setManualTime('');
         }
 
-        if (action === 'Finish Task') {
+        if (action === 'Finish Task' && !isOrderAlreadyCompleted) {
           setIsNextStepDialogOpen(true);
         }
 
@@ -768,13 +812,19 @@ function CheckInClient() {
 
   const isButtonDisabled = (action: ActionType | 'Emergency') => {
     if ((action as string) === 'Emergency') return !!isLoading;
+
+    // 修正モード時は、オーダーが選択されていれば全てのチェックインボタンを押下・修正可能にする
+    // （Clock Out, Wait はオーダー選択なしでも可能）
+    if (isCorrectionMode) {
+      if (['Clock Out', 'Wait'].includes(action)) return false;
+      return !orderId;
+    }
+
     if (['Confirm Read', 'Clock Out', 'Wait'].includes(action)) return false;
     if (!orderId) return true;
 
     // Explicitly disable workflow buttons if the task is already finished
     if (['作業完了', '完了'].includes(currentStatus)) return true;
-
-    if (isCorrectionMode) return false;
 
     switch (action) {
       case 'Start Travel':
