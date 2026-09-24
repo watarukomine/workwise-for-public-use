@@ -631,6 +631,61 @@ export function ScheduleView({
   const [editOrderForm, setEditOrderForm] = React.useState<any>({});
   const staffRowRectsRef = React.useRef<Map<string, DOMRect>>(new Map());
   const scrollContainerRectRef = React.useRef<DOMRect | null>(null);
+  const timelineContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const timelineHeaderRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    let rafId: number | null = null;
+
+    const updateHeaderPosition = () => {
+      const container = timelineContainerRef.current;
+      const header = timelineHeaderRef.current;
+      if (!container || !header) return;
+
+      // 上部ナビゲーションバー（AppShell header）の高さを取得
+      const appHeader = document.querySelector('header');
+      const navBottom = appHeader ? appHeader.getBoundingClientRect().bottom : 0;
+
+      const containerRect = container.getBoundingClientRect();
+      const headerHeight = header.offsetHeight || 34;
+      const containerHeight = container.offsetHeight || 0;
+
+      // タイムラインの上端がナビバー下端を超えた量
+      const scrollOver = navBottom - containerRect.top;
+      
+      // タイムラインの最下部を超えないように制限（スタッフ一覧を過ぎたら一緒に上に抜ける）
+      const maxOffset = containerHeight - headerHeight;
+
+      if (scrollOver > 0 && maxOffset > 0) {
+        const translateY = Math.min(scrollOver, maxOffset);
+        header.style.top = `${translateY}px`;
+        header.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.04)';
+      } else {
+        header.style.top = '0px';
+        header.style.boxShadow = 'none';
+      }
+    };
+
+    const onScroll = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        updateHeaderPosition();
+        rafId = null;
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    
+    // 初回実行
+    updateHeaderPosition();
+
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, [staffData]);
 
   React.useEffect(() => {
     setCurrentViewedDate(currentDate);
@@ -2647,7 +2702,7 @@ export function ScheduleView({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-            <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-20 py-1">
+            <div className="bg-background/95 backdrop-blur-sm z-20 py-1">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                 <div className="md:col-span-3">
                   <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} onDoubleClickOrder={(order) => setDialogState({ mode: 'order-details', order })} />
@@ -2660,14 +2715,14 @@ export function ScheduleView({
 
             <div>
               <div>
-                <div id="timeline-scroll-container" className="w-full border rounded-md h-auto overflow-x-auto overflow-y-visible">
+                <div ref={timelineContainerRef} id="timeline-scroll-container" className="w-full border rounded-md h-auto overflow-x-auto overflow-y-visible">
                   <div className="relative dynamic-width" {...{ 'style': { '--dynamic-width': `calc(var(--staff-col-width) + ${timelineTotalHours * 60} * var(--pixels-per-minute) * 1px + var(--status-col-width))` } as any }}>
 
-                    {/* Header Row - Now inside ScrollArea for perfect alignment */}
-                    <div className="sticky top-0 z-40 flex h-[34px] border-b bg-background/95 backdrop-blur-sm">
+                    {/* Header Row - Sticky top tracking on page scroll while preserving horizontal scroll sync */}
+                    <div ref={timelineHeaderRef} className="z-40 flex h-[34px] border-b bg-background transition-shadow duration-150" style={{ position: 'relative', top: 0 }}>
                       <div className="sticky left-0 z-50 flex-shrink-0 font-semibold px-2 py-1 border-r bg-background w-[130px] text-xs flex items-center">スタッフ</div>
                       <div className="sticky left-[130px] z-50 flex-shrink-0 font-semibold px-2 py-1 border-r bg-background w-[95px] text-xs flex items-center justify-center">拠点</div>
-                      <div className="relative flex-1 h-full">
+                      <div className="relative flex-1 h-full bg-background">
                         {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
                           <div key={i} className="absolute h-full border-l dynamic-left" {...{ 'style': { '--dynamic-left': `calc(${i * 60} * var(--pixels-per-minute) * 1px)` } as any }}>
                             <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
