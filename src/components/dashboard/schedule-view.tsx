@@ -2723,11 +2723,20 @@ export function ScheduleView({
                       <div className="sticky left-0 z-50 flex-shrink-0 font-semibold px-2 py-1 border-r bg-background w-[130px] text-xs flex items-center">スタッフ</div>
                       <div className="sticky left-[130px] z-50 flex-shrink-0 font-semibold px-2 py-1 border-r bg-background w-[95px] text-xs flex items-center justify-center">拠点</div>
                       <div className="relative flex-1 h-full bg-background">
-                        {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => (
-                          <div key={i} className="absolute h-full border-l dynamic-left" {...{ 'style': { '--dynamic-left': `calc(${i * 60} * var(--pixels-per-minute) * 1px)` } as any }}>
-                            <span className="absolute top-1 -translate-x-1/2 text-xs text-muted-foreground">{timelineStartHour + i}:00</span>
-                          </div>
-                        ))}
+                        {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => {
+                          const isFirst = i === 0;
+                          const isLast = i === timelineTotalHours;
+                          return (
+                            <div key={i} className="absolute h-full border-l dynamic-left" {...{ 'style': { '--dynamic-left': `calc(${i * 60} * var(--pixels-per-minute) * 1px)` } as any }}>
+                              <span className={cn(
+                                "absolute top-1 text-xs text-muted-foreground whitespace-nowrap",
+                                isFirst ? "left-0 translate-x-1" : isLast ? "right-0 -translate-x-1" : "-translate-x-1/2"
+                              )}>
+                                {timelineStartHour + i}:00
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                       <div className="sticky right-0 z-50 flex-shrink-0 font-semibold p-2 border-l bg-background w-[120px]">ステータス</div>
                     </div>
@@ -3460,7 +3469,7 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
           {events.map((event) => (<DraggableEvent key={event.id} targetEvent={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={onDoubleClickEvent} onDelete={handleDeleteEvent} />))}
         </div>
       </div>
-      <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[140px]")}>
+      <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[120px]")}>
         {status && isToday && (() => {
           const etaTime = status.estimatedArrivalTime || staff.estimatedArrivalTime;
           const lastUpIso = status.lastUpdate || (staff as any).updatedAt || (staff as any).lastLocationUpdatedAt || (staff as any).statusUpdatedAt;
