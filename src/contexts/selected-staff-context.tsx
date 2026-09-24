@@ -187,11 +187,24 @@ export function SelectedStaffProvider({ children }: { children: ReactNode }) {
       if (base.length === 0 && currentActiveIds && currentActiveIds.length > 0) {
         base = currentActiveIds;
       }
-      return base.includes(cleanId)
+      const nextIds = base.includes(cleanId)
         ? base.filter(id => id !== cleanId)
         : [...base, cleanId];
+
+      // 即座に該当日の手動選択として永続化・適用（「選択を適用」を押さずに画面遷移しても反映されるようにする）
+      setSelectionsByDate(prevMap => {
+        const nextMap = { ...prevMap, [currentDateStr]: nextIds };
+        try {
+          localStorage.setItem(LOCAL_STORAGE_DATE_SELECTION_KEY, JSON.stringify(nextMap));
+        } catch (error) {
+          console.error("Failed to save date selection to localStorage", error);
+        }
+        return nextMap;
+      });
+
+      return nextIds;
     });
-  }, []);
+  }, [currentDateStr]);
 
   const setPendingSelection = React.useCallback((staffIds: string[]) => {
     setPendingSelectedStaffIds(staffIds);

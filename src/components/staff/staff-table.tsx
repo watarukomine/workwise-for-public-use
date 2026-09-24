@@ -261,7 +261,8 @@ export function StaffTable({ staff, isLoading }: StaffTableProps) {
   const isMemberSelected = React.useCallback((member: WithId<Staff>) => {
     const hasManualSelection = pendingSelectedStaffIds.length > 0 || appliedSelectedStaffIds.length > 0;
     if (hasManualSelection) {
-      return pendingSelectedStaffIds.includes(member.id);
+      const targetIds = pendingSelectedStaffIds.length > 0 ? pendingSelectedStaffIds : appliedSelectedStaffIds;
+      return targetIds.includes(member.id) || isStaffMatched(member, targetIds);
     }
     return isStaffMatched(member, Array.from(activeStaffIds));
   }, [appliedSelectedStaffIds, pendingSelectedStaffIds, activeStaffIds]);

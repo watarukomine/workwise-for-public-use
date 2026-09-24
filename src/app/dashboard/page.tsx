@@ -261,16 +261,34 @@ export default function DashboardPage() {
         appliedSelectedStaffIds.includes(staffIdClean) ||
         appliedSelectedStaffIds.includes(staffNameOrig) ||
         appliedSelectedStaffIds.includes(staffNameClean) ||
-        appliedSelectedStaffIds.includes(staffShiMeiClean)
+        appliedSelectedStaffIds.includes(staffShiMeiClean) ||
+        isStaffMatched(staff, appliedSelectedStaffIds)
       ));
 
       // シフト出勤者 OR 当日タスク割当者 OR 手動選択チェックのスタッフを全て合成表示
       return isShiftScheduled || hasTask || isManuallySelected;
     });
 
-    // スイッチOFF時は純粋管理者(Admin)のみ非表示(現場兼務者は表示)
+    // スイッチOFF時は純粋管理者(Admin)のみ非表示(現場兼務者・手動選択者・タスク割当者は表示)
     if (!showManagement) {
       selectedStaff = selectedStaff.filter((staff: any) => {
+        const staffIdClean = String(staff.id || '').trim();
+        const staffNameClean = String(staff.name || '').trim().replace(/[\s\u3000]+/g, '');
+        const staffNameOrig = String(staff.name || '').trim();
+        const staffShiMeiClean = String(staff['氏名'] || '').trim().replace(/[\s\u3000]+/g, '');
+
+        const isManuallySelected = !!(appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0 && (
+          appliedSelectedStaffIds.includes(staffIdClean) ||
+          appliedSelectedStaffIds.includes(staffNameOrig) ||
+          appliedSelectedStaffIds.includes(staffNameClean) ||
+          appliedSelectedStaffIds.includes(staffShiMeiClean) ||
+          isStaffMatched(staff, appliedSelectedStaffIds)
+        ));
+        const hasTask = isStaffMatched(staff, Array.from(activeStaffKeys));
+
+        // 手動選択されたスタッフ、またはタスクがあるスタッフは、管理者(Admin)であっても必ず表示
+        if (isManuallySelected || hasTask) return true;
+
         const roleOrig = String(staff.role || '').trim();
         const rawRoleOrig = String((staff as any)['ロール'] || '').trim();
         const roleLower = roleOrig.toLowerCase();
