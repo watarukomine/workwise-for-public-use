@@ -1180,12 +1180,12 @@ function CheckInClient() {
       </Dialog>
 
       <Dialog open={isNextStepDialogOpen} onOpenChange={setIsNextStepDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="w-[calc(100vw-32px)] max-w-md p-4 sm:p-6 rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="text-left space-y-1">
+            <DialogTitle className="text-base sm:text-lg font-bold">
               {sameStoreOrdersInfo.nextSameStoreOrders.length > 0 ? "同店舗の次の作業を選択" : "作業完了後の移動先を選択"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs sm:text-sm break-words whitespace-normal text-muted-foreground leading-normal">
               {sameStoreOrdersInfo.nextSameStoreOrders.length > 0
                 ? `この店舗（${currentOrder?.customerName || '同店舗'}）には、続けて別の作業予定があります。`
                 : "作業が完了しました。次のアクションを選択してください。"
@@ -1193,7 +1193,7 @@ function CheckInClient() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-col gap-3 py-3">
+          <div className="flex flex-col gap-3 py-2">
             {/* 同店舗の連続作業がある場合の優先メニュー */}
             {sameStoreOrdersInfo.nextSameStoreOrders.length > 0 && (
               <div className="p-3 bg-amber-50/90 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700 rounded-xl space-y-2.5 shadow-xs">
@@ -1205,14 +1205,14 @@ function CheckInClient() {
                 {/* ボタン①: 続けて次の台（2台目）へ進む */}
                 {sameStoreOrdersInfo.nextOrder && (
                   <Button
-                    className="w-full justify-start h-auto py-2.5 px-3.5 text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm flex items-center gap-2.5 rounded-lg"
+                    className="w-full justify-start h-auto py-2.5 px-3 text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm flex items-start sm:items-center gap-2.5 rounded-lg whitespace-normal text-left"
                     onClick={() => handleProceedToNextSameStore(sameStoreOrdersInfo.nextOrder!)}
                     disabled={isProcessingNextStep}
                   >
-                    <ArrowRightCircle className="h-5 w-5 shrink-0" />
-                    <div className="text-left leading-tight">
-                      <div className="text-sm font-bold">🚗 続けて{sameStoreOrdersInfo.currentIndex + 2}台目の作業へ進む</div>
-                      <div className="text-[11px] font-normal opacity-90 mt-0.5">
+                    <ArrowRightCircle className="h-5 w-5 shrink-0 mt-0.5 sm:mt-0" />
+                    <div className="flex-1 min-w-0 leading-tight">
+                      <div className="text-sm font-bold break-words">🚗 続けて{sameStoreOrdersInfo.currentIndex + 2}台目の作業へ進む</div>
+                      <div className="text-[11px] font-normal opacity-90 mt-0.5 break-words">
                         {sameStoreOrdersInfo.nextOrder.carName || '車両'} {sameStoreOrdersInfo.nextOrder.regNo ? `(${sameStoreOrdersInfo.nextOrder.regNo})` : ''}
                         {sameStoreOrdersInfo.nextOrder.tireSize ? ` / ${sameStoreOrdersInfo.nextOrder.tireSize}` : ''}
                       </div>
@@ -1223,14 +1223,14 @@ function CheckInClient() {
                 {/* ボタン②: この店舗の残り全件もまとめて完了にする */}
                 <Button
                   variant="outline"
-                  className="w-full justify-start h-auto py-2.5 px-3.5 text-xs font-bold border-green-400 bg-white dark:bg-slate-900 text-green-800 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/50 flex items-center gap-2 rounded-lg"
+                  className="w-full justify-start h-auto py-2.5 px-3 text-xs font-bold border-green-400 bg-white dark:bg-slate-900 text-green-800 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-950/50 flex items-start sm:items-center gap-2 rounded-lg whitespace-normal text-left"
                   onClick={handleBatchCompleteRemainingSameStore}
                   disabled={isProcessingNextStep}
                 >
-                  <CheckCheck className="h-4.5 w-4.5 text-green-600 shrink-0" />
-                  <div className="text-left leading-tight">
-                    <div className="font-bold">✨ この店舗の残り全件（{sameStoreOrdersInfo.nextSameStoreOrders.length}台）もまとめて作業完了にする</div>
-                    <div className="text-[10px] font-normal text-muted-foreground mt-0.5">
+                  <CheckCheck className="h-4.5 w-4.5 text-green-600 shrink-0 mt-0.5 sm:mt-0" />
+                  <div className="flex-1 min-w-0 leading-tight">
+                    <div className="font-bold break-words leading-snug">✨ この店舗の残り全件（{sameStoreOrdersInfo.nextSameStoreOrders.length}台）もまとめて作業完了にする</div>
+                    <div className="text-[10px] font-normal text-muted-foreground mt-0.5 break-words leading-tight">
                       全台まとめて作業が終わった場合にワンタップで完了できます
                     </div>
                   </div>
@@ -1245,30 +1245,30 @@ function CheckInClient() {
               </div>
               <Button
                 variant={sameStoreOrdersInfo.nextSameStoreOrders.length > 0 ? "outline" : "default"}
-                className="w-full justify-start h-11 text-sm gap-2.5"
+                className="w-full justify-start h-11 text-sm gap-2.5 whitespace-normal"
                 onClick={() => handleNextStepAction('next_task')}
                 disabled={isProcessingNextStep}
               >
-                <Truck className="h-4.5 w-4.5" />
-                別の現場へ移動開始
+                <Truck className="h-4.5 w-4.5 shrink-0" />
+                <span className="truncate">別の現場へ移動開始</span>
               </Button>
               <Button
                 variant="outline"
-                className="w-full justify-start h-11 text-sm gap-2.5"
+                className="w-full justify-start h-11 text-sm gap-2.5 whitespace-normal"
                 onClick={() => handleNextStepAction('return_office')}
                 disabled={isProcessingNextStep}
               >
-                <Building className="h-4.5 w-4.5" />
-                帰社する
+                <Building className="h-4.5 w-4.5 shrink-0" />
+                <span className="truncate">帰社する</span>
               </Button>
               <Button
                 variant="secondary"
-                className="w-full justify-start h-11 text-sm gap-2.5"
+                className="w-full justify-start h-11 text-sm gap-2.5 whitespace-normal"
                 onClick={() => handleNextStepAction('wait')}
                 disabled={isProcessingNextStep}
               >
-                <PauseCircle className="h-4.5 w-4.5" />
-                待機する
+                <PauseCircle className="h-4.5 w-4.5 shrink-0" />
+                <span className="truncate">待機する</span>
               </Button>
             </div>
           </div>
