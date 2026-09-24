@@ -265,20 +265,60 @@ function CheckInClient() {
       const { OrderService } = await import('@/services/order-service');
       const now = new Date();
       const nowIso = now.toISOString();
-      const arrivalToUse = (currentOrder as any)?.arrivalTimestamp || (currentOrder as any)?.actualEndTime || nowIso;
 
-      const totalCount = sameStoreOrdersInfo.nextSameStoreOrders.length;
-      const totalDurationMin = calculateWorkDurationMinutes(arrivalToUse, null, nowIso) || (totalCount * 45);
-      const allocatedDurationPerOrder = Math.max(Math.round(totalDurationMin / (totalCount + 1)), 15);
+      // 作業開始の起点: 1台目の作業開始時刻 -> 現場到着時刻 -> 先行タスクの完了時刻
+      const startToUse = (currentOrder as any)?.actualStartTime || 
+                         (currentOrder as any)?.arrivalTimestamp || 
+                         (currentOrder as any)?.actualEndTime || 
+                         nowIso;
 
-      for (let i = 0; i < sameStoreOrdersInfo.nextSameStoreOrders.length; i++) {
-        const target = sameStoreOrdersInfo.nextSameStoreOrders[i];
+      const remainingOrders = sameStoreOrdersInfo.nextSameStoreOrders;
+      const totalCount = remainingOrders.length + 1; // 1台目も含めた店舗全体の対象台数
+      
+      // 1台目の開始から今（全完了）までの合計作業時間（分）
+      const totalDurationMin = calculateWorkDurationMinutes(startToUse, null, nowIso) || (totalCount * 45);
+      
+      // 1台あたりに均等按分した所要時間（最低15分）
+      const allocatedDurationPerOrder = Math.max(Math.round(totalDurationMin / totalCount), 15);
+
+      // 1. まず 1台目 (currentOrder) の所要時間も按分後の値で更新
+      const currentSysId = currentOrder?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || currentOrder?.id;
+      if (currentSysId) {
+        await OrderService.updateOrder(currentSysId, {
+          status: '作業完了',
+          workDuration: allocatedDurationPerOrder,
+          updatedAt: nowIso
+        } as any);
+
+        // GASのスプレッドシートも按分時間で更新通知
+        updateSheetStatus({
+          gasUrl: ORDER_GAS_URL,
+          eventTitle: `(ID: ${currentSysId})`,
+          staffName: profile?.name || '',
+          statusValue: '作業完了',
+          timestamp: nowIso,
+          actionType: 'Finish Task',
+          actionTimestamp: nowIso,
+          systemId: currentSysId,
+          arrivalTimestamp: (currentOrder as any)?.arrivalTimestamp || startToUse,
+          actualStartTime: (currentOrder as any)?.actualStartTime || startToUse,
+          actualEndTime: nowIso,
+          workDuration: allocatedDurationPerOrder,
+          actualDuration: allocatedDurationPerOrder,
+          '所要時間': allocatedDurationPerOrder,
+          '作業時間（分）': allocatedDurationPerOrder,
+        }).catch(e => console.warn("Current order GAS update skipped:", e));
+      }
+
+      // 2. 残り全件 (2台目以降) も完了・按分時間で一括更新
+      for (let i = 0; i < remainingOrders.length; i++) {
+        const target = remainingOrders[i];
         const sysId = (target as any).systemId || target.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || target.id;
 
         const fields: any = {
           status: '作業完了',
-          arrivalTimestamp: arrivalToUse,
-          actualStartTime: arrivalToUse,
+          arrivalTimestamp: (currentOrder as any)?.arrivalTimestamp || startToUse,
+          actualStartTime: startToUse,
           actualEndTime: nowIso,
           workDuration: allocatedDurationPerOrder,
           actualDuration: allocatedDurationPerOrder,
@@ -297,8 +337,8 @@ function CheckInClient() {
           actionType: 'Finish Task',
           actionTimestamp: nowIso,
           systemId: sysId,
-          arrivalTimestamp: arrivalToUse,
-          actualStartTime: arrivalToUse,
+          arrivalTimestamp: (currentOrder as any)?.arrivalTimestamp || startToUse,
+          actualStartTime: startToUse,
           actualEndTime: nowIso,
           workDuration: allocatedDurationPerOrder,
           actualDuration: allocatedDurationPerOrder,
@@ -308,8 +348,8 @@ function CheckInClient() {
       }
 
       toast({
-        title: '一括作業完了しました！',
-        description: `この店舗の残り全件（${totalCount}台）の作業を完了として記録しました。`
+        title: '全件の作業を一括完了しました！',
+        description: `同店舗の全${totalCount}台の作業時間を均等按分（各 ${allocatedDurationPerOrder}分）して記録しました。`
       });
 
       setIsNextStepDialogOpen(false);
