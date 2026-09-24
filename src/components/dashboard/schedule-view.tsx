@@ -124,16 +124,16 @@ const safeParseISO = (dateStr: any): Date => {
   return isValid(parsedDate) ? parsedDate : new Date();
 };
 
-const minutesToPixels = (minutes: number) => minutes * PIXELS_PER_MINUTE;
+const minutesToPixels = (minutes: number, ppm: number = PIXELS_PER_MINUTE) => minutes * ppm;
 
-const pixelsToMinutes = (pixels: number) => Math.round(pixels / PIXELS_PER_MINUTE / 15) * 15;
+const pixelsToMinutes = (pixels: number, ppm: number = PIXELS_PER_MINUTE) => Math.round(pixels / ppm / 15) * 15;
 
-const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) => {
+const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string, ppm: number = PIXELS_PER_MINUTE) => {
   const start = typeof eventStart === 'string' ? safeParseISO(eventStart) : eventStart;
   const end = typeof eventEnd === 'string' ? safeParseISO(eventEnd) : eventEnd;
 
   if (!start || !end || !isValid(start) || !isValid(end)) {
-    return { left: 0, width: minutesToPixels(60) };
+    return { left: 0, width: minutesToPixels(60, ppm) };
   }
 
   const startOfTimelineDay = new Date(start);
@@ -161,7 +161,7 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
   // Ensure minimum width of 15 minutes if it was clipped, 
   // or 30 minutes if it was normally short.
   // But if the timeline itself has no more room, it might be 0, so clamp to min 15px maybe?
-  let widthPixels = minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30);
+  let widthPixels = minutesToPixels(widthInMinutes > 0 ? widthInMinutes : 30, ppm);
 
   // Hard minimum width so the chip is always clickable even if pushed exactly to 19:00
   if (widthPixels < 20) {
@@ -169,11 +169,11 @@ const getEventDimensions = (eventStart: Date | string, eventEnd: Date | string) 
   }
 
   // If the event is pushed past the end, adjust left to make room for the minimum width
-  let leftPixels = minutesToPixels(leftInMinutes);
+  let leftPixels = minutesToPixels(leftInMinutes, ppm);
   if (leftInMinutes >= timelineTotalHours * 60) {
-    leftPixels = minutesToPixels(timelineTotalHours * 60) - widthPixels;
+    leftPixels = minutesToPixels(timelineTotalHours * 60, ppm) - widthPixels;
   } else {
-    widthPixels = Math.min(widthPixels, minutesToPixels(timelineTotalHours * 60) - leftPixels);
+    widthPixels = Math.min(widthPixels, minutesToPixels(timelineTotalHours * 60, ppm) - leftPixels);
     if (widthPixels < 20) widthPixels = 20;
   }
 
@@ -510,7 +510,7 @@ const UnassignedOrderItem = React.memo(({ order, customer, onDoubleClick }: { or
   );
 });
 
-const TimeIndicator = () => {
+const TimeIndicator = ({ pixelsPerMinute = PIXELS_PER_MINUTE }: { pixelsPerMinute?: number }) => {
   const [now, setNow] = React.useState<Date | null>(null);
 
   React.useEffect(() => {
@@ -527,7 +527,7 @@ const TimeIndicator = () => {
   if (!isVisible) return null;
 
   const minutesFromStart = (now.getHours() - timelineStartHour) * 60 + now.getMinutes();
-  const leftPosition = minutesToPixels(minutesFromStart);
+  const leftPosition = minutesToPixels(minutesFromStart, pixelsPerMinute);
 
   return (
     <div
@@ -541,7 +541,7 @@ const TimeIndicator = () => {
 
 const RenderDragOverlay = () => {
   const { active } = useDndContext();
-  const { getCustomerByCode, getStaffById } = useScheduleView();
+  const { getCustomerByCode, getStaffById, pixelsPerMinute } = useScheduleView();
 
   if (!active) return null;
 
@@ -552,7 +552,7 @@ const RenderDragOverlay = () => {
     <DragOverlay modifiers={undefined} dropAnimation={null}>
       <div>
         {activeIdString.startsWith('order-') ? (
-          <OrderChip order={activeItem as WithId<Order>} style={{ width: `${minutesToPixels((activeItem as WithId<Order>).estimatedDuration || 60)}px` }} isOverlay={true} />
+          <OrderChip order={activeItem as WithId<Order>} style={{ width: `${minutesToPixels((activeItem as WithId<Order>).estimatedDuration || 60, pixelsPerMinute)}px` }} isOverlay={true} />
         ) : activeItem ? (
           (() => {
             const staff = getStaffById((activeItem as WithId<ScheduleEvent>).staffId);
@@ -576,6 +576,7 @@ const RenderDragOverlay = () => {
 interface ScheduleViewContextType {
   getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
   getStaffById: (id: string | undefined) => WithId<Staff> | undefined;
+  pixelsPerMinute: number;
 }
 
 const ScheduleViewContext = createContext<ScheduleViewContextType | undefined>(undefined);
@@ -633,6 +634,53 @@ export function ScheduleView({
   const scrollContainerRectRef = React.useRef<DOMRect | null>(null);
   const timelineContainerRef = React.useRef<HTMLDivElement | null>(null);
   const timelineHeaderRef = React.useRef<HTMLDivElement | null>(null);
+
+  const [containerWidth, setContainerWidth] = React.useState<number>(0);
+
+  // ResizeObserver で timeline-scroll-container の実際の表示幅を監視
+  React.useEffect(() => {
+    const container = timelineContainerRef.current;
+    if (!container) return;
+
+    const updateWidth = () => {
+      const w = container.clientWidth;
+      if (w > 0) setContainerWidth(w);
+    };
+
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        if (w > 0) setContainerWidth(w);
+      }
+    });
+
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  const FIXED_COLS_WIDTH = STAFF_COL_WIDTH + STATUS_COL_WIDTH; // 225 + 120 = 345px
+  const BASE_TIMELINE_MINUTES = timelineTotalHours * 60; // 600分
+  const MIN_GRID_WIDTH = 900; // 600分 * 1.5px
+
+  // 利用可能な時間グリッド幅（画面が広ければ画面幅いっぱいに拡大、狭ければ900pxを維持して横スクロール）
+  const currentGridWidth = React.useMemo(() => {
+    if (!containerWidth) return MIN_GRID_WIDTH;
+    const available = containerWidth - FIXED_COLS_WIDTH;
+    return Math.max(MIN_GRID_WIDTH, available);
+  }, [containerWidth, FIXED_COLS_WIDTH]);
+
+  const currentPixelsPerMinute = React.useMemo(() => {
+    return currentGridWidth / BASE_TIMELINE_MINUTES;
+  }, [currentGridWidth, BASE_TIMELINE_MINUTES]);
+
+  const currentPixelsPerMinuteRef = React.useRef(currentPixelsPerMinute);
+  React.useEffect(() => {
+    currentPixelsPerMinuteRef.current = currentPixelsPerMinute;
+  }, [currentPixelsPerMinute]);
+
+  const totalTimelineWidth = FIXED_COLS_WIDTH + currentGridWidth;
 
   React.useEffect(() => {
     let rafId: number | null = null;
@@ -1175,7 +1223,7 @@ export function ScheduleView({
       const relativeLeftToScrollContainer = active.rect.current.translated.left - scrollContainerRectRef.current.left;
       const dropX = relativeLeftToScrollContainer + scrollContainer.scrollLeft - STAFF_COL_WIDTH;
       
-      const minutes = pixelsToMinutes(dropX);
+      const minutes = pixelsToMinutes(dropX, currentPixelsPerMinuteRef.current);
       const baseDate = new Date(currentDate);
       baseDate.setHours(timelineStartHour, 0, 0, 0);
       const targetTime = addMinutes(baseDate, minutes);
@@ -1316,7 +1364,7 @@ export function ScheduleView({
       }
       const relativeLeftToScrollContainer = active.rect.current.translated.left - scrollContainerRectRef.current.left;
       const dropX = relativeLeftToScrollContainer + scrollContainer.scrollLeft - STAFF_COL_WIDTH;
-      const newStartMinutes = pixelsToMinutes(dropX);
+      const newStartMinutes = pixelsToMinutes(dropX, currentPixelsPerMinuteRef.current);
       
       const startOfTimelineDay = new Date(currentDate);
       startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
@@ -1838,7 +1886,7 @@ export function ScheduleView({
 
     const timelineRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const clickX = e.clientX - timelineRect.left;
-    const clickMinutes = pixelsToMinutes(clickX);
+    const clickMinutes = pixelsToMinutes(clickX, currentPixelsPerMinuteRef.current);
 
     const startOfTimelineDay = new Date(currentDate);
     startOfTimelineDay.setHours(timelineStartHour, 0, 0, 0);
@@ -2581,8 +2629,9 @@ export function ScheduleView({
 
   const contextValue: ScheduleViewContextType = React.useMemo(() => ({
     getCustomerByCode,
-    getStaffById
-  }), [getCustomerByCode, getStaffById]);
+    getStaffById,
+    pixelsPerMinute: currentPixelsPerMinute,
+  }), [getCustomerByCode, getStaffById, currentPixelsPerMinute]);
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
@@ -2640,7 +2689,7 @@ export function ScheduleView({
 
         <TooltipProvider>
           <>
-            <div className="space-y-1 dynamic-maxWidth" {...{ 'style': { '--dynamic-maxWidth': `calc(var(--staff-col-width) + ${timelineTotalHours * 60} * var(--pixels-per-minute) * 1px + var(--status-col-width))` } as any }}>
+            <div className="space-y-1 w-full">
             {/* Emergency Notification Banner */}
             {emergencyNotifications.length > 0 && (
               <div className="w-full bg-red-600/90 text-white px-4 py-2 mb-2 rounded-md shadow-md animate-pulse relative z-50">
@@ -2716,7 +2765,7 @@ export function ScheduleView({
             <div>
               <div>
                 <div ref={timelineContainerRef} id="timeline-scroll-container" className="w-full border rounded-md h-auto overflow-x-auto overflow-y-visible">
-                  <div className="relative dynamic-width" {...{ 'style': { '--dynamic-width': `calc(var(--staff-col-width) + ${timelineTotalHours * 60} * var(--pixels-per-minute) * 1px + var(--status-col-width))` } as any }}>
+                  <div className="relative dynamic-width" {...{ 'style': { '--dynamic-width': `${totalTimelineWidth}px`, '--pixels-per-minute': currentPixelsPerMinute } as any }}>
 
                     {/* Header Row - Sticky top tracking on page scroll while preserving horizontal scroll sync */}
                     <div ref={timelineHeaderRef} className="z-40 flex h-[34px] border-b bg-background transition-shadow duration-150" style={{ position: 'relative', top: 0 }}>
@@ -2757,7 +2806,7 @@ export function ScheduleView({
 
                       {isToday(currentDate) && (
                         <div className="absolute top-0 h-full pointer-events-none z-[15] dynamic-left dynamic-width" {...{ 'style': { '--dynamic-left': `var(--staff-col-width)`, '--dynamic-width': `calc(${timelineTotalHours * 60} * var(--pixels-per-minute) * 1px)` } as any }}>
-                          <TimeIndicator />
+                          <TimeIndicator pixelsPerMinute={currentPixelsPerMinute} />
                         </div>
                       )}
                       {staffData?.map((staff) => {
@@ -3554,7 +3603,8 @@ interface DraggableEventProps {
 
 const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, getCustomerByCode, onDoubleClick, isOverlay, onDelete }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: targetEvent.id, data: targetEvent, disabled: isOverlay });
-  const { left, width } = getEventDimensions(targetEvent.start, targetEvent.end);
+  const { pixelsPerMinute } = useScheduleView();
+  const { left, width } = getEventDimensions(targetEvent.start, targetEvent.end, pixelsPerMinute);
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(targetEvent); };
 
