@@ -112,7 +112,7 @@ export default function UserGuidePage() {
                     <CardContent className="space-y-4">
                         <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
                             <img
-                                src="/images/manual/pc-1-dashboard-overview.png"
+                                src="/images/manual/pc-1-dashboard-overview.png?v=20260926b"
                                 alt="ダッシュボード全体画面"
                                 className="w-full h-auto object-cover"
                             />
@@ -172,7 +172,7 @@ export default function UserGuidePage() {
                     <CardContent className="space-y-4">
                         <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
                             <img
-                                src="/images/manual/pc-3-order-form.png"
+                                src="/images/manual/pc-3-order-form.png?v=20260926b"
                                 alt="タイヤ作業 ご注文フォーム画面"
                                 className="w-full h-auto object-cover"
                             />
@@ -229,7 +229,7 @@ export default function UserGuidePage() {
                     <CardContent className="space-y-4">
                         <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
                             <img
-                                src="/images/manual/pc-4-unassigned-pool.png"
+                                src="/images/manual/pc-4-unassigned-pool.png?v=20260926b"
                                 alt="未割当タスクプール"
                                 className="w-full h-auto object-cover"
                             />
@@ -265,7 +265,7 @@ export default function UserGuidePage() {
                     <CardContent className="space-y-4">
                         <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
                             <img
-                                src="/images/manual/pc-5-timeline-assigned-chips.png"
+                                src="/images/manual/pc-5-timeline-assigned-chips.png?v=20260926b"
                                 alt="タイムラインへのチップ配置状態"
                                 className="w-full h-auto object-cover"
                             />
@@ -316,7 +316,7 @@ export default function UserGuidePage() {
                     <CardContent className="space-y-4">
                         <div className="rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
                             <img
-                                src="/images/manual/pc-2-timeline-store-dropdown.png"
+                                src="/images/manual/pc-2-timeline-store-dropdown.png?v=20260926b"
                                 alt="タイムライン拠点列とプルダウンメニュー"
                                 className="w-full h-auto object-cover"
                             />
@@ -367,12 +367,15 @@ export default function UserGuidePage() {
                             <p className="text-xs text-muted-foreground leading-relaxed">
                                 スタッフ数が多い場合でも、縦スクロール時に「スタッフ名・拠点・9:00〜19:00目盛り・ステータス」のヘッダーが画面上辺にピタッと吸着固定されます。下方のスタッフでも時間帯を見失いません。
                             </p>
-                            <div className="rounded-lg overflow-hidden border shadow-xs">
+                            <div className="rounded-lg overflow-hidden border border-slate-200 shadow-xs bg-slate-50">
                                 <img
-                                    src="/images/manual/timeline-header-sticky.png"
+                                    src="/images/manual/pc-6-timeline-header-sticky.png?v=20260926b"
                                     alt="タイムラインヘッダー固定"
                                     className="w-full h-auto object-cover"
                                 />
+                                <div className="p-2 text-[11px] text-muted-foreground text-center bg-slate-100 dark:bg-slate-800 border-t">
+                                    【PC-6】ヘッダー常時固定（下方向スクロール時も時間軸・拠点列が上部に追従固定）
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
@@ -389,12 +392,15 @@ export default function UserGuidePage() {
                             <p className="text-xs text-muted-foreground leading-relaxed">
                                 ワイドモニターや高解像度ディスプレイでも右端に不自然な余白が出ず、画面幅いっぱいにタイムラインが均等拡大されます。事務所の大画面テレビ等での常時監視にも最適です。
                             </p>
-                            <div className="rounded-lg overflow-hidden border shadow-xs">
+                            <div className="rounded-lg overflow-hidden border border-slate-200 shadow-xs bg-slate-50">
                                 <img
-                                    src="/images/manual/timeline-responsive-fullscreen.png"
+                                    src="/images/manual/pc-7-timeline-responsive-fullscreen.png?v=20260926b"
                                     alt="全幅拡大表示"
                                     className="w-full h-auto object-cover"
                                 />
+                                <div className="p-2 text-[11px] text-muted-foreground text-center bg-slate-100 dark:bg-slate-800 border-t">
+                                    【PC-7】大画面モニター全幅拡大表示（余白なくワイドに全情報が一望可能）
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
