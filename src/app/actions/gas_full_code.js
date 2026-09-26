@@ -512,19 +512,29 @@ function createTask(params) {
  * 受注管理シート（二重バックアップ対応）に追記します
  */
 function createOrder(params) {
-    let primaryResult = null;
-    const targetIds = getTargetSpreadsheetIds();
-    for (let idx = 0; idx < targetIds.length; idx++) {
-        const ssId = targetIds[idx];
-        try {
-            const res = createOrderSingleSheet(ssId, params);
-            if (idx === 0) primaryResult = res;
-        } catch (e) {
-            console.error("createOrder error for ss " + ssId, e);
-            if (idx === 0) return errorResponse("注文登録エラー: " + e.message);
-        }
+    const lock = LockService.getScriptLock();
+    // 排他制御: 他のリクエストと同時に実行されるのを防ぎ、30秒まで待機する
+    const hasLock = lock.tryLock(30000);
+    if (!hasLock) {
+        return errorResponse("サーバーが混雑しています。しばらく経ってから再試行してください。");
     }
-    return primaryResult || errorResponse("注文登録エラー");
+    try {
+        let primaryResult = null;
+        const targetIds = getTargetSpreadsheetIds();
+        for (let idx = 0; idx < targetIds.length; idx++) {
+            const ssId = targetIds[idx];
+            try {
+                const res = createOrderSingleSheet(ssId, params);
+                if (idx === 0) primaryResult = res;
+            } catch (e) {
+                console.error("createOrder error for ss " + ssId, e);
+                if (idx === 0) return errorResponse("注文登録エラー: " + e.message);
+            }
+        }
+        return primaryResult || errorResponse("注文登録エラー");
+    } finally {
+        lock.releaseLock();
+    }
 }
 
 function createOrderSingleSheet(targetSsId, params) {
@@ -667,6 +677,7 @@ function createOrderSingleSheet(targetSsId, params) {
             }
         });
         sheet.getRange(targetRow, 1, 1, newRow.length).setValues([newRow]);
+        SpreadsheetApp.flush();
         ensureArrayFormulas(sheet);
         sendFirebaseSignal('update');
         return successResponse("注文を登録しました。", { orderId: newSystemId, displayId: targetRow - 1 });

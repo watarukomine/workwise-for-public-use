@@ -227,7 +227,7 @@ export const OrderService = {
           createdAt: now,
           updatedAt: now,
           status: data.status || '割当済',
-          isGasSynced: false,
+          isGasSynced: (data as any).isGasSynced !== undefined ? (data as any).isGasSynced : false,
           ...(computedDuration !== null ? { workDuration: computedDuration, actualDuration: computedDuration } : {})
         };
 

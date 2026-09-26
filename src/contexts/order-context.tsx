@@ -482,20 +482,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Background Auto-Recovery Sync Worker (Ensures 100% GAS sync reliability)
-  useEffect(() => {
-    OrderService.syncUnsyncedOrders().catch(err => {
-      console.warn('[OrderProvider] Auto syncUnsyncedOrders error:', err);
-    });
-
-    const interval = setInterval(() => {
-      OrderService.syncUnsyncedOrders().catch(err => {
-        console.warn('[OrderProvider] Auto syncUnsyncedOrders periodic error:', err);
-      });
-    }, 180000);
-
-    return () => clearInterval(interval);
-  }, []);
 
 
   const toggleTripSuppression = useCallback((tripId: string) => {
@@ -642,21 +628,6 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, [profile, isProfileLoading, currentViewedDate, rawOrdersData]);
 
-  // Auto-sync any unsynced orders to GAS in the background
-  useEffect(() => {
-    if (rawOrdersData && rawOrdersData.length > 0) {
-      OrderService.syncUnsyncedOrders().then(count => {
-        if (count > 0) {
-          console.log(`[OrderContext] Auto-synced ${count} unsynced orders to GAS spreadsheet.`);
-        }
-        const nowStr = format(new Date(), 'yyyy/MM/dd HH:mm:ss');
-        setLastGasSyncedAt(nowStr);
-        try {
-          localStorage.setItem('last_gas_synced_at', nowStr);
-        } catch (e) {}
-      }).catch(err => console.warn('[OrderContext] Auto-sync failed:', err));
-    }
-  }, [rawOrdersData.length]);
 
   const saveLocalEvent = useCallback((event: WithId<ScheduleEvent>) => {
     setLocalScheduleEvents(prev => {
