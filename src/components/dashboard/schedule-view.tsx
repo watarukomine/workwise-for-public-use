@@ -263,7 +263,18 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
   };
 
   const equipmentSymbol = getEquipmentSymbol(order.equipmentStatus);
-  const scheduledTime = order.scheduledTime ? formatTime(order.scheduledTime) : '';
+  const scheduledTime = (() => {
+    if (!order.scheduledTime) return '';
+    const startStr = formatTime(order.scheduledTime);
+    if (!startStr) return '';
+    if (order.scheduledEndTime) {
+      const endStr = formatTime(order.scheduledEndTime);
+      if (endStr && endStr !== startStr) {
+        return `${startStr}-${endStr}`;
+      }
+    }
+    return startStr;
+  })();
 
   // Format 本数 to include 本 suffix if not already present
   const formatHonsu = (honsu: string | number | undefined): string => {
@@ -346,9 +357,24 @@ const DraggableOrder = React.memo<DraggableOrderProps>(({ order, customer, class
       data: order,
     });
 
+  const effectiveDuration = React.useMemo(() => {
+    if (order.estimatedDuration && order.estimatedDuration !== 60) {
+      return order.estimatedDuration;
+    }
+    if (order.scheduledTime && order.scheduledEndTime) {
+      const sMatch = String(order.scheduledTime).match(/(\d{1,2}):(\d{2})/);
+      const eMatch = String(order.scheduledEndTime).match(/(\d{1,2}):(\d{2})/);
+      if (sMatch && eMatch) {
+        const diff = (parseInt(eMatch[1], 10) * 60 + parseInt(eMatch[2], 10)) - (parseInt(sMatch[1], 10) * 60 + parseInt(sMatch[2], 10));
+        if (diff > 0) return diff;
+      }
+    }
+    return order.estimatedDuration || 60;
+  }, [order.estimatedDuration, order.scheduledTime, order.scheduledEndTime]);
+
   const style = {
     '--dynamic-opacity': isDragging ? 0.5 : 1,
-    '--dynamic-width': `${minutesToPixels(order.estimatedDuration || 60)}px`,
+    '--dynamic-width': `${minutesToPixels(effectiveDuration)}px`,
     touchAction: 'none',
   };
 
@@ -1684,6 +1710,21 @@ export function ScheduleView({
         const targetRawOrderId = order.rawOrderId || order.id;
         const tripId = `trip-${targetRawOrderId}`;
         const customer = getCustomerByCode(order.customerCode);
+
+        // Resolve exact task duration from order.estimatedDuration or scheduledEndTime difference
+        let taskDuration = order.estimatedDuration;
+        if (!taskDuration || taskDuration === 60) {
+          if (order.scheduledTime && order.scheduledEndTime) {
+            const sMatch = String(order.scheduledTime).match(/(\d{1,2}):(\d{2})/);
+            const eMatch = String(order.scheduledEndTime).match(/(\d{1,2}):(\d{2})/);
+            if (sMatch && eMatch) {
+              const diff = (parseInt(eMatch[1], 10) * 60 + parseInt(eMatch[2], 10)) - (parseInt(sMatch[1], 10) * 60 + parseInt(sMatch[2], 10));
+              if (diff > 0) taskDuration = diff;
+            }
+          }
+        }
+        if (!taskDuration) taskDuration = 60;
+
         const travelEvent: WithId<ScheduleEvent> = {
           ...order,
           id: `${tripId}-travel`, tripId,
@@ -1697,8 +1738,9 @@ export function ScheduleView({
           id: `${tripId}-task`, tripId,
           title: order.taskDetails,
           staffId: newStaffId, locationId: customer?.userCode || '',
-          start: taskStart.toISOString(), end: addMinutes(taskStart, order.estimatedDuration || 60).toISOString(),
+          start: taskStart.toISOString(), end: addMinutes(taskStart, taskDuration).toISOString(),
           rawOrderId: targetRawOrderId, raw: order.raw, systemId: order.id,
+          estimatedDuration: taskDuration,
         };
         newEvents = [travelEvent, taskEvent];
 
@@ -1784,6 +1826,7 @@ export function ScheduleView({
             if (taskEvent) {
               const isNewlyAssigned = order.status === '未割当' || order.status === '入庫待ち' || !order.staffName;
               const targetRawOrderId = order.rawOrderId || order.id;
+              const assignedDuration = taskEvent.estimatedDuration || differenceInMinutes(safeParseISO(taskEvent.end as string), safeParseISO(taskEvent.start as string)) || 60;
 
               const payload: any = {
                 gasUrl: ORDER_GAS_URL,
@@ -1793,11 +1836,11 @@ export function ScheduleView({
                 scheduledDate: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
                 scheduledTime: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
                 scheduledEndTime: format(safeParseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
-                estimatedDuration: order.estimatedDuration || 60,
+                estimatedDuration: assignedDuration,
                 "チップ配置作業予定": format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
                 "チップ配置作業完了予定": format(safeParseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
                 "作業予定日": format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
-                "作業時間（分）": order.estimatedDuration || 60,
+                "作業時間（分）": assignedDuration,
                 timestamp: new Date().toISOString(),
                 systemId: order.id
               };
@@ -1826,7 +1869,7 @@ export function ScheduleView({
                   scheduledDate: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
                   scheduledTime: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
                   scheduledEndTime: format(safeParseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
-                  estimatedDuration: order.estimatedDuration || 60,
+                  estimatedDuration: assignedDuration,
                   updatedAt: new Date().toISOString()
                 } as any);
               } catch (fsErr) {

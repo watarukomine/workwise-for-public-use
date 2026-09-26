@@ -250,6 +250,18 @@ export default function OrderFormPage() {
             const randomStr = Math.random().toString(36).substring(2, 5); // 3 random characters
             const returnedOrderId = `${dateStr}_${userCode}_${randomStr}`;
 
+            // Calculate estimatedDuration if scheduledEndTime is provided
+            let estimatedDuration = 60;
+            if (submissionData.scheduledTime && submissionData.scheduledEndTime) {
+                const [sH, sM] = submissionData.scheduledTime.split(':').map(Number);
+                const [eH, eM] = submissionData.scheduledEndTime.split(':').map(Number);
+                const durationMinutes = (eH * 60 + eM) - (sH * 60 + sM);
+                if (durationMinutes > 0) {
+                    estimatedDuration = durationMinutes;
+                }
+            }
+            submissionData.estimatedDuration = estimatedDuration;
+
             // 2. Full Hybrid Payload (English + Japanese keys) guaranteed for GAS Web App
             const formattedDate = submissionData.scheduledDate ? submissionData.scheduledDate.replace(/-/g, '/') : '';
             const fullGasPayload = {
@@ -280,6 +292,11 @@ export default function OrderFormPage() {
                 '予定終了時間': submissionData.scheduledEndTime || '',
                 '終了予定時間': submissionData.scheduledEndTime || '',
                 'チップ配置作業完了予定': submissionData.scheduledEndTime || '',
+                estimatedDuration: estimatedDuration,
+                '作業時間（分）': estimatedDuration,
+                '作業時間(分)': estimatedDuration,
+                '作業時間': estimatedDuration,
+                '所要時間': estimatedDuration,
                 picName: submissionData.picName || '',
                 'ご担当者様': submissionData.picName || '',
                 orderNo: submissionData.orderNo || '',
@@ -318,17 +335,6 @@ export default function OrderFormPage() {
                 submitter: submissionData.submitter || '',
                 'フォーム入力者': submissionData.submitter || '',
             };
-
-            // Calculate estimatedDuration if scheduledEndTime is provided
-            let estimatedDuration = 60;
-            if (submissionData.scheduledTime && submissionData.scheduledEndTime) {
-                const [sH, sM] = submissionData.scheduledTime.split(':').map(Number);
-                const [eH, eM] = submissionData.scheduledEndTime.split(':').map(Number);
-                const durationMinutes = (eH * 60 + eM) - (sH * 60 + sM);
-                if (durationMinutes > 0) {
-                    estimatedDuration = durationMinutes;
-                }
-            }
 
             // 3. Save to Firestore (0.05s) AND Trigger Guaranteed GAS Sync on Node.js Server
             // 3. Save to Firestore (0.05s) AND Await Direct GAS Server Action Execution

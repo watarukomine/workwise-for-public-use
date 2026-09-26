@@ -275,20 +275,24 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
   // If SystemID exists, use it. Otherwise fallback to visualId, then contentId, then fallbackId/random
   const orderId = sysId ? String(sysId) : (visualId ? String(visualId) : (contentId || fallbackId || `ord-${Math.random()}`));
 
-  const rawDurationVal = findKey(rawOrder, ['作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間']);
+  const rawDurationVal = findKey(rawOrder, ['estimatedDuration', '作業時間（分）', '作業時間(分)', '作業時間', '作業所要時間', '所要時間']) ?? rawOrder?.estimatedDuration;
   let duration = 60; // Default
-  if (rawDurationVal) {
-    const valStr = String(rawDurationVal);
-    // Handle GAS Date object string for Duration (e.g. "1899-12-30T...")
-    if (valStr.includes('1899')) {
-      const date = new Date(valStr);
-      if (!isNaN(date.getTime())) {
-        duration = date.getHours() * 60 + date.getMinutes();
-      }
+  if (rawDurationVal !== undefined && rawDurationVal !== null && rawDurationVal !== '') {
+    if (typeof rawDurationVal === 'number' && !isNaN(rawDurationVal) && rawDurationVal > 0) {
+      duration = rawDurationVal;
     } else {
-      const parsed = parseInt(valStr, 10);
-      if (!isNaN(parsed) && parsed !== 1899) {
-        duration = parsed;
+      const valStr = String(rawDurationVal);
+      // Handle GAS Date object string for Duration (e.g. "1899-12-30T...")
+      if (valStr.includes('1899')) {
+        const date = new Date(valStr);
+        if (!isNaN(date.getTime())) {
+          duration = date.getHours() * 60 + date.getMinutes();
+        }
+      } else {
+        const parsed = parseInt(valStr, 10);
+        if (!isNaN(parsed) && parsed !== 1899 && parsed > 0) {
+          duration = parsed;
+        }
       }
     }
   }
@@ -400,7 +404,7 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
   };
 
   // FIX: Also normalize scheduledEndTime to use the correct date
-  let scheduledEndTime = findKey(rawOrder, ['チップ配置作業完了予定', '終了時間', 'endTime', 'scheduledEndTime', '終了日時', 'シフト終了', '退勤時間', '勤務終了', '業務終了時間', '勤務終了時間']);
+  let scheduledEndTime = findKey(rawOrder, ['予定終了時間', '終了予定時間', 'チップ配置作業完了予定', '終了時間', 'endTime', 'scheduledEndTime', '終了日時', 'シフト終了', '退勤時間', '勤務終了', '業務終了時間', '勤務終了時間']) || rawOrder?.scheduledEndTime;
   if (scheduledEndTime && scheduledDateVal) {
     const timeStr = String(scheduledEndTime);
     let hours = '00';
@@ -426,6 +430,20 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
 
     if (foundTime) {
       scheduledEndTime = `${scheduledDateVal}T${hours}:${minutes}:${seconds}`;
+    }
+  }
+
+  // If both scheduledTime and scheduledEndTime exist, dynamically compute/override duration from the time range
+  if (scheduledTime && scheduledEndTime) {
+    const sMatch = String(scheduledTime).match(/(\d{1,2}):(\d{2})/);
+    const eMatch = String(scheduledEndTime).match(/(\d{1,2}):(\d{2})/);
+    if (sMatch && eMatch) {
+      const sMins = parseInt(sMatch[1], 10) * 60 + parseInt(sMatch[2], 10);
+      const eMins = parseInt(eMatch[1], 10) * 60 + parseInt(eMatch[2], 10);
+      const diff = eMins - sMins;
+      if (diff > 0) {
+        duration = diff;
+      }
     }
   }
 
