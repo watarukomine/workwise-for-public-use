@@ -297,11 +297,11 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
   const displayName = orderOtherWorkType ? <>{rawDisplayName} <span className="text-[9px] text-amber-200 font-bold">({orderOtherWorkType})</span></> : rawDisplayName;
 
   const titleText = `${typeof rawDisplayName === 'string' ? rawDisplayName : '受注タスク'}` +
-    `${orderOtherWorkType ? ` (作業場所: ${orderOtherWorkType})` : ''}` +
+    `${orderOtherWorkType ? ` (${orderOtherWorkType})` : ''}` +
     `${!isGeneric ? ` (${equipmentSymbol})` : ''}` +
     `${scheduledTime ? ` ${scheduledTime}` : ''}` +
     `${(!isGeneric && (order.tireSize || order['本数'])) ? `\n${order.tireSize || ''}${order.tireSize && order['本数'] ? ' ' : ''}${order['本数'] ? formatHonsu(order['本数']) : ''}` : ''}` +
-    `${orderOtherWorkType ? `\n作業場所（詳細）: ${orderOtherWorkType}` : ''}`;
+    `${orderOtherWorkType ? `\n作業区分詳細 (その他): ${orderOtherWorkType}` : ''}`;
 
   const content = (
     <div {...{ 'style': style as any }} title={titleText} className={cn("group h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight relative", style && "dynamic-width", className)}>
@@ -3923,11 +3923,11 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
   );
 
   const titleText = `${customerName || targetEvent.title || line1}` +
-    `${eventOtherWorkType ? ` (作業場所: ${eventOtherWorkType})` : ''}` +
+    `${eventOtherWorkType ? ` (${eventOtherWorkType})` : ''}` +
     `${(!isTravelEvent && !isGeneric) ? ` (${equipmentSymbol})` : ''}` +
     ` ${formatTime(targetEvent.start)}` +
     `${(!isTravelEvent && !isGeneric && (tireSize || honsu)) ? `\n${tireSize ? tireSize : ''}${tireSize && honsu ? ' ' : ''}${honsu ? formatHonsu(honsu) : ''}` : ''}` +
-    `${eventOtherWorkType ? `\n作業場所（詳細）: ${eventOtherWorkType}` : ''}`;
+    `${eventOtherWorkType ? `\n作業区分詳細 (その他): ${eventOtherWorkType}` : ''}`;
 
   const style: any = isOverlay ?
     { touchAction: 'none', width: `${width}px` } :

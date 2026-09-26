@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw, BadgeCheck, Truck, Building, PauseCircle, Car, CheckCheck, ArrowRightCircle } from 'lucide-react';
+import { Clock, MapPin, AlertCircle, Loader2, PlayCircle, LogIn, LogOut, CheckCircle, MessageSquare, Send, RefreshCw, BadgeCheck, Truck, Building, PauseCircle, Car, CheckCheck, ArrowRightCircle, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { useUserProfile } from '@/hooks/use-user-profile';
@@ -948,7 +948,10 @@ function CheckInClient() {
                   </h3>
                 </div>
                 <Badge variant="outline" className="text-xs font-semibold">
-                  {currentOrder.serviceType || currentOrder.taskDetails || '作業'}
+                  {(() => {
+                    const rawServiceType = currentOrder.serviceType || currentOrder.taskDetails || '作業';
+                    return String(rawServiceType).startsWith('その他') ? 'その他' : rawServiceType;
+                  })()}
                 </Badge>
               </div>
 
@@ -965,8 +968,8 @@ function CheckInClient() {
                 if (!otherWorkType) return null;
                 return (
                   <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
-                    <MapPin className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                    <span>📍 作業場所（詳細）: {otherWorkType}</span>
+                    <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>作業区分詳細 (その他): {otherWorkType}</span>
                   </div>
                 );
               })()}

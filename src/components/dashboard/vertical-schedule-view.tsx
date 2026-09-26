@@ -129,6 +129,10 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
         const arrangement = (targetOrder as any)?.arrangement || (event as any).arrangement || (raw ? findKey(raw, ['タイヤ手配状況', '手配', '手配状況']) : undefined);
         const disposal = (targetOrder as any)?.disposal || (event as any).disposal || (raw ? findKey(raw, ['廃タイヤ処分', '廃タイヤ', '廃タイヤ回収']) : undefined);
         const serviceType = (targetOrder as any)?.serviceType || (targetOrder as any)?.taskDetails || (event as any).serviceType || (event as any).taskDetails || (raw ? findKey(raw, ['作業内容', 'サービス種別', 'サービス区分', '作業区分']) : undefined);
+        // 「その他（〇〇）」の場合、重複を防ぐためカッコ書きの詳細を省いて「その他」のみ表示
+        const displayServiceType = serviceType
+          ? (String(serviceType).startsWith('その他') ? 'その他' : String(serviceType))
+          : undefined;
         const workType = (targetOrder as any)?.workType || (event as any).workType || (raw ? findKey(raw, ['作業区分', 'workType']) : undefined);
         const otherWorkType = (targetOrder as any)?.otherWorkType || 
           (event as any).otherWorkType || 
@@ -239,8 +243,8 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
                   </CardTitle>
                   {otherWorkType && (
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 text-xs font-bold shadow-xs">
-                      <MapPin className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                      <span>📍 作業場所（詳細）: {otherWorkType}</span>
+                      <FileText className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <span>作業区分詳細 (その他): {otherWorkType}</span>
                     </div>
                   )}
                 </div>
@@ -315,8 +319,8 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
                 {tireNumber && <div><span className="font-bold text-blue-600 dark:text-blue-400">本数:</span> {tireNumber}本</div>}
                 {arrangement && <div><span className="font-bold text-amber-600 dark:text-amber-400">手配:</span> {arrangement}</div>}
                 {disposal && <div><span className="font-bold text-purple-600 dark:text-purple-400">廃タイヤ:</span> {disposal}</div>}
-                {serviceType && <div><span className="font-bold text-emerald-700 dark:text-emerald-400">作業内容:</span> {serviceType}</div>}
-                {otherWorkType && <div><span className="font-bold text-amber-600 dark:text-amber-400">作業場所（詳細）:</span> <span className="font-bold text-amber-900 dark:text-amber-200">{otherWorkType}</span></div>}
+                {displayServiceType && <div><span className="font-bold text-emerald-700 dark:text-emerald-400">作業内容:</span> {displayServiceType}</div>}
+                {otherWorkType && <div><span className="font-bold text-amber-600 dark:text-amber-400">作業区分詳細 (その他):</span> <span className="font-bold text-amber-900 dark:text-amber-200">{otherWorkType}</span></div>}
                 {specialNotes && <div className="text-red-600 dark:text-red-400 font-medium"><span className="font-bold">特記:</span> {specialNotes}</div>}
               </div>
             </CardContent>
@@ -341,12 +345,12 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
                   {selectedEvent.displayTitle}
                 </DialogTitle>
                 <DialogDescription>
-                  {selectedEvent.serviceType || selectedEvent.taskDetails || '作業予定の詳細情報'}
+                  {selectedEvent.serviceType ? (String(selectedEvent.serviceType).startsWith('その他') ? 'その他' : selectedEvent.serviceType) : (selectedEvent.taskDetails || '作業予定の詳細情報')}
                 </DialogDescription>
                 {selectedEvent.otherWorkType && (
                   <div className="mt-2 p-2 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 rounded-md flex items-center gap-1.5 text-xs font-bold text-amber-900 dark:text-amber-200">
-                    <MapPin className="h-4 w-4 text-amber-600 shrink-0" />
-                    <span>📍 作業場所（詳細）: {selectedEvent.otherWorkType}</span>
+                    <FileText className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>作業区分詳細 (その他): {selectedEvent.otherWorkType}</span>
                   </div>
                 )}
               </DialogHeader>
@@ -423,7 +427,7 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
 
                 {selectedEvent.otherWorkType && (
                   <div className="py-1 border-t">
-                    <span className="text-muted-foreground block">作業場所（作業区分詳細）</span>
+                    <span className="text-muted-foreground block">作業区分詳細 (その他)</span>
                     <span className="font-bold text-amber-700 dark:text-amber-300">{selectedEvent.otherWorkType}</span>
                   </div>
                 )}
