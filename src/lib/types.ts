@@ -70,6 +70,7 @@ export type Order = {
   title?: string;
   serviceType: string;
   workType?: string;
+  otherWorkType?: string; // 作業区分詳細 (その他指定時の作業場所など)
   status: string;
   scheduledDate: string;
   scheduledTime?: string;

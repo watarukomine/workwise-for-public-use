@@ -543,6 +543,15 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     description: findKey(rawOrder, ['作業内容', '業務内容', 'taskDetails', 'Description', '作業', '作業内容・商品詳細', '内容']) || '',
     quantity: findKey(rawOrder, ['本数', 'honsu', '数量', 'Qty', 'Quantity', '本', 'quantity']) || '',
     serviceType: findKey(rawOrder, ['作業内容', '作業区分', 'サービス種別', 'サービス区分', 'serviceType']) || '',
+    workType: findKey(rawOrder, ['作業区分', 'workType']) || '',
+    otherWorkType: (() => {
+      const direct = findKey(rawOrder, ['作業区分詳細', '作業区分詳細(その他)', '作業区分詳細（その他）', 'otherWorkType', 'workTypeDetail']);
+      if (direct && String(direct).trim()) return String(direct).trim();
+      const rawContent = String(findKey(rawOrder, ['作業内容', 'serviceType', 'taskDetails']) || '');
+      const match = rawContent.match(/^その他[（(](.+?)[）)]$/);
+      if (match && match[1]) return match[1].trim();
+      return '';
+    })(),
     orderNo: String(findKey(rawOrder, ['受注No(ﾘﾏｰｸ1 8ｹﾀ)', '受注No(リマーク1 8ケタ)', '受注No(リマーク1)', 'orderNoRemark', 'orderNo']) || rawOrder.orderNo || rawOrder.orderNoRemark || ''),
     picName: findKey(rawOrder, ['ご担当者様', 'picName', '担当者名']) || '',
     orderNoRemark: String(findKey(rawOrder, ['受注No(ﾘﾏｰｸ1 8ｹﾀ)', '受注No(リマーク1 8ケタ)', '受注No(リマーク1)', 'orderNoRemark', 'orderNo']) || rawOrder.orderNoRemark || rawOrder.orderNo || ''),

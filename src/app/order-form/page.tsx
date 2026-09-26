@@ -217,9 +217,17 @@ export default function OrderFormPage() {
         try {
             // Handle 'その他' values
             const submissionData = { ...data } as any;
-            if (data.workType === 'その他' && data.otherWorkType) {
-                submissionData.workType = data.otherWorkType;
-            }
+            const isOtherWork = data.workType === 'その他';
+            const otherDetail = data.otherWorkType ? String(data.otherWorkType).trim() : '';
+            const combinedWorkContent = (isOtherWork && otherDetail)
+                ? `その他（${otherDetail}）`
+                : (data.workType || '');
+
+            submissionData.workType = data.workType;
+            submissionData.otherWorkType = otherDetail;
+            submissionData.serviceType = combinedWorkContent;
+            submissionData.taskDetails = combinedWorkContent;
+
             if (data.quantity === 'その他' && data.customQuantity) {
                 submissionData.quantity = data.customQuantity;
             }
@@ -281,9 +289,11 @@ export default function OrderFormPage() {
                 '店舗名': submissionData.storeName || '',
                 'お取引先名': submissionData.storeName || '',
                 workType: submissionData.workType || '',
+                otherWorkType: submissionData.otherWorkType || '',
                 '作業区分': submissionData.workType || '',
-                '作業': submissionData.workType || '',
-                '作業内容': submissionData.workType || '',
+                '作業区分詳細': submissionData.otherWorkType || '',
+                '作業': combinedWorkContent,
+                '作業内容': combinedWorkContent,
                 scheduledDate: formattedDate,
                 '作業予定日': formattedDate,
                 scheduledTime: submissionData.scheduledTime || '',
@@ -347,6 +357,10 @@ export default function OrderFormPage() {
                 orderNoRemark: submissionData.orderNo || '',
                 customerCode: submissionData.userCode,
                 customerName: submissionData.storeName,
+                workType: submissionData.workType || '',
+                otherWorkType: submissionData.otherWorkType || '',
+                serviceType: combinedWorkContent,
+                taskDetails: combinedWorkContent,
                 scheduledEndTime: submissionData.scheduledEndTime || '',
                 estimatedDuration: estimatedDuration,
                 _type: 'order',

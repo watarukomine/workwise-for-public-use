@@ -285,12 +285,23 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
     return `${str}本`;
   };
 
-  const displayName = isGeneric ? resolvedStoreName : (resolvedStoreName || (order as any).title || line1 || <span className="text-xs font-normal opacity-70">ID:{order.rawOrderId || order.id}</span>);
+  const orderOtherWorkType = order.otherWorkType || 
+    (order.raw ? findKey(order.raw, ['作業区分詳細', '作業区分詳細(その他)', '作業区分詳細（その他）', 'otherWorkType', 'workTypeDetail']) : undefined) || 
+    (() => {
+      const rawContent = String(order.serviceType || order.taskDetails || '');
+      const match = rawContent.match(/^その他[（(](.+?)[）)]$/);
+      return match ? match[1].trim() : undefined;
+    })();
 
-  const titleText = `${displayName}` +
+  const rawDisplayName = isGeneric ? resolvedStoreName : (resolvedStoreName || (order as any).title || line1 || <span className="text-xs font-normal opacity-70">ID:{order.rawOrderId || order.id}</span>);
+  const displayName = orderOtherWorkType ? <>{rawDisplayName} <span className="text-[9px] text-amber-200 font-bold">({orderOtherWorkType})</span></> : rawDisplayName;
+
+  const titleText = `${typeof rawDisplayName === 'string' ? rawDisplayName : '受注タスク'}` +
+    `${orderOtherWorkType ? ` (作業場所: ${orderOtherWorkType})` : ''}` +
     `${!isGeneric ? ` (${equipmentSymbol})` : ''}` +
     `${scheduledTime ? ` ${scheduledTime}` : ''}` +
-    `${(!isGeneric && (order.tireSize || order['本数'])) ? `\n${order.tireSize || ''}${order.tireSize && order['本数'] ? ' ' : ''}${order['本数'] ? formatHonsu(order['本数']) : ''}` : ''}`;
+    `${(!isGeneric && (order.tireSize || order['本数'])) ? `\n${order.tireSize || ''}${order.tireSize && order['本数'] ? ' ' : ''}${order['本数'] ? formatHonsu(order['本数']) : ''}` : ''}` +
+    `${orderOtherWorkType ? `\n作業場所（詳細）: ${orderOtherWorkType}` : ''}`;
 
   const content = (
     <div {...{ 'style': style as any }} title={titleText} className={cn("group h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight relative", style && "dynamic-width", className)}>
@@ -3850,6 +3861,14 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     baseCustomerName = cleanCustomerName || customer?.storeName || targetEvent.title || line1 || '店舗名未設定';
   }
 
+  const eventOtherWorkType = targetEvent.otherWorkType || 
+    (targetEvent.raw ? findKey(targetEvent.raw, ['作業区分詳細', '作業区分詳細(その他)', '作業区分詳細（その他）', 'otherWorkType', 'workTypeDetail']) : undefined) || 
+    (() => {
+      const rawContent = String(targetEvent.serviceType || targetEvent.taskDetails || '');
+      const match = rawContent.match(/^その他[（(](.+?)[）)]$/);
+      return match ? match[1].trim() : undefined;
+    })();
+
   const customerName = isCancelled ? `【キャンセル】 ${baseCustomerName}` : baseCustomerName;
   const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(targetEvent.status || '')) || !!targetEvent.actualEndTime;
 
@@ -3891,7 +3910,12 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
           </div>
         </div>
       )}
-      <p className="text-xs font-semibold truncate pointer-events-none pr-4">{customerName || targetEvent.title || line1}</p>
+      <p className="text-xs font-semibold truncate pointer-events-none pr-4">
+        {customerName || targetEvent.title || line1}
+        {eventOtherWorkType && !isTravelEvent && (
+          <span className="ml-1 text-[10px] font-bold opacity-90">({eventOtherWorkType})</span>
+        )}
+      </p>
       <div className="flex items-center justify-between pointer-events-none">
         <p className="text-xs opacity-80 truncate">{formatTime(targetEvent.start)}</p>
       </div>
@@ -3899,9 +3923,11 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
   );
 
   const titleText = `${customerName || targetEvent.title || line1}` +
+    `${eventOtherWorkType ? ` (作業場所: ${eventOtherWorkType})` : ''}` +
     `${(!isTravelEvent && !isGeneric) ? ` (${equipmentSymbol})` : ''}` +
     ` ${formatTime(targetEvent.start)}` +
-    `${(!isTravelEvent && !isGeneric && (tireSize || honsu)) ? `\n${tireSize ? tireSize : ''}${tireSize && honsu ? ' ' : ''}${honsu ? formatHonsu(honsu) : ''}` : ''}`;
+    `${(!isTravelEvent && !isGeneric && (tireSize || honsu)) ? `\n${tireSize ? tireSize : ''}${tireSize && honsu ? ' ' : ''}${honsu ? formatHonsu(honsu) : ''}` : ''}` +
+    `${eventOtherWorkType ? `\n作業場所（詳細）: ${eventOtherWorkType}` : ''}`;
 
   const style: any = isOverlay ?
     { touchAction: 'none', width: `${width}px` } :

@@ -952,6 +952,25 @@ function CheckInClient() {
                 </Badge>
               </div>
 
+              {(() => {
+                const otherWorkType = currentOrder.otherWorkType || 
+                  (currentOrder as any).workTypeDetail || 
+                  (currentOrder.raw ? findKey(currentOrder.raw, ['作業区分詳細', '作業区分詳細(その他)', '作業区分詳細（その他）', 'otherWorkType', 'workTypeDetail']) : undefined) || 
+                  (() => {
+                    const rawContent = String(currentOrder.serviceType || currentOrder.taskDetails || (currentOrder.raw ? findKey(currentOrder.raw, ['作業内容']) : '') || '');
+                    const match = rawContent.match(/^その他[（(](.+?)[）)]$/);
+                    return match ? match[1].trim() : undefined;
+                  })();
+
+                if (!otherWorkType) return null;
+                return (
+                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
+                    <MapPin className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <span>📍 作業場所（詳細）: {otherWorkType}</span>
+                  </div>
+                );
+              })()}
+
               {/* 作業予定日時の照合カード（当初予定 vs チップ配置時刻） */}
               {(() => {
                 const rawData = currentOrder.raw || {};
