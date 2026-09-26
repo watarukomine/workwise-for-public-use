@@ -107,7 +107,9 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
         const customer = getCustomerById(event.locationId);
         const isTravel = event.title.includes('移動');
         const staffMember = staffData.find(s => s.id === event.staffId);
-        const areaBgClass = staffMember?.['母店'] ? STORE_COLORS[staffMember['母店']] || '' : '';
+        const targetDateStr = format(currentDate, 'yyyy-MM-dd');
+        const effectiveStore = (staffMember as any)?.dailyStores?.[targetDateStr] || staffMember?.['母店'] || (staffMember as any)?.mainStore || '';
+        const areaBgClass = effectiveStore ? STORE_COLORS[effectiveStore] || '' : '';
 
         // Match underlying order object from orders state
         const targetOrder = orders?.find(o =>

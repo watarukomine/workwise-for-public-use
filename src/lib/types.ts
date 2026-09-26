@@ -16,6 +16,7 @@ export type Staff = {
   '母店'?: string;
   mainStore?: string;
   storeName?: string;
+  dailyStores?: { [dateStr: string]: string };
   sortOrder?: number;
   order?: number;
   /** @deprecated パスワードをFirestoreに平文保存するのはセキュリティリスクです。Firebase Authへの完全移行を推奨。 */

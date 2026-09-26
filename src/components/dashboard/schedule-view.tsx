@@ -2534,17 +2534,18 @@ export function ScheduleView({
     }
   };
 
-  const handleStoreChange = async (staffId: string, newStore: string) => {
+  const handleStoreChange = async (staffId: string, newStore: string, dateStr: string) => {
     try {
       const { StaffService } = await import('@/services/staff-service');
-      await StaffService.updateStaff(staffId, {
-        '母店': newStore,
-        mainStore: newStore,
-        storeName: newStore
-      });
+      const staff = getStaffById(staffId);
+      const defaultStore = staff?.['母店'] || (staff as any)?.mainStore || (staff as any)?.storeName || '';
+      const targetDocId = (staff as any)?._docId || staffId;
+
+      await StaffService.updateStaffDailyStore(targetDocId, dateStr, newStore, defaultStore);
+
       toast({
-        title: '拠点を変更しました',
-        description: `所属拠点を「${newStore}」に更新しました。`
+        title: '拠点を変更しました（1日限定）',
+        description: `${staff?.name || 'スタッフ'}の${dateStr}の拠点を「${newStore}」に設定しました。（日付が変わるとデフォルトの${defaultStore || '母店'}に戻ります）`
       });
     } catch (e: any) {
       toast({
@@ -2918,6 +2919,7 @@ export function ScheduleView({
                             isToday={isToday(currentDate)}
                             scheduledStaffIds={scheduledStaffIds}
                             onStoreChange={handleStoreChange}
+                            currentDate={currentDate}
                           />
                         );
                       })}
@@ -3547,14 +3549,17 @@ interface StaffRowProps {
   onDoubleClickTimeline: (staffId: string, e: React.MouseEvent) => void;
   isToday: boolean;
   scheduledStaffIds?: Set<string>;
-  onStoreChange?: (staffId: string, newStore: string) => void;
+  onStoreChange?: (staffId: string, newStore: string, dateStr: string) => void;
+  currentDate: Date;
 }
 
-const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomerByCode, onDoubleClickEvent, onDoubleClickTimeline, isToday, scheduledStaffIds, onStoreChange }) => {
+const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomerByCode, onDoubleClickEvent, onDoubleClickTimeline, isToday, scheduledStaffIds, onStoreChange, currentDate }) => {
   const { pixelsPerMinute } = useScheduleView();
   const { setNodeRef, isOver } = useDroppable({ id: staff.id });
   const { toggleTripSuppression } = useOrder();
-  const currentStore = staff['母店'] || (staff as any).mainStore || (staff as any).storeName || '';
+  const targetDateStr = React.useMemo(() => format(currentDate, 'yyyy-MM-dd'), [currentDate]);
+  const defaultStore = staff['母店'] || (staff as any).mainStore || (staff as any).storeName || '';
+  const currentStore = staff.dailyStores?.[targetDateStr] || defaultStore;
   const areaBgClass = currentStore ? STORE_COLORS[currentStore] || 'bg-background' : 'bg-background';
 
   const isShiftOn = !scheduledStaffIds || scheduledStaffIds.size === 0 || isStaffMatched(staff, Array.from(scheduledStaffIds));
@@ -3594,7 +3599,7 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
       <div className={cn("sticky left-[130px] z-20 flex-shrink-0 px-1 flex items-center justify-center border-r bg-inherit w-[95px]")}>
         <Select
           value={currentStore}
-          onValueChange={(val) => onStoreChange && onStoreChange(staff.id, val)}
+          onValueChange={(val) => onStoreChange && onStoreChange(staff.id, val, targetDateStr)}
         >
           <SelectTrigger className="h-7 text-xs font-semibold px-1.5 py-0 border-slate-300/80 dark:border-slate-700 bg-background/90 shadow-xs hover:bg-background focus:ring-1">
             <SelectValue placeholder="未定" />

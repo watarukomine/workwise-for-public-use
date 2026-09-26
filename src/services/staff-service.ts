@@ -11,7 +11,8 @@ import {
     query,
     where,
     onSnapshot,
-    serverTimestamp
+    serverTimestamp,
+    deleteField
 } from 'firebase/firestore';
 import type { Staff, WithId } from '@/lib/types';
 
@@ -71,6 +72,10 @@ function mergeStaffDocs(existing: WithId<Staff>, current: WithId<Staff>): WithId
         nextDestination: (newerDoc as any).nextDestination || (olderDoc as any).nextDestination,
         lastLocationUpdatedAt: (newerDoc as any)['最終位置更新日時'] || (newerDoc as any).lastLocationUpdatedAt || (newerDoc as any).statusUpdatedAt || (olderDoc as any)['最終位置更新日時'] || (olderDoc as any).lastLocationUpdatedAt,
         updatedAt: (newerDoc as any).updatedAt || (olderDoc as any).updatedAt,
+        dailyStores: {
+            ...((olderDoc as any).dailyStores || {}),
+            ...((newerDoc as any).dailyStores || {})
+        },
     } as unknown as WithId<Staff>;
 }
 
@@ -320,5 +325,43 @@ export const StaffService = {
             updatedAt: serverTimestamp()
         };
         await setDoc(docRef, staffData, { merge: true });
+    },
+
+    /**
+     * Updates staff's assigned store for a specific date (1-day temporary override).
+     * If newStore matches defaultStore, removes the override key to restore default.
+     */
+    async updateStaffDailyStore(id: string, dateStr: string, newStore: string, defaultStore?: string): Promise<void> {
+        const { firestore } = initializeFirebase();
+        const docRef = doc(firestore, COLLECTION, id);
+
+        const isRevertingToDefault = defaultStore && newStore === defaultStore;
+
+        try {
+            if (isRevertingToDefault) {
+                await updateDoc(docRef, {
+                    [`dailyStores.${dateStr}`]: deleteField(),
+                    updatedAt: serverTimestamp()
+                });
+            } else {
+                await updateDoc(docRef, {
+                    [`dailyStores.${dateStr}`]: newStore,
+                    updatedAt: serverTimestamp()
+                });
+            }
+        } catch (e: any) {
+            // Document might not have dailyStores field yet, fallback to setDoc with merge
+            const snap = await getDoc(docRef);
+            const currentDailyStores = { ...(snap.data()?.dailyStores || {}) };
+            if (isRevertingToDefault) {
+                delete currentDailyStores[dateStr];
+            } else {
+                currentDailyStores[dateStr] = newStore;
+            }
+            await setDoc(docRef, {
+                dailyStores: currentDailyStores,
+                updatedAt: serverTimestamp()
+            }, { merge: true });
+        }
     }
 };
