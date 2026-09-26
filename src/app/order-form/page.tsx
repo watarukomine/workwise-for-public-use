@@ -27,6 +27,7 @@ const orderFormSchema = z.object({
     otherWorkType: z.string().optional(), // Added for custom input
     scheduledDate: z.string().min(1, '作業予定日は必須です'),
     scheduledTime: z.string().min(1, '予定時間は必須です'),
+    scheduledEndTime: z.string().optional(),
     picName: z.string().optional(),
     orderNo: z.string().max(8, '受注No(リマーク1)は8桁以内で入力してください').optional(),
     comment: z.string().max(10, '任意コメント(リマーク2)は10桁以内で入力してください').optional(),
@@ -45,6 +46,16 @@ const orderFormSchema = z.object({
     customQuantity: z.string().optional(),
     submitter: z.string().min(1, 'フォーム入力者は必須です'),
 }).superRefine((data, ctx) => {
+    // Custom validation for scheduledEndTime: Must be after scheduledTime if specified
+    if (data.scheduledEndTime && data.scheduledTime) {
+        if (data.scheduledEndTime <= data.scheduledTime) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: '終了予定時刻は開始時刻より後の時刻を入力してください',
+                path: ['scheduledEndTime'],
+            });
+        }
+    }
     // Custom validation for 'その他' workType
     if (data.workType === 'その他' && !data.otherWorkType) {
         ctx.addIssue({
@@ -265,6 +276,10 @@ export default function OrderFormPage() {
                 '作業予定日': formattedDate,
                 scheduledTime: submissionData.scheduledTime || '',
                 '予定時間': submissionData.scheduledTime || '',
+                scheduledEndTime: submissionData.scheduledEndTime || '',
+                '予定終了時間': submissionData.scheduledEndTime || '',
+                '終了予定時間': submissionData.scheduledEndTime || '',
+                'チップ配置作業完了予定': submissionData.scheduledEndTime || '',
                 picName: submissionData.picName || '',
                 'ご担当者様': submissionData.picName || '',
                 orderNo: submissionData.orderNo || '',
@@ -304,6 +319,17 @@ export default function OrderFormPage() {
                 'フォーム入力者': submissionData.submitter || '',
             };
 
+            // Calculate estimatedDuration if scheduledEndTime is provided
+            let estimatedDuration = 60;
+            if (submissionData.scheduledTime && submissionData.scheduledEndTime) {
+                const [sH, sM] = submissionData.scheduledTime.split(':').map(Number);
+                const [eH, eM] = submissionData.scheduledEndTime.split(':').map(Number);
+                const durationMinutes = (eH * 60 + eM) - (sH * 60 + sM);
+                if (durationMinutes > 0) {
+                    estimatedDuration = durationMinutes;
+                }
+            }
+
             // 3. Save to Firestore (0.05s) AND Trigger Guaranteed GAS Sync on Node.js Server
             // 3. Save to Firestore (0.05s) AND Await Direct GAS Server Action Execution
             await OrderService.createOrder({
@@ -315,7 +341,8 @@ export default function OrderFormPage() {
                 orderNoRemark: submissionData.orderNo || '',
                 customerCode: submissionData.userCode,
                 customerName: submissionData.storeName,
-                estimatedDuration: 60,
+                scheduledEndTime: submissionData.scheduledEndTime || '',
+                estimatedDuration: estimatedDuration,
                 _type: 'order',
                 isGasSynced: false,
             });
@@ -456,10 +483,18 @@ export default function OrderFormPage() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <Label htmlFor="scheduledTime">予定時間 <span className="text-red-500">*</span></Label>
-                                    <Input id="scheduledTime" type="time" {...register('scheduledTime')} className={errors.scheduledTime ? "border-red-500" : ""} />
-                                    {errors.scheduledTime && <p className="text-red-500 text-xs">{errors.scheduledTime.message}</p>}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="scheduledTime">予定開始時間 <span className="text-red-500">*</span></Label>
+                                        <Input id="scheduledTime" type="time" {...register('scheduledTime')} className={errors.scheduledTime ? "border-red-500" : ""} />
+                                        {errors.scheduledTime && <p className="text-red-500 text-xs">{errors.scheduledTime.message}</p>}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="scheduledEndTime">予定終了時間 <span className="text-xs text-muted-foreground font-normal">（任意）</span></Label>
+                                        <Input id="scheduledEndTime" type="time" {...register('scheduledEndTime')} className={errors.scheduledEndTime ? "border-red-500" : ""} />
+                                        {errors.scheduledEndTime && <p className="text-red-500 text-xs">{errors.scheduledEndTime.message}</p>}
+                                        <p className="text-[11px] text-muted-foreground">※未入力の場合は自動的に1時間の枠として登録されます</p>
+                                    </div>
                                 </div>
 
                                 <div className="space-y-2">

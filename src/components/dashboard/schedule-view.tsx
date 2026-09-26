@@ -3508,6 +3508,7 @@ interface StaffRowProps {
 }
 
 const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomerByCode, onDoubleClickEvent, onDoubleClickTimeline, isToday, scheduledStaffIds, onStoreChange }) => {
+  const { pixelsPerMinute } = useScheduleView();
   const { setNodeRef, isOver } = useDroppable({ id: staff.id });
   const { toggleTripSuppression } = useOrder();
   const currentStore = staff['母店'] || (staff as any).mainStore || (staff as any).storeName || '';
@@ -3571,6 +3572,22 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
         style={{ minWidth: `${MIN_GRID_WIDTH}px` }}
         onDoubleClick={(e) => onDoubleClickTimeline(staff.id, e)}
       >
+        {/* 背景グリッド縦目盛り線 (10:00〜17:00 / 1時間ごとの目盛り線) */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: timelineTotalHours + 1 }).map((_, i) => {
+            if (i === 0) return null; // 9:00は左端（拠点列境界）
+            const isLast = i === timelineTotalHours;
+            const leftPos = Math.round(i * 60 * pixelsPerMinute);
+            return (
+              <div
+                key={i}
+                className="absolute top-0 bottom-0 border-l border-slate-300/60 dark:border-slate-700/50"
+                style={isLast ? { right: 0 } : { left: `${leftPos}px` }}
+              />
+            );
+          })}
+        </div>
+
         <div className="absolute top-0 left-0 h-full w-full">
           {events.map((event) => (<DraggableEvent key={event.id} targetEvent={event} staff={staff} getCustomerByCode={getCustomerByCode} onDoubleClick={onDoubleClickEvent} onDelete={handleDeleteEvent} />))}
         </div>
