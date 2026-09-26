@@ -21,6 +21,7 @@ import { updateSheetStatus } from '@/app/actions/gas-actions';
 import { calculateWorkDurationMinutes } from '@/lib/utils';
 
 const COLLECTION = 'orders';
+let isSyncingUnsyncedOrders = false;
 
 function generateDateFormats(dateStr: string): string[] {
     const cleanStr = dateStr.split('T')[0];
@@ -466,6 +467,10 @@ export const OrderService = {
      * Auto-recovers and syncs any orders that failed or missed initial GAS sync.
      */
     async syncUnsyncedOrders(): Promise<number> {
+        if (isSyncingUnsyncedOrders) {
+            return 0;
+        }
+        isSyncingUnsyncedOrders = true;
         try {
             const { firestore } = initializeFirebase();
             const colRef = collection(firestore, COLLECTION);
@@ -491,6 +496,13 @@ export const OrderService = {
             let syncedCount = 0;
 
             for (const docSnap of unsyncedDocs) {
+                // Pre-mark in Firestore to immediately prevent duplicate pickup by other tabs/cycles
+                try {
+                    await updateDoc(docSnap.ref, { isGasSynced: true });
+                } catch (fsErr) {
+                    console.warn('[OrderService] Pre-flagging isGasSynced error:', fsErr);
+                }
+
                 const orderData = { ...docSnap.data(), id: docSnap.id } as Order;
                 const res = await this.backupToGas(orderData, 'create', 2);
                 if (res.status === 'success' || res.status === 'ok') {
@@ -502,6 +514,8 @@ export const OrderService = {
         } catch (e) {
             console.error('[OrderService] Error during syncUnsyncedOrders:', e);
             return 0;
+        } finally {
+            isSyncingUnsyncedOrders = false;
         }
     },
 

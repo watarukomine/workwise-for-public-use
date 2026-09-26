@@ -350,7 +350,7 @@ export default function OrderFormPage() {
                 scheduledEndTime: submissionData.scheduledEndTime || '',
                 estimatedDuration: estimatedDuration,
                 _type: 'order',
-                isGasSynced: false,
+                isGasSynced: true,
             });
 
             // Trigger Guaranteed GAS Server Action in the background to avoid blocking transition (0-delay response!)

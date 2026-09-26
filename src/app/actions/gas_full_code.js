@@ -556,6 +556,21 @@ function createOrderSingleSheet(targetSsId, params) {
         const randomStr = Utilities.getUuid().split('-')[0].substring(0, 3);
         const newSystemId = params.systemId || `${dateStr}_${userCode}_${randomStr}`;
 
+        // 【重複作成防止（冪等性保証）】
+        // すでに同じ SystemID の行が存在する場合は、新しい行を追加せず成功レスポンスを返す
+        if (newSystemId && sysIdColIndex !== -1) {
+            const lastRowCheck = Math.max(sheet.getLastRow(), 1);
+            if (lastRowCheck > 1) {
+                const existingSysIds = sheet.getRange(2, sysIdColIndex + 1, lastRowCheck - 1, 1).getValues();
+                for (let i = 0; i < existingSysIds.length; i++) {
+                    if (String(existingSysIds[i][0]).trim() === String(newSystemId).trim()) {
+                        console.log(`[createOrderSingleSheet] SystemID ${newSystemId} は既に行 ${i + 2} に存在します。重複追加をスキップしました。`);
+                        return successResponse("注文は既に登録されています（重複防止）", { orderId: newSystemId, displayId: i + 1 });
+                    }
+                }
+            }
+        }
+
         let nextId = 0;
         if (params.displayId && !isNaN(Number(params.displayId))) {
             nextId = Number(params.displayId);
