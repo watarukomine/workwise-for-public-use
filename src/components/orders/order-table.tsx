@@ -419,12 +419,18 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
       updateData.adminReply = editForm['adminReply'] || '';
       updateData.comment = editForm['comment'] || editForm['任意コメント(ﾘﾏｰｸ2　10ｹﾀ)'] || '';
 
+      const arrangementVal = editForm['タイヤ手配状況'] || editForm['arrangement'] || editForm['tireStatus'] || '';
+      updateData.arrangement = arrangementVal;
+      updateData.tireStatus = arrangementVal;
+      updateData['タイヤ手配状況'] = arrangementVal;
+
       const updatedRaw = { ...(selectedOrder.raw || {}) };
       EXPORT_HEADERS.forEach(h => {
         updatedRaw[h] = editForm[h];
       });
       updatedRaw['受注 No'] = remark1Val;
       updatedRaw['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] = remark1Val;
+      updatedRaw['タイヤ手配状況'] = arrangementVal;
       updateData.raw = updatedRaw;
 
       await OrderService.updateOrder(selectedOrder.id, updateData);
@@ -568,6 +574,7 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                   return (
                     <TableRow 
                       key={order.id || index}
+                      onClick={() => handleRowClick(order)}
                       onDoubleClick={() => handleRowClick(order)}
                       className="cursor-pointer hover:bg-muted/50"
                     >
@@ -807,11 +814,27 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="arrangement">タイヤ手配状況</Label>
-                    <Input
-                      id="arrangement"
-                      value={editForm['タイヤ手配状況'] || ''}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, 'タイヤ手配状況': e.target.value }))}
-                    />
+                    <Select
+                      value={editForm['タイヤ手配状況'] || '未選択'}
+                      onValueChange={(val) => setEditForm(prev => ({ 
+                        ...prev, 
+                        'タイヤ手配状況': val === '未選択' ? '' : val,
+                        arrangement: val === '未選択' ? '' : val,
+                        tireStatus: val === '未選択' ? '' : val
+                      }))}
+                    >
+                      <SelectTrigger id="arrangement">
+                        <SelectValue placeholder="選択してください" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="未選択">未選択</SelectItem>
+                        <SelectItem value="定期便で配送手配済">定期便で配送手配済</SelectItem>
+                        <SelectItem value="タイヤ持込み">タイヤ持込み</SelectItem>
+                        {editForm['タイヤ手配状況'] && !['定期便で配送手配済', 'タイヤ持込み', '未選択', ''].includes(editForm['タイヤ手配状況']) && (
+                          <SelectItem value={editForm['タイヤ手配状況']}>{editForm['タイヤ手配状況']}</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="disposal">廃タイヤ処分</Label>

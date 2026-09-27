@@ -286,6 +286,14 @@ export const OrderService = {
             ...data,
             updatedAt: serverTimestamp()
         };
+        // tireStatus, arrangement, タイヤ手配状況 を相互に完全同期
+        const resolvedArrangement = data.arrangement ?? data.tireStatus ?? (data as any)['タイヤ手配状況'];
+        if (resolvedArrangement !== undefined) {
+            updateData.arrangement = resolvedArrangement;
+            updateData.tireStatus = resolvedArrangement;
+            updateData['タイヤ手配状況'] = resolvedArrangement;
+        }
+
         if (computedDuration !== null) {
             updateData.workDuration = computedDuration;
             updateData.actualDuration = computedDuration;
@@ -326,7 +334,7 @@ export const OrderService = {
         const productNameVal = order.productName || (order as any)['品名'] || '';
         const quantityVal = String(order.quantity || (order as any)['本数'] || '');
         const sensorVal = order.sensor || (order as any)['空気圧センサーパッキン交換'] || '';
-        const arrangementVal = order.arrangement || (order as any)['タイヤ手配状況'] || '';
+        const arrangementVal = order.arrangement || (order as any)['タイヤ手配状況'] || (order as any).tireStatus || '';
         const disposalVal = order.disposal || (order as any)['廃タイヤ処分'] || '';
         const contactVal = order.contact || (order as any)['連絡先'] || '';
         const specialNotesVal = order.specialNotes || (order as any)['特記事項'] || '';

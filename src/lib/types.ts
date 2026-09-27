@@ -103,6 +103,7 @@ export type Order = {
   productName?: string;
   sensor?: string;
   arrangement?: string;
+  tireStatus?: string;
   disposal?: string;
   picName?: string;
   orderNo?: string;

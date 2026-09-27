@@ -2320,6 +2320,10 @@ export function ScheduleView({
             if (overrides.statusValue) {
               updateFields.status = overrides.statusValue;
             }
+            if (editOrderForm.tireStatus !== undefined) {
+              updateFields.arrangement = editOrderForm.tireStatus;
+              updateFields['タイヤ手配状況'] = editOrderForm.tireStatus;
+            }
             // Clean undefined fields safely to prevent Firestore errors
             Object.keys(updateFields).forEach(key => {
               if (updateFields[key] === undefined) delete updateFields[key];
@@ -2344,6 +2348,8 @@ export function ScheduleView({
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`,
             systemId: eventToUpdate.systemId,
             ...editOrderForm,
+            arrangement: editOrderForm.tireStatus || editOrderForm.arrangement || '',
+            "タイヤ手配状況": editOrderForm.tireStatus || editOrderForm.arrangement || '',
             ...overrides, // High-priority overrides (e.g., status/time from Force Complete)
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             scheduledTime: format(newStart, 'HH:mm'), // Changed to HH:mm for clarity against 1970 bugs
@@ -2676,7 +2682,7 @@ export function ScheduleView({
             />
           ) : type === 'select' ? (
             <Select
-              value={String(editOrderForm[field] || '')}
+              value={editOrderForm[field] || '未選択'}
               onValueChange={(val) => setEditOrderForm((prev: any) => ({ ...prev, [field]: val === '未選択' ? '' : val }))}
             >
               <SelectTrigger>
@@ -2687,6 +2693,9 @@ export function ScheduleView({
                 {options.map(opt => (
                   <SelectItem key={opt} value={opt}>{opt}</SelectItem>
                 ))}
+                {editOrderForm[field] && !options.includes(editOrderForm[field]) && editOrderForm[field] !== '未選択' && (
+                  <SelectItem value={editOrderForm[field]}>{editOrderForm[field]}</SelectItem>
+                )}
               </SelectContent>
             </Select>
           ) : (
@@ -3398,7 +3407,7 @@ export function ScheduleView({
                       </div>
                       {renderEditableItem('本数', 'quantity')}
                       {renderEditableItem('空気圧センサーパッキン交換', 'sensor')}
-                      {renderEditableItem('タイヤ手配状況', 'tireStatus')}
+                      {renderEditableItem('タイヤ手配状況', 'tireStatus', 'select', ['定期便で配送手配済', 'タイヤ持込み'])}
                       {renderEditableItem('廃タイヤ処分', 'disposal')}
                       <div className="col-span-full">
                         {renderEditableItem('特記事項', 'specialNotes', 'textarea')}
@@ -3454,10 +3463,15 @@ export function ScheduleView({
                                   try {
                                     const { OrderService } = await import('@/services/order-service');
                                     const orderId = dialogState.order.systemId || dialogState.order.id;
-                                    await OrderService.updateOrder(orderId, {
+                                    const updatePayload: any = {
                                       ...editOrderForm,
                                       updatedAt: new Date().toISOString()
-                                    });
+                                    };
+                                    if (editOrderForm.tireStatus !== undefined) {
+                                      updatePayload.arrangement = editOrderForm.tireStatus;
+                                      updatePayload['タイヤ手配状況'] = editOrderForm.tireStatus;
+                                    }
+                                    await OrderService.updateOrder(orderId, updatePayload);
 
                                     toast({
                                       title: '保存しました',
