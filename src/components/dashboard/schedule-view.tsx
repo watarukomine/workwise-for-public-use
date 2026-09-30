@@ -2590,6 +2590,12 @@ export function ScheduleView({
       const staff = getStaffById(dialogState.staffId);
       return { staff, start: dialogState.start, title: '新規予定の作成' };
     }
+    if (dialogState.mode === 'order-details') {
+      const { order } = dialogState;
+      const staff = order.staffId ? getStaffById(order.staffId) : (order.staffName ? allStaff?.find(s => s.name === order.staffName) : undefined);
+      const customer = getCustomerByCode(order.customerCode || (order as any).userCode);
+      return { event: undefined, staff, customer, title: '受注詳細' };
+    }
     return { event: undefined, staff: undefined, customer: undefined, start: undefined, title: '' };
   };
 
@@ -3024,8 +3030,26 @@ export function ScheduleView({
 
                       // チップへの連動クリック
                       const handleRowClick = () => {
-                        const tripId = `trip-${order.id}`;
-                        const taskEvent = scheduleEvents.find(e => e.tripId === tripId || e.rawOrderId === order.id);
+                        const targetOrderId = order.id;
+                        const targetRawOrderId = order.rawOrderId;
+                        const targetTripId = `trip-${targetRawOrderId || targetOrderId}`;
+
+                        // scheduleEvents からタスクイベントを特定（移動チップ "-travel" は除外し、作業チップ "-task" を優先照合）
+                        const taskEvent = scheduleEvents.find(e => {
+                          const isMatchingTrip = e.tripId === targetTripId || e.tripId === `trip-${targetOrderId}` || (targetRawOrderId && e.tripId === `trip-${targetRawOrderId}`);
+                          const isMatchingRawOrder = Boolean(targetRawOrderId && e.rawOrderId === targetRawOrderId) || e.rawOrderId === targetOrderId;
+                          const isMatchingSystemId = Boolean(e.systemId && (e.systemId === targetOrderId || (targetRawOrderId && e.systemId === targetRawOrderId)));
+                          const isMatchingId = e.id === `${targetTripId}-task` || e.id === `trip-${targetOrderId}-task`;
+
+                          const isMatch = isMatchingTrip || isMatchingRawOrder || isMatchingSystemId || isMatchingId;
+                          return isMatch && (!e.id || !e.id.endsWith('-travel')) && e.title !== '移動';
+                        }) || scheduleEvents.find(e => {
+                          const isMatchingTrip = e.tripId === targetTripId || e.tripId === `trip-${targetOrderId}` || (targetRawOrderId && e.tripId === `trip-${targetRawOrderId}`);
+                          const isMatchingRawOrder = Boolean(targetRawOrderId && e.rawOrderId === targetRawOrderId) || e.rawOrderId === targetOrderId;
+                          const isMatchingSystemId = Boolean(e.systemId && (e.systemId === targetOrderId || (targetRawOrderId && e.systemId === targetRawOrderId)));
+                          return isMatchingTrip || isMatchingRawOrder || isMatchingSystemId;
+                        });
+
                         if (taskEvent) {
                           setEditedEventDetails({
                             title: taskEvent.title || order.customerName || '',
@@ -3087,7 +3111,15 @@ export function ScheduleView({
                             </div>
                           </td>
                           <td className="p-3 pr-4 text-right">
-                            <Button variant="ghost" size="sm" className="h-7 text-[10px] hover:bg-muted font-semibold">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-7 text-[10px] hover:bg-muted font-semibold"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRowClick();
+                              }}
+                            >
                               詳細
                             </Button>
                           </td>
@@ -3111,7 +3143,16 @@ export function ScheduleView({
             >
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                  {dialogState.mode === 'details' ? '受注詳細' : dialogState.mode === 'edit' ? '予定の編集' : dialogState.mode === 'order-details' ? '未割当オーダー詳細' : '新規予定の作成'}
+                  {dialogState.mode === 'details' || dialogState.mode === 'order-details' ? (
+                    <>
+                      <span>受注詳細</span>
+                      {dialogState.mode === 'order-details' && !dialogState.order.staffName && !dialogState.order.staffId && (
+                        <span className="text-xs font-normal px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                          未割当
+                        </span>
+                      )}
+                    </>
+                  ) : dialogState.mode === 'edit' ? '予定の編集' : '新規予定の作成'}
                   {(dialogState.mode === 'details') && (
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => {
                       if (dialogState.mode === 'details') {
@@ -3124,9 +3165,9 @@ export function ScheduleView({
                   )}
                 </DialogTitle>
                 <DialogDescription>
-                  {dialogState.mode === 'details' ? 'スプレッドシートから取得した受注の詳細情報です。' :
+                  {dialogState.mode === 'details' || dialogState.mode === 'order-details' ? 'スプレッドシートから取得した受注の詳細情報です。' :
                     dialogState.mode === 'edit' ? '予定の詳細を編集または削除します。' :
-                      dialogState.mode === 'order-details' ? '未割当オーダーの詳細情報です。' : '新しい予定の詳細を入力してください。'
+                      '新しい予定の詳細を入力してください。'
                   }
                 </DialogDescription>
               </DialogHeader>
@@ -3371,7 +3412,7 @@ export function ScheduleView({
                 <>
                   <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
-                      {renderDetailItem('受注ID', dialogState.order.id)}
+                      {renderDetailItem('担当者', staff?.name || dialogState.order.staffName || '未割り当て')}
                       {renderDetailItem('フォーム入力者', dialogState.order.submitter || (dialogState.order.raw ? findKey(dialogState.order.raw, ['フォーム入力者', '入力者', 'Submitter', '連絡者名']) : undefined) || '---')}
                       {renderDetailItem('受注日時', dialogState.order.createdAt ? (dialogState.order.createdAt instanceof Date ? format(dialogState.order.createdAt, 'yyyy/MM/dd HH:mm:ss') : formatDate(dialogState.order.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(dialogState.order.createdAt)) : '---')}
                       {renderScheduleComparison(dialogState.order)}
@@ -3391,7 +3432,7 @@ export function ScheduleView({
 
                       {renderEditableItem('車名', 'carName')}
                       {renderEditableItem('登録ナンバー(下４桁)', 'regNo')}
-                      {renderEditableItem('入庫状況', 'arrivalStatus')}
+                      {renderEditableItem('入庫状況', 'arrivalStatus', 'select', ['点検', 'お預かり済', 'お客待ち'])}
                       {renderEditableItem('タイヤ品番', 'tireNumber')}
                       {renderEditableItem('タイヤサイズ', 'tireSize')}
                       {renderEditableItem('品名', 'productName')}
@@ -3405,16 +3446,16 @@ export function ScheduleView({
                           'その他'
                         ])}
                       </div>
-                      {renderEditableItem('本数', 'quantity')}
-                      {renderEditableItem('空気圧センサーパッキン交換', 'sensor')}
+                      {renderEditableItem('本数', 'quantity', 'select', ['1', '2', '4', 'その他'])}
+                      {renderEditableItem('空気圧センサーパッキン交換', 'sensor', 'select', ['有', '無'])}
                       {renderEditableItem('タイヤ手配状況', 'tireStatus', 'select', ['定期便で配送手配済', 'タイヤ持込み'])}
-                      {renderEditableItem('廃タイヤ処分', 'disposal')}
+                      {renderEditableItem('廃タイヤ処分', 'disposal', 'select', ['回収有り：廃タイヤラベル在庫有り', '回収有り：廃タイヤラベル未手配(TMP手配）', '回収なし'])}
                       <div className="col-span-full">
                         {renderEditableItem('特記事項', 'specialNotes', 'textarea')}
                       </div>
 
                       <div className="col-span-full border-t my-2 pt-2">
-                        <h4 className="text-sm font-semibold mb-2 text-muted-foreground">スケジュール</h4>
+                        <h4 className="text-sm font-semibold mb-2 text-muted-foreground">訪問履歴 ・ 実績</h4>
                       </div>
                       {renderEditableItem('作業予定日', 'scheduledDate', 'date')}
                       {renderEditableItem('予定時間', 'scheduledTime', 'time')}
@@ -3422,6 +3463,8 @@ export function ScheduleView({
                       {renderEditableItem('現場到着', 'arrivalTimestamp', 'time')}
                       {renderEditableItem('作業開始', 'actualStartTime', 'time')}
                       {renderEditableItem('作業完了', 'actualEndTime', 'time')}
+                      {renderDetailItem('既読確認日時', formatDate((dialogState.order as any).confirmedAt, 'yyyy/MM/dd HH:mm'))}
+                      {renderEditableItem('所要時間（分）', 'actualDuration', 'number')}
                     </div>
                   </div>
                   <DialogFooter className="sm:justify-between pt-4 border-t">
