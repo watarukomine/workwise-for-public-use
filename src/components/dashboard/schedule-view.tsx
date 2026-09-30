@@ -3646,9 +3646,9 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     dynamicBgColor = 'rgb(239 68 68)'; // Vivid Red for cancelled tasks
     textColorClass = 'text-white font-bold';
   } else if (isCompleted && !isTravelEvent) {
-    // 作業完了になったチップはスタッフ色を無視してグレーアウト
-    dynamicBgColor = '#94a3b8'; // Slate-400 (視認性を保った落ち着いたグレー)
-    textColorClass = 'text-white font-medium';
+    // 作業完了になったチップはスタッフ色を無視して濃いダークグレー（チャコールグレー）に設定
+    dynamicBgColor = '#334155'; // Slate-700 (業務チップ rgb(156 163 175) と明確に区別できる濃いグレー)
+    textColorClass = 'text-white font-bold';
   } else if (isTravelEvent) {
     // 輝度をさらに上げて（0.78）、より一層白く薄い背景色に（文字色は受注チップと統一）
     dynamicBgColor = lightenColor(dynamicBgColor, 0.78);
@@ -3757,7 +3757,7 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
         textColorClass, 
         isDragging && !isOverlay && "opacity-50",
         isTravelEvent && "border border-dashed border-current/40 shadow-none font-semibold",
-        isCompleted && !isTravelEvent && "opacity-90 saturate-50 shadow-none border border-slate-400/40"
+        isCompleted && !isTravelEvent && "opacity-95 shadow-none border border-slate-500/60"
       )}
       {...{ 'style': { '--dynamic-bg-color': dynamicBgColor, '--dynamic-width': isOverlay ? `${width}px` : '100%' } as any }}
     >
