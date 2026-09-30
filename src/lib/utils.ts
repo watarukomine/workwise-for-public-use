@@ -573,8 +573,18 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
       return val ? parseInt(String(val), 10) : undefined;
     })(),
     travelDistance: findKey(rawOrder, ['移動距離', 'travelDistance']),
-    emergencyMessage: findKey(rawOrder, ['緊急連絡']) || '',
-    adminReply: findKey(rawOrder, ['管理者返信']) || '',
+    emergencyMessage: String(
+      findKey(rawOrder, ['緊急連絡', 'emergencyMessage']) ||
+      (rawOrder?.raw ? findKey(rawOrder.raw, ['緊急連絡', 'emergencyMessage']) : '') ||
+      rawOrder?.emergencyMessage ||
+      ''
+    ),
+    adminReply: String(
+      findKey(rawOrder, ['管理者返信', 'adminReply']) ||
+      (rawOrder?.raw ? findKey(rawOrder.raw, ['管理者返信', 'adminReply']) : '') ||
+      rawOrder?.adminReply ||
+      ''
+    ),
     isConfirmed: !!(findKey(rawOrder, ['既読確認', '既読', 'confirmedAt', 'readAt'])),
     confirmedAt: String(findKey(rawOrder, ['既読確認', '既読', 'confirmedAt', 'readAt']) || ''),
     createdAt: (() => {
@@ -608,13 +618,22 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
         .map(log => log.reason);
     })(),
     isEmergency: (() => {
-      // 1. Check the dedicated '緊急フラグ' column (Boolean or text "TRUE")
-      const flagVal = findKey(rawOrder, ['緊急フラグ']);
+      // 1. Direct boolean flags on root or nested raw
+      if (rawOrder?.isEmergency === true || rawOrder?.emergencyFlag === true) return true;
+      if (rawOrder?.raw?.isEmergency === true || rawOrder?.raw?.emergencyFlag === true) return true;
+
+      // 2. Status check (ステータスが「緊急」)
+      const st = String(rawOrder?.status || findKey(rawOrder, ['受注ステータス']) || (rawOrder?.raw ? findKey(rawOrder.raw, ['受注ステータス']) : '') || '').trim();
+      if (st === '緊急') return true;
+
+      // 3. Check dedicated '緊急フラグ' column (Boolean or text "TRUE")
+      const flagVal = findKey(rawOrder, ['緊急フラグ', 'emergencyFlag', 'isEmergency']) ??
+                      (rawOrder?.raw ? findKey(rawOrder.raw, ['緊急フラグ', 'emergencyFlag', 'isEmergency']) : undefined);
       if (flagVal === true || String(flagVal).toLowerCase() === 'true') return true;
 
-      // 2. Fallback for older data: check '緊急連絡' for tags
-      const msg = findKey(rawOrder, ['緊急連絡']) || '';
-      return String(msg).includes('【緊急】');
+      // 4. Fallback for older data: check '緊急連絡' for tags
+      const msg = String(findKey(rawOrder, ['緊急連絡']) || (rawOrder?.raw ? findKey(rawOrder.raw, ['緊急連絡']) : '') || '');
+      return msg.includes('【緊急】');
     })(),
     submitter: findKey(rawOrder, ['フォーム入力者']) || '',
   };

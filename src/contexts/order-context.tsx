@@ -100,7 +100,7 @@ const processOrderData = (
   });
 
   // Initialize statuses with staff user document fields
-  const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着', '帰社中'];
+  const activeStatuses = ['移動中', '移動開始', '作業中', '作業開始', '現場到着', '帰社中', '緊急'];
   const passiveStatuses = ['未着手', '未割当', '待機中'];
 
   const targetDateStr = targetDate ? (typeof targetDate === 'string' ? normalizeDateStr(targetDate) : format(targetDate, 'yyyy-MM-dd')) : format(new Date(), 'yyyy-MM-dd');
@@ -164,6 +164,7 @@ const processOrderData = (
 
       if (!isNaN(lastUpdate.getTime()) && isOrderToday) {
         const status = order.status || findKey(rawOrder, ['受注ステータス']) || '待機中';
+        const isEmergencyStatus = status === '緊急' || Boolean(order.isEmergency || (order as any)['緊急フラグ']);
         const isNewer = lastUpdate.getTime() >= currentUpdate.getTime();
         const isCandidateActive = activeStatuses.includes(status);
         const isCurrentActive = activeStatuses.includes(currentStatus.status || '');
@@ -171,7 +172,9 @@ const processOrderData = (
         const isCurrentPassive = passiveStatuses.includes(currentStatus.status || '');
 
         let shouldUpdate = false;
-        if (isNewer) {
+        if (isEmergencyStatus) {
+          shouldUpdate = true; // 緊急ステータスは最優先で反映
+        } else if (isNewer) {
           if (isCandidatePassive && isCurrentActive) {
             shouldUpdate = false;
           } else {
@@ -197,7 +200,7 @@ const processOrderData = (
             const lastUpdateIso = (staffMember as any).updatedAt || (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || lastUpdate.toISOString();
             const etaTime = order.estimatedArrivalTime;
             const etaOverdue = isEtaPassed(etaTime, lastUpdateIso);
-            const finalStatus = (etaOverdue && (status === '帰社中' || status === '移動中')) ? '待機中' : status;
+            const finalStatus = isEmergencyStatus ? '緊急' : ((etaOverdue && (status === '帰社中' || status === '移動中')) ? '待機中' : status);
 
             staffStatusMap.set(staffMember.id, {
                 staffId: staffMember.id,
@@ -300,6 +303,21 @@ const processOrderData = (
         ? (item.order.taskDetails || item.order.title || '汎用タスク')
         : (item.order.customerName || item.order.taskDetails);
 
+      const isEmergencyTask = Boolean(
+        item.order.isEmergency ||
+        (item.order as any).emergencyFlag ||
+        (item.order as any)['緊急フラグ'] === true ||
+        String((item.order as any)['緊急フラグ']).toLowerCase() === 'true' ||
+        item.order.status === '緊急' ||
+        (item.order as any)['受注ステータス'] === '緊急' ||
+        (item.order.raw && (
+          (item.order.raw as any)['緊急フラグ'] === true ||
+          String((item.order.raw as any)['緊急フラグ']).toLowerCase() === 'true' ||
+          String(findKey(item.order.raw, ['緊急連絡']) || '').includes('【緊急】')
+        ))
+      );
+      const emergencyMsg = item.order.emergencyMessage || (item.order as any)['緊急連絡'] || (item.order.raw ? findKey(item.order.raw, ['緊急連絡']) : '') || '';
+
       const taskEvent: WithId<ScheduleEvent> = {
         ...item.order,
         id: `${item.tripId}-task`,
@@ -317,6 +335,8 @@ const processOrderData = (
         end: item.end.toISOString(),
         rawOrderId: item.order.rawOrderId,
         systemId: item.order.id,
+        isEmergency: isEmergencyTask,
+        emergencyMessage: emergencyMsg,
       };
 
       if (item.isGeneric && !item.isAccompany) {
@@ -344,6 +364,8 @@ const processOrderData = (
             end: item.start.toISOString(),
             rawOrderId: item.order.rawOrderId,
             systemId: item.order.id,
+            isEmergency: isEmergencyTask,
+            emergencyMessage: emergencyMsg,
           };
           newScheduleEvents.push(travelEvent);
         }

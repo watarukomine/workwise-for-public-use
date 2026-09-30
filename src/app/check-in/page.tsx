@@ -616,10 +616,16 @@ function CheckInClient() {
               statusUpdatedAt: nowIso,
             };
             // 完了済みの過去タスクの打刻時刻修正（事後修正）の場合、スタッフの現在ステータスは上書きしない
-            if (!isOrderAlreadyCompleted || ['Clock Out', 'Wait'].includes(action)) {
+            if (!isOrderAlreadyCompleted || ['Clock Out', 'Wait', 'Emergency'].includes(action)) {
               staffFields.currentStatus = statusValue;
               if (etaStr) staffFields.estimatedArrivalTime = etaStr;
               if (destStr) staffFields.nextDestination = destStr;
+            }
+
+            if ((action as string) === 'Emergency') {
+              staffFields.currentStatus = '緊急';
+              staffFields.isEmergency = true;
+              staffFields.emergencyMessage = emergencyMessage;
             }
 
             await updateDoc(userRef, staffFields).catch(async () => {
@@ -641,6 +647,27 @@ function CheckInClient() {
           };
           if (latitude !== null) firestoreFields.latitude = latitude;
           if (longitude !== null) firestoreFields.longitude = longitude;
+
+          // 緊急連絡時のフラグおよびメッセージ設定
+          if ((action as string) === 'Emergency') {
+            firestoreFields.status = '緊急';
+            firestoreFields.isEmergency = true;
+            firestoreFields.emergencyFlag = true;
+            firestoreFields.emergencyMessage = emergencyMessage;
+            firestoreFields['緊急連絡'] = emergencyMessage;
+            firestoreFields['緊急フラグ'] = true;
+            firestoreFields.adminReply = '';
+            firestoreFields['管理者返信'] = '';
+            if (currentOrder?.raw) {
+              firestoreFields.raw = {
+                ...currentOrder.raw,
+                '緊急連絡': emergencyMessage,
+                '緊急フラグ': true,
+                '管理者返信': '',
+                '受注ステータス': '緊急',
+              };
+            }
+          }
 
           // Calculate ETA for Clock Out (帰社中) or Start Travel (移動中)
           if (action === 'Clock Out') {
@@ -1110,14 +1137,14 @@ function CheckInClient() {
                 <AlertCircle className="h-4 w-4" />
                 緊急連絡
               </h3>
-              {currentOrder?.raw && findKey(currentOrder.raw, ['緊急連絡']) && (
+              {Boolean(currentOrder && (currentOrder.emergencyMessage || currentOrder.isEmergency || (currentOrder.raw && findKey(currentOrder.raw, ['緊急連絡'])))) && (
                 <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-md text-sm text-red-900">
                   <p className="font-bold mb-1">管理者からの返信:</p>
                   <div className="bg-blue-50 p-2 rounded border border-blue-100 mb-2">
-                    <p className="whitespace-pre-wrap text-blue-800">{String(findKey(currentOrder.raw, ['管理者返信']) || '返信待ち...')}</p>
+                    <p className="whitespace-pre-wrap text-blue-800">{String(currentOrder?.adminReply || (currentOrder?.raw ? findKey(currentOrder.raw, ['管理者返信']) : '') || '返信待ち...')}</p>
                   </div>
                   <p className="font-bold mb-1">あなたの送信内容:</p>
-                  <p className="whitespace-pre-wrap text-muted-foreground">{String(findKey(currentOrder.raw, ['緊急連絡']) || '').replace(/【緊急】/g, '').trim()}</p>
+                  <p className="whitespace-pre-wrap text-muted-foreground">{String(currentOrder?.emergencyMessage || (currentOrder?.raw ? findKey(currentOrder.raw, ['緊急連絡']) : '') || '').replace(/【緊急】/g, '').trim()}</p>
                 </div>
               )}
               <Textarea
@@ -1144,6 +1171,7 @@ function CheckInClient() {
                     try {
                       const eventTitleForUpdate = `(ID: ${orderId || 'N/A'})`;
                       const now = new Date();
+                      const sysId = (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || '';
 
                       let recoveryStatus = '未着手';
                       if (currentOrder) {
@@ -1158,11 +1186,55 @@ function CheckInClient() {
                         }
                       }
 
-                      const currentComment = currentOrder?.raw ? (findKey(currentOrder.raw, ['緊急連絡']) || '') : '';
+                      const currentComment = (currentOrder?.emergencyMessage) || (currentOrder?.raw ? findKey(currentOrder.raw, ['緊急連絡']) : '') || '';
                       const newComment = String(currentComment).replace(/【緊急】/g, '').trim();
 
-                      // Optimistic Update
-                      if (currentOrder && currentOrder.raw) {
+                      // 1. Direct Write to Order Firestore Document (Primary)
+                      if (sysId) {
+                        const { OrderService } = await import('@/services/order-service');
+                        const orderClearFields: any = {
+                          status: recoveryStatus,
+                          isEmergency: false,
+                          emergencyFlag: false,
+                          emergencyMessage: '',
+                          '緊急連絡': newComment,
+                          '緊急フラグ': false,
+                          adminReply: '',
+                          '管理者返信': '',
+                          updatedAt: now.toISOString(),
+                        };
+                        if (currentOrder?.raw) {
+                          orderClearFields.raw = {
+                            ...currentOrder.raw,
+                            '緊急連絡': newComment,
+                            '緊急フラグ': false,
+                            '管理者返信': '',
+                            '受注ステータス': recoveryStatus,
+                          };
+                        }
+                        await OrderService.updateOrder(sysId, orderClearFields);
+                      }
+
+                      // 2. Direct Write to Staff User Document in Firestore
+                      if (profile?.id) {
+                        try {
+                          const { doc, updateDoc } = await import('firebase/firestore');
+                          const { initializeFirebase } = await import('@/firebase');
+                          const { firestore: db } = initializeFirebase();
+                          const userRef = doc(db, 'users', profile.id);
+                          await updateDoc(userRef, {
+                            currentStatus: recoveryStatus,
+                            isEmergency: false,
+                            emergencyMessage: '',
+                            statusUpdatedAt: now.toISOString(),
+                          });
+                        } catch (userErr) {
+                          console.warn("Failed to clear staff user emergency status:", userErr);
+                        }
+                      }
+
+                      // 3. Optimistic Update
+                      if (currentOrder) {
                         saveLocalEvent({
                           ...currentOrder,
                           staffId: profile.id,
@@ -1174,7 +1246,7 @@ function CheckInClient() {
                           start: currentOrder.scheduledTime ?? '',
                           end: currentOrder.scheduledEndTime ?? '',
                           raw: {
-                            ...currentOrder.raw,
+                            ...(currentOrder.raw || {}),
                             '緊急連絡': newComment,
                             '緊急フラグ': false,
                             '管理者返信': '',
@@ -1183,6 +1255,7 @@ function CheckInClient() {
                         } as WithId<ScheduleEvent>);
                       }
 
+                      // 4. Async Background Sync to GAS Spreadsheet
                       await updateSheetStatus({
                         gasUrl: ORDER_GAS_URL,
                         eventTitle: eventTitleForUpdate,
@@ -1193,7 +1266,7 @@ function CheckInClient() {
                         comment: newComment,
                         emergencyFlag: false,
                         adminReply: '',
-                        systemId: (currentOrder as any)?.systemId || currentOrder?.id?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '') || orderId?.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '')
+                        systemId: sysId
                       });
                       toast({ title: '緊急連絡を解除しました', description: `ステータスを「${recoveryStatus}」に戻しました。` });
                       setEmergencyMessage('');

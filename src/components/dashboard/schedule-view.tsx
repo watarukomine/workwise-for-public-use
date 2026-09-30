@@ -1008,7 +1008,21 @@ export function ScheduleView({
   const emergencyNotifications = React.useMemo(() => {
     if (!scheduleEvents) return [];
 
-    const emergencyEvents = scheduleEvents.filter(e => e.isEmergency);
+    const emergencyEvents = scheduleEvents.filter(e => 
+      Boolean(
+        e.isEmergency ||
+        (e as any).emergencyFlag ||
+        (e as any)['緊急フラグ'] === true ||
+        String((e as any)['緊急フラグ']).toLowerCase() === 'true' ||
+        e.status === '緊急' ||
+        (e as any)['受注ステータス'] === '緊急' ||
+        (e.raw && (
+          (e.raw as any)['緊急フラグ'] === true ||
+          String((e.raw as any)['緊急フラグ']).toLowerCase() === 'true' ||
+          String(findKey(e.raw, ['緊急連絡']) || '').includes('【緊急】')
+        ))
+      )
+    );
 
     // return generic structure
     const notifications: { staffId: string, staffName: string, message: string, rawOrderId: string, systemId: string, raw?: any }[] = [];
@@ -1016,21 +1030,22 @@ export function ScheduleView({
     const seenStaff = new Set<string>();
 
     emergencyEvents.forEach(e => {
-      if (seenStaff.has(e.staffId)) return;
+      const staffKey = e.staffId || e.staffName || e.systemId || e.id;
+      if (seenStaff.has(staffKey)) return;
+      seenStaff.add(staffKey);
 
       const staff = getStaffById(e.staffId);
-      if (staff) {
-        seenStaff.add(e.staffId);
-        const comment = e.raw ? findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) : '';
-        notifications.push({
-          staffId: e.staffId,
-          staffName: staff.name,
-          systemId: e.systemId || e.id,
-          message: comment,
-          rawOrderId: e.rawOrderId || '',
-          raw: e.raw
-        });
-      }
+      const staffName = staff?.name || e.staffName || (e.raw ? findKey(e.raw, ['担当者名', 'スタッフ名', '担当']) : '') || '担当者';
+      const comment = e.emergencyMessage || (e as any)['緊急連絡'] || (e.raw ? findKey(e.raw, ['緊急連絡', '任意コメント', '任意コメント(リマーク2)', 'comment']) : '') || '';
+
+      notifications.push({
+        staffId: e.staffId || '',
+        staffName: staffName,
+        systemId: e.systemId || e.id,
+        message: String(comment).replace(/【緊急】/g, '').trim(),
+        rawOrderId: e.rawOrderId || (e as any).displayId || '',
+        raw: e.raw
+      });
     });
 
     return notifications;
@@ -1115,15 +1130,13 @@ export function ScheduleView({
         return;
       }
 
-      const currentComment = event.raw ? (findKey(event.raw, ['緊急連絡']) || '') : '';
-      const newComment = String(currentComment).replace(/【緊急】/g, '').trim();
-
-      // Optimistic update
       const fullEvent = scheduleEvents.find(e => e.id === event.systemId || (e as any).systemId === event.systemId || (e as any).rawOrderId === event.rawOrderId || e.id === (event as any).id || e.tripId === (event as any).tripId);
+      const currentComment = fullEvent?.emergencyMessage || (event.raw ? (findKey(event.raw, ['緊急連絡']) || '') : '');
+      const newComment = String(currentComment).replace(/【緊急】/g, '').trim();
 
       // Calculate recovery status based on timestamps
       let recoveryStatus = '未着手';
-      const orderData = fullEvent; // Use the event we already found
+      const orderData = fullEvent;
       if (orderData) {
         if (orderData.actualEndTime) {
           recoveryStatus = '待機中';
@@ -1136,9 +1149,60 @@ export function ScheduleView({
         }
       }
 
+      // 1. Direct Firestore Update (Primary)
+      const targetSysId = event.systemId || fullEvent?.systemId || fullEvent?.id;
+      if (targetSysId) {
+        try {
+          const { OrderService } = await import('@/services/order-service');
+          const cleanSysId = targetSysId.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
+          const clearFields: any = {
+            status: recoveryStatus,
+            isEmergency: false,
+            emergencyFlag: false,
+            emergencyMessage: '',
+            '緊急連絡': newComment,
+            '緊急フラグ': false,
+            adminReply: '',
+            '管理者返信': '',
+            updatedAt: new Date().toISOString()
+          };
+          if (fullEvent?.raw) {
+            clearFields.raw = {
+              ...fullEvent.raw,
+              '緊急連絡': newComment,
+              '緊急フラグ': false,
+              '管理者返信': '',
+              '受注ステータス': recoveryStatus
+            };
+          }
+          await OrderService.updateOrder(cleanSysId, clearFields);
+        } catch (dbErr) {
+          console.warn("Failed to clear emergency in Firestore:", dbErr);
+        }
+      }
+
+      // 2. Clear Staff User status in Firestore if staffId known
+      if (fullEvent?.staffId) {
+        try {
+          const { doc, updateDoc } = await import('firebase/firestore');
+          const { initializeFirebase } = await import('@/firebase');
+          const { firestore: db } = initializeFirebase();
+          await updateDoc(doc(db, 'users', fullEvent.staffId), {
+            currentStatus: recoveryStatus,
+            isEmergency: false,
+            emergencyMessage: '',
+            statusUpdatedAt: new Date().toISOString()
+          });
+        } catch (uErr) {
+          console.warn("Failed to clear user emergency status:", uErr);
+        }
+      }
+
+      // 3. Optimistic update
       if (fullEvent) {
         saveLocalEvent({
           ...fullEvent,
+          status: recoveryStatus,
           isEmergency: false,
           description: newComment,
           emergencyMessage: newComment,
@@ -1147,16 +1211,18 @@ export function ScheduleView({
             ...fullEvent.raw,
             '緊急フラグ': false,
             '緊急連絡': newComment,
-            '管理者返信': ''
+            '管理者返信': '',
+            '受注ステータス': recoveryStatus
           }
         });
       }
 
+      // 4. Async sync to GAS
       updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: `(ID: ${event.rawOrderId})`,
         staffName: event.staffName,
-        statusValue: recoveryStatus, // Restore status
+        statusValue: recoveryStatus,
         comment: newComment,
         emergencyFlag: false,
         adminReply: '',
@@ -1191,14 +1257,31 @@ export function ScheduleView({
       const { rawOrderId, currentComment, staffName } = targetEmergencyEvent;
       const timestamp = format(new Date(), 'HH:mm');
       const finalReply = `[${timestamp}]: ${replyMessage}`;
+      const targetSysId = (targetEmergencyEvent as any).systemId;
 
+      // 1. Direct write to Firestore Order (Primary for instant reflection on mobile)
+      if (targetSysId) {
+        try {
+          const { OrderService } = await import('@/services/order-service');
+          const cleanSysId = targetSysId.replace(/^trip-/, '').replace(/(-task|-travel)$/i, '');
+          await OrderService.updateOrder(cleanSysId, {
+            adminReply: finalReply,
+            '管理者返信': finalReply,
+            updatedAt: new Date().toISOString()
+          } as any);
+        } catch (dbErr) {
+          console.warn("Failed to save admin reply to Firestore:", dbErr);
+        }
+      }
+
+      // 2. Async sync to GAS
       updateSheetStatus({
         gasUrl: ORDER_GAS_URL,
         eventTitle: `(ID: ${rawOrderId})`,
         staffName: staffName,
         adminReply: finalReply,
         emergencyFlag: true, // Keep it active
-        systemId: (targetEmergencyEvent as any).systemId
+        systemId: targetSysId
       }).catch(err => console.warn('Failed to send reply to sheet:', err));
 
       toast({ title: "返信を送信しました" });
@@ -3757,7 +3840,8 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
         textColorClass, 
         isDragging && !isOverlay && "opacity-50",
         isTravelEvent && "border border-dashed border-current/40 shadow-none font-semibold",
-        isCompleted && !isTravelEvent && "opacity-95 shadow-none border border-slate-500/60"
+        isCompleted && !isTravelEvent && "opacity-95 shadow-none border border-slate-500/60",
+        targetEvent.isEmergency && !isTravelEvent && "ring-2 ring-red-500 ring-offset-1 animate-pulse"
       )}
       {...{ 'style': { '--dynamic-bg-color': dynamicBgColor, '--dynamic-width': isOverlay ? `${width}px` : '100%' } as any }}
     >
@@ -3784,7 +3868,7 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
       )}
       {targetEvent.isEmergency && !isTravelEvent && (
         <div className="absolute -top-1 -left-1 z-[70] pointer-events-none">
-          <div className="bg-red-600 rounded-full p-0.5 shadow-md">
+          <div className="bg-red-600 rounded-full p-0.5 shadow-md animate-bounce">
             <AlertTriangle className="h-3 w-3 text-white" />
           </div>
         </div>
