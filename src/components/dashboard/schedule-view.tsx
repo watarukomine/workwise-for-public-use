@@ -1968,6 +1968,45 @@ export function ScheduleView({
     }
   }, [setEditedEventDetails, setDialogState]);
 
+  // 受注オブジェクトに対応するタスクイベントを特定（移動チップは絶対に除外する）
+  const findTaskEventForOrder = React.useCallback((order: WithId<Order>) => {
+    const targetOrderId = order.id;
+    const targetRawOrderId = order.rawOrderId;
+    const targetTripId = `trip-${targetRawOrderId || targetOrderId}`;
+
+    // 移動チップ（-travel、title: '移動'）は絶対に除外して、作業チップ（-task）のみを取得する！
+    return scheduleEvents.find(e => {
+      const isTravel = Boolean(e.id?.endsWith('-travel')) || e.title === '移動' || Boolean((e as any).isTravel);
+      if (isTravel) return false;
+
+      const isMatchingTrip = e.tripId === targetTripId || e.tripId === `trip-${targetOrderId}` || Boolean(targetRawOrderId && e.tripId === `trip-${targetRawOrderId}`);
+      const isMatchingRawOrder = Boolean(targetRawOrderId && e.rawOrderId === targetRawOrderId) || e.rawOrderId === targetOrderId;
+      const isMatchingSystemId = Boolean(e.systemId && (e.systemId === targetOrderId || (targetRawOrderId && e.systemId === targetRawOrderId)));
+      const isMatchingId = e.id === `${targetTripId}-task` || e.id === `trip-${targetOrderId}-task`;
+
+      return isMatchingTrip || isMatchingRawOrder || isMatchingSystemId || isMatchingId;
+    });
+  }, [scheduleEvents]);
+
+  // 受注一覧や未割当一覧からのダブルクリック／クリック時に詳細モーダルを開く
+  const openOrderDetails = React.useCallback((order: WithId<Order>) => {
+    const taskEvent = findTaskEventForOrder(order);
+    if (taskEvent) {
+      handleDoubleClickEvent(taskEvent);
+    } else {
+      const rawTime = order.scheduledTime || findKey(order.raw, ['予定時間', '作業予定時間', '希望時間', '開始時間']) || '';
+      const formattedStartTime = rawTime ? formatTime(rawTime) : '';
+      setEditedEventDetails({
+        title: order.customerName || order.taskDetails || '',
+        description: order.specialNotes || '',
+        startTime: formattedStartTime,
+        endTime: '',
+        destination: order.destination || order.storeName || ''
+      });
+      setDialogState({ mode: 'order-details', order });
+    }
+  }, [findTaskEventForOrder, handleDoubleClickEvent, setEditedEventDetails, setDialogState]);
+
   const handleDoubleClickTimeline = React.useCallback((staffId: string, e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('[data-event-chip="true"]')) {
       return;
@@ -2594,7 +2633,7 @@ export function ScheduleView({
       const { order } = dialogState;
       const staff = order.staffId ? getStaffById(order.staffId) : (order.staffName ? allStaff?.find(s => s.name === order.staffName) : undefined);
       const customer = getCustomerByCode(order.customerCode || (order as any).userCode);
-      return { event: undefined, staff, customer, title: '受注詳細' };
+      return { event: order as any, staff, customer, title: '受注詳細' };
     }
     return { event: undefined, staff: undefined, customer: undefined, start: undefined, title: '' };
   };
@@ -2859,7 +2898,7 @@ export function ScheduleView({
             <div className="bg-background/95 backdrop-blur-sm z-20 py-1">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                 <div className="md:col-span-3">
-                  <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} onDoubleClickOrder={(order) => setDialogState({ mode: 'order-details', order })} />
+                  <UnassignedTasks orders={unassignedOrders} customers={allCustomers || []} date={currentDate} onDoubleClickOrder={openOrderDetails} />
                 </div>
                 <div className="md:col-span-2">
                   <GenericTasks />
@@ -3028,47 +3067,12 @@ export function ScheduleView({
                         }
                       }
 
-                      // チップへの連動クリック
-                      const handleRowClick = () => {
-                        const targetOrderId = order.id;
-                        const targetRawOrderId = order.rawOrderId;
-                        const targetTripId = `trip-${targetRawOrderId || targetOrderId}`;
-
-                        // scheduleEvents からタスクイベントを特定（移動チップ "-travel" は除外し、作業チップ "-task" を優先照合）
-                        const taskEvent = scheduleEvents.find(e => {
-                          const isMatchingTrip = e.tripId === targetTripId || e.tripId === `trip-${targetOrderId}` || (targetRawOrderId && e.tripId === `trip-${targetRawOrderId}`);
-                          const isMatchingRawOrder = Boolean(targetRawOrderId && e.rawOrderId === targetRawOrderId) || e.rawOrderId === targetOrderId;
-                          const isMatchingSystemId = Boolean(e.systemId && (e.systemId === targetOrderId || (targetRawOrderId && e.systemId === targetRawOrderId)));
-                          const isMatchingId = e.id === `${targetTripId}-task` || e.id === `trip-${targetOrderId}-task`;
-
-                          const isMatch = isMatchingTrip || isMatchingRawOrder || isMatchingSystemId || isMatchingId;
-                          return isMatch && (!e.id || !e.id.endsWith('-travel')) && e.title !== '移動';
-                        }) || scheduleEvents.find(e => {
-                          const isMatchingTrip = e.tripId === targetTripId || e.tripId === `trip-${targetOrderId}` || (targetRawOrderId && e.tripId === `trip-${targetRawOrderId}`);
-                          const isMatchingRawOrder = Boolean(targetRawOrderId && e.rawOrderId === targetRawOrderId) || e.rawOrderId === targetOrderId;
-                          const isMatchingSystemId = Boolean(e.systemId && (e.systemId === targetOrderId || (targetRawOrderId && e.systemId === targetRawOrderId)));
-                          return isMatchingTrip || isMatchingRawOrder || isMatchingSystemId;
-                        });
-
-                        if (taskEvent) {
-                          setEditedEventDetails({
-                            title: taskEvent.title || order.customerName || '',
-                            description: taskEvent.description || '',
-                            startTime: formatTime(taskEvent.start),
-                            endTime: formatTime(taskEvent.end),
-                            destination: (taskEvent as any).destination || (order as any).destination || ''
-                          });
-                          setDialogState({ mode: 'details', event: taskEvent });
-                        } else {
-                          setDialogState({ mode: 'order-details', order });
-                        }
-                      };
-
                       return (
                         <tr 
                           key={order.id} 
                           className="hover:bg-muted/30 transition-colors cursor-pointer"
-                          onClick={handleRowClick}
+                          onClick={() => openOrderDetails(order)}
+                          onDoubleClick={() => openOrderDetails(order)}
                         >
                           <td className="p-3 pl-4 font-semibold text-foreground font-mono text-xs">
                             {rawId}
@@ -3117,7 +3121,7 @@ export function ScheduleView({
                               className="h-7 text-[10px] hover:bg-muted font-semibold"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleRowClick();
+                                openOrderDetails(order);
                               }}
                             >
                               詳細
@@ -3171,13 +3175,13 @@ export function ScheduleView({
                   }
                 </DialogDescription>
               </DialogHeader>
-              {(dialogState.mode === 'details' || dialogState.mode === 'edit') && event ? (
+              {(dialogState.mode === 'details' || dialogState.mode === 'edit' || dialogState.mode === 'order-details') && event ? (
                 <>
                   <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
                     {/* Details section */}
-                    {dialogState.mode === 'details' && (
+                    {(dialogState.mode === 'details' || dialogState.mode === 'order-details') && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
-                        {renderDetailItem('担当者', staff?.name)}
+                        {renderDetailItem('担当者', staff?.name || (event as any).staffName || '未割り当て')}
                         {renderDetailItem('フォーム入力者', event.submitter || (event.raw ? findKey(event.raw, ['フォーム入力者', '入力者', 'Submitter', '連絡者名']) : undefined) || '---')}
                         {renderDetailItem('受注日時', event.createdAt ? (event.createdAt instanceof Date ? format(event.createdAt, 'yyyy/MM/dd HH:mm:ss') : formatDate(event.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(event.createdAt)) : '---')}
                         {renderScheduleComparison(event)}
@@ -3289,7 +3293,7 @@ export function ScheduleView({
                                 {isSaving ? '送信中...' : '保存して送信'}
                               </Button>
 
-                              {dialogState.mode === 'details' && (
+                              {(dialogState.mode === 'details' || dialogState.mode === 'order-details') && (
                                 <Button
                                   variant="outline"
                                   onClick={() => {
@@ -3302,7 +3306,7 @@ export function ScheduleView({
                                 </Button>
                               )}
 
-                              {isAdmin && dialogState.mode === 'details' && (
+                              {isAdmin && (dialogState.mode === 'details' || dialogState.mode === 'order-details') && (
                                 <Button
                                   variant="outline"
                                   onClick={handleForceComplete}
@@ -3314,9 +3318,11 @@ export function ScheduleView({
                                 </Button>
                               )}
 
-                              <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
-                                {isSaving ? '処理中...' : (isGenericTask((dialogState as any).event || (dialogState as any).order) ? 'タスクの削除' : '未割当に戻す')}
-                              </Button>
+                              {dialogState.mode !== 'order-details' && (
+                                <Button variant="destructive" onClick={handleDeleteEvent} disabled={isSaving}>
+                                  {isSaving ? '処理中...' : (isGenericTask((dialogState as any).event || (dialogState as any).order) ? 'タスクの削除' : '未割当に戻す')}
+                                </Button>
+                              )}
                               {!isGenericTask((dialogState as any).event || (dialogState as any).order) && (
                                 <Button variant="destructive" onClick={handleDeleteOrder} disabled={isSaving} className="bg-red-900 hover:bg-red-950">
                                   受注を消去
@@ -3406,195 +3412,6 @@ export function ScheduleView({
                         ) : '保存'}
                       </Button>
                     </div>
-                  </DialogFooter>
-                </>
-              ) : (dialogState.mode === 'order-details') ? (
-                <>
-                  <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
-                      {renderDetailItem('担当者', staff?.name || dialogState.order.staffName || '未割り当て')}
-                      {renderDetailItem('フォーム入力者', dialogState.order.submitter || (dialogState.order.raw ? findKey(dialogState.order.raw, ['フォーム入力者', '入力者', 'Submitter', '連絡者名']) : undefined) || '---')}
-                      {renderDetailItem('受注日時', dialogState.order.createdAt ? (dialogState.order.createdAt instanceof Date ? format(dialogState.order.createdAt, 'yyyy/MM/dd HH:mm:ss') : formatDate(dialogState.order.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(dialogState.order.createdAt)) : '---')}
-                      {renderScheduleComparison(dialogState.order)}
-                      {dialogState.order.status === 'キャンセル' && (
-                        <>
-                          {renderDetailItem('キャンセル日時', dialogState.order.cancelDate ? (formatDate(dialogState.order.cancelDate, 'yyyy/MM/dd HH:mm:ss') || String(dialogState.order.cancelDate)) : '---')}
-                          {renderDetailItem('キャンセル連絡・受付者', dialogState.order.cancelContact || '---')}
-                        </>
-                      )}
-                      {renderEditableItem('受注No (リマーク1)', 'orderNo')}
-                      {renderEditableItem('任意コメント (リマーク2)', 'comment')}
-                      {renderEditableItem('お取引先名', 'storeName')}
-                      {renderEditableItem('ユーザーコード', 'customerCode')}
-                      {renderEditableItem('ご担当者様', 'picName')}
-                      {renderEditableItem('連絡先', 'contact')}
-                      {renderEditableItem('機材有無', 'equipmentStatus')}
-
-                      {renderEditableItem('車名', 'carName')}
-                      {renderEditableItem('登録ナンバー(下４桁)', 'regNo')}
-                      {renderEditableItem('入庫状況', 'arrivalStatus', 'select', ['点検', 'お預かり済', 'お客待ち'])}
-                      {renderEditableItem('タイヤ品番', 'tireNumber')}
-                      {renderEditableItem('タイヤサイズ', 'tireSize')}
-                      {renderEditableItem('品名', 'productName')}
-                      <div className="col-span-full">
-                        {renderEditableItem('作業内容', 'taskDetails', 'select', [
-                          '販売店店舗内作業',
-                          'TCC作業',
-                          '持ち帰り作業',
-                          'ホイールセット付替',
-                          '配送のみ',
-                          'その他'
-                        ])}
-                      </div>
-                      {renderEditableItem('本数', 'quantity', 'select', ['1', '2', '4', 'その他'])}
-                      {renderEditableItem('空気圧センサーパッキン交換', 'sensor', 'select', ['有', '無'])}
-                      {renderEditableItem('タイヤ手配状況', 'tireStatus', 'select', ['定期便で配送手配済', 'タイヤ持込み'])}
-                      {renderEditableItem('廃タイヤ処分', 'disposal', 'select', ['回収有り：廃タイヤラベル在庫有り', '回収有り：廃タイヤラベル未手配(TMP手配）', '回収なし'])}
-                      <div className="col-span-full">
-                        {renderEditableItem('特記事項', 'specialNotes', 'textarea')}
-                      </div>
-
-                      <div className="col-span-full border-t my-2 pt-2">
-                        <h4 className="text-sm font-semibold mb-2 text-muted-foreground">訪問履歴 ・ 実績</h4>
-                      </div>
-                      {renderEditableItem('作業予定日', 'scheduledDate', 'date')}
-                      {renderEditableItem('予定時間', 'scheduledTime', 'time')}
-                      {renderEditableItem('移動開始', 'startTravelTime', 'time')}
-                      {renderEditableItem('現場到着', 'arrivalTimestamp', 'time')}
-                      {renderEditableItem('作業開始', 'actualStartTime', 'time')}
-                      {renderEditableItem('作業完了', 'actualEndTime', 'time')}
-                      {renderDetailItem('既読確認日時', formatDate((dialogState.order as any).confirmedAt, 'yyyy/MM/dd HH:mm'))}
-                      {renderEditableItem('所要時間（分）', 'actualDuration', 'number')}
-                    </div>
-                  </div>
-                  <DialogFooter className="sm:justify-between pt-4 border-t">
-                    {isCancelling ? (
-                      <div className="flex items-center gap-2 w-full">
-                        <Input
-                          placeholder="キャンセル連絡者名"
-                          value={cancelContact}
-                          onChange={(e) => setCancelContact(e.target.value)}
-                          className="flex-1"
-                        />
-                        <Button variant="destructive" onClick={handleWorkCancel} disabled={isSaving}>
-                          確定
-                        </Button>
-                        <Button variant="ghost" onClick={() => setIsCancelling(false)} disabled={isSaving}>
-                          戻る
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex flex-wrap gap-2">
-                          {isEditingOrderDetails ? (
-                            <>
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  setIsEditingOrderDetails(false);
-                                }}
-                                disabled={isSaving}
-                              >
-                                キャンセル
-                              </Button>
-                              <Button
-                                onClick={async () => {
-                                  if (!dialogState.order) return;
-
-                                  setIsSaving(true);
-
-                                  try {
-                                    const { OrderService } = await import('@/services/order-service');
-                                    const orderId = dialogState.order.systemId || dialogState.order.id;
-                                    const updatePayload: any = {
-                                      ...editOrderForm,
-                                      updatedAt: new Date().toISOString()
-                                    };
-                                    if (editOrderForm.tireStatus !== undefined) {
-                                      updatePayload.arrangement = editOrderForm.tireStatus;
-                                      updatePayload['タイヤ手配状況'] = editOrderForm.tireStatus;
-                                    }
-                                    await OrderService.updateOrder(orderId, updatePayload);
-
-                                    toast({
-                                      title: '保存しました',
-                                      description: 'オーダー詳細を更新しました'
-                                    });
-                                    setIsEditingOrderDetails(false);
-                                    await refetchOrders();
-                                    setDialogState({ mode: 'closed' });
-                                  } catch (error) {
-                                    console.error('Failed to update order details:', error);
-                                    toast({
-                                      title: 'エラー',
-                                      description: '更新に失敗しました',
-                                      variant: 'destructive'
-                                    });
-                                  } finally {
-                                    setIsSaving(false);
-                                  }
-                                }}
-                                disabled={isSaving}
-                              >
-                                {isSaving ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    保存中...
-                                  </>
-                                ) : '保存'}
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                onClick={() => {
-                                  setIsEditingOrderDetails(true);
-                                }}
-                              >
-                                <Pencil className="mr-2 h-4 w-4" />
-                                編集する
-                              </Button>
-                              <Button
-                                variant="outline"
-                                onClick={async () => {
-                                  if (!dialogState.order) return;
-                                  setIsSaving(true);
-                                  try {
-                                    const { OrderService } = await import('@/services/order-service');
-                                    const orderId = dialogState.order.systemId || dialogState.order.id;
-                                    await OrderService.updateOrder(orderId, {
-                                      staffName: '',
-                                      staffId: '',
-                                      status: '未割当',
-                                      updatedAt: new Date().toISOString()
-                                    });
-                                    toast({ title: 'タスクを未割り当てに戻しました' });
-                                    await refetchOrders();
-                                    setDialogState({ mode: 'closed' });
-                                  } catch (err: any) {
-                                    toast({ variant: 'destructive', title: 'エラー', description: err.message });
-                                  } finally {
-                                    setIsSaving(false);
-                                  }
-                                }}
-                                disabled={isSaving}
-                              >
-                                未割当に戻す
-                              </Button>
-                              <Button variant="destructive" onClick={() => setIsCancelling(true)} className="bg-red-700 hover:bg-red-800">
-                                受注をキャンセル
-                              </Button>
-                              <Button variant="destructive" onClick={handleDeleteOrder} className="bg-red-900 hover:bg-red-950">
-                                受注を消去
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                        {!isCancelling && (
-                          <DialogClose asChild><Button variant="ghost">閉じる</Button></DialogClose>
-                        )}
-                      </>
-                    )}
                   </DialogFooter>
                 </>
               ) : null}
@@ -3823,16 +3640,21 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
   let textColorClass = getContrastingTextColor(dynamicBgColor) === '#FFFFFF' ? 'text-white' : 'text-black';
 
   const isCancelled = targetEvent.status === 'キャンセル' || (targetEvent as any).statusValue === 'キャンセル';
+  const isCompleted = ['Finish Task', '作業完了', '完了', '完了済', '作業終了'].includes(String(targetEvent.status || '')) || !!targetEvent.actualEndTime;
 
   if (isCancelled) {
     dynamicBgColor = 'rgb(239 68 68)'; // Vivid Red for cancelled tasks
     textColorClass = 'text-white font-bold';
+  } else if (isCompleted && !isTravelEvent) {
+    // 作業完了になったチップはスタッフ色を無視してグレーアウト
+    dynamicBgColor = '#94a3b8'; // Slate-400 (視認性を保った落ち着いたグレー)
+    textColorClass = 'text-white font-medium';
   } else if (isTravelEvent) {
     // 輝度をさらに上げて（0.78）、より一層白く薄い背景色に（文字色は受注チップと統一）
     dynamicBgColor = lightenColor(dynamicBgColor, 0.78);
   }
 
-  if (!isCancelled) {
+  if (!isCancelled && !isCompleted) {
     if (targetEvent.title === '業務') {
       dynamicBgColor = 'rgb(156 163 175)';
       textColorClass = 'text-white';
@@ -3927,7 +3749,6 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     })();
 
   const customerName = isCancelled ? `【キャンセル】 ${baseCustomerName}` : baseCustomerName;
-  const isCompleted = ['Finish Task', '作業完了', '完了'].includes(String(targetEvent.status || '')) || !!targetEvent.actualEndTime;
 
   const eventContent = (
     <div
@@ -3935,7 +3756,8 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
         "w-full h-full rounded-md flex flex-col justify-center p-1 relative dynamic-bg dynamic-width transition-all", 
         textColorClass, 
         isDragging && !isOverlay && "opacity-50",
-        isTravelEvent && "border border-dashed border-current/40 shadow-none font-semibold"
+        isTravelEvent && "border border-dashed border-current/40 shadow-none font-semibold",
+        isCompleted && !isTravelEvent && "opacity-90 saturate-50 shadow-none border border-slate-400/40"
       )}
       {...{ 'style': { '--dynamic-bg-color': dynamicBgColor, '--dynamic-width': isOverlay ? `${width}px` : '100%' } as any }}
     >
