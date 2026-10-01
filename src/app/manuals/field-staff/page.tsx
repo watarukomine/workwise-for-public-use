@@ -237,7 +237,8 @@ export default function FieldStaffManualPage() {
                         </CardHeader>
                         <CardContent className="px-4 pb-4 text-xs sm:text-sm space-y-2 text-muted-foreground">
                             <p>• 向かう案件をタップしてチェックイン画面を開きます。</p>
-                            <p>• 案件の依頼内容を確認したら <strong>「タスク確認」</strong> を押します（確認済みとして記録されます）。</p>
+                            <p>• 案件の依頼内容を確認したら <strong>「タスク確認」</strong> を押します（確認済みとして記録され、管理者のチップに「確」が付きます）。</p>
+                            <p className="text-[11px] text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200">※管理者が担当者を張り替えた場合、確認状態は自動リセットされます。新担当者は改めて内容を確認して「タスク確認」を押してください。</p>
                             <p>• 車で現場へ向けて出発するタイミングで <strong>「移動開始」</strong> ボタンを押します（ステータスが「移動中」になります）。</p>
                         </CardContent>
                     </Card>

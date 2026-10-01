@@ -16,6 +16,13 @@ const MANUALS = [
         subtitle: 'ユーザー操作マニュアル'
     },
     {
+        id: 'specifications',
+        input: 'specifications.md',
+        output: 'specifications.pdf',
+        title: 'WorkWise',
+        subtitle: 'システム仕様書'
+    },
+    {
         id: 'field_staff_manual',
         input: 'FIELD_STAFF_MANUAL.md',
         output: 'FIELD_STAFF_MANUAL.pdf',

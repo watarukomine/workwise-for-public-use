@@ -293,6 +293,12 @@ export default function UserGuidePage() {
                                     配置した瞬間、バックエンドデータベース（Firestore）およびバックアップ用スプレッドシート（受注管理WW3）へ<strong>きれいに1行のみ自動同期</strong>され、重複なく保存されます。
                                 </p>
                             </div>
+                            <div className="flex items-start gap-2">
+                                <div className="p-1 rounded bg-indigo-100 text-indigo-700 font-bold shrink-0 text-xs">STEP 4</div>
+                                <p>
+                                    <strong>担当スタッフの張り替え（チップの移動）</strong>：配置済みのチップを別のスタッフ行へ移動させた場合、元のスタッフが行ったタスク確認状態（チップの「確」マーク）は<strong>自動でリセット</strong>されます。新しい担当者のスマホ画面では未確認状態に戻るため、新担当者が改めて「タスク確認」を行えます。
+                                </p>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
