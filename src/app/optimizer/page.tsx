@@ -24,7 +24,7 @@ function OptimizerPageContent() {
   const { profile, isLoading: isProfileLoading } = useUserProfile();
   const { customers: allCustomers, isLoading: isLoadingCustomers } = useCustomer();
   const { rawOrdersData: _rawOrders, isLoading: isLoadingOrders, statuses: contextStatuses, orders, refetchOrders } = useOrder();
-  const { allStaff, isLoading: isStaffLoading } = useSelectedStaff();
+  const { allStaff, isLoading: isStaffLoading, currentScheduledStaffIds, appliedSelectedStaffIds } = useSelectedStaff();
   const router = useRouter();
 
   const [optimizedRoute, setOptimizedRoute] = React.useState<OptimizeRouteOutput | null>(null);
@@ -48,14 +48,14 @@ function OptimizerPageContent() {
         母店: (s as any)['母店'] || (s as any).mainStore || (s as any).storeName || '-',
         緯度: (s as any).latitude ?? '-',
         経度: (s as any).longitude ?? '-',
-        最終位置更新日時: (s as any).lastLocationUpdatedAt || (s as any).statusUpdatedAt || (s as any).updatedAt || '-',
+        最終位置更新日時: (s as any).lastLocationUpdatedAt || (s as any)['最終位置更新日時'] || '-',
         ステータス: (s as any).currentStatus || (s as any).status || '-'
       })));
       console.groupEnd();
     }
   }, [allStaff]);
 
-  // Extract ONLY staff who have updated location TODAY via check-in or location update
+  // Extract ONLY staff who are scheduled/active TODAY and have updated location TODAY
   const staffWithLocation = React.useMemo(() => {
     if (!allStaff || allStaff.length === 0) return [];
 
@@ -86,18 +86,18 @@ function OptimizerPageContent() {
         if (isNaN(timeMs) || timeMs === 0 || !d) return false;
 
         const now = new Date();
+
+        // Must be the exact same calendar date (Local/JST)
+        const isSameLocal =
+          d.getFullYear() === now.getFullYear() &&
+          d.getMonth() === now.getMonth() &&
+          d.getDate() === now.getDate();
+
+        if (!isSameLocal) return false;
+
+        // Ensure not in far future (clock skew protection, max 1 hour in future)
         const diffHours = (now.getTime() - timeMs) / (1000 * 60 * 60);
-
-        // Check if within last 24 hours OR same calendar date (Local/UTC)
-        const isSameLocal = d.getFullYear() === now.getFullYear() &&
-                            d.getMonth() === now.getMonth() &&
-                            d.getDate() === now.getDate();
-
-        const isSameUtc = d.getUTCFullYear() === now.getUTCFullYear() &&
-                           d.getUTCMonth() === now.getUTCMonth() &&
-                           d.getUTCDate() === now.getUTCDate();
-
-        return (diffHours >= -2 && diffHours <= 20) || isSameLocal || isSameUtc;
+        return diffHours >= -1;
       } catch {
         return false;
       }
@@ -131,7 +131,20 @@ function OptimizerPageContent() {
           return null;
         }
 
-        // 2. Extract location coordinates updated directly on user profile or status
+        // 2. Check if staff is scheduled or active today (shift attendance, manual selection, or assigned orders)
+        const hasShiftData = (currentScheduledStaffIds && currentScheduledStaffIds.length > 0) || (appliedSelectedStaffIds && appliedSelectedStaffIds.length > 0);
+        if (hasShiftData) {
+          const isScheduled = currentScheduledStaffIds?.some(id => id === staffMember.id || id === (staffMember as any).staffId || id === displayName);
+          const isSelected = appliedSelectedStaffIds?.some(id => id === staffMember.id || id === (staffMember as any).staffId || id === displayName);
+          const hasOrderToday = orders?.some(o => o.staffId === staffMember.id || (o.staffName && o.staffName === displayName) || ((o as any).staffCode && (o as any).staffCode === staffMember.id));
+
+          if (!isScheduled && !isSelected && !hasOrderToday) {
+            console.log('[Optimizer] Staff not on duty today:', displayName);
+            return null;
+          }
+        }
+
+        // 3. Extract location coordinates updated directly on user profile or status
         let rawStrLat: number | null = null;
         let rawStrLng: number | null = null;
         const locStr = (staffMember as any)['位置情報'] || (staffMember as any).lastLocation || (staffMember as any).location;
@@ -150,18 +163,17 @@ function OptimizerPageContent() {
           return null;
         }
 
-        // 3. Check location update timestamp (from check-in / location update timestamp)
+        // 4. Check location update timestamp - ONLY accept timestamps specifically for location, NOT general profile updates
         const locTime =
           (staffMember as any)['最終位置更新日時'] ||
           (staffMember as any).lastLocationUpdatedAt ||
-          (staffMember as any).statusUpdatedAt ||
-          status?.lastUpdate ||
-          (staffMember as any).updatedAt;
+          status?.lastUpdate;
 
         const isTodayUpdated = isUpdatedToday(locTime);
 
-        // Exclude anyone who has NOT updated location TODAY (if timestamp is known and not today)
-        if (locTime && !isTodayUpdated) {
+        // Exclude anyone who has NOT updated location TODAY (if timestamp is missing or not today)
+        if (!locTime || !isTodayUpdated) {
+          console.log('[Optimizer] Staff location not updated today:', displayName, locTime);
           return null;
         }
 
@@ -186,7 +198,7 @@ function OptimizerPageContent() {
       .filter((s): s is WithId<Staff> & { latitude: number; longitude: number; lastAction: string } =>
         s !== null && s !== undefined && typeof s.latitude === 'number' && typeof s.longitude === 'number' && !isNaN(s.latitude) && !isNaN(s.longitude)
       );
-  }, [allStaff, contextStatuses]);
+  }, [allStaff, contextStatuses, currentScheduledStaffIds, appliedSelectedStaffIds, orders]);
 
   const handleRouteOptimized = (data: OptimizeRouteOutput | null, options: { avoidHighways: boolean }) => {
     setOptimizedRoute(data);
