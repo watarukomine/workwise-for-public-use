@@ -124,8 +124,13 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
         const carName = (targetOrder as any)?.carName || (targetOrder as any)?.carModel || (event as any).carName || (raw ? findKey(raw, ['車名', '車種', '車両']) : undefined);
         const regNo = (targetOrder as any)?.regNo || (targetOrder as any)?.carNumber || (event as any).regNo || (raw ? findKey(raw, ['登録ナンバー(下４桁)', '登録ナンバー', 'ナンバー', '車番', '登録番号']) : undefined);
         const tireSize = (targetOrder as any)?.tireSize || (targetOrder as any)?.size || (event as any).tireSize || (raw ? findKey(raw, ['タイヤサイズ', 'サイズ', 'タイヤ']) : undefined);
-        const tireNumberRaw = (targetOrder as any)?.tireNumber || (targetOrder as any)?.quantity || (targetOrder as any)?.['本数'] || (event as any).tireNumber || (raw ? findKey(raw, ['本数', 'honsu']) : undefined);
-        const tireNumber = tireNumberRaw ? String(tireNumberRaw).replace(/本$/, '') : undefined;
+        // タイヤ品番（tireNumber / partNumber）
+        const partNumber = (targetOrder as any)?.tireNumber || (targetOrder as any)?.partNumber || (event as any).tireNumber || (raw ? findKey(raw, ['タイヤ品番', '品番', 'tireNumber']) : undefined);
+        // タイヤ本数（quantity / 本数）- 誤って tireNumber（品番）を拾わないように修正
+        const quantityRaw = (targetOrder as any)?.quantity || (targetOrder as any)?.['本数'] || (event as any).quantity || (event as any)['本数'] || (raw ? findKey(raw, ['本数', 'honsu', '数量', 'Qty', 'Quantity', '本', 'タイヤ本数']) : undefined);
+        const quantity = quantityRaw ? String(quantityRaw).replace(/本$/, '').trim() : undefined;
+        // 先方のご担当者様名
+        const picName = (targetOrder as any)?.picName || (targetOrder as any)?.['ご担当者様'] || (event as any).picName || (raw ? findKey(raw, ['ご担当者様', '担当者名', '発注担当者様名', '店舗担当者', 'picName']) : undefined);
         const arrangement = (targetOrder as any)?.arrangement || (event as any).arrangement || (raw ? findKey(raw, ['タイヤ手配状況', '手配', '手配状況']) : undefined);
         const disposal = (targetOrder as any)?.disposal || (event as any).disposal || (raw ? findKey(raw, ['廃タイヤ処分', '廃タイヤ', '廃タイヤ回収']) : undefined);
         const serviceType = (targetOrder as any)?.serviceType || (targetOrder as any)?.taskDetails || (event as any).serviceType || (event as any).taskDetails || (raw ? findKey(raw, ['作業内容', 'サービス種別', 'サービス区分', '作業区分']) : undefined);
@@ -208,7 +213,7 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
 
         const eventCard = (
           <Card 
-            onClick={() => setSelectedEvent({ ...event, targetOrder, raw, displayTitle, staffMember, customer, submitter, origDate, origTime, chipStartTime, chipEndTime, hasTimeDiff, carName, regNo, tireSize, tireNumber, arrangement, disposal, serviceType, workType, otherWorkType, specialNotes })}
+            onClick={() => setSelectedEvent({ ...event, targetOrder, raw, displayTitle, staffMember, customer, submitter, origDate, origTime, chipStartTime, chipEndTime, hasTimeDiff, carName, regNo, tireSize, partNumber, quantity, picName, arrangement, disposal, serviceType, workType, otherWorkType, specialNotes })}
             className={cn(
               "cursor-pointer hover:bg-muted/50 relative overflow-hidden transition-all shadow-sm border",
               areaBgClass,
@@ -310,13 +315,20 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
                   <span className="text-muted-foreground">フォーム入力者:</span>
                   <span className="font-bold text-foreground truncate">{submitter}</span>
                 </div>
+                {picName && (
+                  <div className="flex items-center gap-1 col-span-2">
+                    <span className="text-muted-foreground">ご担当者様:</span>
+                    <span className="font-bold text-foreground truncate">{picName}</span>
+                  </div>
+                )}
               </div>
 
               <div className="pt-1.5 border-t border-slate-200 dark:border-slate-700/60 space-y-1 text-xs text-slate-800 dark:text-slate-200">
                 {carName && <div><span className="font-bold text-slate-500">車種:</span> {carName}</div>}
                 {regNo && <div><span className="font-bold text-slate-500">ナンバー:</span> {regNo}</div>}
+                {partNumber && <div><span className="font-bold text-slate-500">品番:</span> {partNumber}</div>}
                 {tireSize && <div><span className="font-bold text-blue-600 dark:text-blue-400">サイズ:</span> {tireSize}</div>}
-                {tireNumber && <div><span className="font-bold text-blue-600 dark:text-blue-400">本数:</span> {tireNumber}本</div>}
+                {quantity && <div><span className="font-bold text-blue-600 dark:text-blue-400">本数:</span> {quantity}本</div>}
                 {arrangement && <div><span className="font-bold text-amber-600 dark:text-amber-400">手配:</span> {arrangement}</div>}
                 {disposal && <div><span className="font-bold text-purple-600 dark:text-purple-400">廃タイヤ:</span> {disposal}</div>}
                 {displayServiceType && <div><span className="font-bold text-emerald-700 dark:text-emerald-400">作業内容:</span> {displayServiceType}</div>}
@@ -399,6 +411,12 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
                     <span className="text-muted-foreground block font-medium">フォーム入力者</span>
                     <span className="font-bold text-foreground text-sm">{selectedEvent.submitter}</span>
                   </div>
+                  {selectedEvent.picName && (
+                    <div className="col-span-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                      <span className="text-muted-foreground block font-medium">ご担当者様（先方）</span>
+                      <span className="font-bold text-foreground text-sm">{selectedEvent.picName}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 py-1">
@@ -409,7 +427,11 @@ export function VerticalScheduleView({ staffData, currentDate, checkedOutStaffId
                   <div>
                     <span className="text-muted-foreground block">タイヤ品番 / サイズ / 本数</span>
                     <span className="font-semibold text-foreground">
-                      {selectedEvent.tireSize || '-'} {selectedEvent.tireNumber ? `(${selectedEvent.tireNumber}本)` : ''}
+                      {[
+                        selectedEvent.partNumber,
+                        selectedEvent.tireSize,
+                        selectedEvent.quantity ? `${selectedEvent.quantity}本` : undefined
+                      ].filter(Boolean).join(' / ') || '-'}
                     </span>
                   </div>
                 </div>
