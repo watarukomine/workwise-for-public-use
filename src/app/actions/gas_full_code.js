@@ -1028,6 +1028,14 @@ function updateSheetWithOrderInfo(params) {
             updateColumn("キャンセル日時", new Date(params.cancelDate));
             updateColumn("キャンセル連絡者", params.cancelContact);
         }
+
+        // 既読確認の更新・リセット
+        if (params.readConfirmation !== undefined) {
+            updateColumn(["既読確認", "既読"], params.readConfirmation);
+        }
+        if (params['既読確認'] !== undefined) {
+            updateColumn(["既読確認", "既読"], params['既読確認']);
+        }
         SpreadsheetApp.flush(); // Ensure immediate write
         // 信号を送信
         sendFirebaseSignal(emergencyFlag ? 'emergency' : 'update');

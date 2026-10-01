@@ -565,7 +565,9 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
     chipWorkScheduled: findKey(rawOrder, ['チップ配置作業予定', 'chipWorkScheduled']) || '',
     chipWorkCompleted: findKey(rawOrder, ['チップ配置作業完了予定', 'chipWorkCompleted']) || '',
     clockIn: findKey(rawOrder, ['出勤ボタン', 'clockIn']) || '',
-    readConfirmation: findKey(rawOrder, ['既読確認', 'readConfirmation']) || '',
+    readConfirmation: rawOrder.isConfirmed === false
+      ? ''
+      : (findKey(rawOrder, ['既読確認', 'readConfirmation']) || ''),
     workDuration: findKey(rawOrder, ['作業所要時間', 'workDuration']) || '',
     clockOut: findKey(rawOrder, ['退勤ボタン', 'clockOut']) || '',
     travelTime: (() => {
@@ -585,8 +587,14 @@ export const mapRawToOrder = (rawOrder: any, fallbackId?: string): WithId<Order>
       rawOrder?.adminReply ||
       ''
     ),
-    isConfirmed: !!(findKey(rawOrder, ['既読確認', '既読', 'confirmedAt', 'readAt'])),
-    confirmedAt: String(findKey(rawOrder, ['既読確認', '既読', 'confirmedAt', 'readAt']) || ''),
+    isConfirmed: rawOrder.isConfirmed === false
+      ? false
+      : (rawOrder.isConfirmed === true
+        ? true
+        : !!(findKey(rawOrder, ['既読確認', '既読', 'confirmedAt', 'readAt']))),
+    confirmedAt: rawOrder.isConfirmed === false
+      ? ''
+      : String(findKey(rawOrder, ['既読確認', '既読', 'confirmedAt', 'readAt']) || rawOrder.confirmedAt || ''),
     createdAt: (() => {
       const val = findKey(rawOrder, ['受注日時', '受付日時', '作成日時', '登録日時', 'createdAt', 'created_at', 'タイムスタンプ', 'Timestamp']) || rawOrder.createdAt;
       if (val) {

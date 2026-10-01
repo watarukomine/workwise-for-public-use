@@ -431,11 +431,50 @@ export function OrderTable({ orders: rawOrders, isLoading }: OrderTableProps) {
       updatedRaw['受注 No'] = remark1Val;
       updatedRaw['受注No(ﾘﾏｰｸ1 8ｹﾀ)'] = remark1Val;
       updatedRaw['タイヤ手配状況'] = arrangementVal;
+
+      // 担当スタッフが変更された場合、タスク確認状態（isConfirmed）をリセットして新担当者が確認できるようにする
+      const oldStaff = selectedOrder.staffName || (selectedOrder.raw ? (selectedOrder.raw['担当'] || selectedOrder.raw['作業担当者']) : '') || '';
+      const newStaff = updateData.staffName !== undefined ? updateData.staffName : oldStaff;
+      const isStaffChanged = Boolean(oldStaff && newStaff && oldStaff !== newStaff);
+
+      if (isStaffChanged) {
+        updateData.isConfirmed = false;
+        updateData.confirmedAt = '';
+        updateData.readConfirmation = '';
+        updateData['既読確認'] = '';
+        updateData['既読'] = '';
+        updateData['readAt'] = '';
+        updatedRaw['既読確認'] = '';
+        updatedRaw['既読'] = '';
+        updatedRaw['readConfirmation'] = '';
+        updatedRaw['confirmedAt'] = '';
+        updatedRaw.isConfirmed = false;
+      }
+
       updateData.raw = updatedRaw;
 
       await OrderService.updateOrder(selectedOrder.id, updateData);
       if (updateOrderFullSync) {
         updateOrderFullSync(selectedOrder.id, updateData);
+      }
+
+      if (isStaffChanged) {
+        try {
+          const { updateSheetStatus } = await import('@/app/actions/gas-actions');
+          const { ORDER_GAS_URL } = await import('@/lib/settings');
+          updateSheetStatus({
+            gasUrl: ORDER_GAS_URL,
+            eventTitle: `(ID: ${selectedOrder.id})`,
+            staffName: newStaff,
+            readConfirmation: '',
+            "既読確認": '',
+            isConfirmed: false,
+            confirmedAt: '',
+            systemId: selectedOrder.id
+          }).catch(err => console.warn('Failed to update sheet confirmation on staff change:', err));
+        } catch (gasErr) {
+          console.warn('GAS import failed on order save:', gasErr);
+        }
       }
       setIsDialogOpen(false);
       toast({ title: '受注データを更新しました。', duration: 3000 });

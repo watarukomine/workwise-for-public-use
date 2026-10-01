@@ -162,6 +162,11 @@ function CheckInClient() {
     return fromEvents || null;
   }, [orders, scheduleEvents, orderId]);
 
+  // オーダーの変更またはバックエンド側での確認ステータス変更時に楽観的確認状態をリセット
+  React.useEffect(() => {
+    setIsConfirmedOptimistic(null);
+  }, [currentOrder?.id, currentOrder?.isConfirmed]);
+
   // 同一店舗の連続受注を判定・管理
   const sameStoreOrdersInfo = React.useMemo(() => {
     if (!currentOrder || !profile) {

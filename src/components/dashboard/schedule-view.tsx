@@ -1415,17 +1415,30 @@ export function ScheduleView({
     }
 
     try {
+      const unassignUpdates = {
+        staffName: '',
+        staffId: '',
+        status: '未割当',
+        isConfirmed: false,
+        confirmedAt: '',
+        readConfirmation: '',
+        '既読確認': '',
+        '既読': '',
+        updatedAt: new Date().toISOString()
+      };
+
       // 1. Direct Write to Firestore (Primary) for instant reflection on database
       try {
         const { OrderService } = await import('@/services/order-service');
-        await OrderService.updateOrder(targetOrderId, {
-          staffName: '',
-          staffId: '',
-          status: '未割当',
-          updatedAt: new Date().toISOString()
-        } as any);
+        await OrderService.updateOrder(targetOrderId, unassignUpdates as any);
       } catch (fsErr) {
         console.error("Firestore sync error on unassign:", fsErr);
+      }
+
+      if (updateOrderFullSync) {
+        updateOrderFullSync(targetOrderId, unassignUpdates);
+      } else if (updateRawOrder) {
+        updateRawOrder(targetOrderId, unassignUpdates);
       }
 
       // 2. Secondary update to GAS Sheet
@@ -1436,7 +1449,11 @@ export function ScheduleView({
         statusValue: "未割当",
         scheduledTime: "",
         timestamp: new Date().toISOString(),
-        systemId: targetOrderId
+        systemId: targetOrderId,
+        readConfirmation: "",
+        "既読確認": "",
+        isConfirmed: false,
+        confirmedAt: "",
       }).catch(err => console.warn('Failed to update sheet on unassign:', err));
 
       await refetchOrders();
@@ -1565,6 +1582,11 @@ export function ScheduleView({
         const taskPartId = finalSystemId ? `trip-${finalSystemId}-task` : taskEventInTrip.id;
         const travelPartId = finalSystemId ? `trip-${finalSystemId}-travel` : `${effectiveTripId}-travel`;
 
+        // Detect if staff changed
+        const previousEventState = previousSchedule.find(e => e.id === draggedEvent.id || (draggedEvent.tripId && e.tripId === draggedEvent.tripId));
+        const oldStaffId = previousEventState?.staffId || draggedEvent.staffId;
+        const isStaffChanged = Boolean(oldStaffId && newStaffId && oldStaffId !== newStaffId);
+
         const updatedTask: WithId<ScheduleEvent> = {
           ...taskEventInTrip,
           id: taskPartId,
@@ -1573,7 +1595,12 @@ export function ScheduleView({
           staffId: newStaffId,
           staffName: newStaff.name,
           start: format(newTaskStart, "yyyy-MM-dd'T'HH:mm:ss"),
-          end: format(newTaskEnd, "yyyy-MM-dd'T'HH:mm:ss")
+          end: format(newTaskEnd, "yyyy-MM-dd'T'HH:mm:ss"),
+          ...(isStaffChanged ? {
+            isConfirmed: false,
+            confirmedAt: '',
+            readConfirmation: '',
+          } : {})
         };
 
         const updatedTravel: WithId<ScheduleEvent> = travelEventInTrip ? {
@@ -1584,7 +1611,12 @@ export function ScheduleView({
           staffId: newStaffId,
           staffName: newStaff.name,
           start: format(newTravelStart, "yyyy-MM-dd'T'HH:mm:ss"),
-          end: format(newTaskStart, "yyyy-MM-dd'T'HH:mm:ss")
+          end: format(newTaskStart, "yyyy-MM-dd'T'HH:mm:ss"),
+          ...(isStaffChanged ? {
+            isConfirmed: false,
+            confirmedAt: '',
+            readConfirmation: '',
+          } : {})
         } : {
           ...taskEventInTrip,
           id: travelPartId,
@@ -1595,7 +1627,12 @@ export function ScheduleView({
           staffName: newStaff.name,
           start: format(newTravelStart, "yyyy-MM-dd'T'HH:mm:ss"),
           end: format(newTaskStart, "yyyy-MM-dd'T'HH:mm:ss"),
-          estimatedDuration: travelDuration
+          estimatedDuration: travelDuration,
+          ...(isStaffChanged ? {
+            isConfirmed: false,
+            confirmedAt: '',
+            readConfirmation: '',
+          } : {})
         };
 
         return [...otherEvents, updatedTask, updatedTravel];
@@ -1627,6 +1664,12 @@ export function ScheduleView({
           const taskPartId = finalSystemId ? `trip-${finalSystemId}-task` : taskPart.id;
           const travelPartId = finalSystemId ? `trip-${finalSystemId}-travel` : `${effectiveTripId}-travel`;
 
+          // Determine old staff before move to check if staff changed
+          const previousEventState = previousSchedule.find(e => e.id === draggedEvent.id || (draggedEvent.tripId && e.tripId === draggedEvent.tripId));
+          const oldStaffId = previousEventState?.staffId || draggedEvent.staffId;
+          const oldStaffName = getStaffById(oldStaffId)?.name || draggedEvent.staffName || '';
+          const isStaffChanged = Boolean(oldStaffId && newStaffId && oldStaffId !== newStaffId);
+
           // Local Storage Persistence & Optimistic Event Save (BOTH Task and Travel Events)
           const updatedTask = {
             ...taskPart,
@@ -1636,7 +1679,12 @@ export function ScheduleView({
             staffId: newStaffId,
             staffName: newStaff.name,
             start: format(taskStart, "yyyy-MM-dd'T'HH:mm:ss"),
-            end: format(taskEnd, "yyyy-MM-dd'T'HH:mm:ss")
+            end: format(taskEnd, "yyyy-MM-dd'T'HH:mm:ss"),
+            ...(isStaffChanged ? {
+              isConfirmed: false,
+              confirmedAt: '',
+              readConfirmation: '',
+            } : {})
           };
           const updatedTravel = travelPart ? {
             ...travelPart,
@@ -1646,7 +1694,12 @@ export function ScheduleView({
             staffId: newStaffId,
             staffName: newStaff.name,
             start: format(travelStart, "yyyy-MM-dd'T'HH:mm:ss"),
-            end: format(taskStart, "yyyy-MM-dd'T'HH:mm:ss")
+            end: format(taskStart, "yyyy-MM-dd'T'HH:mm:ss"),
+            ...(isStaffChanged ? {
+              isConfirmed: false,
+              confirmedAt: '',
+              readConfirmation: '',
+            } : {})
           } : {
             ...taskPart,
             id: travelPartId,
@@ -1657,13 +1710,16 @@ export function ScheduleView({
             staffName: newStaff.name,
             start: format(travelStart, "yyyy-MM-dd'T'HH:mm:ss"),
             end: format(taskStart, "yyyy-MM-dd'T'HH:mm:ss"),
-            estimatedDuration: travelDuration
+            estimatedDuration: travelDuration,
+            ...(isStaffChanged ? {
+              isConfirmed: false,
+              confirmedAt: '',
+              readConfirmation: '',
+            } : {})
           };
 
           saveLocalEvent(updatedTask);
           saveLocalEvent(updatedTravel);
-
-
 
           // Triple Instant Sync across Timeline Chips, Bottom Order Table, and Firestore Backend
           const updatePayload: any = {
@@ -1677,6 +1733,14 @@ export function ScheduleView({
           };
           if (taskPart.status === '未割当') {
             updatePayload.status = '割当済';
+          }
+          if (isStaffChanged) {
+            updatePayload.isConfirmed = false;
+            updatePayload.confirmedAt = '';
+            updatePayload.readConfirmation = '';
+            updatePayload['既読確認'] = '';
+            updatePayload['既読'] = '';
+            updatePayload['readAt'] = '';
           }
 
           if (updateOrderFullSync) {
@@ -1697,11 +1761,6 @@ export function ScheduleView({
             console.warn('Direct Firestore auto-save on move warning:', fsErr);
           }
 
-          // Determine old staff name before move for GAS spreadsheet lookup
-          const previousEventState = previousSchedule.find(e => e.id === draggedEvent.id || (draggedEvent.tripId && e.tripId === draggedEvent.tripId));
-          const oldStaffId = previousEventState?.staffId || draggedEvent.staffId;
-          const oldStaffName = getStaffById(oldStaffId)?.name || draggedEvent.staffName || '';
-
           // Backup Sync to Spreadsheet
           updateSheetStatus({
             gasUrl: ORDER_GAS_URL,
@@ -1720,6 +1779,12 @@ export function ScheduleView({
             "作業予定日": format(taskStart, 'yyyy/MM/dd'),
             systemId: finalSystemId,
             oldStaffName: oldStaffName,
+            ...(isStaffChanged ? {
+              readConfirmation: '',
+              "既読確認": '',
+              isConfirmed: false,
+              confirmedAt: '',
+            } : {})
           }).catch(err => {
             console.warn('Failed to update sheet on task move:', err);
           });
@@ -1826,6 +1891,7 @@ export function ScheduleView({
           staffId: newStaffId, locationId: customer?.userCode || '',
           start: subMinutes(taskStart, TRAVEL_TIME_MINUTES).toISOString(), end: taskStart.toISOString(),
           rawOrderId: targetRawOrderId, raw: order.raw, systemId: order.id,
+          isConfirmed: false, confirmedAt: '', readConfirmation: '',
         };
         const taskEvent: WithId<ScheduleEvent> = {
           ...order,
@@ -1835,6 +1901,7 @@ export function ScheduleView({
           start: taskStart.toISOString(), end: addMinutes(taskStart, taskDuration).toISOString(),
           rawOrderId: targetRawOrderId, raw: order.raw, systemId: order.id,
           estimatedDuration: taskDuration,
+          isConfirmed: false, confirmedAt: '', readConfirmation: '',
         };
         newEvents = [travelEvent, taskEvent];
 
@@ -1936,7 +2003,11 @@ export function ScheduleView({
                 "作業予定日": format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
                 "作業時間（分）": assignedDuration,
                 timestamp: new Date().toISOString(),
-                systemId: order.id
+                systemId: order.id,
+                readConfirmation: "",
+                "既読確認": "",
+                isConfirmed: false,
+                confirmedAt: "",
               };
 
               // Clear any corrupted 1970 dates in action history upon initial assignment
@@ -1953,19 +2024,32 @@ export function ScheduleView({
                 newEvents.forEach(e => deleteLocalEvent(e.id));
               });
 
+              const assignUpdates: any = {
+                staffName: staff.name,
+                staffId: newStaffId,
+                status: '割当済',
+                scheduledDate: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
+                scheduledTime: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
+                scheduledEndTime: format(safeParseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
+                estimatedDuration: assignedDuration,
+                isConfirmed: false,
+                confirmedAt: '',
+                readConfirmation: '',
+                '既読確認': '',
+                '既読': '',
+                updatedAt: new Date().toISOString()
+              };
+
+              if (updateOrderFullSync) {
+                updateOrderFullSync(targetRawOrderId, assignUpdates);
+              } else if (updateRawOrder) {
+                updateRawOrder(targetRawOrderId, assignUpdates);
+              }
+
               // Direct Write to Firestore (Primary) to ensure instant reflection on the PC timeline
               try {
                 const { OrderService } = await import('@/services/order-service');
-                await OrderService.updateOrder(targetRawOrderId, {
-                  staffName: staff.name,
-                  staffId: newStaffId,
-                  status: '割当済',
-                  scheduledDate: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd'),
-                  scheduledTime: format(safeParseISO(taskEvent.start as string), 'yyyy/MM/dd HH:mm:ss'),
-                  scheduledEndTime: format(safeParseISO(taskEvent.end as string), 'yyyy/MM/dd HH:mm:ss'),
-                  estimatedDuration: assignedDuration,
-                  updatedAt: new Date().toISOString()
-                } as any);
+                await OrderService.updateOrder(targetRawOrderId, assignUpdates);
               } catch (fsErr) {
                 console.error("Firestore sync error on assign:", fsErr);
               }
