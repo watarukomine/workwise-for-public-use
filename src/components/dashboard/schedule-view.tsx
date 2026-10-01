@@ -36,7 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '../ui/tooltip';
-import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay } from 'date-fns';
+import { addMinutes, differenceInMinutes, format, parseISO, subMinutes, isToday, isValid, isEqual, startOfDay, isSameDay } from 'date-fns';
 import { cn, findKey, formatTime, mapRawToOrder, getContrastingTextColor, darkenColor, lightenColor, formatDate, normalizeDateStr, isEtaPassed, isStaffMatched, toHalfWidthAlphanumeric } from '../../lib/utils';
 import { ScrollArea, ScrollBar } from '../ui/scroll-area';
 import { Button } from '../ui/button';
@@ -3610,28 +3610,52 @@ const StaffRow = React.memo<StaffRowProps>(({ staff, events, status, getCustomer
       </div>
       <div className={cn("sticky right-0 z-20 flex-shrink-0 px-2 flex items-center justify-center border-l bg-inherit w-[120px]")}>
         {status && isToday && (() => {
-          const etaTime = status.estimatedArrivalTime || staff.estimatedArrivalTime;
-          const lastUpIso = status.lastUpdate || (staff as any).updatedAt || (staff as any).lastLocationUpdatedAt || (staff as any).statusUpdatedAt;
+          // 過去日付（昨日以前）のステータスやETA時刻の残骸を今日に引き継がないよう厳密にチェック
+          const now = new Date();
+          const staffStatusUpdatedDate = (staff as any).statusUpdatedAt ? new Date((staff as any).statusUpdatedAt) : null;
+          const isStaffStatusUpdatedToday = Boolean(staffStatusUpdatedDate && !isNaN(staffStatusUpdatedDate.getTime()) && isSameDay(staffStatusUpdatedDate, now));
+
+          const orderUpdatedDate = status.lastUpdate ? new Date(status.lastUpdate) : null;
+          const isOrderUpdatedToday = Boolean(orderUpdatedDate && !isNaN(orderUpdatedDate.getTime()) && isSameDay(orderUpdatedDate, now));
+
+          const etaTime = (isOrderUpdatedToday ? status.estimatedArrivalTime : undefined) || 
+            (isStaffStatusUpdatedToday ? staff.estimatedArrivalTime : undefined);
+
+          const lastUpIso = (isStaffStatusUpdatedToday ? (staff as any).statusUpdatedAt : null) || 
+            (isOrderUpdatedToday ? status.lastUpdate : null) || 
+            (staff as any).lastLocationUpdatedAt;
+
           const etaOverdue = isEtaPassed(etaTime, lastUpIso);
 
           // 本日のタスク情報: 未完了作業、完了済み作業、開始時間を過ぎた作業
           const hasActiveTodayEvents = events && events.some(e => e.status !== '作業完了' && e.status !== 'キャンセル' && !e.actualEndTime);
           const hasCompletedTodayEvents = events && events.some(e => e.status === '作業完了' || !!e.actualEndTime);
-          const now = new Date();
           const hasPastStartedTodayEvents = events && events.some(e => {
             const start = typeof e.start === 'string' ? parseISO(e.start) : e.start;
             return isValid(start) && now >= start;
           });
 
+          // 過去の currentStatus による循環誤判定を排除
           const isAlreadyActiveToday = hasCompletedTodayEvents || 
             hasPastStartedTodayEvents || 
-            ['帰社', '帰社中', '待機中'].includes((staff as any).currentStatus) ||
-            (status.lastAction && ['作業完了', '帰社', '現場到着', '作業開始', '移動開始'].includes(status.lastAction));
+            ((isStaffStatusUpdatedToday || isOrderUpdatedToday) && status.lastAction && ['作業完了', '帰社', '現場到着', '作業開始', '移動開始'].includes(status.lastAction));
 
           let rawStatus = status.status;
-          // 割当イベントが無い場合の「移動中」「作業中」「作業待ち」はアクティブなタスクが無いため補正
-          if ((rawStatus === '移動中' || rawStatus === '作業中' || rawStatus === '作業待ち') && !hasActiveTodayEvents) {
+          // 割当イベントが無い場合の「移動中」「作業中」「作業待ち」「帰社中」はアクティブなタスクが無いため補正
+          if ((rawStatus === '移動中' || rawStatus === '作業中' || rawStatus === '作業待ち' || rawStatus === '帰社中') && !hasActiveTodayEvents) {
             rawStatus = isAlreadyActiveToday ? '待機中' : (isShiftOn ? '出勤予定' : '-');
+          }
+
+          // 本日の作業開始前（まだ完了タスクも無く、開始予定時刻も過ぎていない朝の時間帯）の安全ガード
+          if (!hasCompletedTodayEvents && !hasPastStartedTodayEvents) {
+            if (rawStatus === '帰社中' || rawStatus === '帰社') {
+              rawStatus = isAlreadyActiveToday ? '待機中' : (isShiftOn ? '出勤予定' : '-');
+            }
+            if (rawStatus === '移動中' || rawStatus === '作業中' || rawStatus === '作業待ち') {
+              if (!isStaffStatusUpdatedToday && !isOrderUpdatedToday) {
+                rawStatus = isAlreadyActiveToday ? '待機中' : (isShiftOn ? '出勤予定' : '-');
+              }
+            }
           }
 
           const displayStatus = (etaOverdue && (rawStatus === '帰社中' || rawStatus === '移動中')) ? '待機中' : rawStatus;

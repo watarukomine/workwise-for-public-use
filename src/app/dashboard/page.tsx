@@ -581,19 +581,24 @@ export default function DashboardPage() {
         }
 
         // 2. Active Order / Direct Staff Status (Priority 2: Button Status)
-        let displayStatus = (staff as any).currentStatus || orderStatusObj?.status || '';
-        let lastAction = orderStatusObj?.lastAction || '';
+        // 過去日付（昨日以前）のステータスやETA時刻の残骸を今日に引き継がないよう厳密にチェック
+        const staffStatusUpdatedDate = (staff as any).statusUpdatedAt ? new Date((staff as any).statusUpdatedAt) : null;
+        const isStaffStatusUpdatedToday = Boolean(staffStatusUpdatedDate && !isNaN(staffStatusUpdatedDate.getTime()) && isToday(staffStatusUpdatedDate));
 
-        if (orderStatusObj?.lastUpdate) {
-          const lastUpdateDate = new Date(orderStatusObj.lastUpdate);
-          if (isToday(lastUpdateDate)) {
-            displayStatus = displayStatus || orderStatusObj.status || '';
-            lastAction = orderStatusObj.lastAction || '';
-          }
-        }
+        const orderUpdatedDate = orderStatusObj?.lastUpdate ? new Date(orderStatusObj.lastUpdate) : null;
+        const isOrderUpdatedToday = Boolean(orderUpdatedDate && !isNaN(orderUpdatedDate.getTime()) && isToday(orderUpdatedDate));
 
-        const etaTime = (staff as any).estimatedArrivalTime || orderStatusObj?.estimatedArrivalTime;
-        const lastUpIso = orderStatusObj?.lastUpdate || (staff as any).updatedAt || (staff as any).lastLocationUpdatedAt || (staff as any).statusUpdatedAt;
+        const directStaffStatus = isStaffStatusUpdatedToday ? ((staff as any).currentStatus || '') : '';
+        const directStaffEta = isStaffStatusUpdatedToday ? ((staff as any).estimatedArrivalTime || '') : '';
+
+        let displayStatus = directStaffStatus || (isOrderUpdatedToday ? (orderStatusObj?.status || '') : '');
+        let lastAction = isStaffStatusUpdatedToday ? ((staff as any).lastAction || '') : (isOrderUpdatedToday ? (orderStatusObj?.lastAction || '') : '');
+
+        const etaTime = directStaffEta || (isOrderUpdatedToday ? orderStatusObj?.estimatedArrivalTime : undefined);
+        // ステータス更新日時を最優先。プロファイルの一般的な updatedAt で今日と誤認させない
+        const lastUpIso = (isStaffStatusUpdatedToday ? (staff as any).statusUpdatedAt : null) || 
+          (isOrderUpdatedToday ? orderStatusObj?.lastUpdate : null) || 
+          (staff as any).lastLocationUpdatedAt;
 
         // Check if staff has tasks TODAY: active (incomplete), completed, or past start time
         let hasActiveTasksToday = false;
@@ -621,11 +626,11 @@ export default function DashboardPage() {
         }
 
         // Check if staff is already active today (punched in, worked on tasks, returned, or past start time)
+        // 過去の currentStatus による循環誤判定を排除
         const isAlreadyActiveToday = presentStaffIds.has(staff.id) || 
           hasCompletedTasksToday || 
           hasPastStartedTaskToday || 
-          ['帰社', '帰社中', '待機中'].includes((staff as any).currentStatus) ||
-          (orderStatusObj?.lastAction && ['作業完了', '帰社', '現場到着', '作業開始', '移動開始'].includes(orderStatusObj.lastAction));
+          ((isStaffStatusUpdatedToday || isOrderUpdatedToday) && lastAction && ['作業完了', '帰社', '現場到着', '作業開始', '移動開始'].includes(lastAction));
 
         const getFallbackStatus = () => {
           if (isAlreadyActiveToday) {
@@ -636,6 +641,21 @@ export default function DashboardPage() {
           return hasTasksToday ? '待機中' : '-';
         };
 
+        // 本日の作業開始前（まだ完了タスクも無く、開始予定時刻も過ぎていない時間帯）の安全ガード
+        if (!hasCompletedTasksToday && !hasPastStartedTaskToday) {
+          if (displayStatus === '帰社' || displayStatus === '帰社中') {
+            return getFallbackStatus();
+          }
+          if (displayStatus === '現場到着' || displayStatus === '作業待ち' || displayStatus === '作業開始' || displayStatus === '作業中') {
+            return getFallbackStatus();
+          }
+          if (displayStatus === '移動開始' || displayStatus === '移動中') {
+            if (!isStaffStatusUpdatedToday && !isOrderUpdatedToday) {
+              return getFallbackStatus();
+            }
+          }
+        }
+
         if (displayStatus === '移動開始' || displayStatus === '移動中') {
           if (isEtaPassed(etaTime, lastUpIso)) return getFallbackStatus();
           if (!hasActiveTasksToday) return getFallbackStatus();
@@ -643,6 +663,7 @@ export default function DashboardPage() {
         }
         if (displayStatus === '帰社' || displayStatus === '帰社中') {
           if (isEtaPassed(etaTime, lastUpIso)) return '待機中';
+          if (!hasActiveTasksToday && !hasCompletedTasksToday) return getFallbackStatus();
           return '帰社中';
         }
         if (displayStatus === '現場到着' || displayStatus === '作業待ち') {

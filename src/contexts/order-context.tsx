@@ -197,7 +197,7 @@ const processOrderData = (
                 lon = parts[1];
             }
 
-            const lastUpdateIso = (staffMember as any).updatedAt || (staffMember as any).lastLocationUpdatedAt || (staffMember as any).statusUpdatedAt || lastUpdate.toISOString();
+            const lastUpdateIso = (staffMember as any).statusUpdatedAt || (staffMember as any).lastLocationUpdatedAt || lastUpdate.toISOString();
             const etaTime = order.estimatedArrivalTime;
             const etaOverdue = isEtaPassed(etaTime, lastUpdateIso);
             const finalStatus = isEmergencyStatus ? '緊急' : ((etaOverdue && (status === '帰社中' || status === '移動中')) ? '待機中' : status);
