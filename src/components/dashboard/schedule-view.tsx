@@ -70,6 +70,7 @@ import { Mail, Pencil, Loader2, CheckCircle, AlertTriangle, Clock } from 'lucide
 import { createContext, useContext, useState } from 'react';
 import { STORE_COLORS, MAIN_STORES } from '../../lib/constants';
 import { useUserProfile } from '../../hooks/use-user-profile';
+import { useUser } from '@/firebase/provider';
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -296,12 +297,17 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
   const rawDisplayName = isGeneric ? resolvedStoreName : (resolvedStoreName || (order as any).title || line1 || <span className="text-xs font-normal opacity-70">ID:{order.rawOrderId || order.id}</span>);
   const displayName = orderOtherWorkType ? <>{rawDisplayName} <span className="text-[9px] text-amber-200 font-bold">({orderOtherWorkType})</span></> : rawDisplayName;
 
+  const chipSubmitter = order.submitter || (order as any)['フォーム入力者'] || (order.raw ? findKey(order.raw, ['フォーム入力者', '入力者', 'Submitter', '連絡者名']) : undefined);
+  const chipOrderDate = order.orderDate || (order as any)['受注日時'] || (order.createdAt ? (order.createdAt instanceof Date ? format(order.createdAt, 'yyyy/MM/dd HH:mm:ss') : formatDate(order.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(order.createdAt)) : '') || (order.raw ? findKey(order.raw, ['受注日時', '注文日時', 'タイムスタンプ', '作成日時']) : undefined);
+
   const titleText = `${typeof rawDisplayName === 'string' ? rawDisplayName : '受注タスク'}` +
     `${orderOtherWorkType ? ` (${orderOtherWorkType})` : ''}` +
     `${!isGeneric ? ` (${equipmentSymbol})` : ''}` +
     `${scheduledTime ? ` ${scheduledTime}` : ''}` +
     `${(!isGeneric && (order.tireSize || order['本数'])) ? `\n${order.tireSize || ''}${order.tireSize && order['本数'] ? ' ' : ''}${order['本数'] ? formatHonsu(order['本数']) : ''}` : ''}` +
-    `${orderOtherWorkType ? `\n作業区分詳細 (その他): ${orderOtherWorkType}` : ''}`;
+    `${orderOtherWorkType ? `\n作業区分詳細 (その他): ${orderOtherWorkType}` : ''}` +
+    `${chipSubmitter ? `\n入力者: ${chipSubmitter}` : ''}` +
+    `${chipOrderDate ? `\n受注日時: ${chipOrderDate}` : ''}`;
 
   const content = (
     <div {...{ 'style': style as any }} title={titleText} className={cn("group h-full min-h-[2.5rem] rounded-md px-1.5 py-1 flex flex-col justify-center cursor-move bg-primary text-primary-foreground text-[10px] leading-tight relative", style && "dynamic-width", className)}>
@@ -642,6 +648,8 @@ export function ScheduleView({
   scheduledStaffIds,
 }: ScheduleViewProps) {
   const { profile } = useUserProfile();
+  const { user } = useUser();
+  const currentUserName = profile?.name || user?.displayName || (user?.email ? user.email.split('@')[0] : '') || '管理者';
   const isAdmin = profile?.role === 'admin';
 
 
@@ -1670,6 +1678,16 @@ export function ScheduleView({
           const oldStaffName = getStaffById(oldStaffId)?.name || draggedEvent.staffName || '';
           const isStaffChanged = Boolean(oldStaffId && newStaffId && oldStaffId !== newStaffId);
 
+          // Check if this task is a generic task
+          const isGeneric = Boolean(taskPart.isGeneric) ||
+            isGenericTask(taskPart) ||
+            String(finalSystemId).startsWith('task-') ||
+            String(finalSystemId).startsWith('generic-') ||
+            String(taskPart.id).startsWith('event-');
+
+          const now = new Date();
+          const formattedTimestamp = format(now, 'yyyy/MM/dd HH:mm:ss');
+
           // Local Storage Persistence & Optimistic Event Save (BOTH Task and Travel Events)
           const updatedTask = {
             ...taskPart,
@@ -1680,6 +1698,17 @@ export function ScheduleView({
             staffName: newStaff.name,
             start: format(taskStart, "yyyy-MM-dd'T'HH:mm:ss"),
             end: format(taskEnd, "yyyy-MM-dd'T'HH:mm:ss"),
+            ...(isGeneric ? {
+              submitter: currentUserName,
+              createdAt: formattedTimestamp,
+              orderDate: formattedTimestamp,
+              raw: {
+                ...(taskPart.raw || {}),
+                'フォーム入力者': currentUserName,
+                '受注日時': formattedTimestamp,
+                'タイムスタンプ': formattedTimestamp,
+              }
+            } : {}),
             ...(isStaffChanged ? {
               isConfirmed: false,
               confirmedAt: '',
@@ -1734,6 +1763,14 @@ export function ScheduleView({
           if (taskPart.status === '未割当') {
             updatePayload.status = '割当済';
           }
+          if (isGeneric) {
+            updatePayload.submitter = currentUserName;
+            updatePayload['フォーム入力者'] = currentUserName;
+            updatePayload.createdAt = formattedTimestamp;
+            updatePayload.orderDate = formattedTimestamp;
+            updatePayload['受注日時'] = formattedTimestamp;
+            updatePayload['タイムスタンプ'] = formattedTimestamp;
+          }
           if (isStaffChanged) {
             updatePayload.isConfirmed = false;
             updatePayload.confirmedAt = '';
@@ -1779,6 +1816,12 @@ export function ScheduleView({
             "作業予定日": format(taskStart, 'yyyy/MM/dd'),
             systemId: finalSystemId,
             oldStaffName: oldStaffName,
+            ...(isGeneric ? {
+              submitter: currentUserName,
+              "フォーム入力者": currentUserName,
+              "受注日時": formattedTimestamp,
+              "タイムスタンプ": formattedTimestamp,
+            } : {}),
             ...(isStaffChanged ? {
               readConfirmation: '',
               "既読確認": '',
@@ -1814,6 +1857,8 @@ export function ScheduleView({
       // Optimistic UI Update
       if (isGeneric) {
         const taskTitle = order.taskDetails || order.title || '汎用タスク';
+        const now = new Date();
+        const formattedTimestamp = format(now, 'yyyy/MM/dd HH:mm:ss');
         if (isGenericAccompany) {
           const baseId = `event-${Date.now()}`;
           const derivedTripId = `trip-${baseId}`;
@@ -1839,11 +1884,19 @@ export function ScheduleView({
             staffId: newStaffId, locationId: '',
             start: taskStart.toISOString(),
             end: addMinutes(taskStart, order.estimatedDuration || 60).toISOString(),
-            raw: {},
+            raw: {
+              'フォーム入力者': currentUserName,
+              '受注日時': formattedTimestamp,
+              'タイムスタンプ': formattedTimestamp
+            },
             customerCode: '', customerName: taskTitle, address: '', taskDetails: taskTitle, serviceType: '', status: '未割当', scheduledDate: '', estimatedDuration: order.estimatedDuration || 60, value: 0, staffName: staff.name, equipmentStatus: '',
             tripId: derivedTripId,
             isGeneric: true,
-            _type: 'task'
+            _type: 'task',
+            submitter: currentUserName,
+            createdAt: formattedTimestamp,
+            updatedAt: now.toISOString(),
+            orderDate: formattedTimestamp
           };
           newEvents = [travelEvent, taskEvent];
         } else {
@@ -1853,10 +1906,18 @@ export function ScheduleView({
             staffId: newStaffId, locationId: '',
             start: taskStart.toISOString(),
             end: addMinutes(taskStart, order.estimatedDuration || 60).toISOString(),
-            raw: {},
+            raw: {
+              'フォーム入力者': currentUserName,
+              '受注日時': formattedTimestamp,
+              'タイムスタンプ': formattedTimestamp
+            },
             customerCode: '', customerName: taskTitle, address: '', taskDetails: taskTitle, serviceType: '', status: '未割当', scheduledDate: '', estimatedDuration: order.estimatedDuration || 60, value: 0, staffName: staff.name, equipmentStatus: '',
             isGeneric: true,
-            _type: 'task'
+            _type: 'task',
+            submitter: currentUserName,
+            createdAt: formattedTimestamp,
+            updatedAt: now.toISOString(),
+            orderDate: formattedTimestamp
           };
           newEvents = [newEvent];
         }
@@ -1919,6 +1980,8 @@ export function ScheduleView({
         try {
           if (isGeneric || isGenericAccompany) {
             const updatedEvents = [...newEvents];
+            const now = new Date();
+            const formattedTimestamp = format(now, 'yyyy/MM/dd HH:mm:ss');
             // For Accompany tasks, we only send the MAIN task to backend
             // The backend creates ONE row. Frontend (OrderContext) derives two events.
             const eventsToCreate = isGenericAccompany ? newEvents.filter(e => e.id.endsWith('-task')) : newEvents;
@@ -1946,7 +2009,14 @@ export function ScheduleView({
                   scheduledTime: format(safeParseISO(ev.start), "yyyy-MM-dd'T'HH:mm:ss"),
                   scheduledEndTime: format(safeParseISO(ev.end), "yyyy-MM-dd'T'HH:mm:ss"),
                   estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string)) || 60,
-                  status: '割当済'
+                  status: '割当済',
+                  submitter: currentUserName,
+                  'フォーム入力者': currentUserName,
+                  createdAt: formattedTimestamp,
+                  updatedAt: now.toISOString(),
+                  orderDate: formattedTimestamp,
+                  '受注日時': formattedTimestamp,
+                  'タイムスタンプ': formattedTimestamp
                 };
                 await OrderService.createOrder(genericOrderData);
                 saveLocalEvent(ev);
@@ -1965,17 +2035,18 @@ export function ScheduleView({
                       gasUrl: ORDER_GAS_URL,
                       staffName: staff.name,
                       taskName: ev.title,
+                      description: `作成者: ${currentUserName}`,
                       startTime: ev.start as string,
                       endTime: ev.end as string,
-                      estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string))
-                    });
+                      estimatedDuration: differenceInMinutes(safeParseISO(ev.end as string), safeParseISO(ev.start as string)),
+                      submitter: currentUserName,
+                    } as any);
                     if (res && (res.status === 'success' || (res.status as string) === 'ok')) {
                       break;
                     }
                   } catch (err) {
                     console.warn(`[GAS createTask] Attempt ${attempt} failed:`, err);
                   }
-                  if (attempt < 3) await new Promise(r => setTimeout(r, 1500));
                 }
               })();
             }
@@ -2382,6 +2453,8 @@ export function ScheduleView({
         const frontendId = `TASK_${dateStrPrefix}_${timeStrSuffix}`;
         const derivedTripId = `trip-${frontendId}`;
 
+        const now = new Date();
+        const formattedTimestamp = format(now, 'yyyy/MM/dd HH:mm:ss');
         const taskTitle = submitDetails.title || '社内作業';
         const destination = submitDetails.destination ? String(submitDetails.destination).trim() : '';
 
@@ -2408,7 +2481,15 @@ export function ScheduleView({
           tripId: derivedTripId,
           isGeneric: true,
           _type: 'task',
-          raw: {}
+          submitter: currentUserName,
+          createdAt: formattedTimestamp,
+          updatedAt: now.toISOString(),
+          orderDate: formattedTimestamp,
+          raw: {
+            'フォーム入力者': currentUserName,
+            '受注日時': formattedTimestamp,
+            'タイムスタンプ': formattedTimestamp
+          }
         };
 
         // Optimistic UI Update
@@ -2439,7 +2520,14 @@ export function ScheduleView({
             picName: staff.name,
             status: '割当済',
             isGeneric: true,
-            _type: 'task' as any
+            _type: 'task' as any,
+            submitter: currentUserName,
+            'フォーム入力者': currentUserName,
+            createdAt: formattedTimestamp,
+            updatedAt: now.toISOString(),
+            orderDate: formattedTimestamp,
+            '受注日時': formattedTimestamp,
+            'タイムスタンプ': formattedTimestamp
           }).then(() => {
             refetchOrders();
             toast({ title: '予定を保存しました' });
@@ -2526,10 +2614,24 @@ export function ScheduleView({
             if (overrides.statusValue) {
               updateFields.status = overrides.statusValue;
             }
-            if (editOrderForm.tireStatus !== undefined) {
-              updateFields.arrangement = editOrderForm.tireStatus;
-              updateFields['タイヤ手配状況'] = editOrderForm.tireStatus;
+            const isGeneric = Boolean(eventToUpdate.isGeneric) ||
+              isGenericTask(eventToUpdate) ||
+              String(eventToUpdate.id || '').startsWith('task-') ||
+              String(eventToUpdate.id || '').startsWith('generic-') ||
+              String(eventToUpdate.id || '').startsWith('event-');
+
+            const now = new Date();
+            const formattedTimestamp = format(now, 'yyyy/MM/dd HH:mm:ss');
+
+            if (isGeneric) {
+              updateFields.submitter = currentUserName;
+              updateFields['フォーム入力者'] = currentUserName;
+              updateFields.createdAt = formattedTimestamp;
+              updateFields.orderDate = formattedTimestamp;
+              updateFields['受注日時'] = formattedTimestamp;
+              updateFields['タイムスタンプ'] = formattedTimestamp;
             }
+
             // Clean undefined fields safely to prevent Firestore errors
             Object.keys(updateFields).forEach(key => {
               if (updateFields[key] === undefined) delete updateFields[key];
@@ -2549,6 +2651,14 @@ export function ScheduleView({
           }
 
           // 2. Backup to GAS (Asynchronous - Background)
+          const nowForGas = new Date();
+          const formattedTimestampForGas = format(nowForGas, 'yyyy/MM/dd HH:mm:ss');
+          const isGenericForGas = Boolean(eventToUpdate.isGeneric) ||
+            isGenericTask(eventToUpdate) ||
+            String(eventToUpdate.id || '').startsWith('task-') ||
+            String(eventToUpdate.id || '').startsWith('generic-') ||
+            String(eventToUpdate.id || '').startsWith('event-');
+
           const gasPayload: any = {
             gasUrl: ORDER_GAS_URL,
             eventTitle: `(ID: ${eventToUpdate.rawOrderId || eventToUpdate.id})`,
@@ -2557,6 +2667,12 @@ export function ScheduleView({
             arrangement: editOrderForm.tireStatus || editOrderForm.arrangement || '',
             "タイヤ手配状況": editOrderForm.tireStatus || editOrderForm.arrangement || '',
             ...overrides, // High-priority overrides (e.g., status/time from Force Complete)
+            ...(isGenericForGas ? {
+              submitter: currentUserName,
+              'フォーム入力者': currentUserName,
+              '受注日時': formattedTimestampForGas,
+              'タイムスタンプ': formattedTimestampForGas
+            } : {}),
             scheduledDate: format(newStart, 'yyyy/MM/dd'),
             scheduledTime: format(newStart, 'HH:mm'), // Changed to HH:mm for clarity against 1970 bugs
             scheduledEndTime: format(finalEnd, 'HH:mm'),
@@ -3349,8 +3465,13 @@ export function ScheduleView({
                     {(dialogState.mode === 'details' || dialogState.mode === 'order-details') && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 p-1">
                         {renderDetailItem('担当者', staff?.name || (event as any).staffName || '未割り当て')}
-                        {renderDetailItem('フォーム入力者', event.submitter || (event.raw ? findKey(event.raw, ['フォーム入力者', '入力者', 'Submitter', '連絡者名']) : undefined) || '---')}
-                        {renderDetailItem('受注日時', event.createdAt ? (event.createdAt instanceof Date ? format(event.createdAt, 'yyyy/MM/dd HH:mm:ss') : formatDate(event.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(event.createdAt)) : '---')}
+                        {renderDetailItem('フォーム入力者', event.submitter || (event as any)['フォーム入力者'] || (event.raw ? findKey(event.raw, ['フォーム入力者', '入力者', 'Submitter', '連絡者名']) : undefined) || '---')}
+                        {renderDetailItem('受注日時', (() => {
+                          const dt = event.orderDate || (event as any)['受注日時'] || event.createdAt || (event.raw ? findKey(event.raw, ['受注日時', '注文日時', 'タイムスタンプ', '作成日時']) : undefined);
+                          if (!dt) return '---';
+                          if (dt instanceof Date) return format(dt, 'yyyy/MM/dd HH:mm:ss');
+                          return formatDate(dt, 'yyyy/MM/dd HH:mm:ss') || String(dt);
+                        })())}
                         {renderScheduleComparison(event)}
                         {event.status === 'キャンセル' && (
                           <>
@@ -3993,12 +4114,17 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
     </div>
   );
 
+  const submitterName = targetEvent.submitter || (targetEvent as any)['フォーム入力者'] || (targetEvent.raw ? findKey(targetEvent.raw, ['フォーム入力者', '入力者', 'Submitter', '連絡者名']) : undefined);
+  const orderDateTime = targetEvent.orderDate || (targetEvent as any)['受注日時'] || (targetEvent.createdAt ? (targetEvent.createdAt instanceof Date ? format(targetEvent.createdAt, 'yyyy/MM/dd HH:mm:ss') : formatDate(targetEvent.createdAt, 'yyyy/MM/dd HH:mm:ss') || String(targetEvent.createdAt)) : '') || (targetEvent.raw ? findKey(targetEvent.raw, ['受注日時', '注文日時', 'タイムスタンプ', '作成日時']) : undefined);
+
   const titleText = `${customerName || targetEvent.title || line1}` +
     `${eventOtherWorkType ? ` (${eventOtherWorkType})` : ''}` +
     `${(!isTravelEvent && !isGeneric) ? ` (${equipmentSymbol})` : ''}` +
     ` ${formatTime(targetEvent.start)}` +
     `${(!isTravelEvent && !isGeneric && (tireSize || honsu)) ? `\n${tireSize ? tireSize : ''}${tireSize && honsu ? ' ' : ''}${honsu ? formatHonsu(honsu) : ''}` : ''}` +
-    `${eventOtherWorkType ? `\n作業区分詳細 (その他): ${eventOtherWorkType}` : ''}`;
+    `${eventOtherWorkType ? `\n作業区分詳細 (その他): ${eventOtherWorkType}` : ''}` +
+    `${submitterName ? `\n入力者: ${submitterName}` : ''}` +
+    `${orderDateTime ? `\n受注日時: ${orderDateTime}` : ''}`;
 
   const style: any = isOverlay ?
     { touchAction: 'none', width: `${width}px` } :

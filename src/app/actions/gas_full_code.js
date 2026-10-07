@@ -474,7 +474,7 @@ function confirmReadOrder(params) {
  * スタッフマスタ側の「行動予定」シートに追記します
  */
 function createTask(params) {
-    const { staffName, taskName, description, startTime, endTime } = params;
+    const { staffName, taskName, description, startTime, endTime, submitter } = params;
     try {
         const ss = SpreadsheetApp.openById(STAFF_SPREADSHEET_ID);
         let sheet = ss.getSheetByName(ACTION_LOG_SHEET_NAME);
@@ -487,12 +487,13 @@ function createTask(params) {
         // ID生成
         const id = 'task-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
         const now = new Date();
+        const detailDesc = description || (submitter ? `作成者: ${submitter}` : '');
         // 行追加
         sheet.appendRow([
             id,
             staffName,
             taskName,
-            description || '',
+            detailDesc,
             startTime ? new Date(startTime) : '',
             endTime ? new Date(endTime) : '',
             now

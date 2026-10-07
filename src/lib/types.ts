@@ -124,6 +124,7 @@ export type Order = {
   adminReply?: string;
   isConfirmed?: boolean;
   submitter?: string;
+  orderDate?: string; // 受注日時
   confirmedAt?: string;
   description?: string;
   updatedAt?: string | Date;
@@ -143,6 +144,7 @@ export type Order = {
   completeWork?: string;
   workDuration?: string | number;
   clockOut?: string;
+  [key: string]: any;
 };
 
 export type ScheduleEvent = WithId<Order> & {

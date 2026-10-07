@@ -299,6 +299,12 @@ export default function UserGuidePage() {
                                     <strong>担当スタッフの張り替え（チップの移動）</strong>：配置済みのチップを別のスタッフ行へ移動させた場合、元のスタッフが行ったタスク確認状態（チップの「確」マーク）は<strong>自動でリセット</strong>されます。新しい担当者のスマホ画面では未確認状態に戻るため、新担当者が改めて「タスク確認」を行えます。
                                 </p>
                             </div>
+                            <div className="flex items-start gap-2">
+                                <div className="p-1 rounded bg-amber-100 text-amber-800 font-bold shrink-0 text-xs">STEP 5</div>
+                                <p>
+                                    <strong>汎用タスクの作成者・更新者・タイムスタンプ自動記録</strong>：休憩、商談、研修、同行、業務、会議などの汎用タスクを配置した際、作成した方のログイン者名が「フォーム入力者」として、貼り付け日時が「受注日時」に自動保存されます。後から別の人がチップを移動した場合は、移動した方のログイン者名と日時に自動更新されます（チップのホバー時やダブルクリック詳細画面で確認可能）。
+                                </p>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>

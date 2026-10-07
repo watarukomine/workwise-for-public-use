@@ -34,7 +34,7 @@ function Calendar({
         table: "w-full border-collapse space-y-1",
         weekdays: "flex", // v9: Updated from head_row
         weekday:
-          "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]", // v9: Updated from head_cell
+          "text-muted-foreground rounded-md w-11 font-normal text-[0.8rem] flex items-center justify-center text-center", // v9: Updated from head_cell (matched to day cell width w-11)
         week: "flex w-full mt-2", // v9: Updated from row
         day: cn(
           buttonVariants({ variant: "ghost" }),

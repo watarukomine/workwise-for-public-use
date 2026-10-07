@@ -121,6 +121,7 @@ export async function createTask(args: {
     startTime: string;
     endTime: string;
     estimatedDuration: number;
+    submitter?: string;
 }): Promise<GasResponse> {
     return callGasApi({ ...args, action: 'createTask' });
 }
