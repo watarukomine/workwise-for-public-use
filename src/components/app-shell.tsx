@@ -55,6 +55,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useUserProfile } from '@/hooks/use-user-profile';
 import { signOut } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { APP_VERSION } from '@/lib/constants';
 
 
 const allNavItems = [
@@ -402,7 +403,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     </header>
                     <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
                     <div className="fixed bottom-1 right-2 text-[10px] text-muted-foreground/40 pointer-events-none z-50 font-mono">
-                        {`v${process.env.NEXT_PUBLIC_APP_VERSION || '2.2.2'}`}
+                        {`v${process.env.NEXT_PUBLIC_APP_VERSION || APP_VERSION}`}
                     </div>
                 </SidebarInset>
             </SidebarProvider>
@@ -465,7 +466,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </header>
             <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
             <div className="fixed bottom-1 right-2 text-[10px] text-muted-foreground/40 pointer-events-none z-50 font-mono">
-                {`v${process.env.NEXT_PUBLIC_APP_VERSION || '2.2.2'}`}
+                {`v${process.env.NEXT_PUBLIC_APP_VERSION || APP_VERSION}`}
             </div>
         </div>
     )

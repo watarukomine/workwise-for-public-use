@@ -97,3 +97,5 @@ export const STORE_ORDER: Record<string, number> = {
   '綾瀬店': 6,
   '小田原店': 7,
 };
+
+export const APP_VERSION = '2.2.5';
