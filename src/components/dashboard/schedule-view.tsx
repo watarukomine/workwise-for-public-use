@@ -66,11 +66,20 @@ import { useOrder } from '../../contexts/order-context';
 import { OrderService } from '../../services/order-service';
 import { updateSheetStatus, sendIcsEmail, createTask, updateOrderDateTime } from '../../app/actions/gas-actions';
 import { ORDER_GAS_URL } from '../../lib/settings';
-import { Mail, Pencil, Loader2, CheckCircle, AlertTriangle, Clock } from 'lucide-react';
+import { Mail, Pencil, Loader2, CheckCircle, AlertTriangle, Clock, Lock, Unlock, Smartphone } from 'lucide-react';
 import { createContext, useContext, useState } from 'react';
 import { STORE_COLORS, MAIN_STORES } from '../../lib/constants';
 import { useUserProfile } from '../../hooks/use-user-profile';
 import { useUser } from '@/firebase/provider';
+
+const checkIsMobileDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const isMobileUA = /iPhone|iPod|Android.*Mobile|Windows Phone|BlackBerry|webOS/i.test(ua);
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const isSmallScreen = Math.min(window.innerWidth, window.innerHeight) <= 600;
+  return isMobileUA || (isTouch && isSmallScreen);
+};
 
 const PIXELS_PER_MINUTE = 1.5;
 const timelineStartHour = 9;
@@ -360,6 +369,25 @@ const OrderChip = React.memo<OrderChipProps>(({ order, className, style, isOverl
 });
 
 
+interface ScheduleViewContextType {
+  getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
+  getStaffById: (id: string | undefined) => WithId<Staff> | undefined;
+  pixelsPerMinute: number;
+  isDragDisabled?: boolean;
+}
+
+const ScheduleViewContext = createContext<ScheduleViewContextType | undefined>(undefined);
+
+const useScheduleView = () => {
+  const context = useContext(ScheduleViewContext);
+  return context || {
+    getCustomerByCode: () => undefined,
+    getStaffById: () => undefined,
+    pixelsPerMinute: 1.5,
+    isDragDisabled: false,
+  };
+};
+
 interface DraggableOrderProps {
   order: WithId<Order>;
   customer?: WithId<Customer>;
@@ -368,10 +396,12 @@ interface DraggableOrderProps {
 }
 
 const DraggableOrder = React.memo<DraggableOrderProps>(({ order, customer, className, onDoubleClick }) => {
+  const { isDragDisabled } = useScheduleView();
   const { attributes, listeners, setNodeRef, isDragging } =
     useDraggable({
       id: `order-${order.id}`,
       data: order,
+      disabled: isDragDisabled,
     });
 
   const effectiveDuration = React.useMemo(() => {
@@ -392,7 +422,7 @@ const DraggableOrder = React.memo<DraggableOrderProps>(({ order, customer, class
   const style = {
     '--dynamic-opacity': isDragging ? 0.5 : 1,
     '--dynamic-width': `${minutesToPixels(effectiveDuration)}px`,
-    touchAction: 'none',
+    touchAction: isDragDisabled ? 'auto' : 'none',
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -403,7 +433,14 @@ const DraggableOrder = React.memo<DraggableOrderProps>(({ order, customer, class
   };
 
   return (
-    <div ref={setNodeRef} {...{ 'style': style as any }} className="dynamic-opacity dynamic-width" {...listeners} {...attributes} onDoubleClick={handleDoubleClick}>
+    <div
+      ref={setNodeRef}
+      {...{ 'style': style as any }}
+      className={cn("dynamic-opacity dynamic-width", isDragDisabled ? "cursor-pointer" : "cursor-move")}
+      {...(isDragDisabled ? {} : listeners)}
+      {...attributes}
+      onDoubleClick={handleDoubleClick}
+    >
       <OrderChip order={order} className={className} />
     </div>
   );
@@ -619,21 +656,6 @@ const RenderDragOverlay = () => {
   );
 }
 
-interface ScheduleViewContextType {
-  getCustomerByCode: (code: string | undefined) => WithId<Customer> | undefined;
-  getStaffById: (id: string | undefined) => WithId<Staff> | undefined;
-  pixelsPerMinute: number;
-}
-
-const ScheduleViewContext = createContext<ScheduleViewContextType | undefined>(undefined);
-
-const useScheduleView = () => {
-  const context = useContext(ScheduleViewContext);
-  if (!context) {
-    throw new Error('useScheduleView must be used within a ScheduleView');
-  }
-  return context;
-}
 
 
 import { useSelectedStaff } from '@/contexts/selected-staff-context';
@@ -670,6 +692,8 @@ export function ScheduleView({
   }, [orders, currentDate]);
 
   const [isClient, setIsClient] = React.useState(false);
+  const [isMobileDevice, setIsMobileDevice] = React.useState(false);
+  const [isDragLocked, setIsDragLocked] = React.useState(false);
   const [dialogState, setDialogState] = React.useState<DialogState>({ mode: 'closed' });
   const [activeId, setActiveId] = React.useState<string | null>(null);
 
@@ -727,6 +751,8 @@ export function ScheduleView({
   // Window resize も監視して確実に幅を同期
   React.useEffect(() => {
     const handleResize = () => {
+      const isMob = checkIsMobileDevice();
+      setIsMobileDevice(isMob);
       const container = timelineContainerRef.current;
       if (container && container.clientWidth > 0) {
         setContainerWidth(container.clientWidth);
@@ -1343,6 +1369,11 @@ export function ScheduleView({
 
   React.useEffect(() => {
     setIsClient(true);
+    const mobile = checkIsMobileDevice();
+    setIsMobileDevice(mobile);
+    if (mobile) {
+      setIsDragLocked(true);
+    }
   }, []);
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -3058,25 +3089,31 @@ export function ScheduleView({
     getCustomerByCode,
     getStaffById,
     pixelsPerMinute: currentPixelsPerMinute,
-  }), [getCustomerByCode, getStaffById, currentPixelsPerMinute]);
-  const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 3,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 150,
-        tolerance: 5,
-      },
-    }),
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 3,
-      },
-    })
-  );
+    isDragDisabled: isDragLocked,
+  }), [getCustomerByCode, getStaffById, currentPixelsPerMinute, isDragLocked]);
+
+  const mouseSensor = useSensor(MouseSensor, {
+    activationConstraint: {
+      distance: 3,
+    },
+  });
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 150,
+      tolerance: 5,
+    },
+  });
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 3,
+    },
+  });
+
+  const activeSensors = React.useMemo(() => {
+    return isDragLocked ? [] : [mouseSensor, touchSensor, pointerSensor];
+  }, [isDragLocked, mouseSensor, touchSensor, pointerSensor]);
+
+  const sensors = useSensors(...activeSensors);
 
   if (!isClient) {
     return (
@@ -3178,6 +3215,38 @@ export function ScheduleView({
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Mobile Drag Lock Banner */}
+            {isMobileDevice && (
+              <div className="flex flex-wrap items-center justify-between gap-2 bg-amber-50/90 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 px-3 py-1.5 rounded-md text-xs text-amber-900 dark:text-amber-200 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span>
+                    <strong>モバイル表示中:</strong> 誤操作防止のためチップ移動は<strong>{isDragLocked ? 'ロック中' : '解除中'}</strong>です（{isDragLocked ? '画面スクロール優先' : 'チップ移動可能'}）。
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 text-xs px-2.5 py-0 border-amber-300 dark:border-amber-700 bg-white dark:bg-amber-900/50 hover:bg-amber-100 flex items-center gap-1.5 shrink-0"
+                  onClick={() => setIsDragLocked(!isDragLocked)}
+                >
+                  {isDragLocked ? (
+                    <>
+                      <Unlock className="h-3.5 w-3.5" />
+                      <span>移動ロック解除</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-3.5 w-3.5" />
+                      <span>移動をロック</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
             <div className="bg-background/95 backdrop-blur-sm z-20 py-1">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                 <div className="md:col-span-3">
@@ -3921,8 +3990,12 @@ interface DraggableEventProps {
 }
 
 const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, getCustomerByCode, onDoubleClick, isOverlay, onDelete }) => {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: targetEvent.id, data: targetEvent, disabled: isOverlay });
-  const { pixelsPerMinute } = useScheduleView();
+  const { pixelsPerMinute, isDragDisabled } = useScheduleView();
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: targetEvent.id,
+    data: targetEvent,
+    disabled: isOverlay || isDragDisabled,
+  });
   const { left, width } = getEventDimensions(targetEvent.start, targetEvent.end, pixelsPerMinute);
 
   const handleDoubleClick = (e: React.MouseEvent) => { e.stopPropagation(); onDoubleClick(targetEvent); };
@@ -4132,18 +4205,19 @@ const DraggableEvent = React.memo<DraggableEventProps>(({ targetEvent, staff, ge
       '--dynamic-left': `${left}px`,
       '--dynamic-width': `${width}px`,
       '--dynamic-opacity': isDragging ? 0 : 1,
-      touchAction: 'none',
+      touchAction: isDragDisabled ? 'auto' : 'none',
     };
 
   return (
     <div
       ref={setNodeRef}
       {...{ 'style': style as any }}
-      {...listeners}
+      {...(isDragDisabled ? {} : listeners)}
       {...attributes}
       onDoubleClick={handleDoubleClick}
       className={cn(
-        "rounded-md flex flex-col justify-center cursor-move h-12 relative group", 
+        "rounded-md flex flex-col justify-center h-12 relative group", 
+        isDragDisabled ? "cursor-pointer" : "cursor-move",
         !isOverlay && "dynamic-left dynamic-width dynamic-opacity event-chip-container",
         isOverlay ? 'shadow-lg' : ''
       )}
